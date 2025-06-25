@@ -13,7 +13,7 @@ interface SigtapContextType {
   processingProgress: number;
   currentPage?: number;
   totalPages?: number;
-  importSigtapFile: (file: File) => Promise<SigtapProcessingResult>;
+  importSigtapFile: (file: File | null, directProcedures?: SigtapProcedure[]) => Promise<SigtapProcessingResult>;
   clearData: () => void;
 }
 

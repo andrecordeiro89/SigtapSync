@@ -5,17 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Filter, Download, Eye, FileText, AlertCircle } from 'lucide-react';
+import { Search, Filter, Download, Eye, FileText, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatCurrency } from '../utils/validation';
 import { SigtapProcedure } from '../types';
 import { useSigtapContext } from '../contexts/SigtapContext';
 
 const SigtapViewer = () => {
-  const { procedures, totalProcedures, lastImportDate, error } = useSigtapContext();
+  const { procedures, totalProcedures, lastImportDate, error, clearData } = useSigtapContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [complexityFilter, setComplexityFilter] = useState('all');
   const [financingFilter, setFinancingFilter] = useState('all');
-  const [selectedProcedure, setSelectedProcedure] = useState<SigtapProcedure | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
@@ -48,20 +48,56 @@ const SigtapViewer = () => {
     return [...new Set(procedures.map(p => p.financing))];
   }, [procedures]);
 
+  const toggleRowExpansion = (procedureCode: string) => {
+    const newExpandedRows = new Set(expandedRows);
+    if (newExpandedRows.has(procedureCode)) {
+      newExpandedRows.delete(procedureCode);
+    } else {
+      newExpandedRows.add(procedureCode);
+    }
+    setExpandedRows(newExpandedRows);
+  };
+
   const handleExportCSV = () => {
     if (!filteredProcedures.length) return;
     
-    const headers = ['Código', 'Descrição', 'Valor Ambulatorial', 'Valor Hospitalar', 'Valor Profissional', 'Complexidade', 'Financiamento'];
+    const headers = [
+      'Código', 'Procedimento', 'Complexidade', 'Modalidade', 'Instrumento de Registro', 
+      'Tipo de Financiamento', 'Valor Ambulatorial SA', 'Valor Ambulatorial Total', 
+      'Valor Hospitalar SH', 'Valor Hospitalar SP', 'Valor Hospitalar Total',
+      'Atributo Complementar', 'Sexo', 'Idade Mínima', 'Unidade Idade Min', 
+      'Idade Máxima', 'Unidade Idade Max', 'Quantidade Máxima', 
+      'Média Permanência', 'Pontos', 'CBO', 'CID', 'Habilitação',
+      'Grupos de Habilitação', 'Serviço/Classificação'
+    ];
     const csvContent = [
       headers.join(','),
       ...filteredProcedures.map(p => [
         p.code,
         `"${p.description}"`,
+          `"${p.complexity}"`,
+          `"${p.modality || ''}"`,
+          `"${p.registrationInstrument || ''}"`,
+          `"${p.financing || ''}"`,
         p.valueAmb,
+          p.valueAmbTotal,
         p.valueHosp,
         p.valueProf,
-        p.complexity,
-        p.financing
+          p.valueHospTotal,
+          `"${p.complementaryAttribute || ''}"`,
+          `"${p.gender || ''}"`,
+          p.minAge,
+          `"${p.minAgeUnit || ''}"`,
+          p.maxAge,
+          `"${p.maxAgeUnit || ''}"`,
+          p.maxQuantity,
+          p.averageStay,
+          p.points,
+          `"${p.cbo || ''}"`,
+          `"${p.cid || ''}"`,
+          `"${p.habilitation || ''}"`,
+          `"${p.habilitationGroup?.join('; ') || ''}"`,
+          `"${p.serviceClassification || ''}"`
       ].join(','))
     ].join('\n');
 
@@ -126,6 +162,18 @@ const SigtapViewer = () => {
           >
             <Download className="w-4 h-4" />
             <span>Exportar CSV</span>
+          </Button>
+          <Button 
+            onClick={() => {
+              if (confirm('Tem certeza que deseja limpar todos os dados? Você precisará importar o PDF novamente.')) {
+                clearData();
+              }
+            }}
+            variant="outline" 
+            className="flex items-center space-x-2 text-red-600 hover:text-red-700"
+          >
+            <AlertCircle className="w-4 h-4" />
+            <span>Limpar Dados</span>
           </Button>
         </div>
       </div>
@@ -202,53 +250,294 @@ const SigtapViewer = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Procedimentos SIGTAP</CardTitle>
+          <CardTitle>Procedimentos SIGTAP - Tabela Completa para Faturamento</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Descrição</TableHead>
-                  <TableHead>Valor Amb.</TableHead>
-                  <TableHead>Valor Hosp.</TableHead>
-                  <TableHead>Valor Prof.</TableHead>
-                  <TableHead>Complexidade</TableHead>
-                  <TableHead>Financiamento</TableHead>
-                  <TableHead>Ações</TableHead>
+                  <TableHead className="w-28">Código</TableHead>
+                  <TableHead className="min-w-64">Procedimento</TableHead>
+                  <TableHead className="w-36">Complexidade</TableHead>
+                  <TableHead className="w-36">Financiamento</TableHead>
+                  <TableHead className="w-28 text-right">Valor SA</TableHead>
+                  <TableHead className="w-28 text-right">Valor SP</TableHead>
+                  <TableHead className="w-28 text-right">Valor SH</TableHead>
+                  <TableHead className="w-20 text-center">
+                    <span className="inline-flex items-center gap-1 text-xs font-medium">
+                      <FileText className="w-4 h-4" />
+                      Detalhes
+                    </span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedProcedures.map((procedure) => (
-                  <TableRow key={procedure.code}>
-                    <TableCell className="font-mono text-sm">{procedure.code}</TableCell>
-                    <TableCell className="max-w-xs truncate" title={procedure.description}>
+                  <React.Fragment key={procedure.code}>
+                    <TableRow className={expandedRows.has(procedure.code) ? 'bg-blue-50' : 'hover:bg-gray-50'}>
+                      <TableCell className="font-mono text-sm font-medium">{procedure.code}</TableCell>
+                      <TableCell className="text-sm" title={procedure.description}>
+                        <div className="max-w-md">
+                          <div className="line-clamp-2 overflow-hidden text-ellipsis">
                       {procedure.description}
+                          </div>
+                        </div>
                     </TableCell>
-                    <TableCell className="text-right">{formatCurrency(procedure.valueAmb)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(procedure.valueHosp)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(procedure.valueProf)}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="text-xs">
-                        {procedure.complexity}
+                        <Badge variant="outline" className="text-xs whitespace-nowrap">
+                          {procedure.complexity.length > 15 ? 
+                            procedure.complexity.substring(0, 15) + '...' : 
+                            procedure.complexity
+                          }
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="text-xs">
-                        {procedure.financing}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
+                      <TableCell className="text-xs">
+                        <div className="max-w-32 truncate" title={procedure.financing}>
+                          {procedure.financing ? 
+                            (procedure.financing.length > 20 ? 
+                              procedure.financing.substring(0, 20) + '...' : 
+                              procedure.financing
+                            ) : '-'
+                          }
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium text-green-600">
+                        {formatCurrency(procedure.valueAmb)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium text-blue-600">
+                        {formatCurrency(procedure.valueProf)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium text-blue-700">
+                        {formatCurrency(procedure.valueHosp)}
+                      </TableCell>
+                      <TableCell className="text-center">
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => setSelectedProcedure(procedure)}
-                      >
-                        <Eye className="w-4 h-4" />
+                          className={`p-2 rounded-full transition-all duration-200 ${
+                            expandedRows.has(procedure.code) 
+                              ? 'bg-blue-100 hover:bg-blue-200 text-blue-700' 
+                              : 'hover:bg-gray-100 text-gray-600 hover:text-gray-800'
+                          }`}
+                          onClick={() => toggleRowExpansion(procedure.code)}
+                          title={expandedRows.has(procedure.code) ? "Fechar detalhes" : "Ver todos os detalhes"}
+                        >
+                          {expandedRows.has(procedure.code) ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
                       </Button>
                     </TableCell>
                   </TableRow>
+                    
+                    {expandedRows.has(procedure.code) && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="p-0">
+                          <div className="bg-gradient-to-r from-blue-50 to-gray-50 p-6 border-t">
+                            <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                              <FileText className="w-5 h-5 text-blue-600 mr-2" />
+                              Detalhes Completos do Procedimento
+                            </h4>
+                            
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                              {/* Coluna 1: Identificação e Classificação */}
+                              <div className="space-y-4">
+                                <div className="bg-white p-4 rounded-lg border">
+                                  <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">Identificação</h5>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Código:</span>
+                                      <span className="font-mono font-medium">{procedure.code}</span>
+                                    </div>
+                                    <div className="pt-1">
+                                      <span className="text-gray-600 block mb-1">Procedimento:</span>
+                                      <span className="text-gray-900 text-sm leading-relaxed">{procedure.description}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="bg-white p-4 rounded-lg border">
+                                  <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">Classificação</h5>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Complexidade:</span>
+                                      <Badge variant="outline">{procedure.complexity}</Badge>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Modalidade:</span>
+                                      <span className="text-xs">{procedure.modality || 'Não informado'}</span>
+                                    </div>
+                                    <div className="pt-1">
+                                      <span className="text-gray-600 block mb-1">Instrumento:</span>
+                                      <span className="text-xs">{procedure.registrationInstrument || 'Não informado'}</span>
+                                    </div>
+                                    <div className="pt-1">
+                                      <span className="text-gray-600 block mb-1">Financiamento:</span>
+                                      <span className="text-xs">{procedure.financing || 'Não informado'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Coluna 2: Valores Financeiros */}
+                              <div className="space-y-4">
+                                <div className="bg-white p-4 rounded-lg border">
+                                  <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">Valores Ambulatoriais</h5>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Serviço Amb. (SA):</span>
+                                      <span className="font-semibold text-green-600">{formatCurrency(procedure.valueAmb)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Total Ambulatorial:</span>
+                                      <span className="font-semibold text-green-600">{formatCurrency(procedure.valueAmbTotal)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="bg-white p-4 rounded-lg border">
+                                  <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">Valores Hospitalares</h5>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Serviço Hosp. (SH):</span>
+                                      <span className="font-semibold text-blue-600">{formatCurrency(procedure.valueHosp)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Serviço Prof. (SP):</span>
+                                      <span className="font-semibold text-blue-600">{formatCurrency(procedure.valueProf)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Total Hospitalar:</span>
+                                      <span className="font-semibold text-blue-600">{formatCurrency(procedure.valueHospTotal)}</span>
+                                    </div>
+                                    <hr className="my-2" />
+                                    <div className="flex justify-between text-base font-bold">
+                                      <span>VALOR TOTAL:</span>
+                                      <span className="text-purple-600">
+                                        {formatCurrency(
+                                          procedure.valueAmb + 
+                                          procedure.valueAmbTotal + 
+                                          procedure.valueHosp + 
+                                          procedure.valueProf + 
+                                          procedure.valueHospTotal
+                                        )}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Coluna 3: Critérios e Limites */}
+                              <div className="space-y-4">
+                                <div className="bg-white p-4 rounded-lg border">
+                                  <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">Critérios de Elegibilidade</h5>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Sexo:</span>
+                                      <span className="font-medium">{procedure.gender || 'Ambos'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Idade Mínima:</span>
+                                      <span className="font-medium">
+                                        {procedure.minAge || 0} {procedure.minAgeUnit || 'Ano(s)'}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Idade Máxima:</span>
+                                      <span className="font-medium">
+                                        {procedure.maxAge || 'Sem limite'} {procedure.maxAgeUnit || 'Ano(s)'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="bg-white p-4 rounded-lg border">
+                                  <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">Limites Operacionais</h5>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Quantidade Máxima:</span>
+                                      <span className="font-medium">{procedure.maxQuantity || 'Sem limite'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Média Permanência:</span>
+                                      <span className="font-medium">{procedure.averageStay || '-'} dias</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Pontos:</span>
+                                      <span className="font-medium">{procedure.points || '-'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Nova seção: Classificações Médicas e Profissionais */}
+                                <div className="bg-white p-4 rounded-lg border">
+                                  <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">Classificações</h5>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="pt-1">
+                                      <span className="text-gray-600 block mb-1">CBO:</span>
+                                      <span className="text-xs break-words">{procedure.cbo || 'Não especificado'}</span>
+                                    </div>
+                                    {procedure.cid && (
+                                      <div className="pt-1">
+                                        <span className="text-gray-600 block mb-1">CID:</span>
+                                        <span className="text-xs break-words">{procedure.cid}</span>
+                                      </div>
+                                    )}
+                                    {procedure.complementaryAttribute && (
+                                      <div className="pt-1">
+                                        <span className="text-gray-600 block mb-1">Atributo Complementar:</span>
+                                        <span className="text-xs break-words">{procedure.complementaryAttribute}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {/* Nova seção: Habilitações */}
+                                {(procedure.habilitation || procedure.habilitationGroup?.length > 0) && (
+                                  <div className="bg-white p-4 rounded-lg border">
+                                    <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">Habilitações</h5>
+                                    <div className="space-y-2 text-sm">
+                                      {procedure.habilitation && (
+                                        <div className="pt-1">
+                                          <span className="text-gray-600 block mb-1">Habilitação:</span>
+                                          <span className="text-xs">{procedure.habilitation}</span>
+                                        </div>
+                                      )}
+                                      {procedure.habilitationGroup?.length > 0 && (
+                                        <div className="pt-1">
+                                          <span className="text-gray-600 block mb-1">Grupos de Habilitação:</span>
+                                          <div className="space-y-1">
+                                            {procedure.habilitationGroup.slice(0, 5).map((group, index) => (
+                                              <div key={index} className="text-xs bg-gray-50 p-1 rounded">
+                                                {group}
+                                              </div>
+                                            ))}
+                                            {procedure.habilitationGroup.length > 5 && (
+                                              <div className="text-xs text-gray-500">
+                                                ... e mais {procedure.habilitationGroup.length - 5} grupos
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {procedure.serviceClassification && (
+                                        <div className="pt-1">
+                                          <span className="text-gray-600 block mb-1">Serviço/Classificação:</span>
+                                          <span className="text-xs">{procedure.serviceClassification}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>
@@ -284,72 +573,6 @@ const SigtapViewer = () => {
           )}
         </CardContent>
       </Card>
-
-      {selectedProcedure && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <FileText className="w-5 h-5 text-blue-600" />
-              <span>Detalhes do Procedimento</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Código do Procedimento</label>
-                  <p className="font-mono text-lg">{selectedProcedure.code}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Descrição Completa</label>
-                  <p className="text-gray-900">{selectedProcedure.description}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Complexidade</label>
-                  <Badge variant="outline" className="ml-2">{selectedProcedure.complexity}</Badge>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Tipo de Financiamento</label>
-                  <Badge variant="secondary" className="ml-2">{selectedProcedure.financing}</Badge>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Valores de Faturamento</label>
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                    <div className="flex justify-between">
-                      <span>Valor Ambulatorial (SA):</span>
-                      <span className="font-semibold">{formatCurrency(selectedProcedure.valueAmb)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Valor Hospitalar (SH):</span>
-                      <span className="font-semibold">{formatCurrency(selectedProcedure.valueHosp)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Valor Profissional (SP):</span>
-                      <span className="font-semibold">{formatCurrency(selectedProcedure.valueProf)}</span>
-                    </div>
-                    <hr className="my-2" />
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>Valor Total:</span>
-                      <span className="text-blue-600">
-                        {formatCurrency(selectedProcedure.valueAmb + selectedProcedure.valueHosp + selectedProcedure.valueProf)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-6 flex justify-end">
-              <Button variant="outline" onClick={() => setSelectedProcedure(null)}>
-                Fechar Detalhes
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };

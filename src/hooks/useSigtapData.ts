@@ -24,18 +24,35 @@ export const useSigtapData = () => {
     processingProgress: 0
   });
 
-  const importSigtapFile = useCallback(async (file: File): Promise<SigtapProcessingResult> => {
+  const importSigtapFile = useCallback(async (file: File | null, directProcedures?: SigtapProcedure[]): Promise<SigtapProcessingResult> => {
     setState(prev => ({ ...prev, isLoading: true, error: null, processingProgress: 0 }));
     
     try {
-      const result = await processSigtapFile(file, (progress, currentPage, totalPages) => {
-        setState(prev => ({ 
-          ...prev, 
-          processingProgress: progress,
-          currentPage,
-          totalPages
-        }));
-      });
+      let result: SigtapProcessingResult;
+      
+      if (directProcedures) {
+        // Importação direta de procedimentos (Excel)
+        result = {
+          success: true,
+          message: `${directProcedures.length} procedimentos importados com sucesso!`,
+          procedures: directProcedures,
+          totalProcessed: directProcedures.length
+        };
+        
+        setState(prev => ({ ...prev, processingProgress: 100 }));
+      } else if (file) {
+        // Importação de arquivo (PDF/ZIP)
+        result = await processSigtapFile(file, (progress, currentPage, totalPages) => {
+          setState(prev => ({ 
+            ...prev, 
+            processingProgress: progress,
+            currentPage,
+            totalPages
+          }));
+        });
+      } else {
+        throw new Error('Nenhum arquivo ou procedimentos fornecidos');
+      }
       
       if (result.success) {
         setState(prev => ({

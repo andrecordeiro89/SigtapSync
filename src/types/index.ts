@@ -1,4 +1,3 @@
-
 export interface Patient {
   id: string;
   name: string;
@@ -16,11 +15,29 @@ export interface Patient {
 export interface SigtapProcedure {
   code: string;
   description: string;
+  complexity: string;
+  modality: string;
+  registrationInstrument: string;
+  financing: string;
   valueAmb: number;
+  valueAmbTotal: number;
   valueHosp: number;
   valueProf: number;
-  complexity: string;
-  financing: string;
+  valueHospTotal: number;
+  complementaryAttribute: string;
+  gender: string;
+  minAge: number;
+  minAgeUnit: string;
+  maxAge: number;
+  maxAgeUnit: string;
+  maxQuantity: number;
+  averageStay: number;
+  points: number;
+  cbo: string;
+  cid: string;
+  habilitation: string;
+  habilitationGroup: string[];
+  serviceClassification: string;
 }
 
 export interface ProcedureRecord {
