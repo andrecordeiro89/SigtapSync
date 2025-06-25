@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, Upload, Users, FileText, Home } from 'lucide-react';
+import { BarChart3, Upload, Users, FileText, Home, Search } from 'lucide-react';
 
 interface NavigationProps {
   activeTab: string;
@@ -23,6 +23,12 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       icon: Upload,
       description: 'Importação da tabela',
       badge: 'Nova versão'
+    },
+    {
+      id: 'sigtap-viewer',
+      label: 'Consulta SIGTAP',
+      icon: Search,
+      description: 'Visualizar procedimentos'
     },
     {
       id: 'patients',
