@@ -1,13 +1,13 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileText, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, X, FileIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSigtapContext } from '../contexts/SigtapContext';
 
 const SigtapImport = () => {
-  const [progress, setProgress] = useState(0);
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const { toast } = useToast();
   const { 
@@ -15,6 +15,9 @@ const SigtapImport = () => {
     error, 
     lastImportDate, 
     totalProcedures, 
+    processingProgress,
+    currentPage,
+    totalPages,
     importSigtapFile, 
     clearData 
   } = useSigtapContext();
@@ -24,35 +27,32 @@ const SigtapImport = () => {
     if (!file) return;
 
     // Validar tipo de arquivo
-    if (!file.name.toLowerCase().endsWith('.zip')) {
+    const fileName = file.name.toLowerCase();
+    if (!fileName.endsWith('.zip') && !fileName.endsWith('.pdf')) {
       toast({
         title: "Arquivo inválido",
-        description: "Por favor, selecione um arquivo ZIP da tabela SIGTAP.",
+        description: "Por favor, selecione um arquivo PDF ou ZIP da tabela SIGTAP.",
         variant: "destructive"
       });
       return;
     }
 
-    console.log('Arquivo selecionado:', file.name, 'Tamanho:', file.size);
-    setImportStatus('processing');
-    setProgress(0);
-
-    // Simular progresso
-    const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + 10;
+    // Validar tamanho do arquivo (limite de 100MB)
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (file.size > maxSize) {
+      toast({
+        title: "Arquivo muito grande",
+        description: "O arquivo deve ter no máximo 100MB. Para arquivos maiores, considere usar a versão ZIP compactada.",
+        variant: "destructive"
       });
-    }, 300);
+      return;
+    }
+
+    console.log('Arquivo selecionado:', file.name, 'Tamanho:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+    setImportStatus('processing');
 
     try {
       const result = await importSigtapFile(file);
-      
-      clearInterval(progressInterval);
-      setProgress(100);
       
       if (result.success) {
         setImportStatus('success');
@@ -69,7 +69,6 @@ const SigtapImport = () => {
         });
       }
     } catch (error) {
-      clearInterval(progressInterval);
       setImportStatus('error');
       toast({
         title: "Erro na importação",
@@ -85,7 +84,6 @@ const SigtapImport = () => {
   const handleClearData = () => {
     clearData();
     setImportStatus('idle');
-    setProgress(0);
     toast({
       title: "Dados limpos",
       description: "Todos os dados da tabela SIGTAP foram removidos.",
@@ -96,7 +94,7 @@ const SigtapImport = () => {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Importação Tabela SIGTAP</h2>
-        <p className="text-gray-600 mt-1">Importe a tabela oficial do DATASUS para atualizar os procedimentos</p>
+        <p className="text-gray-600 mt-1">Importe a tabela oficial do DATASUS (ZIP ou PDF) para atualizar os procedimentos</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -109,13 +107,19 @@ const SigtapImport = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
-              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 mb-4">
-                Selecione o arquivo ZIP da tabela SIGTAP
+              <div className="flex justify-center space-x-4 mb-4">
+                <FileIcon className="w-12 h-12 text-blue-400" />
+                <FileText className="w-12 h-12 text-red-400" />
+              </div>
+              <p className="text-gray-600 mb-2">
+                Selecione o arquivo da tabela SIGTAP
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                Suporte a arquivos ZIP e PDF (máximo 100MB)
               </p>
               <input
                 type="file"
-                accept=".zip"
+                accept=".zip,.pdf"
                 onChange={handleFileSelect}
                 className="hidden"
                 id="sigtap-upload"
@@ -129,7 +133,7 @@ const SigtapImport = () => {
                   asChild
                 >
                   <span>
-                    {isLoading ? 'Processando...' : 'Selecionar Arquivo ZIP'}
+                    {isLoading ? 'Processando...' : 'Selecionar Arquivo (ZIP/PDF)'}
                   </span>
                 </Button>
               </label>
@@ -139,12 +143,19 @@ const SigtapImport = () => {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Progresso da importação:</span>
-                  <span>{progress}%</span>
+                  <span>{Math.round(processingProgress)}%</span>
                 </div>
-                <Progress value={progress} className="w-full" />
-                <p className="text-sm text-gray-600">
-                  Processando arquivo ZIP e extraindo dados...
-                </p>
+                <Progress value={processingProgress} className="w-full" />
+                {currentPage && totalPages && (
+                  <p className="text-sm text-gray-600">
+                    Processando página {currentPage} de {totalPages}...
+                  </p>
+                )}
+                {!currentPage && (
+                  <p className="text-sm text-gray-600">
+                    Processando arquivo e extraindo dados...
+                  </p>
+                )}
               </div>
             )}
 
@@ -206,7 +217,7 @@ const SigtapImport = () => {
                   <AlertCircle className="w-5 h-5 text-gray-600" />
                 </div>
                 <p className="text-sm text-gray-600">
-                  Importe um arquivo ZIP da tabela SIGTAP para começar a usar o sistema.
+                  Importe um arquivo ZIP ou PDF da tabela SIGTAP para começar a usar o sistema.
                 </p>
               </div>
             )}
@@ -214,12 +225,12 @@ const SigtapImport = () => {
             <div className="border-l-4 border-blue-400 bg-blue-50 p-4">
               <div className="flex items-center space-x-2 mb-2">
                 <FileText className="w-5 h-5 text-blue-600" />
-                <span className="font-medium text-blue-800">Informação</span>
+                <span className="font-medium text-blue-800">Suporte a PDF</span>
               </div>
               <p className="text-sm text-blue-700">
-                Este sistema processa arquivos ZIP reais da tabela SIGTAP. 
-                Após a importação, você poderá visualizar e consultar todos os procedimentos 
-                na seção "Consulta SIGTAP".
+                Agora você pode importar arquivos PDF da tabela SIGTAP! 
+                O sistema processa automaticamente PDFs com milhares de páginas, 
+                extraindo todos os procedimentos e seus valores.
               </p>
             </div>
           </CardContent>
@@ -242,11 +253,17 @@ const SigtapImport = () => {
             </div>
             <div className="flex items-start space-x-3">
               <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">3</div>
-              <p>Baixe o arquivo ZIP da versão mais recente da tabela</p>
+              <p>Baixe o arquivo <strong>ZIP</strong> (recomendado) ou <strong>PDF</strong> da versão mais recente</p>
             </div>
             <div className="flex items-start space-x-3">
               <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">4</div>
-              <p>Selecione o arquivo baixado usando o botão "Selecionar Arquivo ZIP" acima</p>
+              <p>Selecione o arquivo baixado usando o botão acima</p>
+            </div>
+            <div className="bg-yellow-50 p-3 rounded-lg mt-4">
+              <p className="text-sm text-yellow-800">
+                <strong>Dica:</strong> Arquivos ZIP são processados mais rapidamente que PDFs. 
+                Para PDFs grandes (4000+ páginas), o processamento pode levar alguns minutos.
+              </p>
             </div>
           </div>
         </CardContent>

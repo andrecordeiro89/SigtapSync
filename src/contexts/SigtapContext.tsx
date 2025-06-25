@@ -10,6 +10,9 @@ interface SigtapContextType {
   error: string | null;
   lastImportDate: string | null;
   totalProcedures: number;
+  processingProgress: number;
+  currentPage?: number;
+  totalPages?: number;
   importSigtapFile: (file: File) => Promise<SigtapProcessingResult>;
   clearData: () => void;
 }

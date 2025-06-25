@@ -1,7 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { SigtapProcedure } from '../types';
-import { processSigtapZip, SigtapProcessingResult } from '../utils/sigtapProcessor';
+import { processSigtapFile, SigtapProcessingResult } from '../utils/sigtapProcessor';
 
 export interface SigtapDataState {
   procedures: SigtapProcedure[];
@@ -9,6 +9,9 @@ export interface SigtapDataState {
   error: string | null;
   lastImportDate: string | null;
   totalProcedures: number;
+  processingProgress: number;
+  currentPage?: number;
+  totalPages?: number;
 }
 
 export const useSigtapData = () => {
@@ -17,14 +20,22 @@ export const useSigtapData = () => {
     isLoading: false,
     error: null,
     lastImportDate: null,
-    totalProcedures: 0
+    totalProcedures: 0,
+    processingProgress: 0
   });
 
   const importSigtapFile = useCallback(async (file: File): Promise<SigtapProcessingResult> => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setState(prev => ({ ...prev, isLoading: true, error: null, processingProgress: 0 }));
     
     try {
-      const result = await processSigtapZip(file);
+      const result = await processSigtapFile(file, (progress, currentPage, totalPages) => {
+        setState(prev => ({ 
+          ...prev, 
+          processingProgress: progress,
+          currentPage,
+          totalPages
+        }));
+      });
       
       if (result.success) {
         setState(prev => ({
@@ -33,13 +44,15 @@ export const useSigtapData = () => {
           totalProcedures: result.totalProcessed,
           lastImportDate: new Date().toISOString(),
           isLoading: false,
-          error: null
+          error: null,
+          processingProgress: 100
         }));
       } else {
         setState(prev => ({
           ...prev,
           isLoading: false,
-          error: result.message
+          error: result.message,
+          processingProgress: 0
         }));
       }
       
@@ -49,7 +62,8 @@ export const useSigtapData = () => {
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: errorMessage
+        error: errorMessage,
+        processingProgress: 0
       }));
       
       return {
@@ -67,7 +81,8 @@ export const useSigtapData = () => {
       isLoading: false,
       error: null,
       lastImportDate: null,
-      totalProcedures: 0
+      totalProcedures: 0,
+      processingProgress: 0
     });
   }, []);
 
