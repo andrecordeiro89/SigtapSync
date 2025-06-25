@@ -1,56 +1,95 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useSigtapContext } from '../contexts/SigtapContext';
 
 const SigtapImport = () => {
-  const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const { toast } = useToast();
+  const { 
+    isLoading, 
+    error, 
+    lastImportDate, 
+    totalProcedures, 
+    importSigtapFile, 
+    clearData 
+  } = useSigtapContext();
 
-  const simulateImport = async () => {
-    setIsUploading(true);
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      toast({
+        title: "Arquivo inválido",
+        description: "Por favor, selecione um arquivo ZIP da tabela SIGTAP.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('Arquivo selecionado:', file.name, 'Tamanho:', file.size);
     setImportStatus('processing');
     setProgress(0);
 
-    // Simular progresso de importação
-    const steps = [
-      { step: 20, message: 'Extraindo arquivo ZIP...' },
-      { step: 40, message: 'Convertendo arquivos DBC...' },
-      { step: 60, message: 'Processando dados SIGTAP...' },
-      { step: 80, message: 'Validando procedimentos...' },
-      { step: 100, message: 'Finalizando importação...' }
-    ];
+    // Simular progresso
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 300);
 
-    for (const { step, message } of steps) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setProgress(step);
+    try {
+      const result = await importSigtapFile(file);
       
+      clearInterval(progressInterval);
+      setProgress(100);
+      
+      if (result.success) {
+        setImportStatus('success');
+        toast({
+          title: "Importação concluída",
+          description: result.message,
+        });
+      } else {
+        setImportStatus('error');
+        toast({
+          title: "Erro na importação",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      clearInterval(progressInterval);
+      setImportStatus('error');
       toast({
-        title: "Importação em andamento",
-        description: message,
+        title: "Erro na importação",
+        description: "Erro inesperado durante o processamento do arquivo.",
+        variant: "destructive"
       });
     }
 
-    setImportStatus('success');
-    setIsUploading(false);
-    
-    toast({
-      title: "Importação concluída",
-      description: "Tabela SIGTAP importada com sucesso! 4.256 procedimentos atualizados.",
-    });
+    // Reset file input
+    event.target.value = '';
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      console.log('Arquivo selecionado:', file.name);
-      simulateImport();
-    }
+  const handleClearData = () => {
+    clearData();
+    setImportStatus('idle');
+    setProgress(0);
+    toast({
+      title: "Dados limpos",
+      description: "Todos os dados da tabela SIGTAP foram removidos.",
+    });
   };
 
   return (
@@ -80,29 +119,32 @@ const SigtapImport = () => {
                 onChange={handleFileSelect}
                 className="hidden"
                 id="sigtap-upload"
-                disabled={isUploading}
+                disabled={isLoading}
               />
               <label htmlFor="sigtap-upload">
                 <Button 
                   variant="outline" 
                   className="cursor-pointer"
-                  disabled={isUploading}
+                  disabled={isLoading}
                   asChild
                 >
                   <span>
-                    {isUploading ? 'Processando...' : 'Selecionar Arquivo'}
+                    {isLoading ? 'Processando...' : 'Selecionar Arquivo ZIP'}
                   </span>
                 </Button>
               </label>
             </div>
 
-            {isUploading && (
+            {isLoading && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Progresso da importação:</span>
                   <span>{progress}%</span>
                 </div>
                 <Progress value={progress} className="w-full" />
+                <p className="text-sm text-gray-600">
+                  Processando arquivo ZIP e extraindo dados...
+                </p>
               </div>
             )}
 
@@ -112,57 +154,73 @@ const SigtapImport = () => {
                 <span className="text-sm">Importação concluída com sucesso!</span>
               </div>
             )}
+
+            {importStatus === 'error' && error && (
+              <div className="flex items-center space-x-2 text-red-600">
+                <AlertCircle className="w-5 h-5" />
+                <span className="text-sm">{error}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <FileText className="w-5 h-5 text-green-600" />
-              <span>Status da Tabela Atual</span>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <FileText className="w-5 h-5 text-green-600" />
+                <span>Status da Tabela</span>
+              </div>
+              {totalProcedures > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleClearData}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Limpar
+                </Button>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-green-50 p-4 rounded-lg">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-medium text-green-800">Tabela Ativa</span>
-                <CheckCircle className="w-5 h-5 text-green-600" />
+            {totalProcedures > 0 ? (
+              <div className="bg-green-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-green-800">Tabela Carregada</span>
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+                <div className="text-sm text-green-700 space-y-1">
+                  <p><strong>Procedimentos:</strong> {totalProcedures.toLocaleString()}</p>
+                  {lastImportDate && (
+                    <p><strong>Importado em:</strong> {new Date(lastImportDate).toLocaleString('pt-BR')}</p>
+                  )}
+                  <p><strong>Status:</strong> Pronto para consulta</p>
+                </div>
               </div>
-              <div className="text-sm text-green-700 space-y-1">
-                <p><strong>Versão:</strong> 2024.06.001</p>
-                <p><strong>Data de Import.:</strong> 15/06/2024</p>
-                <p><strong>Procedimentos:</strong> 4.256</p>
-                <p><strong>Última Atualização:</strong> Há 10 dias</p>
+            ) : (
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-gray-800">Nenhuma Tabela Carregada</span>
+                  <AlertCircle className="w-5 h-5 text-gray-600" />
+                </div>
+                <p className="text-sm text-gray-600">
+                  Importe um arquivo ZIP da tabela SIGTAP para começar a usar o sistema.
+                </p>
               </div>
-            </div>
+            )}
 
-            <div className="border-l-4 border-orange-400 bg-orange-50 p-4">
+            <div className="border-l-4 border-blue-400 bg-blue-50 p-4">
               <div className="flex items-center space-x-2 mb-2">
-                <AlertCircle className="w-5 h-5 text-orange-600" />
-                <span className="font-medium text-orange-800">Atenção</span>
+                <FileText className="w-5 h-5 text-blue-600" />
+                <span className="font-medium text-blue-800">Informação</span>
               </div>
-              <p className="text-sm text-orange-700">
-                Uma nova versão da tabela SIGTAP está disponível no site do DATASUS. 
-                Recomendamos a atualização mensal.
+              <p className="text-sm text-blue-700">
+                Este sistema processa arquivos ZIP reais da tabela SIGTAP. 
+                Após a importação, você poderá visualizar e consultar todos os procedimentos 
+                na seção "Consulta SIGTAP".
               </p>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="font-medium text-gray-900">Histórico de Importações</h4>
-              <div className="text-sm space-y-1">
-                <div className="flex justify-between">
-                  <span>2024.06.001</span>
-                  <span className="text-gray-500">15/06/2024</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>2024.05.001</span>
-                  <span className="text-gray-500">15/05/2024</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>2024.04.001</span>
-                  <span className="text-gray-500">12/04/2024</span>
-                </div>
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -188,7 +246,7 @@ const SigtapImport = () => {
             </div>
             <div className="flex items-start space-x-3">
               <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">4</div>
-              <p>Selecione o arquivo baixado usando o botão "Selecionar Arquivo" acima</p>
+              <p>Selecione o arquivo baixado usando o botão "Selecionar Arquivo ZIP" acima</p>
             </div>
           </div>
         </CardContent>

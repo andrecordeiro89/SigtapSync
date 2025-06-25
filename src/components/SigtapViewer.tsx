@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,12 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Filter, Download, Eye, FileText } from 'lucide-react';
-import { mockSigtapProcedures } from '../data/mockData';
+import { Search, Filter, Download, Eye, FileText, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../utils/validation';
 import { SigtapProcedure } from '../types';
+import { useSigtapContext } from '../contexts/SigtapContext';
 
 const SigtapViewer = () => {
+  const { procedures, totalProcedures, lastImportDate, error } = useSigtapContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [complexityFilter, setComplexityFilter] = useState('all');
   const [financingFilter, setFinancingFilter] = useState('all');
@@ -20,7 +20,9 @@ const SigtapViewer = () => {
   const itemsPerPage = 20;
 
   const filteredProcedures = useMemo(() => {
-    return mockSigtapProcedures.filter(procedure => {
+    if (!procedures.length) return [];
+    
+    return procedures.filter(procedure => {
       const matchesSearch = procedure.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            procedure.description.toLowerCase().includes(searchTerm.toLowerCase());
       
@@ -29,7 +31,7 @@ const SigtapViewer = () => {
       
       return matchesSearch && matchesComplexity && matchesFinancing;
     });
-  }, [searchTerm, complexityFilter, financingFilter]);
+  }, [procedures, searchTerm, complexityFilter, financingFilter]);
 
   const paginatedProcedures = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -38,10 +40,17 @@ const SigtapViewer = () => {
 
   const totalPages = Math.ceil(filteredProcedures.length / itemsPerPage);
 
-  const complexities = [...new Set(mockSigtapProcedures.map(p => p.complexity))];
-  const financingTypes = [...new Set(mockSigtapProcedures.map(p => p.financing))];
+  const complexities = useMemo(() => {
+    return [...new Set(procedures.map(p => p.complexity))];
+  }, [procedures]);
+
+  const financingTypes = useMemo(() => {
+    return [...new Set(procedures.map(p => p.financing))];
+  }, [procedures]);
 
   const handleExportCSV = () => {
+    if (!filteredProcedures.length) return;
+    
     const headers = ['Código', 'Descrição', 'Valor Ambulatorial', 'Valor Hospitalar', 'Valor Profissional', 'Complexidade', 'Financiamento'];
     const csvContent = [
       headers.join(','),
@@ -59,19 +68,62 @@ const SigtapViewer = () => {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'sigtap_procedures.csv';
+    link.download = `sigtap_procedures_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
   };
+
+  // Se não há dados carregados
+  if (!procedures.length) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Consulta Tabela SIGTAP</h2>
+          <p className="text-gray-600 mt-1">Visualize e consulte todos os procedimentos da tabela SIGTAP</p>
+        </div>
+
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center space-y-4">
+              <AlertCircle className="w-16 h-16 text-gray-400 mx-auto" />
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Nenhuma tabela SIGTAP carregada</h3>
+                <p className="text-gray-600 mt-2">
+                  Para consultar os procedimentos, você precisa primeiro importar um arquivo ZIP da tabela SIGTAP.
+                </p>
+              </div>
+              <div className="flex justify-center">
+                <Button onClick={() => window.location.hash = '#sigtap'} variant="outline">
+                  Ir para Importação
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Consulta Tabela SIGTAP</h2>
-          <p className="text-gray-600 mt-1">Visualize e consulte todos os procedimentos da tabela SIGTAP</p>
+          <p className="text-gray-600 mt-1">
+            Visualize e consulte todos os procedimentos da tabela SIGTAP
+            {lastImportDate && (
+              <span className="text-sm text-gray-500 block">
+                Importado em: {new Date(lastImportDate).toLocaleString('pt-BR')}
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex space-x-2">
-          <Button onClick={handleExportCSV} variant="outline" className="flex items-center space-x-2">
+          <Button 
+            onClick={handleExportCSV} 
+            variant="outline" 
+            className="flex items-center space-x-2"
+            disabled={!filteredProcedures.length}
+          >
             <Download className="w-4 h-4" />
             <span>Exportar CSV</span>
           </Button>
@@ -82,7 +134,9 @@ const SigtapViewer = () => {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Filtros de Pesquisa</span>
-            <Badge variant="secondary">{filteredProcedures.length} procedimentos encontrados</Badge>
+            <Badge variant="secondary">
+              {filteredProcedures.length} de {totalProcedures} procedimentos
+            </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
