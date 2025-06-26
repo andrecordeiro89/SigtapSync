@@ -177,19 +177,49 @@ VITE_ENABLE_ANALYTICS=true
 
 ### **❌ Problemas Comuns:**
 
-**1. Erro de Conexão Supabase:**
+**1. Erro 401 - Row Level Security (RLS):**
+```
+❌ new row violates row-level security policy
+❌ POST 401 (Unauthorized)
+```
+**SOLUÇÕES:**
+
+**Opção A - Desabilitar RLS (Desenvolvimento):**
+```sql
+-- Execute no SQL Editor do Supabase:
+ALTER TABLE sigtap_versions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE sigtap_procedures DISABLE ROW LEVEL SECURITY;
+ALTER TABLE hospitals DISABLE ROW LEVEL SECURITY;
+ALTER TABLE patients DISABLE ROW LEVEL SECURITY;
+ALTER TABLE aihs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE aih_matches DISABLE ROW LEVEL SECURITY;
+ALTER TABLE procedure_records DISABLE ROW LEVEL SECURITY;
+ALTER TABLE system_settings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs DISABLE ROW LEVEL SECURITY;
+```
+
+**Opção B - Criar Políticas RLS (Produção):**
+```sql
+-- Políticas básicas para desenvolvimento
+CREATE POLICY "Allow all operations" ON sigtap_versions FOR ALL USING (true);
+CREATE POLICY "Allow all operations" ON sigtap_procedures FOR ALL USING (true);
+CREATE POLICY "Allow all operations" ON hospitals FOR ALL USING (true);
+-- Repita para todas as tabelas...
+```
+
+**2. Erro de Conexão Supabase:**
 ```
 ❌ VITE_SUPABASE_URL não está configurada
 ```
 **Solução:** Verificar arquivo `.env` e chaves do Supabase
 
-**2. Matching Não Funciona:**
+**3. Matching Não Funciona:**
 ```
 ⚠️ Nenhum procedimento SIGTAP encontrado
 ```
 **Solução:** Importar tabela SIGTAP atualizada
 
-**3. Upload de Arquivo Falha:**
+**4. Upload de Arquivo Falha:**
 ```
 ❌ Arquivo muito grande
 ```
