@@ -4,6 +4,7 @@ import Dashboard from '../components/Dashboard';
 import SigtapImport from '../components/SigtapImport';
 import SigtapViewer from '../components/SigtapViewer';
 import AIHUpload from '../components/AIHUpload';
+import ExcelAnalyzer from '../components/ExcelAnalyzer';
 import PatientManagement from '../components/PatientManagement';
 import ProcedureRecords from '../components/ProcedureRecords';
 
@@ -20,6 +21,8 @@ const Index = () => {
         return <SigtapViewer />;
       case 'aih-upload':
         return <AIHUpload />;
+      case 'excel-analyzer':
+        return <ExcelAnalyzer />;
       case 'patients':
         return <PatientManagement />;
       case 'procedures':

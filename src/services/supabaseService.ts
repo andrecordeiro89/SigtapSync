@@ -4,13 +4,21 @@ import { SigtapProcedure } from '../types';
 // SIGTAP SERVICE
 export class SigtapService {
   static async createVersion(version: Omit<SigtapVersion, 'id' | 'created_at'>): Promise<SigtapVersion> {
+    console.log('💾 Criando versão com dados:', JSON.stringify(version, null, 2));
+    
     const { data, error } = await supabase
       .from('sigtap_versions')
       .insert(version)
       .select()
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Erro ao criar versão:', error);
+      console.error('❌ Dados enviados:', version);
+      throw error;
+    }
+    
+    console.log('✅ Versão criada com sucesso:', data.id);
     return data;
   }
 
@@ -43,7 +51,19 @@ export class SigtapService {
   }
 
   static async saveProcedures(versionId: string, procedures: SigtapProcedure[]): Promise<void> {
-    const dbProcedures = procedures.map(proc => ({
+    console.log(`💾 Preparando ${procedures.length} procedimentos para salvar...`);
+    
+    // Remover duplicatas por código antes de salvar
+    const uniqueProcedures = procedures.reduce((acc, proc) => {
+      if (!acc.some(p => p.code === proc.code)) {
+        acc.push(proc);
+      }
+      return acc;
+    }, [] as SigtapProcedure[]);
+    
+    console.log(`💾 ${uniqueProcedures.length} procedimentos únicos após deduplicação`);
+    
+    const dbProcedures = uniqueProcedures.map(proc => ({
       version_id: versionId,
       code: proc.code,
       description: proc.description,
@@ -60,11 +80,11 @@ export class SigtapService {
       complementary_attribute: proc.complementaryAttribute || null,
       service_classification: proc.serviceClassification || null,
       especialidade_leito: proc.especialidadeLeito || null,
-      gender: proc.gender || null,
-      min_age: proc.minAge || null,
-      min_age_unit: proc.minAgeUnit || null,
-      max_age: proc.maxAge || null,
-      max_age_unit: proc.maxAgeUnit || null,
+      gender: proc.gender && proc.gender.trim() !== '' ? proc.gender : null,
+      min_age: proc.minAge && proc.minAge > 0 ? proc.minAge : null,
+      min_age_unit: proc.minAgeUnit && proc.minAgeUnit.trim() !== '' ? proc.minAgeUnit : null,
+      max_age: proc.maxAge && proc.maxAge > 0 ? proc.maxAge : null,
+      max_age_unit: proc.maxAgeUnit && proc.maxAgeUnit.trim() !== '' ? proc.maxAgeUnit : null,
       max_quantity: proc.maxQuantity || null,
       average_stay: proc.averageStay || null,
       points: proc.points || null,
@@ -76,15 +96,25 @@ export class SigtapService {
       validation_status: 'valid'
     }));
 
-    const batchSize = 100;
+    const batchSize = 50; // Reduzir batch size para evitar timeouts
+    console.log(`💾 Salvando em batches de ${batchSize}...`);
+    
     for (let i = 0; i < dbProcedures.length; i += batchSize) {
       const batch = dbProcedures.slice(i, i + batchSize);
+      console.log(`💾 Salvando batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(dbProcedures.length/batchSize)} (${batch.length} procedimentos)`);
+      
       const { error } = await supabase
         .from('sigtap_procedures')
         .insert(batch);
       
-      if (error) throw error;
+      if (error) {
+        console.error(`❌ Erro no batch ${Math.floor(i/batchSize) + 1}:`, error);
+        console.error('❌ Procedimentos do batch com erro:', batch.map(p => p.code).slice(0, 5));
+        throw error;
+      }
     }
+    
+    console.log('✅ Todos os procedimentos salvos com sucesso');
   }
 
   static async getActiveProcedures(): Promise<SigtapProcedure[]> {

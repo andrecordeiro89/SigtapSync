@@ -53,7 +53,8 @@ export const processSigtapPDF = async (
     let processedPages = 0;
     
     // Process pages in batches to avoid memory issues
-    const batchSize = 10;
+    // Otimizado para PDFs grandes (4998+ páginas)
+    const batchSize = totalPages > 1000 ? 20 : 10;
     for (let i = 1; i <= totalPages; i += batchSize) {
       const endPage = Math.min(i + batchSize - 1, totalPages);
       
@@ -67,9 +68,9 @@ export const processSigtapPDF = async (
           const pageProcedures = await fastExtractor.extractFromText(textContent, pageNum);
           procedures.push(...pageProcedures);
           
-          // Log progresso a cada 50 páginas para não sobrecarregar
-          if (pageNum <= 3 || pageNum % 50 === 0) {
-            console.log(`⚡ Página ${pageNum}: ${pageProcedures.length} procedimentos`);
+          // Log progresso otimizado para PDFs grandes
+          if (pageNum <= 3 || pageNum % 100 === 0 || pageNum === totalPages) {
+            console.log(`⚡ Página ${pageNum}/${totalPages}: ${pageProcedures.length} procedimentos (${procedures.length} total)`);
           }
           
           processedPages++;
@@ -486,6 +487,7 @@ export const extractProceduresFromPageText = (textContent: any, pageNumber: numb
               // Identificação
               code,
               description: description.substring(0, 200),
+              origem: 'PDF',
               
               // Classificação
               complexity,
@@ -518,11 +520,12 @@ export const extractProceduresFromPageText = (textContent: any, pageNumber: numb
               points: isNaN(points) ? 0 : points,
               
               // Classificação Profissional
-              cbo,
-              cid,
+              cbo: cbo ? [cbo] : [],
+              cid: cid ? [cid] : [],
               habilitation,
               habilitationGroup,
-              serviceClassification
+              serviceClassification,
+              especialidadeLeito: ''
             });
             
             console.log(`✅ Extraído: ${code} - ${description.substring(0, 30)}... [${complexity}] [${financing}]`);
@@ -573,6 +576,7 @@ export const extractProceduresFromPageText = (textContent: any, pageNumber: numb
             // Identificação
             code: firstCode,
             description: description.substring(0, 200),
+            origem: 'PDF',
             
             // Classificação
             complexity,
@@ -605,11 +609,12 @@ export const extractProceduresFromPageText = (textContent: any, pageNumber: numb
             points: 0,
             
             // Classificação Profissional
-            cbo: '',
-            cid: '',
+            cbo: [],
+            cid: [],
             habilitation: '',
             habilitationGroup: [],
-            serviceClassification: ''
+            serviceClassification: '',
+            especialidadeLeito: ''
           });
           console.log(`✅ Extraído código isolado: ${firstCode} - ${description.substring(0, 30)}... [${complexity}]`);
         }

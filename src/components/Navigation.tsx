@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, Upload, Users, FileText, Home, Search, FileUp } from 'lucide-react';
+import { BarChart3, Upload, Users, FileText, Home, Search, FileUp, Code } from 'lucide-react';
 
 interface NavigationProps {
   activeTab: string;
@@ -36,6 +36,13 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       icon: FileUp,
       description: 'Importação de AIHs',
       badge: 'NOVO'
+    },
+    {
+      id: 'excel-analyzer',
+      label: 'Analisar Excel',
+      icon: Code,
+      description: 'Gerar código Python customizado',
+      badge: 'DEV'
     },
     {
       id: 'patients',

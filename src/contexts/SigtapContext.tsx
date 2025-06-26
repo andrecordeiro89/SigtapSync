@@ -107,12 +107,12 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Método createVersion não está disponível no SigtapService');
       }
       
-      // Criar nova versão
+      // Criar nova versão - removendo campo problemático temporariamente
       const version = await SigtapService.createVersion({
         version_name: versionName,
         file_type: 'pdf',
         total_procedures: procedures.length,
-        extraction_method: 'hybrid',
+        // extraction_method: removido temporariamente devido à constraint
         import_status: 'completed',
         import_date: new Date().toISOString(),
         is_active: false
@@ -131,6 +131,7 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
       console.log('🎉 Dados salvos no Supabase com sucesso!');
     } catch (error) {
       console.error('❌ Erro ao salvar no Supabase:', error);
+      console.error('❌ Detalhes do erro:', JSON.stringify(error, null, 2));
       throw error;
     }
   };
