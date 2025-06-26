@@ -1,379 +1,424 @@
-import { AIH, AIHMatch, SigtapProcedure } from '../types';
+import { AIH, SigtapProcedure, AIHMatchDB, AIHAnalysisReport } from '../types';
+import { AIHMatchService, SigtapService } from '../services/supabaseService';
+import { reaisToCentavos } from '../lib/supabase';
 
-interface MatchingCriteria {
-  exactCodeMatch: boolean;
-  genderCompatible: boolean;
-  ageCompatible: boolean;
-  cidCompatible: boolean;
-  valueWithinRange: boolean;
-}
-
-interface MatchingScore {
-  overall: number;
-  codeMatch: number;
-  genderMatch: number;
-  ageMatch: number;
-  cidMatch: number;
-  valueMatch: number;
+interface MatchingConfig {
+  minScoreThreshold: number;
+  genderWeight: number;
+  ageWeight: number;
+  cidWeight: number;
+  habilitationWeight: number;
+  cboWeight: number;
+  exactCodeBonus: number;
 }
 
 export class AIHMatcher {
-  private sigtapProcedures: SigtapProcedure[];
+  private procedures: SigtapProcedure[] = [];
+  private config: MatchingConfig;
 
-  constructor(sigtapProcedures: SigtapProcedure[] = []) {
-    this.sigtapProcedures = sigtapProcedures;
+  constructor(config?: Partial<MatchingConfig>) {
+    this.config = {
+      minScoreThreshold: 70,
+      genderWeight: 10,
+      ageWeight: 15,
+      cidWeight: 20,
+      habilitationWeight: 25,
+      cboWeight: 15,
+      exactCodeBonus: 15,
+      ...config
+    };
   }
 
   /**
-   * Atualiza a lista de procedimentos SIGTAP
+   * Inicializa o matcher carregando procedimentos SIGTAP ativos
    */
-  updateSigtapProcedures(procedures: SigtapProcedure[]): void {
-    this.sigtapProcedures = procedures;
-    console.log(`📋 Carregados ${procedures.length} procedimentos SIGTAP para matching`);
+  async initialize(): Promise<void> {
+    console.log('🔄 Inicializando AIH Matcher...');
+    this.procedures = await SigtapService.getActiveProcedures();
+    console.log(`✅ ${this.procedures.length} procedimentos SIGTAP carregados`);
   }
 
   /**
-   * Realiza matching de uma AIH com procedimentos SIGTAP
+   * Processa uma AIH individual e encontra matches
    */
-  async matchAIH(aih: AIH): Promise<AIHMatch[]> {
-    const matches: AIHMatch[] = [];
+  async processAIH(aih: AIH): Promise<AIHAnalysisReport> {
+    console.log(`🔍 Processando AIH: ${aih.numeroAIH}`);
+    
+    // Buscar procedimento principal
+    const mainProcedureMatches = await this.findProcedureMatches(
+      aih.procedimentoPrincipal,
+      aih
+    );
 
-    if (!aih.procedimentoPrincipal) {
-      return matches;
+    // Processar procedimentos realizados
+    const allMatches: AIHMatchDB[] = [];
+    for (const procRealizado of aih.procedimentosRealizados) {
+      const matches = await this.findProcedureMatches(procRealizado.codigo, aih);
+      allMatches.push(...matches);
     }
 
-    try {
-      // 1. Busca exata por código
-      const exactMatches = this.findExactMatches(aih);
-      
-      // 2. Busca parcial por código similar
-      const partialMatches = this.findPartialMatches(aih);
-      
-      // 3. Combinar e calcular scores
-      const allCandidates = [...exactMatches, ...partialMatches];
-      
-      for (const procedure of allCandidates) {
-        const matchScore = this.calculateMatchScore(aih, procedure);
-        
-        if (matchScore.overall >= 50) { // Threshold mínimo de 50%
-          const match: AIHMatch = {
-            aihId: aih.id || '',
-            procedureId: procedure.id || '',
-            matchType: matchScore.codeMatch === 100 ? 'exact' : 'partial',
-            confidenceScore: matchScore.overall,
-            validationResults: {
-              genderMatch: matchScore.genderMatch === 100,
-              ageMatch: matchScore.ageMatch === 100,
-              cidMatch: matchScore.cidMatch >= 75,
-              valueMatch: matchScore.valueMatch >= 75
-            },
-            status: matchScore.overall >= 85 ? 'approved' : 'pending',
-            createdAt: new Date().toISOString()
-          };
+    // Combinar matches do procedimento principal
+    allMatches.push(...mainProcedureMatches);
 
-          // Adicionar observações se necessário
-          if (matchScore.overall < 85) {
-            match.observations = this.generateMatchObservations(matchScore, aih, procedure);
-          }
+    // Remover duplicatas e ordenar por score
+    const uniqueMatches = this.removeDuplicateMatches(allMatches);
+    const sortedMatches = uniqueMatches.sort((a, b) => b.overall_score - a.overall_score);
 
-          matches.push(match);
-        }
+    // Gerar relatório de análise
+    const report = this.generateAnalysisReport(aih, sortedMatches);
+    
+    console.log(`✅ Processamento concluído: ${sortedMatches.length} matches encontrados`);
+    return report;
+  }
+
+  /**
+   * Encontra matches para um código de procedimento específico
+   */
+  private async findProcedureMatches(
+    procedureCode: string, 
+    aih: AIH
+  ): Promise<AIHMatchDB[]> {
+    
+    const matches: AIHMatchDB[] = [];
+    
+    // Busca exata por código
+    const exactMatch = this.procedures.find(p => p.code === procedureCode);
+    if (exactMatch) {
+      const match = await this.createMatch(aih, exactMatch, 'exact');
+      if (match.overall_score >= this.config.minScoreThreshold) {
+        matches.push(match);
       }
-
-      // Ordenar por score de confiança
-      matches.sort((a, b) => b.confidenceScore - a.confidenceScore);
-
-      console.log(`🎯 Encontrados ${matches.length} matches para AIH ${aih.numeroAIH}`);
-      
-      return matches.slice(0, 5); // Retornar até 5 melhores matches
-
-    } catch (error) {
-      console.error('❌ Erro no matching da AIH:', error);
-      return [];
     }
+
+    // Busca por códigos similares (primeiros dígitos iguais)
+    const codePrefix = procedureCode.substring(0, 6); // Primeiros 6 dígitos
+    const similarProcedures = this.procedures.filter(p => 
+      p.code.startsWith(codePrefix) && p.code !== procedureCode
+    );
+
+    for (const procedure of similarProcedures.slice(0, 5)) { // Limitar a 5 similares
+      const match = await this.createMatch(aih, procedure, 'similar');
+      if (match.overall_score >= this.config.minScoreThreshold) {
+        matches.push(match);
+      }
+    }
+
+    return matches;
+  }
+
+  /**
+   * Cria um match entre AIH e procedimento SIGTAP
+   */
+  private async createMatch(
+    aih: AIH, 
+    procedure: SigtapProcedure, 
+    matchType: 'exact' | 'similar'
+  ): Promise<AIHMatchDB> {
+    
+    // Validações individuais
+    const genderValid = this.validateGender(aih, procedure);
+    const ageValid = this.validateAge(aih, procedure);
+    const cidValid = this.validateCID(aih, procedure);
+    const habilitationValid = this.validateHabilitation(aih, procedure);
+    const cboValid = this.validateCBO(aih, procedure);
+
+    // Cálculo do score
+    let score = 0;
+    
+    if (genderValid) score += this.config.genderWeight;
+    if (ageValid) score += this.config.ageWeight;
+    if (cidValid) score += this.config.cidWeight;
+    if (habilitationValid) score += this.config.habilitationWeight;
+    if (cboValid) score += this.config.cboWeight;
+    
+    // Bônus para match exato de código
+    if (matchType === 'exact') {
+      score += this.config.exactCodeBonus;
+    }
+
+    // Cálculo dos valores
+    const calculatedValueAmb = reaisToCentavos(procedure.valueAmb);
+    const calculatedValueHosp = reaisToCentavos(procedure.valueHosp);
+    const calculatedValueProf = reaisToCentavos(procedure.valueProf);
+    const calculatedTotal = calculatedValueAmb + calculatedValueHosp + calculatedValueProf;
+
+    // Detalhes da validação
+    const validationDetails = {
+      matchType,
+      validations: {
+        gender: { valid: genderValid, details: this.getGenderValidationDetails(aih, procedure) },
+        age: { valid: ageValid, details: this.getAgeValidationDetails(aih, procedure) },
+        cid: { valid: cidValid, details: this.getCIDValidationDetails(aih, procedure) },
+        habilitation: { valid: habilitationValid, details: this.getHabilitationValidationDetails(aih, procedure) },
+        cbo: { valid: cboValid, details: this.getCBOValidationDetails(aih, procedure) }
+      },
+      scoreBreakdown: {
+        gender: genderValid ? this.config.genderWeight : 0,
+        age: ageValid ? this.config.ageWeight : 0,
+        cid: cidValid ? this.config.cidWeight : 0,
+        habilitation: habilitationValid ? this.config.habilitationWeight : 0,
+        cbo: cboValid ? this.config.cboWeight : 0,
+        exactMatch: matchType === 'exact' ? this.config.exactCodeBonus : 0
+      }
+    };
+
+    const match: AIHMatchDB = {
+      id: `${aih.id || 'temp'}_${procedure.id || procedure.code}_${Date.now()}`,
+      aih_id: aih.id || '',
+      procedure_id: procedure.id || '',
+      gender_valid: genderValid,
+      age_valid: ageValid,
+      cid_valid: cidValid,
+      habilitation_valid: habilitationValid,
+      cbo_valid: cboValid,
+      overall_score: Math.min(score, 100), // Máximo 100%
+      calculated_value_amb: calculatedValueAmb,
+      calculated_value_hosp: calculatedValueHosp,
+      calculated_value_prof: calculatedValueProf,
+      calculated_total: calculatedTotal,
+      validation_details: validationDetails,
+      match_confidence: this.calculateConfidence(score, matchType),
+      match_method: 'automatic',
+      status: score >= 90 ? 'approved' : score >= this.config.minScoreThreshold ? 'pending' : 'rejected',
+      created_at: new Date().toISOString()
+    };
+
+    return match;
+  }
+
+  /**
+   * Validações específicas
+   */
+  private validateGender(aih: AIH, procedure: SigtapProcedure): boolean {
+    if (!procedure.gender || procedure.gender === 'AMBOS') return true;
+    return procedure.gender === aih.sexo;
+  }
+
+  private validateAge(aih: AIH, procedure: SigtapProcedure): boolean {
+    if (!procedure.minAge && !procedure.maxAge) return true;
+    
+    const birthDate = new Date(aih.nascimento);
+    const currentDate = new Date();
+    const ageInYears = currentDate.getFullYear() - birthDate.getFullYear();
+    
+    if (procedure.minAge && ageInYears < procedure.minAge) return false;
+    if (procedure.maxAge && ageInYears > procedure.maxAge) return false;
+    
+    return true;
+  }
+
+  private validateCID(aih: AIH, procedure: SigtapProcedure): boolean {
+    if (!procedure.cid || procedure.cid.length === 0) return true;
+    
+    const aihCIDs = [aih.cidPrincipal, ...(aih.procedimentosRealizados.map(p => p.codigo) || [])];
+    return procedure.cid.some(cid => aihCIDs.includes(cid));
+  }
+
+  private validateHabilitation(aih: AIH, procedure: SigtapProcedure): boolean {
+    // TODO: Implementar validação de habilitação baseada no hospital
+    // Por enquanto, sempre válido
+    return true;
+  }
+
+  private validateCBO(aih: AIH, procedure: SigtapProcedure): boolean {
+    if (!procedure.cbo || procedure.cbo.length === 0) return true;
+    if (!aih.cnsSolicitante) return true; // Se não tem CBO na AIH, considera válido
+    
+    // TODO: Implementar validação de CBO baseada nos profissionais
+    return true;
+  }
+
+  /**
+   * Métodos para detalhes de validação
+   */
+  private getGenderValidationDetails(aih: AIH, procedure: SigtapProcedure): any {
+    return {
+      aihGender: aih.sexo,
+      procedureGender: procedure.gender,
+      restriction: procedure.gender && procedure.gender !== 'AMBOS'
+    };
+  }
+
+  private getAgeValidationDetails(aih: AIH, procedure: SigtapProcedure): any {
+    const birthDate = new Date(aih.nascimento);
+    const currentDate = new Date();
+    const ageInYears = currentDate.getFullYear() - birthDate.getFullYear();
+    
+    return {
+      patientAge: ageInYears,
+      minAge: procedure.minAge,
+      maxAge: procedure.maxAge,
+      withinRange: this.validateAge(aih, procedure)
+    };
+  }
+
+  private getCIDValidationDetails(aih: AIH, procedure: SigtapProcedure): any {
+    return {
+      aihCID: aih.cidPrincipal,
+      procedureCIDs: procedure.cid,
+      hasRestriction: procedure.cid && procedure.cid.length > 0
+    };
+  }
+
+  private getHabilitationValidationDetails(aih: AIH, procedure: SigtapProcedure): any {
+    return {
+      procedureHabilitation: procedure.habilitation,
+      habilitationGroup: procedure.habilitationGroup
+    };
+  }
+
+  private getCBOValidationDetails(aih: AIH, procedure: SigtapProcedure): any {
+    return {
+      procedureCBOs: procedure.cbo,
+      hasRestriction: procedure.cbo && procedure.cbo.length > 0
+    };
+  }
+
+  /**
+   * Calcula confiança do match
+   */
+  private calculateConfidence(score: number, matchType: 'exact' | 'similar'): number {
+    let confidence = score;
+    
+    // Penalidade para matches similares
+    if (matchType === 'similar') {
+      confidence = confidence * 0.9;
+    }
+    
+    return Math.min(Math.round(confidence), 100);
+  }
+
+  /**
+   * Remove matches duplicados
+   */
+  private removeDuplicateMatches(matches: AIHMatchDB[]): AIHMatchDB[] {
+    const seen = new Set<string>();
+    return matches.filter(match => {
+      const key = `${match.aih_id}_${match.procedure_id}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }
+
+  /**
+   * Gera relatório de análise
+   */
+  private generateAnalysisReport(aih: AIH, matches: AIHMatchDB[]): AIHAnalysisReport {
+    const bestMatch = matches[0];
+    const alternativeMatches = matches.slice(1, 4); // Top 3 alternativas
+    
+    // Identificar problemas
+    const issues: string[] = [];
+    if (matches.length === 0) {
+      issues.push('Nenhum procedimento SIGTAP compatível encontrado');
+    } else if (bestMatch.overall_score < 90) {
+      issues.push(`Score do melhor match é ${bestMatch.overall_score}% (recomendado > 90%)`);
+    }
+    
+    if (!bestMatch?.gender_valid) issues.push('Incompatibilidade de gênero');
+    if (!bestMatch?.age_valid) issues.push('Faixa etária incompatível');
+    if (!bestMatch?.cid_valid) issues.push('CID não compatível');
+
+    // Sugerir ações
+    const suggestedActions: string[] = [];
+    if (issues.length > 0) {
+      suggestedActions.push('Revisão manual recomendada');
+    }
+    if (bestMatch && bestMatch.overall_score >= this.config.minScoreThreshold) {
+      suggestedActions.push('Proceder com o faturamento');
+    } else {
+      suggestedActions.push('Verificar código do procedimento');
+      suggestedActions.push('Consultar tabela SIGTAP atualizada');
+    }
+
+    // Impacto financeiro
+    const originalValue = aih.procedimentosRealizados.reduce((sum, proc) => sum + (proc.quantidade || 1), 0) * 100; // Mock
+    const suggestedValue = bestMatch ? bestMatch.calculated_total : 0;
+    const difference = suggestedValue - originalValue;
+    const percentageChange = originalValue > 0 ? (difference / originalValue) * 100 : 0;
+
+    // Resumo de validação
+    const totalChecks = 5; // gender, age, cid, habilitation, cbo
+    let passedChecks = 0;
+    const failedChecks: string[] = [];
+    const warningChecks: string[] = [];
+
+    if (bestMatch) {
+      if (bestMatch.gender_valid) passedChecks++; else failedChecks.push('Gênero');
+      if (bestMatch.age_valid) passedChecks++; else failedChecks.push('Idade');
+      if (bestMatch.cid_valid) passedChecks++; else warningChecks.push('CID');
+      if (bestMatch.habilitation_valid) passedChecks++; else warningChecks.push('Habilitação');
+      if (bestMatch.cbo_valid) passedChecks++; else warningChecks.push('CBO');
+    }
+
+    return {
+      aihId: aih.id || aih.numeroAIH,
+      matches,
+      recommendations: {
+        bestMatch,
+        alternativeMatches,
+        issues,
+        suggestedActions
+      },
+      financialImpact: {
+        originalValue,
+        suggestedValue,
+        difference,
+        percentageChange
+      },
+      validationSummary: {
+        totalChecks,
+        passedChecks,
+        failedChecks,
+        warningChecks
+      }
+    };
   }
 
   /**
    * Processa múltiplas AIHs em lote
    */
-  async batchMatchAIHs(aihs: AIH[], progressCallback?: (progress: number) => void): Promise<AIHMatch[]> {
-    const allMatches: AIHMatch[] = [];
-
+  async batchProcessAIHs(
+    aihs: AIH[], 
+    onProgress?: (processed: number, total: number) => void
+  ): Promise<AIHAnalysisReport[]> {
+    console.log(`🚀 Processando ${aihs.length} AIHs em lote...`);
+    
+    const reports: AIHAnalysisReport[] = [];
+    
     for (let i = 0; i < aihs.length; i++) {
-      const aih = aihs[i];
-      const matches = await this.matchAIH(aih);
-      allMatches.push(...matches);
-
-      // Callback de progresso
-      if (progressCallback) {
-        progressCallback(((i + 1) / aihs.length) * 100);
+      const report = await this.processAIH(aihs[i]);
+      reports.push(report);
+      
+      if (onProgress) {
+        onProgress(i + 1, aihs.length);
       }
-
-      // Pequena pausa para não bloquear a UI
-      if (i % 10 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
+      
+      // Pequeno delay para não sobrecarregar o sistema
+      await new Promise(resolve => setTimeout(resolve, 10));
     }
-
-    console.log(`📊 Processamento em lote concluído: ${allMatches.length} matches de ${aihs.length} AIHs`);
     
-    return allMatches;
+    console.log(`✅ Processamento em lote concluído: ${reports.length} relatórios gerados`);
+    return reports;
   }
 
   /**
-   * Busca matches exatos por código
+   * Salva matches no banco de dados
    */
-  private findExactMatches(aih: AIH): SigtapProcedure[] {
-    const procedureCode = aih.procedimentoPrincipal;
+  async saveMatches(matches: AIHMatchDB[]): Promise<void> {
+    console.log(`💾 Salvando ${matches.length} matches no banco...`);
     
-    return this.sigtapProcedures.filter(procedure => 
-      procedure.code === procedureCode
-    );
-  }
-
-  /**
-   * Busca matches parciais por código similar
-   */
-  private findPartialMatches(aih: AIH): SigtapProcedure[] {
-    const procedureCode = aih.procedimentoPrincipal;
-    const codeBase = procedureCode.substring(0, 8); // Primeiros 8 caracteres (ex: 04.15.02)
-    
-    return this.sigtapProcedures.filter(procedure => 
-      procedure.code !== procedureCode && // Excluir matches exatos já encontrados
-      procedure.code.startsWith(codeBase)
-    );
-  }
-
-  /**
-   * Calcula score de matching entre AIH e procedimento SIGTAP
-   */
-  private calculateMatchScore(aih: AIH, procedure: SigtapProcedure): MatchingScore {
-    const score: MatchingScore = {
-      overall: 0,
-      codeMatch: 0,
-      genderMatch: 0,
-      ageMatch: 0,
-      cidMatch: 0,
-      valueMatch: 0
-    };
-
-    // 1. Score do código (40% do peso total)
-    score.codeMatch = this.calculateCodeMatchScore(aih.procedimentoPrincipal, procedure.code);
-
-    // 2. Score do gênero (15% do peso total)
-    score.genderMatch = this.calculateGenderMatchScore(aih.sexo, procedure.gender);
-
-    // 3. Score da idade (15% do peso total)
-    score.ageMatch = this.calculateAgeMatchScore(aih.nascimento, procedure);
-
-    // 4. Score do CID (20% do peso total)
-    score.cidMatch = this.calculateCidMatchScore(aih.cidPrincipal, procedure.cid);
-
-    // 5. Score do valor (10% do peso total)
-    score.valueMatch = this.calculateValueMatchScore(aih, procedure);
-
-    // Calcular score geral
-    score.overall = Math.round(
-      (score.codeMatch * 0.4) +
-      (score.genderMatch * 0.15) +
-      (score.ageMatch * 0.15) +
-      (score.cidMatch * 0.2) +
-      (score.valueMatch * 0.1)
-    );
-
-    return score;
-  }
-
-  /**
-   * Calcula score de match do código
-   */
-  private calculateCodeMatchScore(aihCode: string, sigtapCode: string): number {
-    if (aihCode === sigtapCode) return 100;
-    
-    // Verificar similaridade parcial
-    const aihParts = aihCode.split('.');
-    const sigtapParts = sigtapCode.split('.');
-    
-    let matchingParts = 0;
-    const maxParts = Math.min(aihParts.length, sigtapParts.length);
-    
-    for (let i = 0; i < maxParts; i++) {
-      if (aihParts[i] === sigtapParts[i]) {
-        matchingParts++;
-      } else {
-        break; // Para na primeira diferença
+    for (const match of matches) {
+      try {
+        await AIHMatchService.createMatch(match);
+      } catch (error) {
+        console.error(`Erro ao salvar match ${match.id}:`, error);
       }
     }
     
-    return Math.round((matchingParts / 4) * 80); // Máximo 80% para match parcial
-  }
-
-  /**
-   * Calcula score de match do gênero
-   */
-  private calculateGenderMatchScore(aihGender: 'M' | 'F', procedureGender: string): number {
-    if (!procedureGender || procedureGender === 'Ambos' || procedureGender === '') {
-      return 100; // Sem restrição de gênero
-    }
-    
-    const normalizedProcedureGender = procedureGender.toLowerCase();
-    
-    if (
-      (aihGender === 'M' && normalizedProcedureGender.includes('masculino')) ||
-      (aihGender === 'F' && normalizedProcedureGender.includes('feminino'))
-    ) {
-      return 100;
-    }
-    
-    return 0; // Incompatível
-  }
-
-  /**
-   * Calcula score de match da idade
-   */
-  private calculateAgeMatchScore(birthDate: string, procedure: SigtapProcedure): number {
-    if (!birthDate || !procedure.minAge || !procedure.maxAge) {
-      return 100; // Sem restrição de idade
-    }
-
-    try {
-      const birth = new Date(birthDate.split('/').reverse().join('-'));
-      const today = new Date();
-      const ageInYears = today.getFullYear() - birth.getFullYear();
-      
-      // Converter idades do procedimento para anos
-      const minAgeYears = this.convertAgeToYears(procedure.minAge, procedure.minAgeUnit);
-      const maxAgeYears = this.convertAgeToYears(procedure.maxAge, procedure.maxAgeUnit);
-      
-      if (ageInYears >= minAgeYears && ageInYears <= maxAgeYears) {
-        return 100;
-      }
-      
-      // Calcular score parcial se próximo da faixa
-      const distance = Math.min(
-        Math.abs(ageInYears - minAgeYears),
-        Math.abs(ageInYears - maxAgeYears)
-      );
-      
-      return Math.max(0, 100 - (distance * 10)); // Reduz 10 pontos por ano de diferença
-      
-    } catch (error) {
-      console.warn('⚠️ Erro ao calcular idade:', error);
-      return 50; // Score neutro em caso de erro
-    }
-  }
-
-  /**
-   * Converte idade para anos
-   */
-  private convertAgeToYears(age: number, unit: string): number {
-    const unitLower = unit.toLowerCase();
-    
-    if (unitLower.includes('ano')) return age;
-    if (unitLower.includes('mes')) return age / 12;
-    if (unitLower.includes('dia')) return age / 365;
-    
-    return age; // Assume anos como padrão
-  }
-
-  /**
-   * Calcula score de match do CID
-   */
-  private calculateCidMatchScore(aihCid: string, procedureCids: string[]): number {
-    if (!aihCid || !procedureCids || procedureCids.length === 0) {
-      return 75; // Score neutro se não há restrições de CID
-    }
-
-    // Verificar match exato
-    if (procedureCids.includes(aihCid)) {
-      return 100;
-    }
-
-    // Verificar match parcial (mesmo grupo de CID)
-    const aihGroup = aihCid.charAt(0); // Primeira letra (ex: M de M751)
-    const hasGroupMatch = procedureCids.some(cid => cid.charAt(0) === aihGroup);
-    
-    if (hasGroupMatch) {
-      return 75;
-    }
-
-    return 25; // CID não relacionado
-  }
-
-  /**
-   * Calcula score de match do valor
-   */
-  private calculateValueMatchScore(aih: AIH, procedure: SigtapProcedure): number {
-    // Por enquanto, retorna score neutro
-    // TODO: Implementar comparação de valores quando disponível na AIH
-    return 75;
-  }
-
-  /**
-   * Gera observações para o match
-   */
-  private generateMatchObservations(score: MatchingScore, aih: AIH, procedure: SigtapProcedure): string {
-    const observations: string[] = [];
-
-    if (score.codeMatch < 100) {
-      observations.push(`Código parcialmente compatível (${score.codeMatch}%)`);
-    }
-
-    if (score.genderMatch < 100) {
-      observations.push(`Restrição de gênero: procedimento para ${procedure.gender}, paciente ${aih.sexo}`);
-    }
-
-    if (score.ageMatch < 100) {
-      observations.push(`Faixa etária: ${procedure.minAge}${procedure.minAgeUnit} a ${procedure.maxAge}${procedure.maxAgeUnit}`);
-    }
-
-    if (score.cidMatch < 75) {
-      observations.push(`CID ${aih.cidPrincipal} pode não ser compatível com o procedimento`);
-    }
-
-    return observations.join('; ');
-  }
-
-  /**
-   * Estatísticas de matching
-   */
-  getMatchingStats(matches: AIHMatch[]): {
-    totalMatches: number;
-    exactMatches: number;
-    partialMatches: number;
-    averageConfidence: number;
-    approvedMatches: number;
-    pendingMatches: number;
-  } {
-    if (matches.length === 0) {
-      return {
-        totalMatches: 0,
-        exactMatches: 0,
-        partialMatches: 0,
-        averageConfidence: 0,
-        approvedMatches: 0,
-        pendingMatches: 0
-      };
-    }
-
-    const exactMatches = matches.filter(m => m.matchType === 'exact').length;
-    const partialMatches = matches.filter(m => m.matchType === 'partial').length;
-    const approvedMatches = matches.filter(m => m.status === 'approved').length;
-    const pendingMatches = matches.filter(m => m.status === 'pending').length;
-    
-    const averageConfidence = Math.round(
-      matches.reduce((sum, m) => sum + m.confidenceScore, 0) / matches.length
-    );
-
-    return {
-      totalMatches: matches.length,
-      exactMatches,
-      partialMatches,
-      averageConfidence,
-      approvedMatches,
-      pendingMatches
-    };
+    console.log('✅ Matches salvos com sucesso!');
   }
 }
-
-export default AIHMatcher;

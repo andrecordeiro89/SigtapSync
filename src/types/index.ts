@@ -184,3 +184,135 @@ export interface AIHUploadStats {
   totalValue: number;
   avgConfidenceScore: number;
 }
+
+// ================================================
+// NOVOS TIPOS PARA ESTRUTURA REAL SUPABASE
+// ================================================
+
+// Matching avançado AIH x SIGTAP
+export interface AIHMatchDB {
+  id: string;
+  aih_id: string;
+  procedure_id: string;
+  gender_valid: boolean;
+  age_valid: boolean;
+  cid_valid: boolean;
+  habilitation_valid: boolean;
+  cbo_valid: boolean;
+  overall_score: number;
+  calculated_value_amb: number; // em centavos
+  calculated_value_hosp: number; // em centavos
+  calculated_value_prof: number; // em centavos
+  calculated_total: number; // em centavos
+  validation_details: any; // jsonb
+  match_confidence: number;
+  match_method: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  status: string;
+  approval_notes?: string;
+  created_at: string;
+}
+
+// Registro de procedimentos realizados
+export interface ProcedureRecordDB {
+  id: string;
+  hospital_id: string;
+  patient_id: string;
+  procedure_id: string;
+  aih_id?: string;
+  aih_match_id?: string;
+  procedure_date: string;
+  value_charged: number; // em centavos
+  professional?: string;
+  professional_cbo?: string;
+  billing_status?: 'pending' | 'billed' | 'paid' | 'rejected';
+  billing_date?: string;
+  payment_date?: string;
+  notes?: string;
+  created_at: string;
+  created_by?: string;
+}
+
+// Configurações do sistema
+export interface SystemSettingDB {
+  id: string;
+  hospital_id?: string;
+  setting_key: string;
+  setting_value: any; // jsonb
+  setting_type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  description?: string;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by?: string;
+}
+
+// Logs de auditoria
+export interface AuditLogDB {
+  id: string;
+  table_name: string;
+  record_id: string;
+  action: 'INSERT' | 'UPDATE' | 'DELETE';
+  old_values?: any; // jsonb
+  new_values?: any; // jsonb
+  changed_fields: string[];
+  user_id?: string;
+  hospital_id?: string;
+  ip_address?: string;
+  user_agent?: string;
+  operation_type?: string;
+  session_id?: string;
+  created_at: string;
+}
+
+// Acesso de usuários aos hospitais
+export interface UserHospitalAccessDB {
+  id: string;
+  user_id: string;
+  hospital_id: string;
+  role: 'admin' | 'manager' | 'operator' | 'viewer';
+  created_at: string;
+  created_by?: string;
+}
+
+// Estatísticas avançadas do dashboard
+export interface DashboardStatsAdvanced extends DashboardStats {
+  // Estatísticas financeiras
+  totalRevenue: number;
+  averageTicket: number;
+  monthlyGrowth: number;
+  
+  // Estatísticas de matching
+  totalMatches: number;
+  successRate: number;
+  pendingReview: number;
+  
+  // Estatísticas de performance
+  avgProcessingTime: number;
+  systemUptime: number;
+}
+
+// Relatório de análise AIH
+export interface AIHAnalysisReport {
+  aihId: string;
+  matches: AIHMatchDB[];
+  recommendations: {
+    bestMatch?: AIHMatchDB;
+    alternativeMatches: AIHMatchDB[];
+    issues: string[];
+    suggestedActions: string[];
+  };
+  financialImpact: {
+    originalValue: number;
+    suggestedValue: number;
+    difference: number;
+    percentageChange: number;
+  };
+  validationSummary: {
+    totalChecks: number;
+    passedChecks: number;
+    failedChecks: string[];
+    warningChecks: string[];
+  };
+}
