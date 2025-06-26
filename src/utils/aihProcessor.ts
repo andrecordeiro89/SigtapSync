@@ -28,11 +28,17 @@ export class AIHProcessor {
   /**
    * Processa arquivo de AIH (Excel, CSV ou PDF extraído)
    */
-  async processAIHFile(file: File): Promise<AIHProcessingResult> {
+  async processAIHFile(
+    file: File, 
+    hospitalContext?: { hospitalId: string; hospitalName: string }
+  ): Promise<AIHProcessingResult> {
     const startTime = Date.now();
     
     try {
       console.log('🚀 Iniciando processamento de AIH:', file.name);
+      if (hospitalContext) {
+        console.log('🏥 Hospital contexto:', hospitalContext.hospitalName);
+      }
       
       let content: string;
       
@@ -44,7 +50,7 @@ export class AIHProcessor {
         throw new Error('Formato de arquivo não suportado');
       }
 
-      const aihs = this.extractAIHsFromText(content);
+      const aihs = this.extractAIHsFromText(content, hospitalContext);
       const validationResults = await this.validateAIHs(aihs);
       
       const processingTime = Date.now() - startTime;
@@ -56,7 +62,9 @@ export class AIHProcessor {
         invalidAIHs: validationResults.invalid.length,
         matches: [], // Será preenchido na etapa de matching
         errors: validationResults.errors,
-        processingTime
+        processingTime,
+        hospitalId: hospitalContext?.hospitalId,
+        hospitalName: hospitalContext?.hospitalName
       };
 
     } catch (error) {
@@ -72,7 +80,9 @@ export class AIHProcessor {
           field: 'file',
           message: error instanceof Error ? error.message : 'Erro desconhecido'
         }],
-        processingTime: Date.now() - startTime
+        processingTime: Date.now() - startTime,
+        hospitalId: hospitalContext?.hospitalId,
+        hospitalName: hospitalContext?.hospitalName
       };
     }
   }
@@ -80,7 +90,10 @@ export class AIHProcessor {
   /**
    * Extrai AIHs de texto estruturado
    */
-  extractAIHsFromText(content: string): AIH[] {
+  extractAIHsFromText(
+    content: string, 
+    hospitalContext?: { hospitalId: string; hospitalName: string }
+  ): AIH[] {
     const aihs: AIH[] = [];
     
     // Dividir o conteúdo em seções de AIH individuais
@@ -90,6 +103,10 @@ export class AIHProcessor {
       try {
         const aih = this.parseAIHSection(aihSections[i], i + 1);
         if (aih) {
+          // Adicionar ID do hospital se fornecido
+          if (hospitalContext) {
+            aih.hospitalId = hospitalContext.hospitalId;
+          }
           aihs.push(aih);
         }
       } catch (error) {

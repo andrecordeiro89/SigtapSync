@@ -252,3 +252,176 @@ CREATE POLICY "Allow all operations" ON hospitals FOR ALL USING (true);
 **🎯 O sistema está 100% sincronizado com sua base Supabase e pronto para produção!**
 
 **Versão:** 3.0.0 | **Status:** ✅ Produção Ready | **Performance:** ⚡ Otimizada 
+
+### 🏥 **PASSO 6: INSERIR HOSPITAIS CIS MANUALMENTE**
+
+Execute este SQL no Supabase para inserir os 8 hospitais da rede CIS:
+
+```sql
+-- 🏥 INSERIR HOSPITAIS CIS - CENTRO INTEGRADO EM SAÚDE LTDA
+INSERT INTO hospitals (
+  name, 
+  cnpj, 
+  address, 
+  city, 
+  state, 
+  zip_code, 
+  phone, 
+  email, 
+  manager_name, 
+  cnes, 
+  type_code, 
+  level_code, 
+  habilitation, 
+  is_active
+) VALUES 
+-- 1. MATRIZ - SANTA MARIANA/PR
+(
+  'CIS - Centro Integrado em Saúde LTDA',
+  '14736446000193',
+  'Rua Principal, 123',
+  'Santa Mariana',
+  'PR',
+  '86170000',
+  '(43) 3000-0001',
+  'matriz@cis.com.br',
+  'Diretor Administrativo CIS',
+  '2765901',
+  '07',
+  '2',
+  'GERAL',
+  true
+),
+-- 2. FILIAL - CASCAVEL/PR
+(
+  'Hospital Municipal Santa Alice',
+  '14736446000165',
+  'Av. Brasil, 1500',
+  'Cascavel',
+  'PR',
+  '85801000',
+  '(45) 3000-0002',
+  'cascavel@cis.com.br',
+  'Dr. Carlos Silva',
+  '2769102',
+  '07',
+  '3',
+  'URGENCIA',
+  true
+),
+-- 3. SEDE ADMIN - LONDRINA/PR  
+(
+  'CIS Londrina',
+  '14736446000517',
+  'Rua Sergipe, 1000',
+  'Londrina',
+  'PR',
+  '86020000',
+  '(43) 3000-0003',
+  'londrina@cis.com.br',
+  'Dra. Maria Santos',
+  '2769203',
+  '01',
+  '4',
+  'MAC',
+  true
+),
+-- 4. FILIAL - FAXINAL/PR
+(
+  'Hospital Municipal Juarez Barreto de Macedo',
+  '14736446000606',
+  'Rua Saúde, 50',
+  'Faxinal',
+  'PR',
+  '86640000',
+  '(43) 3000-0004',
+  'faxinal@cis.com.br',
+  'Dr. João Macedo',
+  '2769304',
+  '07',
+  '2',
+  'GERAL',
+  true
+),
+-- 5. FILIAL - CARLÓPOLIS/PR
+(
+  'Hospital Municipal São José',
+  '14736446000789',
+  'Av. São José, 200',
+  'Carlópolis',
+  'PR',
+  '86430000',
+  '(43) 3000-0005',
+  'carlopolis@cis.com.br',
+  'Enfª Ana Costa',
+  '2769405',
+  '07',
+  '2',
+  'GERAL',
+  true
+),
+-- 6. FILIAL - ARAPOTI/PR
+(
+  'Hospital Municipal 18 de Dezembro',
+  '14736446000860',
+  'Rua 18 de Dezembro, 300',
+  'Arapoti',
+  'PR',
+  '84990000',
+  '(43) 3000-0006',
+  'arapoti@cis.com.br',
+  'Dr. Pedro Lima',
+  '2769506',
+  '07',
+  '2',
+  'GERAL',
+  true
+),
+-- 7. FILIAL - FOZ DO IGUAÇU/PR
+(
+  'Hospital Nossa Senhora Aparecida',
+  '14736446000940',
+  'Av. Paraná, 800',
+  'Foz do Iguaçu',
+  'PR',
+  '85851000',
+  '(45) 3000-0007',
+  'foz@cis.com.br',
+  'Dra. Lucia Oliveira',
+  '2769607',
+  '07',
+  '3',
+  'URGENCIA',
+  true
+),
+-- 8. FILIAL - FAZENDA RIO GRANDE/PR
+(
+  'Hospital Maternidade Nossa Senhora Aparecida',
+  '14736446001084',
+  'Rua Maternidade, 150',
+  'Fazenda Rio Grande',
+  'PR',
+  '83823000',
+  '(41) 3000-0008',
+  'maternidade@cis.com.br',
+  'Dra. Rosa Fernandes',
+  '2769708',
+  '05',
+  '3',
+  'MATERNIDADE',
+  true
+);
+
+-- ✅ VERIFICAR INSERÇÃO
+SELECT 
+  name,
+  city,
+  cnpj,
+  habilitation,
+  is_active
+FROM hospitals 
+WHERE cnpj LIKE '14736446%'
+ORDER BY city;
+```
+
+**🎯 RESULTADO ESPERADO:** 8 hospitais da rede CIS inseridos e ativos. 

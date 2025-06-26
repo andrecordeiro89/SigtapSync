@@ -174,6 +174,8 @@ export interface AIHProcessingResult {
     value?: any;
   }>;
   processingTime: number;
+  hospitalId?: string;
+  hospitalName?: string;
 }
 
 export interface AIHUploadStats {
