@@ -1,9 +1,9 @@
-
 import React, { useState } from 'react';
 import Navigation from '../components/Navigation';
 import Dashboard from '../components/Dashboard';
 import SigtapImport from '../components/SigtapImport';
 import SigtapViewer from '../components/SigtapViewer';
+import AIHUpload from '../components/AIHUpload';
 import PatientManagement from '../components/PatientManagement';
 import ProcedureRecords from '../components/ProcedureRecords';
 
@@ -18,6 +18,8 @@ const Index = () => {
         return <SigtapImport />;
       case 'sigtap-viewer':
         return <SigtapViewer />;
+      case 'aih-upload':
+        return <AIHUpload />;
       case 'patients':
         return <PatientManagement />;
       case 'procedures':

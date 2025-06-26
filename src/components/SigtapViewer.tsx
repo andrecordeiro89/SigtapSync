@@ -15,6 +15,7 @@ const SigtapViewer = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [complexityFilter, setComplexityFilter] = useState('all');
   const [financingFilter, setFinancingFilter] = useState('all');
+  const [origemFilter, setOrigemFilter] = useState('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -28,10 +29,11 @@ const SigtapViewer = () => {
       
       const matchesComplexity = complexityFilter === 'all' || procedure.complexity === complexityFilter;
       const matchesFinancing = financingFilter === 'all' || procedure.financing === financingFilter;
+      const matchesOrigem = origemFilter === 'all' || procedure.origem === origemFilter;
       
-      return matchesSearch && matchesComplexity && matchesFinancing;
+      return matchesSearch && matchesComplexity && matchesFinancing && matchesOrigem;
     });
-  }, [procedures, searchTerm, complexityFilter, financingFilter]);
+  }, [procedures, searchTerm, complexityFilter, financingFilter, origemFilter]);
 
   const paginatedProcedures = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -48,6 +50,10 @@ const SigtapViewer = () => {
     return [...new Set(procedures.map(p => p.financing))];
   }, [procedures]);
 
+  const origemTypes = useMemo(() => {
+    return [...new Set(procedures.map(p => p.origem).filter(Boolean))];
+  }, [procedures]);
+
   const toggleRowExpansion = (procedureCode: string) => {
     const newExpandedRows = new Set(expandedRows);
     if (newExpandedRows.has(procedureCode)) {
@@ -62,19 +68,20 @@ const SigtapViewer = () => {
     if (!filteredProcedures.length) return;
     
     const headers = [
-      'Código', 'Procedimento', 'Complexidade', 'Modalidade', 'Instrumento de Registro', 
+      'Código', 'Procedimento', 'Origem', 'Complexidade', 'Modalidade', 'Instrumento de Registro', 
       'Tipo de Financiamento', 'Valor Ambulatorial SA', 'Valor Ambulatorial Total', 
       'Valor Hospitalar SH', 'Valor Hospitalar SP', 'Valor Hospitalar Total',
       'Atributo Complementar', 'Sexo', 'Idade Mínima', 'Unidade Idade Min', 
       'Idade Máxima', 'Unidade Idade Max', 'Quantidade Máxima', 
       'Média Permanência', 'Pontos', 'CBO', 'CID', 'Habilitação',
-      'Grupos de Habilitação', 'Serviço/Classificação'
+      'Grupos de Habilitação', 'Serviço/Classificação', 'Especialidade Leito'
     ];
     const csvContent = [
       headers.join(','),
       ...filteredProcedures.map(p => [
         p.code,
         `"${p.description}"`,
+        `"${p.origem || ''}"`,
           `"${p.complexity}"`,
           `"${p.modality || ''}"`,
           `"${p.registrationInstrument || ''}"`,
@@ -93,11 +100,12 @@ const SigtapViewer = () => {
           p.maxQuantity,
           p.averageStay,
           p.points,
-          `"${p.cbo || ''}"`,
-          `"${p.cid || ''}"`,
+          `"${Array.isArray(p.cbo) ? p.cbo.join('; ') : p.cbo || ''}"`,
+          `"${Array.isArray(p.cid) ? p.cid.join('; ') : p.cid || ''}"`,
           `"${p.habilitation || ''}"`,
           `"${p.habilitationGroup?.join('; ') || ''}"`,
-          `"${p.serviceClassification || ''}"`
+          `"${p.serviceClassification || ''}"`,
+          `"${p.especialidadeLeito || ''}"`
       ].join(','))
     ].join('\n');
 
@@ -188,7 +196,7 @@ const SigtapViewer = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Buscar por código ou descrição</label>
               <div className="relative">
@@ -239,6 +247,26 @@ const SigtapViewer = () => {
                   {financingTypes.map((financing) => (
                     <SelectItem key={financing} value={financing}>
                       {financing}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Filtrar por origem</label>
+              <Select value={origemFilter} onValueChange={(value) => {
+                setOrigemFilter(value);
+                setCurrentPage(1);
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas as origens" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as origens</SelectItem>
+                  {origemTypes.map((origem) => (
+                    <SelectItem key={origem} value={origem}>
+                      {origem}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -362,6 +390,10 @@ const SigtapViewer = () => {
                                   <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">Classificação</h5>
                                   <div className="space-y-2 text-sm">
                                     <div className="flex justify-between">
+                                      <span className="text-gray-600">Origem:</span>
+                                      <span className="text-xs">{procedure.origem || 'Não informado'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
                                       <span className="text-gray-600">Complexidade:</span>
                                       <Badge variant="outline">{procedure.complexity}</Badge>
                                     </div>
@@ -376,6 +408,10 @@ const SigtapViewer = () => {
                                     <div className="pt-1">
                                       <span className="text-gray-600 block mb-1">Financiamento:</span>
                                       <span className="text-xs">{procedure.financing || 'Não informado'}</span>
+                                    </div>
+                                    <div className="pt-1">
+                                      <span className="text-gray-600 block mb-1">Especialidade Leito:</span>
+                                      <span className="text-xs">{procedure.especialidadeLeito || 'Não informado'}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -477,12 +513,20 @@ const SigtapViewer = () => {
                                   <div className="space-y-2 text-sm">
                                     <div className="pt-1">
                                       <span className="text-gray-600 block mb-1">CBO:</span>
-                                      <span className="text-xs break-words">{procedure.cbo || 'Não especificado'}</span>
+                                      <span className="text-xs break-words">
+                                        {Array.isArray(procedure.cbo) && procedure.cbo.length > 0 
+                                          ? procedure.cbo.join(', ') 
+                                          : 'Não especificado'}
+                                      </span>
                                     </div>
-                                    {procedure.cid && (
+                                    {((Array.isArray(procedure.cid) && procedure.cid.length > 0) || procedure.cid) && (
                                       <div className="pt-1">
                                         <span className="text-gray-600 block mb-1">CID:</span>
-                                        <span className="text-xs break-words">{procedure.cid}</span>
+                                        <span className="text-xs break-words">
+                                          {Array.isArray(procedure.cid) 
+                                            ? procedure.cid.join(', ') 
+                                            : procedure.cid}
+                                        </span>
                                       </div>
                                     )}
                                     {procedure.complementaryAttribute && (

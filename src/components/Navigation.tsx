@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, Upload, Users, FileText, Home, Search } from 'lucide-react';
+import { BarChart3, Upload, Users, FileText, Home, Search, FileUp } from 'lucide-react';
 
 interface NavigationProps {
   activeTab: string;
@@ -29,6 +29,13 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       label: 'Consulta SIGTAP',
       icon: Search,
       description: 'Visualizar procedimentos'
+    },
+    {
+      id: 'aih-upload',
+      label: 'Upload AIH',
+      icon: FileUp,
+      description: 'Importação de AIHs',
+      badge: 'NOVO'
     },
     {
       id: 'patients',

@@ -34,12 +34,14 @@ interface ColumnMapping {
 const COLUMN_MAPPINGS: ColumnMapping = {
   code: ['código', 'codigo', 'code', 'procedimento', 'cod_procedimento', 'cod procedimento'],
   description: ['descrição', 'descricao', 'description', 'nome', 'procedimento', 'desc_procedimento'],
+  origem: ['origem', 'origin', 'fonte', 'proveniencia', 'procedencia'],
   complexity: ['complexidade', 'complexity', 'nivel', 'nível', 'tipo_complexidade'],
   modality: ['modalidade', 'modality', 'mod', 'tipo_modalidade'],
   financing: ['financiamento', 'financing', 'tipo_financiamento', 'fonte'],
   valueAmb: ['valor_ambulatorial', 'valor ambulatorial', 'valor_amb', 'value_amb', 'ambulatorial'],
   valueHosp: ['valor_hospitalar', 'valor hospitalar', 'valor_hosp', 'value_hosp', 'hospitalar'],
-  valueProf: ['valor_profissional', 'valor profissional', 'valor_prof', 'value_prof', 'profissional']
+  valueProf: ['valor_profissional', 'valor profissional', 'valor_prof', 'value_prof', 'profissional'],
+  especialidadeLeito: ['especialidade_leito', 'especialidade leito', 'especialidade do leito', 'specialty_bed', 'bed_specialty']
 };
 
 export class ExcelProcessor {
@@ -262,12 +264,16 @@ export class ExcelProcessor {
       }
 
       // Extrair outros campos com valores padrão
+      const origem = this.extractValue(row, columnMapping.origem, '');
+      
       const complexity = this.normalizeComplexity(
         this.extractValue(row, columnMapping.complexity, 'MÉDIA COMPLEXIDADE')
       );
 
       const modality = this.extractValue(row, columnMapping.modality, '');
       const financing = this.extractValue(row, columnMapping.financing, '');
+      
+      const especialidadeLeito = this.extractValue(row, columnMapping.especialidadeLeito, '');
 
       // Extrair valores financeiros
       const valueAmb = this.parseNumericValue(
@@ -286,6 +292,7 @@ export class ExcelProcessor {
       const procedure: SigtapProcedure = {
         code,
         description,
+        origem,
         complexity,
         modality,
         registrationInstrument: additionalFields.registrationInstrument || '',
@@ -304,11 +311,12 @@ export class ExcelProcessor {
         maxQuantity: additionalFields.maxQuantity || 0,
         averageStay: additionalFields.averageStay || 0,
         points: additionalFields.points || 0,
-        cbo: additionalFields.cbo || '',
-        cid: additionalFields.cid || '',
+        cbo: additionalFields.cbo || [],
+        cid: additionalFields.cid || [],
         habilitation: additionalFields.habilitation || '',
         habilitationGroup: additionalFields.habilitationGroup || [],
-        serviceClassification: additionalFields.serviceClassification || ''
+        serviceClassification: additionalFields.serviceClassification || '',
+        especialidadeLeito
       };
 
       return procedure;
@@ -351,9 +359,11 @@ export class ExcelProcessor {
       } else if (header.includes('idade_max') || header.includes('idade máxima')) {
         fields.maxAge = this.parseNumericValue(value, 999);
       } else if (header.includes('cbo')) {
-        fields.cbo = String(value || '');
+        const cboValue = String(value || '').trim();
+        fields.cbo = cboValue ? cboValue.split(/[,;|\/]/).map(s => s.trim()).filter(s => s) : [];
       } else if (header.includes('cid')) {
-        fields.cid = String(value || '');
+        const cidValue = String(value || '').trim();
+        fields.cid = cidValue ? cidValue.split(/[,;|\/]/).map(s => s.trim()).filter(s => s) : [];
       } else if (header.includes('habilitação') || header.includes('habilitacao')) {
         fields.habilitation = String(value || '');
       } else if (header.includes('pontos') || header.includes('points')) {
