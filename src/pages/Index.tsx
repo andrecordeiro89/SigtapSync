@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Navigation from '../components/Navigation';
 import Dashboard from '../components/Dashboard';
 import SigtapImport from '../components/SigtapImport';
+import { SigtapOfficialImporter } from '../components/SigtapOfficialImporter';
 import SigtapViewer from '../components/SigtapViewer';
 import AIHUpload from '../components/AIHUpload';
 import ExcelAnalyzer from '../components/ExcelAnalyzer';
@@ -17,6 +18,8 @@ const Index = () => {
         return <Dashboard />;
       case 'sigtap':
         return <SigtapImport />;
+      case 'sigtap-official':
+        return <SigtapOfficialImporter />;
       case 'sigtap-viewer':
         return <SigtapViewer />;
       case 'aih-upload':

@@ -131,4 +131,77 @@ const importProcessedData = async () => {
 - 🎯 **Precisão:** 99%+ de acurácia
 - 🔧 **Flexível:** Adapta-se a formatos variados
 - 💰 **Econômico:** Sem custos de IA
-- 📊 **Completo:** Extrai todos os campos relevantes 
+- 📊 **Completo:** Extrai todos os campos relevantes
+
+---
+
+## 🆕 FERRAMENTAS DE ANÁLISE DE ZIP SIGTAP
+
+### **Para Dados Oficiais Estruturados**
+
+Se você tem acesso aos **arquivos ZIP oficiais do SIGTAP** com dados estruturados (CSV, TXT), use estas ferramentas para análise e importação automatizada:
+
+### 🔍 **Inspeção Rápida de ZIP**
+```bash
+python scripts/quick_zip_inspector.py caminho/para/sigtap.zip
+```
+
+**O que faz:**
+- ✅ Lista todos os arquivos no ZIP
+- ✅ Mostra tamanhos e extensões  
+- ✅ Categoriza arquivos de dados
+- ✅ Identifica maiores arquivos
+
+### 📊 **Análise Profunda de ZIP**
+```bash
+python scripts/analyze_sigtap_zip.py caminho/para/sigtap.zip
+```
+
+**O que faz:**
+- ✅ Detecta encoding e delimitadores
+- ✅ Mapeia estrutura de colunas
+- ✅ Identifica chaves primárias/estrangeiras
+- ✅ Detecta relacionamentos entre tabelas
+- ✅ Sugere estratégia de importação
+- ✅ Gera relatório JSON detalhado
+
+### 📈 **Vantagens da Importação Estruturada:**
+
+| Aspecto | Excel/PDF | ZIP Estruturado |
+|---------|-----------|-----------------|
+| **Precisão** | 95-99% | 100% |
+| **Completude** | Limitado | Todos os dados |
+| **Relacionamentos** | Manual | Automático |
+| **Atualizações** | Manual | Automatizável |
+| **Performance** | Média | Excelente |
+
+### 🎯 **Quando Usar Cada Ferramenta:**
+
+**📊 Use ZIP Analysis quando:**
+- Tem acesso aos dados oficiais estruturados
+- Quer importação 100% precisa
+- Precisa de todos os relacionamentos
+- Quer automatizar atualizações
+
+**📋 Use Excel Processor quando:**
+- Só tem arquivos Excel/PDF disponíveis
+- Precisa de solução rápida
+- Dados são para análise pontual
+
+### 🚀 **Próximos Passos com ZIP:**
+
+1. **Execute a análise:**
+   ```bash
+   python scripts/quick_zip_inspector.py seu_arquivo.zip
+   python scripts/analyze_sigtap_zip.py seu_arquivo.zip
+   ```
+
+2. **Revise o relatório:**
+   - Arquivo `sigtap_analysis_report.json` será gerado
+   - Contém estratégia completa de importação
+
+3. **Implemente importador:**
+   - Baseado na estratégia descoberta
+   - Importação automatizada para Supabase
+
+📚 **Documentação Completa:** `../SIGTAP_ZIP_ANALYSIS_GUIDE.md` 

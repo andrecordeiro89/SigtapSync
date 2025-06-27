@@ -252,7 +252,7 @@ export const extractProceduresFromPageText = (textContent: any, pageNumber: numb
           let complexity = 'MÉDIA COMPLEXIDADE'; // default
           
           // ETAPA 1: Capturar tudo após "Complexidade:" até encontrar palavra-chave de parada (versão otimizada)
-          const complexityRawMatch = blockText.match(/Complexidade:\s*([^M\n\r]*?)(?=\s*(?:Modalidade|Instrumento|Tipo|Valor|Sexo|Idade|CBO|CID|Habilitação|Grupo|Serviço|$))/i);
+          const complexityRawMatch = blockText.match(/Complexidade:\s*([^\n\r]*?)(?=\s*(?:Modalidade|Instrumento|Tipo|Valor|Sexo|Idade|CBO|CID|Habilitação|Grupo|Serviço|$))/i);
           
           if (complexityRawMatch) {
             let complexityRaw = complexityRawMatch[1].trim();

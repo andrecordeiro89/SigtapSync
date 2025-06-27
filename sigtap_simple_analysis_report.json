@@ -1,0 +1,747 @@
+{
+  "arquivo": "c:\\users\\cis_f\\downloads\\TabelaUnificada_202504_v2504031832.zip",
+  "total_arquivos": 87,
+  "tabelas_principais": {
+    "tb_detalhe_layout.txt": {
+      "tamanho_bytes": 121,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_sia_sih.txt": {
+      "tamanho_bytes": 997577,
+      "tamanho_mb": 0.95,
+      "tipo": "tabela_principal"
+    },
+    "tb_habilitacao.txt": {
+      "tamanho_bytes": 52488,
+      "tamanho_mb": 0.05,
+      "tipo": "tabela_principal"
+    },
+    "tb_ocupacao_layout.txt": {
+      "tamanho_bytes": 88,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_financiamento_layout.txt": {
+      "tamanho_bytes": 133,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_habilitacao_layout.txt": {
+      "tamanho_bytes": 129,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_procedimento_layout.txt": {
+      "tamanho_bytes": 551,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_sub_grupo.txt": {
+      "tamanho_bytes": 7392,
+      "tamanho_mb": 0.01,
+      "tipo": "tabela_principal",
+      "delimitador": ";",
+      "linhas_amostra": 5,
+      "layout_info": "Coluna,Tamanho,Inicio,Fim,Tipo\r\nCO_GRUPO,2,1,2,VARCHAR2\r\nCO_SUB_GRUPO,2,3,4,VARCHAR2\r\nNO_SUB_GRUPO,100,5,104,VARCHAR2\r\nDT_COMPETENCIA,6,105,110,CHAR\r\n",
+      "primeira_linha": "0201Coleta de material                                                                              "
+    },
+    "tb_tipo_leito_layout.txt": {
+      "tamanho_bytes": 123,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_servico.txt": {
+      "tamanho_bytes": 9563,
+      "tamanho_mb": 0.01,
+      "tipo": "tabela_principal"
+    },
+    "tb_ocupacao.txt": {
+      "tamanho_bytes": 429444,
+      "tamanho_mb": 0.41,
+      "tipo": "tabela_principal"
+    },
+    "tb_grupo_layout.txt": {
+      "tamanho_bytes": 117,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_detalhe.txt": {
+      "tamanho_bytes": 5106,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_sub_grupo_layout.txt": {
+      "tamanho_bytes": 150,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_registro_layout.txt": {
+      "tamanho_bytes": 119,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_procedimento.txt": {
+      "tamanho_bytes": 1615512,
+      "tamanho_mb": 1.54,
+      "tipo": "tabela_principal",
+      "delimitador": ";",
+      "linhas_amostra": 5,
+      "layout_info": "Coluna,Tamanho,Inicio,Fim,Tipo\r\nCO_PROCEDIMENTO,10,1,10,VARCHAR2\r\nNO_PROCEDIMENTO,250,11,260,VARCHAR2\r\nTP_COMPLEXIDADE,1,261,261,VARCHAR2\r\nTP_SEXO,1,262,262,VARCHAR2\r\nQT_MAXIMA_EXECUCAO,4,263,266,NUMB",
+      "primeira_linha": "0101010010ATIVIDADE EDUCATIVA / ORIENTAO EM GRUPO NA ATENO PRIMRIA                                  "
+    },
+    "tb_grupo.txt": {
+      "tamanho_bytes": 990,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal",
+      "delimitador": ";",
+      "linhas_amostra": 5,
+      "layout_info": "Coluna,Tamanho,Inicio,Fim,Tipo\r\nCO_GRUPO,2,1,2,VARCHAR2\r\nNO_GRUPO,100,3,102,VARCHAR2\r\nDT_COMPETENCIA,6,103,108,CHAR\r\n",
+      "primeira_linha": "01Aes de promoo e preveno em sade                                                              20250"
+    },
+    "tb_regra_condicionada.txt": {
+      "tamanho_bytes": 45716,
+      "tamanho_mb": 0.04,
+      "tipo": "tabela_principal"
+    },
+    "tb_registro.txt": {
+      "tamanho_bytes": 600,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_componente_rede_layout.txt": {
+      "tamanho_bytes": 145,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_rede_atencao_layout.txt": {
+      "tamanho_bytes": 98,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_servico_classificacao_layout.txt": {
+      "tamanho_bytes": 160,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_descricao_detalhe.txt": {
+      "tamanho_bytes": 184506,
+      "tamanho_mb": 0.18,
+      "tipo": "tabela_principal"
+    },
+    "tb_componente_rede.txt": {
+      "tamanho_bytes": 3300,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_descricao_detalhe_layout.txt": {
+      "tamanho_bytes": 125,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_tuss.txt": {
+      "tamanho_bytes": 2663892,
+      "tamanho_mb": 2.54,
+      "tipo": "tabela_principal"
+    },
+    "tb_renases_layout.txt": {
+      "tamanho_bytes": 93,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_modalidade.txt": {
+      "tamanho_bytes": 440,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal",
+      "delimitador": ";",
+      "linhas_amostra": 5,
+      "layout_info": "Coluna,Tamanho,Inicio,Fim,Tipo\r\nCO_MODALIDADE,2,1,2,VARCHAR2\r\nNO_MODALIDADE,100,3,102,VARCHAR2\r\nDT_COMPETENCIA,6,103,108,CHAR\r\n",
+      "primeira_linha": "01Ambulatorial                                                                                      "
+    },
+    "tb_tipo_leito.txt": {
+      "tamanho_bytes": 2870,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_sia_sih_layout.txt": {
+      "tamanho_bytes": 186,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_regra_condicionada_layout.txt": {
+      "tamanho_bytes": 158,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_forma_organizacao.txt": {
+      "tamanho_bytes": 46512,
+      "tamanho_mb": 0.04,
+      "tipo": "tabela_principal"
+    },
+    "tb_rubrica_layout.txt": {
+      "tamanho_bytes": 121,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_descricao_layout.txt": {
+      "tamanho_bytes": 138,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_cid_layout.txt": {
+      "tamanho_bytes": 198,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_descricao.txt": {
+      "tamanho_bytes": 16317098,
+      "tamanho_mb": 15.56,
+      "tipo": "tabela_principal",
+      "delimitador": ",",
+      "linhas_amostra": 5,
+      "layout_info": "Coluna,Tamanho,Inicio,Fim,Tipo\r\nCO_PROCEDIMENTO,10,1,10,VARCHAR2\r\nDS_PROCEDIMENTO,4000,11,4010,VARCHAR2\r\nDT_COMPETENCIA,6,4011,4016,CHAR\r\n",
+      "primeira_linha": "0101010010CONSISTE NAS ATIVIDADES EDUCATIVAS, EM GRUPO,  SOBRE AES DE PROMOO E PREVENO  SADE, DESENV"
+    },
+    "tb_rede_atencao.txt": {
+      "tamanho_bytes": 275,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_modalidade_layout.txt": {
+      "tamanho_bytes": 127,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_forma_organizacao_layout.txt": {
+      "tamanho_bytes": 195,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_grupo_habilitacao_layout.txt": {
+      "tamanho_bytes": 150,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_cid.txt": {
+      "tamanho_bytes": 1609346,
+      "tamanho_mb": 1.53,
+      "tipo": "tabela_principal",
+      "delimitador": ";",
+      "linhas_amostra": 5,
+      "layout_info": "Coluna,Tamanho,Inicio,Fim,Tipo\r\nCO_CID,4,1,4,VARCHAR2\r\nNO_CID,100,5,104,VARCHAR2\r\nTP_AGRAVO,1,105,105,CHAR\r\nTP_SEXO,1,106,106,CHAR\r\nTP_ESTADIO,1,107,107,CHAR\r\nVL_CAMPOS_IRRADIADOS,4,108,111,NUMBER\r\n",
+      "primeira_linha": "A00 Clera                                                                                           "
+    },
+    "tb_servico_classificacao.txt": {
+      "tamanho_bytes": 68060,
+      "tamanho_mb": 0.06,
+      "tipo": "tabela_principal"
+    },
+    "tb_servico_layout.txt": {
+      "tamanho_bytes": 121,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_grupo_habilitacao.txt": {
+      "tamanho_bytes": 8556,
+      "tamanho_mb": 0.01,
+      "tipo": "tabela_principal"
+    },
+    "tb_tuss_layout.txt": {
+      "tamanho_bytes": 87,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_rubrica.txt": {
+      "tamanho_bytes": 4218,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal"
+    },
+    "tb_renases.txt": {
+      "tamanho_bytes": 32562,
+      "tamanho_mb": 0.03,
+      "tipo": "tabela_principal"
+    },
+    "tb_financiamento.txt": {
+      "tamanho_bytes": 770,
+      "tamanho_mb": 0.0,
+      "tipo": "tabela_principal",
+      "delimitador": ";",
+      "linhas_amostra": 5,
+      "layout_info": "Coluna,Tamanho,Inicio,Fim,Tipo\r\nCO_FINANCIAMENTO,2,1,2,VARCHAR2\r\nNO_FINANCIAMENTO,100,3,102,VARCHAR2\r\nDT_COMPETENCIA,6,103,108,CHAR\r\n",
+      "primeira_linha": "01Ateno Bsica (PAB)                                                                                2"
+    }
+  },
+  "tabelas_relacionamento": {
+    "rl_procedimento_sia_sih.txt": {
+      "tamanho_bytes": 156368,
+      "tamanho_mb": 0.15,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_tuss.txt": {
+      "tamanho_bytes": 0,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_habilitacao_layout.txt": {
+      "tamanho_bytes": 167,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_regra_cond.txt": {
+      "tamanho_bytes": 3504,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_registro.txt": {
+      "tamanho_bytes": 145620,
+      "tamanho_mb": 0.14,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_servico.txt": {
+      "tamanho_bytes": 96720,
+      "tamanho_mb": 0.09,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_renases_layout.txt": {
+      "tamanho_bytes": 96,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_sia_sih_layout.txt": {
+      "tamanho_bytes": 172,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_detalhe.txt": {
+      "tamanho_bytes": 191415,
+      "tamanho_mb": 0.18,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_tuss_layout.txt": {
+      "tamanho_bytes": 93,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_modalidade.txt": {
+      "tamanho_bytes": 155640,
+      "tamanho_mb": 0.15,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_comp_rede_layout.txt": {
+      "tamanho_bytes": 104,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_cid_layout.txt": {
+      "tamanho_bytes": 147,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_modalidade_layout.txt": {
+      "tamanho_bytes": 127,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_habilitacao.txt": {
+      "tamanho_bytes": 167804,
+      "tamanho_mb": 0.16,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_ocupacao_layout.txt": {
+      "tamanho_bytes": 121,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_servico_layout.txt": {
+      "tamanho_bytes": 159,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_compativel.txt": {
+      "tamanho_bytes": 440633,
+      "tamanho_mb": 0.42,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_leito_layout.txt": {
+      "tamanho_bytes": 127,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_detalhe_layout.txt": {
+      "tamanho_bytes": 124,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_incremento.txt": {
+      "tamanho_bytes": 102684,
+      "tamanho_mb": 0.1,
+      "tipo": "relacionamento"
+    },
+    "rl_excecao_compatibilidade_layout.txt": {
+      "tamanho_bytes": 314,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_registro_layout.txt": {
+      "tamanho_bytes": 125,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_comp_rede.txt": {
+      "tamanho_bytes": 88,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_cid.txt": {
+      "tamanho_bytes": 1868359,
+      "tamanho_mb": 1.78,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_compativel_layout.txt": {
+      "tamanho_bytes": 298,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_leito.txt": {
+      "tamanho_bytes": 82880,
+      "tamanho_mb": 0.08,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_regra_cond_layout.txt": {
+      "tamanho_bytes": 106,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_renases.txt": {
+      "tamanho_bytes": 116996,
+      "tamanho_mb": 0.11,
+      "tipo": "relacionamento"
+    },
+    "rl_excecao_compatibilidade.txt": {
+      "tamanho_bytes": 215,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_origem_layout.txt": {
+      "tamanho_bytes": 137,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_incremento_layout.txt": {
+      "tamanho_bytes": 227,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_ocupacao.txt": {
+      "tamanho_bytes": 4599024,
+      "tamanho_mb": 4.39,
+      "tipo": "relacionamento"
+    },
+    "rl_procedimento_origem.txt": {
+      "tamanho_bytes": 112,
+      "tamanho_mb": 0.0,
+      "tipo": "relacionamento"
+    }
+  },
+  "layouts_encontrados": {},
+  "documentacao": [
+    {
+      "arquivo": "layout.txt",
+      "tamanho_bytes": 7171
+    },
+    {
+      "arquivo": "LEIA_ME.TXT",
+      "tamanho_bytes": 14396
+    }
+  ],
+  "estrategia_importacao": [
+    {
+      "ordem": 1,
+      "tabela": "tb_detalhe_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 2,
+      "tabela": "tb_ocupacao_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 3,
+      "tabela": "tb_financiamento_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 4,
+      "tabela": "tb_habilitacao_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 5,
+      "tabela": "tb_procedimento_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 6,
+      "tabela": "tb_tipo_leito_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 7,
+      "tabela": "tb_grupo_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 8,
+      "tabela": "tb_detalhe.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 9,
+      "tabela": "tb_sub_grupo_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 10,
+      "tabela": "tb_registro_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 11,
+      "tabela": "tb_grupo.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 12,
+      "tabela": "tb_registro.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 13,
+      "tabela": "tb_componente_rede_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 14,
+      "tabela": "tb_rede_atencao_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 15,
+      "tabela": "tb_servico_classificacao_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 16,
+      "tabela": "tb_componente_rede.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 17,
+      "tabela": "tb_descricao_detalhe_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 18,
+      "tabela": "tb_renases_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 19,
+      "tabela": "tb_modalidade.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 20,
+      "tabela": "tb_tipo_leito.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 21,
+      "tabela": "tb_sia_sih_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 22,
+      "tabela": "tb_regra_condicionada_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 23,
+      "tabela": "tb_rubrica_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 24,
+      "tabela": "tb_descricao_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 25,
+      "tabela": "tb_cid_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 26,
+      "tabela": "tb_rede_atencao.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 27,
+      "tabela": "tb_modalidade_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 28,
+      "tabela": "tb_forma_organizacao_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 29,
+      "tabela": "tb_grupo_habilitacao_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 30,
+      "tabela": "tb_servico_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 31,
+      "tabela": "tb_tuss_layout.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 32,
+      "tabela": "tb_rubrica.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 33,
+      "tabela": "tb_financiamento.txt",
+      "tamanho_mb": 0.0,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 34,
+      "tabela": "tb_sub_grupo.txt",
+      "tamanho_mb": 0.01,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 35,
+      "tabela": "tb_servico.txt",
+      "tamanho_mb": 0.01,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 36,
+      "tabela": "tb_grupo_habilitacao.txt",
+      "tamanho_mb": 0.01,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 37,
+      "tabela": "tb_renases.txt",
+      "tamanho_mb": 0.03,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 38,
+      "tabela": "tb_regra_condicionada.txt",
+      "tamanho_mb": 0.04,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 39,
+      "tabela": "tb_forma_organizacao.txt",
+      "tamanho_mb": 0.04,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 40,
+      "tabela": "tb_habilitacao.txt",
+      "tamanho_mb": 0.05,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 41,
+      "tabela": "tb_servico_classificacao.txt",
+      "tamanho_mb": 0.06,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 42,
+      "tabela": "tb_descricao_detalhe.txt",
+      "tamanho_mb": 0.18,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 43,
+      "tabela": "tb_ocupacao.txt",
+      "tamanho_mb": 0.41,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 44,
+      "tabela": "tb_sia_sih.txt",
+      "tamanho_mb": 0.95,
+      "categoria": "Pequenas (Referência)"
+    },
+    {
+      "ordem": 45,
+      "tabela": "tb_cid.txt",
+      "tamanho_mb": 1.53,
+      "categoria": "Médias"
+    },
+    {
+      "ordem": 46,
+      "tabela": "tb_procedimento.txt",
+      "tamanho_mb": 1.54,
+      "categoria": "Médias"
+    },
+    {
+      "ordem": 47,
+      "tabela": "tb_tuss.txt",
+      "tamanho_mb": 2.54,
+      "categoria": "Médias"
+    },
+    {
+      "ordem": 48,
+      "tabela": "tb_descricao.txt",
+      "tamanho_mb": 15.56,
+      "categoria": "Grandes (Principal)"
+    }
+  ]
+}
