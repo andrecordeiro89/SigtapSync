@@ -148,9 +148,18 @@ const SigtapImport = () => {
               <p className="text-gray-600 mb-2">
                 Selecione o arquivo da tabela SIGTAP
               </p>
-              <p className="text-sm text-gray-500 mb-4">
-                <strong>🚀 NOVO:</strong> Suporte a Excel (.xlsx/.xls) • ZIP • PDF (máximo 100MB)
-              </p>
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-left">
+                <h4 className="font-semibold text-green-800 mb-2">🚀 Sistema de Extração Otimizado</h4>
+                <div className="text-xs text-green-700 space-y-1">
+                  <div><strong>📄 PDF:</strong> Extração sequencial/posicional + IA Gemini (híbrido)</div>
+                  <div><strong>📊 Excel:</strong> Performance ultra (5-30 segundos para 4886+ procedimentos)</div>
+                  <div><strong>📦 ZIP:</strong> Rápido e compacto</div>
+                  <div className="mt-2 pt-2 border-t border-green-300">
+                    <div><strong>Sequencial:</strong> Procedimento, Complexidade, Valores, Idades...</div>
+                    <div><strong>Posicional:</strong> Origem, Modalidade, CBO, CID...</div>
+                  </div>
+                </div>
+              </div>
               <input
                 type="file"
                 accept=".xlsx,.xls,.xlsm,.zip,.pdf"
@@ -346,6 +355,8 @@ const SigtapImport = () => {
           </div>
         </CardContent>
       </Card>
+
+
     </div>
   );
 };
