@@ -10,8 +10,62 @@ import { formatCurrency } from '../utils/validation';
 import { SigtapProcedure } from '../types';
 import { useSigtapContext } from '../contexts/SigtapContext';
 
+// Função para corrigir problemas de encoding
+const fixEncoding = (text: string): string => {
+  if (!text) return text;
+  
+  try {
+    // Se o texto já está em UTF-8 correto, retorna como está
+    if (text.includes('á') || text.includes('ã') || text.includes('ç')) {
+      return text;
+    }
+    
+    // Corrigir caracteres mal codificados mais comuns
+    let fixedText = text;
+    
+    // Substituições seguras usando replace
+    fixedText = fixedText.replace(/Ã¡/g, 'á');
+    fixedText = fixedText.replace(/Ã£/g, 'ã');
+    fixedText = fixedText.replace(/Ã§/g, 'ç');
+    fixedText = fixedText.replace(/Ã©/g, 'é');
+    fixedText = fixedText.replace(/Ãª/g, 'ê');
+    fixedText = fixedText.replace(/Ã­/g, 'í');
+    fixedText = fixedText.replace(/Ã³/g, 'ó');
+    fixedText = fixedText.replace(/Ã´/g, 'ô');
+    fixedText = fixedText.replace(/Ãµ/g, 'õ');
+    fixedText = fixedText.replace(/Ãº/g, 'ú');
+    fixedText = fixedText.replace(/Ã /g, 'à');
+    fixedText = fixedText.replace(/Ã¢/g, 'â');
+    fixedText = fixedText.replace(/Ã¨/g, 'è');
+    fixedText = fixedText.replace(/Ã¬/g, 'ì');
+    fixedText = fixedText.replace(/Ã²/g, 'ò');
+    fixedText = fixedText.replace(/Ã¹/g, 'ù');
+    
+    return fixedText;
+  } catch (error) {
+    console.warn('Erro ao corrigir encoding:', error);
+    return text;
+  }
+};
+
+// Função para garantir texto UTF-8 limpo
+const cleanText = (text: string): string => {
+  if (!text) return text;
+  
+  // Primeiro corrige encoding
+  let cleaned = fixEncoding(text);
+  
+  // Remove caracteres de controle não imprimíveis
+  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  
+  // Normaliza espaços
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  
+  return cleaned;
+};
+
 const SigtapViewer = () => {
-  const { procedures, totalProcedures, lastImportDate, error, clearData } = useSigtapContext();
+  const { procedures, totalProcedures, lastImportDate, error, clearData, forceReload, isLoading, importSigtapFile } = useSigtapContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [complexityFilter, setComplexityFilter] = useState('all');
   const [financingFilter, setFinancingFilter] = useState('all');
@@ -69,8 +123,8 @@ const SigtapViewer = () => {
     
     const headers = [
       'Código', 'Procedimento', 'Origem', 'Complexidade', 'Modalidade', 'Instrumento de Registro', 
-      'Tipo de Financiamento', 'Valor Ambulatorial SA', 'Valor Ambulatorial Total', 
-      'Valor Hospitalar SH', 'Valor Hospitalar SP', 'Valor Hospitalar Total',
+      'Tipo de Financiamento', 'Valor SA (Ambulatorial)', 'Valor SH (Hospitalar)', 
+      'Valor SP (Profissional)', 'VALOR TOTAL SIGTAP',
       'Atributo Complementar', 'Sexo', 'Idade Mínima', 'Unidade Idade Min', 
       'Idade Máxima', 'Unidade Idade Max', 'Quantidade Máxima', 
       'Média Permanência', 'Pontos', 'CBO', 'CID', 'Habilitação',
@@ -87,10 +141,9 @@ const SigtapViewer = () => {
           `"${p.registrationInstrument || ''}"`,
           `"${p.financing || ''}"`,
         p.valueAmb,
-          p.valueAmbTotal,
         p.valueHosp,
         p.valueProf,
-          p.valueHospTotal,
+          (p.valueAmb + p.valueHosp + p.valueProf).toFixed(2),
           `"${p.complementaryAttribute || ''}"`,
           `"${p.gender || ''}"`,
           p.minAge,
@@ -116,6 +169,8 @@ const SigtapViewer = () => {
     link.click();
   };
 
+  // Remover debug temporário para limpar console
+
   // Se não há dados carregados
   if (!procedures.length) {
     return (
@@ -135,7 +190,27 @@ const SigtapViewer = () => {
                   Para consultar os procedimentos, você precisa primeiro importar um arquivo ZIP da tabela SIGTAP.
                 </p>
               </div>
-              <div className="flex justify-center">
+              <div className="flex justify-center space-x-3">
+                <Button 
+                  onClick={forceReload} 
+                  variant="outline"
+                  disabled={isLoading}
+                  className="flex items-center space-x-2"
+                >
+                  <Search className="w-4 h-4" />
+                  <span>{isLoading ? 'Carregando...' : 'Buscar Dados'}</span>
+                </Button>
+                <Button 
+                  onClick={() => {
+                    const testText = "Ã¡ Ã£ Ã§ Ã© Ãª Ã­ Ã³ Ã´ Ãµ Ãº";
+                    const cleaned = cleanText(testText);
+                    alert(`Teste de encoding:\nOriginal: ${testText}\nLimpo: ${cleaned}`);
+                  }} 
+                  variant="outline"
+                  className="flex items-center space-x-2"
+                >
+                  🔧 Testar Encoding
+                </Button>
                 <Button onClick={() => window.location.hash = '#sigtap'} variant="outline">
                   Ir para Importação
                 </Button>
@@ -177,6 +252,12 @@ const SigtapViewer = () => {
                   Importado em: {new Date(lastImportDate).toLocaleString('pt-BR')}
                 </span>
               )}
+              <span className="text-sm font-medium text-blue-600 block mt-1">
+                📊 {procedures.length} procedimentos carregados {procedures.length >= 10000 ? '⚠️ (limite atingido)' : procedures.length < 2000 ? '❌ (incompleto - cache?)' : '✅ (completo)'}
+              </span>
+              <div className="text-xs text-gray-500 mt-1">
+                Debug: Array length = {procedures.length} | Total = {totalProcedures} | Loading = {isLoading ? 'Sim' : 'Não'}
+              </div>
             </p>
           </div>
           <div className="flex space-x-2">
@@ -201,7 +282,71 @@ const SigtapViewer = () => {
               <AlertCircle className="w-4 h-4" />
               <span>Limpar Dados</span>
             </Button>
-          </div>
+            <Button 
+              onClick={async () => {
+                console.log('🧹 LIMPEZA TOTAL DE CACHE INICIADA...');
+                
+                // 1. Limpar dados do contexto
+                clearData();
+                
+                // 2. Limpar localStorage
+                localStorage.clear();
+                
+                // 3. Limpar sessionStorage  
+                sessionStorage.clear();
+                
+                // 4. Aguardar um pouco
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // 5. Forçar reload dos dados
+                console.log('🔄 Recarregando dados do banco...');
+                await forceReload();
+                
+                // 6. Aguardar mais um pouco
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // 7. Verificar se funcionou
+                console.log('📊 Verificando resultado... procedures.length =', procedures.length);
+                            }} 
+              variant="outline" 
+              className="flex items-center space-x-2 bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100"
+              disabled={isLoading}
+            >
+              {isLoading ? '⏳' : '🧹'} {isLoading ? 'Carregando...' : 'Limpar Cache'}
+            </Button>
+            <Button 
+              onClick={async () => {
+                console.log('🔧 FORÇA RELOAD - LIMPEZA TOTAL E DADOS CORRETOS');
+                
+                try {
+                  // 1. Limpar TUDO
+                  console.log('🧹 Limpando todos os dados...');
+                  clearData();
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  
+                  // 2. Aguardar limpeza
+                  await new Promise(resolve => setTimeout(resolve, 200));
+                  
+                  // 3. Forçar carregamento apenas de dados oficiais
+                  console.log('📥 Carregando APENAS dados oficiais (valores corretos)...');
+                  await forceReload();
+                  
+                  console.log('✅ FORÇA RELOAD CONCLUÍDO!');
+                  alert('✅ Dados recarregados com valores corretos!');
+                } catch (error) {
+                  console.error('❌ Erro no força reload:', error);
+                  alert('❌ Erro no reload. Verifique o console.');
+                }
+              }} 
+              variant="outline" 
+              className="flex items-center space-x-2 bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
+              disabled={isLoading}
+            >
+              {isLoading ? '⏳' : '🔧'} {isLoading ? 'Carregando...' : 'FORÇA RELOAD'}
+            </Button>
+
+            </div>
         </div>
 
         <Card>
@@ -307,9 +452,10 @@ const SigtapViewer = () => {
                     <TableHead className="min-w-64">Procedimento</TableHead>
                     <TableHead className="w-36">Complexidade</TableHead>
                     <TableHead className="w-36">Financiamento</TableHead>
-                    <TableHead className="w-28 text-right">Valor SA</TableHead>
-                    <TableHead className="w-28 text-right">Valor SP</TableHead>
-                    <TableHead className="w-28 text-right">Valor SH</TableHead>
+                    <TableHead className="w-24 text-right">SA</TableHead>
+                    <TableHead className="w-24 text-right">SP</TableHead>
+                    <TableHead className="w-24 text-right">SH</TableHead>
+                    <TableHead className="w-28 text-right font-bold">💰 Total</TableHead>
                     <TableHead className="w-20 text-center">
                       <span className="inline-flex items-center gap-1 text-xs font-medium">
                         <FileText className="w-4 h-4" />
@@ -326,24 +472,24 @@ const SigtapViewer = () => {
                         <TableCell className="text-sm" title={procedure.description}>
                           <div className="max-w-md">
                             <div className="line-clamp-2 overflow-hidden text-ellipsis">
-                          {procedure.description}
+                          {cleanText(procedure.description)}
                             </div>
                           </div>
                       </TableCell>
                         <TableCell>
                             <Badge variant="outline" className="text-xs whitespace-nowrap">
-                              {procedure.complexity.length > 15 ? 
-                                procedure.complexity.substring(0, 15) + '...' : 
-                                procedure.complexity
+                              {cleanText(procedure.complexity).length > 15 ? 
+                                cleanText(procedure.complexity).substring(0, 15) + '...' : 
+                                cleanText(procedure.complexity)
                               }
                           </Badge>
                         </TableCell>
                           <TableCell className="text-xs">
-                            <div className="max-w-32 truncate" title={procedure.financing}>
+                            <div className="max-w-32 truncate" title={cleanText(procedure.financing || '')}>
                               {procedure.financing ? 
-                                (procedure.financing.length > 20 ? 
-                                  procedure.financing.substring(0, 20) + '...' : 
-                                  procedure.financing
+                                (cleanText(procedure.financing).length > 20 ? 
+                                  cleanText(procedure.financing).substring(0, 20) + '...' : 
+                                  cleanText(procedure.financing)
                                 ) : '-'
                               }
                             </div>
@@ -356,6 +502,13 @@ const SigtapViewer = () => {
                           </TableCell>
                           <TableCell className="text-right text-sm font-medium text-blue-700">
                             {formatCurrency(procedure.valueHosp)}
+                          </TableCell>
+                          <TableCell className="text-right text-sm font-bold text-purple-600">
+                            {formatCurrency(
+                              procedure.valueAmb + 
+                              procedure.valueHosp + 
+                              procedure.valueProf
+                            )}
                           </TableCell>
                           <TableCell className="text-center">
                           <Button
@@ -380,7 +533,7 @@ const SigtapViewer = () => {
                         
                         {expandedRows.has(procedure.code) && (
                           <TableRow>
-                            <TableCell colSpan={8} className="p-0">
+                            <TableCell colSpan={9} className="p-0">
                               <div className="bg-gradient-to-r from-blue-50 to-gray-50 p-6 border-t">
                                 <h4 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                                   <FileText className="w-5 h-5 text-blue-600 mr-2" />
@@ -399,7 +552,7 @@ const SigtapViewer = () => {
                                         </div>
                                         <div className="pt-1">
                                           <span className="text-gray-600 block mb-1">Procedimento:</span>
-                                          <span className="text-gray-900 text-sm leading-relaxed">{procedure.description}</span>
+                                          <span className="text-gray-900 text-sm leading-relaxed">{cleanText(procedure.description)}</span>
                                         </div>
                                       </div>
                                     </div>
@@ -438,46 +591,59 @@ const SigtapViewer = () => {
                                   {/* Coluna 2: Valores Financeiros */}
                                   <div className="space-y-4">
                                     <div className="bg-white p-4 rounded-lg border">
-                                      <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">Valores Ambulatoriais</h5>
+                                      <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">💊 Valores Ambulatoriais</h5>
                                       <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
                                           <span className="text-gray-600">Serviço Amb. (SA):</span>
                                           <span className="font-semibold text-green-600">{formatCurrency(procedure.valueAmb)}</span>
                                         </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-gray-600">Total Ambulatorial:</span>
-                                          <span className="font-semibold text-green-600">{formatCurrency(procedure.valueAmbTotal)}</span>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          * Valor base para procedimentos ambulatoriais
                                         </div>
                                       </div>
                                     </div>
                                     
-                                    <div className="bg-white p-4 rounded-lg border">
-                                      <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">Valores Hospitalares</h5>
+                                                                        <div className="bg-white p-4 rounded-lg border">
+                                      <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">🏥 Valores Hospitalares</h5>
                                       <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
                                           <span className="text-gray-600">Serviço Hosp. (SH):</span>
-                                          <span className="font-semibold text-blue-600">{formatCurrency(procedure.valueHosp)}</span>
+                                          <span className="font-semibold text-blue-600">
+                                            {formatCurrency(procedure.valueHosp)}
+                                            <span className="text-xs text-red-500 block">DEBUG: {procedure.valueHosp}</span>
+                                          </span>
                                         </div>
                                         <div className="flex justify-between">
                                           <span className="text-gray-600">Serviço Prof. (SP):</span>
-                                          <span className="font-semibold text-blue-600">{formatCurrency(procedure.valueProf)}</span>
+                                          <span className="font-semibold text-blue-600">
+                                            {formatCurrency(procedure.valueProf)}
+                                            <span className="text-xs text-red-500 block">DEBUG: {procedure.valueProf}</span>
+                                          </span>
                                         </div>
-                                        <div className="flex justify-between">
-                                          <span className="text-gray-600">Total Hospitalar:</span>
-                                          <span className="font-semibold text-blue-600">{formatCurrency(procedure.valueHospTotal)}</span>
+                                        <div className="flex justify-between border-t pt-2 mt-2">
+                                          <span className="text-gray-600">Subtotal Hospitalar:</span>
+                                          <span className="font-semibold text-blue-700">
+                                            {formatCurrency(procedure.valueHospTotal)}
+                                            <span className="text-xs text-red-500 block">DEBUG: {procedure.valueHospTotal}</span>
+                                          </span>
                                         </div>
-                                        <hr className="my-2" />
-                                        <div className="flex justify-between text-base font-bold">
-                                          <span>VALOR TOTAL:</span>
+                                        <hr className="my-3" />
+                                        <div className="flex justify-between text-base font-bold bg-purple-50 p-2 rounded">
+                                          <span>💰 VALOR TOTAL SIGTAP:</span>
                                           <span className="text-purple-600">
                                             {formatCurrency(
                                               procedure.valueAmb + 
-                                              procedure.valueAmbTotal + 
                                               procedure.valueHosp + 
-                                              procedure.valueProf + 
-                                              procedure.valueHospTotal
+                                              procedure.valueProf
                                             )}
                                           </span>
+                                        </div>
+                                        {/* Composição do valor */}
+                                        <div className="text-xs text-gray-500 mt-2 bg-gray-50 p-2 rounded">
+                                          <div className="font-medium mb-1">Composição:</div>
+                                          <div>• SA (Amb): {formatCurrency(procedure.valueAmb)}</div>
+                                          <div>• SH (Hosp): {formatCurrency(procedure.valueHosp)}</div>
+                                          <div>• SP (Prof): {formatCurrency(procedure.valueProf)}</div>
                                         </div>
                                       </div>
                                     </div>

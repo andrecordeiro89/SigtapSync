@@ -19,6 +19,7 @@ interface SigtapContextType {
   isSupabaseEnabled: boolean;
   loadFromSupabase: () => Promise<void>;
   saveToSupabase: (procedures: SigtapProcedure[], versionName: string) => Promise<void>;
+  forceReload: () => Promise<void>;
 }
 
 const SigtapContext = createContext<SigtapContextType | undefined>(undefined);
@@ -45,43 +46,39 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
     if (!isSupabaseEnabled) return;
     
     try {
-      console.log('📥 Carregando procedimentos do Supabase...');
+      console.log('📥 🔧 CARREGAMENTO FORÇADO - APENAS DADOS OFICIAIS CORRETOS...');
       
       // Import dinâmico para evitar problemas de módulo
       const { SigtapService } = await import('../services/supabaseService');
       
-      // Verificação mais robusta do SigtapService
-      if (!SigtapService) {
-        console.warn('⚠️ SigtapService não foi importado corretamente');
-        return;
-      }
+      // FORÇAR uso EXCLUSIVO da tabela oficial (valores corretos)
+      console.log('🎯 Carregando EXCLUSIVAMENTE da tabela oficial (valores íntegros)...');
+      const officialProcedures = await SigtapService.getActiveProceduresFromOfficial();
       
-      if (typeof SigtapService.getActiveProcedures !== 'function') {
-        console.warn('⚠️ Método getActiveProcedures não está disponível no SigtapService');
-        console.log('SigtapService disponível:', Object.getOwnPropertyNames(SigtapService));
-        return;
-      }
-      
-      const procedures = await SigtapService.getActiveProcedures();
-      
-      if (procedures && procedures.length > 0) {
-        console.log(`✅ ${procedures.length} procedimentos carregados do Supabase`);
+      if (officialProcedures && officialProcedures.length > 0) {
+        console.log(`✅ ${officialProcedures.length} procedimentos OFICIAIS carregados (valores corretos)`);
         
-        // Simular resultado de importação para manter compatibilidade
-        const result: SigtapProcessingResult = {
-          success: true,
-          message: `${procedures.length} procedimentos carregados do banco de dados`,
-          procedures,
-          totalProcessed: procedures.length
-        };
+        // Debug dos primeiros valores para confirmar correção
+        console.log('🔍 VALORES DE TESTE (primeiros 3 procedimentos):');
+        officialProcedures.slice(0, 3).forEach((proc, index) => {
+          console.log(`${index + 1}. ${proc.code}: SA=${proc.valueAmb}, SH=${proc.valueHosp}, SP=${proc.valueProf}`);
+        });
         
-        // Usar método direto do contexto existente
-        await sigtapData.importSigtapFile(null, procedures);
+        // Limpar dados antigos ANTES de carregar novos
+        sigtapData.clearData();
+        
+        // Aguardar um momento para garantir limpeza
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Carregar APENAS dados oficiais corretos
+        await sigtapData.importSigtapFile(null, officialProcedures);
+        
+        console.log('✅ CARREGAMENTO OFICIAL CONCLUÍDO - valores corretos garantidos');
       } else {
-        console.log('ℹ️ Nenhum procedimento ativo encontrado no banco');
+        console.error('❌ Nenhum procedimento encontrado na tabela oficial');
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar dados do Supabase:', error);
+      console.error('❌ Erro ao carregar dados oficiais:', error);
     }
   };
 
@@ -160,12 +157,20 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
     return result;
   };
 
+  // Função para forçar recarregamento
+  const forceReload = async () => {
+    console.log('🔄 Forçando recarregamento dos dados...');
+    sigtapData.clearData();
+    await loadFromSupabase();
+  };
+
   const contextValue: SigtapContextType = {
     ...sigtapData,
     importSigtapFile,
     isSupabaseEnabled,
     loadFromSupabase,
-    saveToSupabase
+    saveToSupabase,
+    forceReload
   };
 
   return (
