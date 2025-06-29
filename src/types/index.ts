@@ -330,3 +330,63 @@ export interface AIHAnalysisReport {
     warningChecks: string[];
   };
 }
+
+// Procedimento individual da segunda página da AIH
+export interface ProcedureAIH {
+  sequencia: number;
+  procedimento: string;
+  documentoProfissional: string;
+  cbo: string;
+  participacao: string;
+  cnes: string;
+  aceitar: boolean;
+  data: string;
+  descricao?: string;
+  
+  // Campos do matching
+  matchStatus: 'pending' | 'matched' | 'manual' | 'rejected';
+  matchConfidence?: number;
+  sigtapProcedure?: SigtapProcedure;
+  valorCalculado?: number;
+  valorOriginal?: number;
+  observacoes?: string;
+  
+  // Auditoria
+  revisadoPor?: string;
+  dataRevisao?: string;
+  aprovado?: boolean;
+}
+
+// AIH expandida com procedimentos
+export interface AIHComplete extends AIH {
+  procedimentos: ProcedureAIH[];
+  valorTotalCalculado?: number;
+  valorTotalOriginal?: number;
+  statusGeral: 'processando' | 'aguardando_revisao' | 'aprovada' | 'rejeitada';
+  totalProcedimentos: number;
+  procedimentosAprovados: number;
+  procedimentosRejeitados: number;
+}
+
+// Resultado do matching de procedimentos
+export interface ProcedureMatchingResult {
+  success: boolean;
+  totalProcedimentos: number;
+  procedimentosEncontrados: number;
+  procedimentosNaoEncontrados: number;
+  valorTotalCalculado: number;
+  matchingDetails: Array<{
+    codigo: string;
+    encontrado: boolean;
+    confidence: number;
+    sigtapMatch?: SigtapProcedure;
+    erro?: string;
+  }>;
+  tempoProcessamento: number;
+}
+
+// Resultado completo do processamento PDF com procedimentos
+export interface AIHCompleteProcessingResult extends AIHProcessingResult {
+  aihCompleta?: AIHComplete;
+  procedureMatchingResult?: ProcedureMatchingResult;
+}

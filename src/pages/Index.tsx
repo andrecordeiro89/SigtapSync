@@ -7,8 +7,10 @@ import SigtapViewer from '../components/SigtapViewer';
 import AIHUpload from '../components/AIHUpload';
 import ExcelAnalyzer from '../components/ExcelAnalyzer';
 import PatientManagement from '../components/PatientManagement';
-import ProcedureRecords from '../components/ProcedureRecords';
+import ProcedureManagement from '../components/ProcedureManagement';
 import AIHPDFTester from '../components/AIHPDFTester';
+import AIHMultiPageTester from '../components/AIHMultiPageTester';
+import DataVerifier from '../components/DataVerifier';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -27,12 +29,16 @@ const Index = () => {
         return <AIHUpload />;
       case 'aih-pdf-tester':
         return <AIHPDFTester />;
+      case 'aih-multipage-tester':
+        return <AIHMultiPageTester />;
+      case 'data-verifier':
+        return <DataVerifier />;
       case 'excel-analyzer':
         return <ExcelAnalyzer />;
       case 'patients':
         return <PatientManagement />;
       case 'procedures':
-        return <ProcedureRecords />;
+        return <ProcedureManagement aihCompleta={{} as any} onUpdateAIH={() => {}} />;
       default:
         return <Dashboard />;
     }

@@ -44,6 +44,20 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       badge: 'TESTE'
     },
     {
+      id: 'aih-multipage-tester',
+      label: 'Multi-Página',
+      icon: FileText,
+      description: 'Teste AIH Multi-Página',
+      badge: 'NOVO'
+    },
+    {
+      id: 'data-verifier',
+      label: 'Verificar Dados',
+      icon: Database,
+      description: 'Verificar dados salvos',
+      badge: 'NOVO'
+    },
+    {
       id: 'patients',
       label: 'Pacientes',
       icon: Users,
@@ -51,9 +65,10 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
     },
     {
       id: 'procedures',
-      label: 'Procedimentos',
+      label: 'Gestão Proc.',
       icon: FileText,
-      description: 'Registro de atendimentos'
+      description: 'Gestão completa de procedimentos AIH',
+      badge: 'NOVO'
     }
   ];
 
