@@ -1,7 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { BarChart3, Upload, Users, FileText, Home, Search, FileUp, TestTube, Database } from 'lucide-react';
+import { BarChart3, Upload, Users, FileText, Home, Search, FileUp, BarChart4 } from 'lucide-react';
 
 interface NavigationProps {
   activeTab: string;
@@ -20,8 +19,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       id: 'sigtap',
       label: 'SIGTAP',
       icon: Upload,
-      description: 'Importação da tabela',
-      badge: 'Nova versão'
+      description: 'Importação da tabela'
     },
     {
       id: 'sigtap-viewer',
@@ -30,32 +28,10 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       description: 'Visualizar procedimentos'
     },
     {
-      id: 'aih-upload',
+      id: 'aih-multipage-tester',
       label: 'Upload AIH',
       icon: FileUp,
-      description: 'Importação de AIHs',
-      badge: 'NOVO'
-    },
-    {
-      id: 'aih-pdf-tester',
-      label: 'Teste PDF AIH',
-      icon: TestTube,
-      description: 'Testador PDF AIH',
-      badge: 'TESTE'
-    },
-    {
-      id: 'aih-multipage-tester',
-      label: 'Multi-Página',
-      icon: FileText,
-      description: 'Teste AIH Multi-Página',
-      badge: 'NOVO'
-    },
-    {
-      id: 'data-verifier',
-      label: 'Verificar Dados',
-      icon: Database,
-      description: 'Verificar dados salvos',
-      badge: 'NOVO'
+      description: 'Upload e processamento de AIHs'
     },
     {
       id: 'patients',
@@ -64,11 +40,10 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       description: 'Cadastro e gerenciamento'
     },
     {
-      id: 'procedures',
-      label: 'Gestão Proc.',
-      icon: FileText,
-      description: 'Gestão completa de procedimentos AIH',
-      badge: 'NOVO'
+      id: 'reports',
+      label: 'Relatórios',
+      icon: BarChart4,
+      description: 'Central de relatórios executivos'
     }
   ];
 
@@ -90,15 +65,10 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                 key={tab.id}
                 variant={activeTab === tab.id ? "default" : "ghost"}
                 onClick={() => onTabChange(tab.id)}
-                className="flex items-center space-x-2 relative"
+                className="flex items-center space-x-2"
               >
                 <tab.icon className="w-4 h-4" />
                 <span className="hidden sm:inline">{tab.label}</span>
-                {tab.badge && (
-                  <Badge variant="destructive" className="absolute -top-2 -right-2 text-xs px-1 py-0">
-                    !
-                  </Badge>
-                )}
               </Button>
             ))}
           </nav>

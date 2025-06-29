@@ -33,6 +33,7 @@ import { ProcedureMatchingService } from '../services/procedureMatchingService';
 import { useSigtapContext } from '../contexts/SigtapContext';
 import { AIHCompleteProcessingResult, AIHComplete, ProcedureAIH } from '../types';
 
+
 // Componente organizado para visualizar AIH completa
 const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComplete; onUpdateAIH: (aih: AIHComplete) => void }) => {
   const [expandedProcedures, setExpandedProcedures] = useState<Set<number>>(new Set());
