@@ -1,41 +1,84 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, User, Phone, MapPin } from 'lucide-react';
+import { Search, Plus, User, Phone, MapPin, Database, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { mockPatients } from '../data/mockData';
+import { useAuth } from '../contexts/AuthContext';
+import { PatientService } from '../services/supabaseService';
 import { validateCNS, formatCNS, formatDate } from '../utils/validation';
-import { Patient } from '../types';
+import { PatientDB } from '../lib/supabase';
 
 const PatientManagement = () => {
-  const [patients, setPatients] = useState(mockPatients);
+  const [patients, setPatients] = useState<PatientDB[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     cns: '',
-    birthDate: '',
+    birth_date: '',
     gender: '',
     address: '',
     city: '',
     state: '',
-    zipCode: '',
+    zip_code: '',
     phone: ''
   });
   const { toast } = useToast();
+  const { user, profile } = useAuth();
+  
+  // Por enquanto, usar primeiro hospital do usuário ou hospital padrão
+  const currentHospital = profile?.hospital_access?.[0] 
+    ? { id: profile.hospital_access[0], name: 'Hospital Principal' }
+    : { id: 'a0000000-0000-0000-0000-000000000001', name: 'Hospital Demo' };
+
+  // Carregar pacientes do hospital atual
+  useEffect(() => {
+    loadPatients();
+  }, [currentHospital]);
+
+  const loadPatients = async () => {
+    if (!currentHospital) return;
+    
+    setIsLoading(true);
+    try {
+      console.log('👥 Carregando pacientes do hospital:', currentHospital.name);
+      const hospitalPatients = await PatientService.getPatients(currentHospital.id);
+      setPatients(hospitalPatients);
+      console.log(`✅ ${hospitalPatients.length} pacientes carregados`);
+    } catch (error) {
+      console.error('❌ Erro ao carregar pacientes:', error);
+      toast({
+        title: "Erro ao carregar pacientes",
+        description: "Não foi possível carregar os dados dos pacientes",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredPatients = patients.filter(patient =>
     patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     patient.cns.includes(searchTerm.replace(/\D/g, ''))
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!currentHospital) {
+      toast({
+        title: "Erro",
+        description: "Nenhum hospital selecionado",
+        variant: "destructive"
+      });
+      return;
+    }
     
     if (!validateCNS(formData.cns)) {
       toast({
@@ -46,31 +89,61 @@ const PatientManagement = () => {
       return;
     }
 
-    const newPatient: Patient = {
-      id: Date.now().toString(),
-      ...formData,
-      gender: formData.gender as 'M' | 'F',
-      createdAt: new Date().toISOString()
-    };
+    setIsSaving(true);
+    
+    try {
+      const newPatientData = {
+        hospital_id: currentHospital.id,
+        name: formData.name,
+        cns: formData.cns.replace(/\D/g, ''),
+        birth_date: formData.birth_date,
+        gender: formData.gender as 'M' | 'F',
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zip_code: formData.zip_code,
+        phone: formData.phone,
+        is_active: true,
+        created_by: user?.id
+      };
 
-    setPatients([newPatient, ...patients]);
-    setFormData({
-      name: '',
-      cns: '',
-      birthDate: '',
-      gender: '',
-      address: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      phone: ''
-    });
-    setShowForm(false);
+      console.log('👤 Cadastrando novo paciente:', newPatientData.name);
+      const newPatient = await PatientService.createPatient(newPatientData);
+      
+      // Adicionar à lista local
+      setPatients(prev => [newPatient, ...prev]);
+      
+      // Limpar formulário
+      setFormData({
+        name: '',
+        cns: '',
+        birth_date: '',
+        gender: '',
+        address: '',
+        city: '',
+        state: '',
+        zip_code: '',
+        phone: ''
+      });
+      setShowForm(false);
 
-    toast({
-      title: "Paciente cadastrado",
-      description: `${newPatient.name} foi cadastrado com sucesso.`,
-    });
+      toast({
+        title: "✅ Paciente cadastrado",
+        description: `${newPatient.name} foi cadastrado com sucesso.`,
+      });
+      
+      console.log('✅ Paciente cadastrado com ID:', newPatient.id);
+
+    } catch (error) {
+      console.error('❌ Erro ao cadastrar paciente:', error);
+      toast({
+        title: "Erro ao cadastrar paciente",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -80,17 +153,56 @@ const PatientManagement = () => {
     }));
   };
 
+  if (!currentHospital) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <User className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-semibold text-gray-900">Nenhum hospital selecionado</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Faça login para acessar o gerenciamento de pacientes
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Gerenciamento de Pacientes</h2>
-          <p className="text-gray-600 mt-1">Cadastre e gerencie os dados dos pacientes</p>
+          <p className="text-gray-600 mt-1">
+            Hospital: <span className="font-medium">{currentHospital.name}</span>
+          </p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="flex items-center space-x-2">
-          <Plus className="w-4 h-4" />
-          <span>Novo Paciente</span>
-        </Button>
+        <div className="flex space-x-2">
+          <Button 
+            onClick={loadPatients} 
+            variant="outline" 
+            disabled={isLoading}
+            className="flex items-center space-x-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Atualizar</span>
+          </Button>
+          <Button 
+            onClick={() => setShowForm(!showForm)} 
+            className="flex items-center space-x-2"
+            disabled={isSaving}
+          >
+            <Plus className="w-4 h-4" />
+            <span>Novo Paciente</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Status do banco de dados */}
+      <div className="flex items-center space-x-2 text-sm text-gray-600">
+        <Database className="w-4 h-4" />
+        <span>
+          {isLoading ? 'Carregando...' : `${patients.length} paciente(s) cadastrado(s)`}
+        </span>
       </div>
 
       {showForm && (
@@ -126,8 +238,8 @@ const PatientManagement = () => {
                   <Input
                     id="birthDate"
                     type="date"
-                    value={formData.birthDate}
-                    onChange={(e) => handleInputChange('birthDate', e.target.value)}
+                    value={formData.birth_date}
+                    onChange={(e) => handleInputChange('birth_date', e.target.value)}
                     required
                   />
                 </div>
@@ -156,8 +268,8 @@ const PatientManagement = () => {
                   <Label htmlFor="zipCode">CEP</Label>
                   <Input
                     id="zipCode"
-                    value={formData.zipCode}
-                    onChange={(e) => handleInputChange('zipCode', e.target.value)}
+                    value={formData.zip_code}
+                    onChange={(e) => handleInputChange('zip_code', e.target.value)}
                     placeholder="00000-000"
                   />
                 </div>
@@ -235,7 +347,7 @@ const PatientManagement = () => {
                           <span>{formatCNS(patient.cns)}</span>
                         </p>
                         <p>
-                          <span className="font-medium">Nascimento:</span> {formatDate(patient.birthDate)} 
+                          <span className="font-medium">Nascimento:</span> {formatDate(patient.birth_date)} 
                           <span className="ml-2 font-medium">Sexo:</span> {patient.gender === 'M' ? 'Masculino' : 'Feminino'}
                         </p>
                         {patient.phone && (
@@ -252,7 +364,7 @@ const PatientManagement = () => {
                     </div>
                   </div>
                   <div className="text-xs text-gray-500">
-                    Cadastrado em {formatDate(patient.createdAt)}
+                    Cadastrado em {formatDate(patient.created_at)}
                   </div>
                 </div>
               </div>

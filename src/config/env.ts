@@ -9,7 +9,7 @@ export const ENV_CONFIG = {
   GEMINI_API_KEY: import.meta.env.VITE_GEMINI_API_KEY || '',
   
   // ===== APLICAÇÃO =====
-  APP_NAME: import.meta.env.VITE_APP_NAME || 'SIGTAP Billing Wizard',
+  APP_NAME: import.meta.env.VITE_APP_NAME || 'SIGTAP Sync',
   APP_VERSION: import.meta.env.VITE_APP_VERSION || '3.0.0',
   APP_ENVIRONMENT: import.meta.env.VITE_APP_ENVIRONMENT || 'development',
   

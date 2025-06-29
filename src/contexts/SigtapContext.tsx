@@ -90,6 +90,7 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       console.log('💾 Salvando no Supabase...');
+      console.log(`📊 Total de procedimentos a salvar: ${procedures.length}`);
       
       // Import dinâmico para evitar problemas de módulo
       const { SigtapService } = await import('../services/supabaseService');
@@ -104,12 +105,13 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
         throw new Error('Método createVersion não está disponível no SigtapService');
       }
       
-      // Criar nova versão - removendo campo problemático temporariamente
+      // Criar nova versão - INCLUINDO extraction_method novamente
+      console.log('🔄 Criando nova versão SIGTAP...');
       const version = await SigtapService.createVersion({
         version_name: versionName,
         file_type: 'pdf',
         total_procedures: procedures.length,
-        // extraction_method: removido temporariamente devido à constraint
+        extraction_method: 'pdf', // ✅ CAMPO REATIVADO
         import_status: 'completed',
         import_date: new Date().toISOString(),
         is_active: false
@@ -118,14 +120,17 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
       console.log('✅ Versão criada:', version.id);
 
       // Salvar procedimentos
+      console.log('💾 Salvando procedimentos no banco...');
       await SigtapService.saveProcedures(version.id, procedures);
       console.log('✅ Procedimentos salvos');
       
       // Ativar versão
+      console.log('🔄 Ativando versão...');
       await SigtapService.setActiveVersion(version.id);
       console.log('✅ Versão ativada');
       
       console.log('🎉 Dados salvos no Supabase com sucesso!');
+      console.log(`📊 ${procedures.length} procedimentos persistidos no banco de dados`);
     } catch (error) {
       console.error('❌ Erro ao salvar no Supabase:', error);
       console.error('❌ Detalhes do erro:', JSON.stringify(error, null, 2));
@@ -144,10 +149,13 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
           `Import_${file.name}_${new Date().toISOString().slice(0, 16)}` :
           `Direct_Import_${new Date().toISOString().slice(0, 16)}`;
           
+        console.log(`🚀 Iniciando salvamento no banco: ${result.procedures.length} procedimentos`);
         await saveToSupabase(result.procedures, versionName);
         
         // Atualizar mensagem de sucesso
         result.message += ' (Salvo no banco de dados)';
+        console.log('🎉 UPLOAD COMPLETO: Dados processados e persistidos no banco!');
+        console.log('🎉 UPLOAD COMPLETO: Dados processados e persistidos no banco!');
       } catch (error) {
         console.warn('⚠️ Dados importados localmente, mas falha ao salvar no Supabase:', error);
         result.message += ' (Erro ao salvar no banco - dados mantidos localmente)';

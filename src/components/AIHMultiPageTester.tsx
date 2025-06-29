@@ -25,12 +25,16 @@ import {
   X,
   Info,
   DollarSign,
-  Stethoscope
+  Stethoscope,
+  Database,
+  Save
 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { AIHCompleteProcessor } from '../utils/aihCompleteProcessor';
 import { ProcedureMatchingService } from '../services/procedureMatchingService';
 import { useSigtapContext } from '../contexts/SigtapContext';
+import { useAuth } from '../contexts/AuthContext';
+import { AIHPersistenceService } from '../services/aihPersistenceService';
 import { AIHCompleteProcessingResult, AIHComplete, ProcedureAIH } from '../types';
 
 
@@ -718,11 +722,14 @@ const AIHMultiPageTester = () => {
   const [result, setResult] = useState<AIHCompleteProcessingResult | null>(null);
   const [aihCompleta, setAihCompleta] = useState<AIHComplete | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [aihSaved, setAihSaved] = useState(false);
   const { toast } = useToast();
   const { procedures: sigtapProcedures, isLoading: sigtapLoading, totalProcedures } = useSigtapContext();
+  const { user, currentHospital } = useAuth();
 
   const processor = new AIHCompleteProcessor();
   const matchingService = new ProcedureMatchingService(sigtapProcedures);
+  const aihPersistenceService = new AIHPersistenceService();
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -781,6 +788,39 @@ const AIHMultiPageTester = () => {
         title: "✅ Processamento concluído",
         description: `AIH processada em ${totalTime}ms`
       });
+
+      // Persistir AIH processada no banco de dados
+      if (processingResult.aihCompleta && user && currentHospital) {
+        try {
+          console.log('💾 Salvando AIH no banco de dados...');
+          const persistenceResult = await AIHPersistenceService.persistAIHFromPDF(
+            processingResult.aihCompleta,
+            currentHospital.id,
+            selectedFile.name
+          );
+          
+          if (persistenceResult.success) {
+            toast({
+              title: "✅ AIH salva com sucesso",
+              description: persistenceResult.message
+            });
+            setAihSaved(true);
+          } else {
+            toast({
+              title: "⚠️ Erro ao salvar AIH",
+              description: persistenceResult.message,
+              variant: "destructive"
+            });
+          }
+        } catch (error) {
+          console.error('❌ Erro na persistência:', error);
+          toast({
+            title: "❌ Erro na persistência",
+            description: "Falha ao salvar no banco de dados",
+            variant: "destructive"
+          });
+        }
+      }
 
     } catch (error) {
       console.error('❌ Erro no processamento:', error);
@@ -847,6 +887,8 @@ const AIHMultiPageTester = () => {
           total: matchingResult.totalProcedimentos,
           valor: matchingResult.valorTotalCalculado
         });
+
+        // AIH já foi salva anteriormente no processamento inicial
 
       } else {
         throw new Error('Falha no matching dos procedimentos');

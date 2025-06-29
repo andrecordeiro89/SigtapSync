@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -15,43 +15,174 @@ import {
   Building2,
   CheckCircle,
   AlertTriangle,
-  Eye
+  Eye,
+  RefreshCw,
+  Database
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { PatientService, AIHService } from '../services/supabaseService';
 import { CIS_HOSPITALS } from '../data/realHospitals';
 
-const ReportsSimple: React.FC = () => {
-  const [selectedHospital, setSelectedHospital] = useState('');
-  const [selectedHospitalName, setSelectedHospitalName] = useState('');
+interface ReportData {
+  totalAIHs: number;
+  totalProcedimentos: number;
+  procedimentosAprovados: number;
+  valorTotal: number;
+  ticketMedio: number;
+  hospitaisDistintos: number;
+  aihsList: Array<{
+    numeroAIH: string;
+    paciente: string;
+    hospital: string;
+    valor: number;
+    status: string;
+    data: string;
+  }>;
+}
 
-  // Dados mock para demonstração
-  const mockStatistics = {
-    totalAIHs: 24,
-    totalProcedimentos: 85,
-    procedimentosAprovados: 78,
-    valorTotal: 45750.90,
-    ticketMedio: 1906.29,
-    hospitaisDistintos: 3
+const ReportsSimple: React.FC = () => {
+  const [selectedHospital, setSelectedHospital] = useState('all');
+  const [selectedHospitalName, setSelectedHospitalName] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [reportData, setReportData] = useState<ReportData>({
+    totalAIHs: 0,
+    totalProcedimentos: 0,
+    procedimentosAprovados: 0,
+    valorTotal: 0,
+    ticketMedio: 0,
+    hospitaisDistintos: 0,
+    aihsList: []
+  });
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+  const { user, profile } = useAuth();
+  
+  // Hospital atual (simplificado para Fase 1)
+  const currentHospital = profile?.hospital_access?.[0] 
+    ? { id: profile.hospital_access[0], name: 'Hospital Principal' }
+    : { id: 'a0000000-0000-0000-0000-000000000001', name: 'Hospital Demo' };
+
+  // Carregar dados reais do relatório
+  const loadReportData = async () => {
+    if (!currentHospital) return;
+    
+    setIsLoading(true);
+    try {
+      console.log('📊 Carregando dados do relatório...');
+      
+      // Carregar AIHs
+      const aihs = await AIHService.getAIHs(
+        selectedHospital === 'all' ? undefined : selectedHospital
+      );
+      
+      // Carregar pacientes para enriquecer dados
+      const patients = await PatientService.getPatients(currentHospital.id);
+      const patientsMap = new Map(patients.map(p => [p.id, p]));
+      
+      // Processar dados
+      const valorTotal = aihs.reduce((sum, aih) => {
+        return sum + (aih.original_value ? aih.original_value / 100 : 0);
+      }, 0);
+      
+      const procedimentosAprovados = aihs.filter(aih => 
+        aih.processing_status === 'matched' || aih.processing_status === 'approved'
+      ).length;
+      
+      const aihsList = aihs.map(aih => {
+        const patient = patientsMap.get(aih.patient_id);
+        return {
+          numeroAIH: aih.aih_number,
+          paciente: patient?.name || 'Nome não encontrado',
+          hospital: currentHospital.name,
+          valor: aih.original_value ? aih.original_value / 100 : 0,
+          status: aih.processing_status || 'pending',
+          data: new Date(aih.admission_date).toLocaleDateString('pt-BR')
+        };
+      });
+      
+      const newReportData: ReportData = {
+        totalAIHs: aihs.length,
+        totalProcedimentos: aihs.length, // Simplificado
+        procedimentosAprovados,
+        valorTotal,
+        ticketMedio: aihs.length > 0 ? valorTotal / aihs.length : 0,
+        hospitaisDistintos: 1, // Simplificado para Fase 1
+        aihsList
+      };
+      
+      setReportData(newReportData);
+      setLastUpdate(new Date());
+      
+      console.log('✅ Dados do relatório carregados:', newReportData);
+      
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados do relatório:', error);
+      toast.error('Erro ao carregar dados do relatório');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const mockAIHs = [
-    { numeroAIH: '2024001001', paciente: 'João Silva Santos', hospital: 'Hospital Santa Alice', valor: 1250.80 },
-    { numeroAIH: '2024001002', paciente: 'Maria Oliveira Costa', hospital: 'Hospital Faxinal', valor: 2100.50 },
-    { numeroAIH: '2024001003', paciente: 'Carlos Eduardo Lima', hospital: 'Hospital CIS', valor: 875.25 }
-  ];
+  // Carregar dados na inicialização
+  useEffect(() => {
+    loadReportData();
+  }, [selectedHospital, currentHospital?.id]);
 
   const handleHospitalSelect = (hospitalCnpj: string) => {
-    const hospital = CIS_HOSPITALS.find(h => h.cnpj === hospitalCnpj);
-    setSelectedHospital(hospitalCnpj);
-    setSelectedHospitalName(hospital?.name || '');
+    if (hospitalCnpj === 'all') {
+      setSelectedHospital('all');
+      setSelectedHospitalName('');
+    } else {
+      const hospital = CIS_HOSPITALS.find(h => h.cnpj === hospitalCnpj);
+      setSelectedHospital(hospitalCnpj);
+      setSelectedHospitalName(hospital?.name || '');
+    }
   };
 
   const handleExportExcel = () => {
-    toast.success('📊 Relatório Excel gerado com sucesso!');
+    // Preparar dados para exportação
+    const exportData = [
+      ['Número AIH', 'Paciente', 'Hospital', 'Valor (R$)', 'Status', 'Data'],
+      ...reportData.aihsList.map(aih => [
+        aih.numeroAIH,
+        aih.paciente,
+        aih.hospital,
+        aih.valor.toFixed(2),
+        aih.status,
+        aih.data
+      ])
+    ];
+    
+    // Converter para CSV simples
+    const csvContent = exportData.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `relatorio-aihs-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+    toast.success('📊 Relatório CSV gerado com sucesso!');
   };
 
   const handleExportPDF = () => {
     toast.success('📄 Relatório PDF Premium gerado com sucesso!');
   };
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <BarChart4 className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-semibold text-gray-900">Acesso restrito</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Faça login para acessar os relatórios
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
@@ -60,11 +191,20 @@ const ReportsSimple: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2">📊 Central de Relatórios</h1>
-            <p className="text-blue-100">Análises executivas e relatórios detalhados de faturamento</p>
+            <p className="text-blue-100">
+              {currentHospital?.name || 'Sistema de Faturamento SIGTAP'}
+            </p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold">{mockStatistics.totalAIHs}</div>
-            <div className="text-blue-100">AIHs no Período</div>
+            <div className="text-2xl font-bold">
+              {isLoading ? '...' : reportData.totalAIHs}
+            </div>
+            <div className="text-blue-100">AIHs no Sistema</div>
+            {lastUpdate && (
+              <div className="text-xs text-blue-200 mt-1">
+                Atualizado: {lastUpdate.toLocaleTimeString()}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -74,12 +214,12 @@ const ReportsSimple: React.FC = () => {
         <CardHeader className="bg-blue-50">
           <CardTitle className="flex items-center gap-2 text-blue-700">
             <Filter className="h-5 w-5" />
-            Filtros Avançados
+            Filtros e Controles
           </CardTitle>
-          <CardDescription>Configure os filtros para gerar relatórios personalizados</CardDescription>
+          <CardDescription>Configure os filtros e atualize os dados</CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* HOSPITAL */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Hospital</label>
@@ -88,7 +228,7 @@ const ReportsSimple: React.FC = () => {
                   <SelectValue placeholder="Todos os hospitais" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos os hospitais</SelectItem>
+                  <SelectItem value="all">Todos os hospitais</SelectItem>
                   {CIS_HOSPITALS.filter(h => h.is_active).map(hospital => (
                     <SelectItem key={hospital.cnpj} value={hospital.cnpj}>
                       <div className="flex items-center gap-2">
@@ -133,6 +273,19 @@ const ReportsSimple: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* ATUALIZAR */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Controles</label>
+              <Button 
+                onClick={loadReportData} 
+                disabled={isLoading}
+                className="w-full flex items-center space-x-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <span>Atualizar</span>
+              </Button>
+            </div>
           </div>
 
           {/* HOSPITAL SELECIONADO */}
@@ -144,6 +297,14 @@ const ReportsSimple: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* STATUS DO BANCO */}
+          <div className="mt-4 flex items-center space-x-2 text-sm text-gray-600">
+            <Database className="w-4 h-4" />
+            <span>
+              {isLoading ? 'Carregando...' : `${reportData.totalAIHs} AIH(s) encontrada(s)`}
+            </span>
+          </div>
         </CardContent>
       </Card>
 
@@ -152,7 +313,9 @@ const ReportsSimple: React.FC = () => {
         <Card className="border-blue-200">
           <CardContent className="p-4 text-center">
             <FileText className="h-8 w-8 mx-auto mb-2 text-blue-600" />
-            <div className="text-2xl font-bold text-blue-700">{mockStatistics.totalAIHs}</div>
+            <div className="text-2xl font-bold text-blue-700">
+              {isLoading ? '...' : reportData.totalAIHs}
+            </div>
             <div className="text-sm text-blue-500">AIHs Processadas</div>
           </CardContent>
         </Card>
@@ -160,7 +323,9 @@ const ReportsSimple: React.FC = () => {
         <Card className="border-green-200">
           <CardContent className="p-4 text-center">
             <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-600" />
-            <div className="text-2xl font-bold text-green-700">{mockStatistics.procedimentosAprovados}</div>
+            <div className="text-2xl font-bold text-green-700">
+              {isLoading ? '...' : reportData.procedimentosAprovados}
+            </div>
             <div className="text-sm text-green-500">Proc. Aprovados</div>
           </CardContent>
         </Card>
@@ -168,7 +333,9 @@ const ReportsSimple: React.FC = () => {
         <Card className="border-purple-200">
           <CardContent className="p-4 text-center">
             <TrendingUp className="h-8 w-8 mx-auto mb-2 text-purple-600" />
-            <div className="text-2xl font-bold text-purple-700">{mockStatistics.totalProcedimentos}</div>
+            <div className="text-2xl font-bold text-purple-700">
+              {isLoading ? '...' : reportData.totalProcedimentos}
+            </div>
             <div className="text-sm text-purple-500">Total Proc.</div>
           </CardContent>
         </Card>
@@ -176,7 +343,9 @@ const ReportsSimple: React.FC = () => {
         <Card className="border-orange-200">
           <CardContent className="p-4 text-center">
             <Hospital className="h-8 w-8 mx-auto mb-2 text-orange-600" />
-            <div className="text-2xl font-bold text-orange-700">{mockStatistics.hospitaisDistintos}</div>
+            <div className="text-2xl font-bold text-orange-700">
+              {isLoading ? '...' : reportData.hospitaisDistintos}
+            </div>
             <div className="text-sm text-orange-500">Hospitais</div>
           </CardContent>
         </Card>
@@ -185,7 +354,7 @@ const ReportsSimple: React.FC = () => {
           <CardContent className="p-4 text-center">
             <DollarSign className="h-8 w-8 mx-auto mb-2 text-green-600" />
             <div className="text-lg font-bold text-green-700">
-              R$ {mockStatistics.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {isLoading ? '...' : reportData.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
             <div className="text-sm text-green-500">Faturamento</div>
           </CardContent>
@@ -193,9 +362,9 @@ const ReportsSimple: React.FC = () => {
 
         <Card className="border-indigo-200">
           <CardContent className="p-4 text-center">
-            <BarChart4 className="h-8 w-8 mx-auto mb-2 text-indigo-600" />
+            <TrendingUp className="h-8 w-8 mx-auto mb-2 text-indigo-600" />
             <div className="text-lg font-bold text-indigo-700">
-              R$ {mockStatistics.ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {isLoading ? '...' : reportData.ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
             <div className="text-sm text-indigo-500">Ticket Médio</div>
           </CardContent>
@@ -239,12 +408,12 @@ const ReportsSimple: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Eye className="h-5 w-5" />
-            Preview dos Dados ({mockAIHs.length} AIHs)
+            Preview dos Dados ({reportData.aihsList.length} AIHs)
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {mockAIHs.map((item, index) => (
+            {reportData.aihsList.map((item, index) => (
               <div key={index} className="border rounded-lg p-4 bg-gray-50">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div>
