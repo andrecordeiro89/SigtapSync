@@ -86,27 +86,28 @@ export interface AIH {
   
   // Apresentação da AIH
   numeroAIH: string;
-  situacao: string;
-  tipo: string;
-  dataAutorizacao: string;
+  situacao?: string;
+  tipo?: string;
+  dataAutorizacao?: string;
   apresentacao?: string;
   
   // Dados da AIH
   dataInicio: string;
-  dataFim: string;
-  motivoEncerramento: string;
-  cnsAutorizador: string;
-  cnsSolicitante: string;
-  cnsResponsavel: string;
+  dataFim?: string;
+  motivoEncerramento?: string;
+  cnsAutorizador?: string;
+  cnsSolicitante?: string;
+  cnsResponsavel?: string;
   aihAnterior?: string;
   aihPosterior?: string;
   
   // Identificação do paciente
-  prontuario: string;
+  prontuario?: string;
   nomePaciente: string;
+  cns?: string; // CNS do paciente
   nascimento: string;
   sexo: 'M' | 'F';
-  nacionalidade: string;
+  nacionalidade?: string;
   tipoDocumento?: string;
   documento?: string;
   nomeResponsavel?: string;
@@ -121,19 +122,22 @@ export interface AIH {
   telefone?: string;
   
   // Dados da internação
-  procedimentoSolicitado: string;
-  mudancaProc: boolean;
+  procedimentoSolicitado?: string;
+  mudancaProc?: boolean;
   procedimentoPrincipal: string;
-  cidPrincipal: string;
-  especialidade: string;
-  modalidade: string;
-  caracterAtendimento: string;
+  cidPrincipal?: string;
+  especialidade?: string;
+  modalidade?: string;
+  caracterAtendimento?: string;
   
   // Procedimentos realizados
   procedimentosRealizados: AIHProcedureRealized[];
   
   // OPMs (Órteses, Próteses e Materiais)
   opms?: any[];
+  
+  // Estimativa de valor original da AIH
+  estimatedOriginalValue?: number; // em centavos
   
   // Metadados
   createdAt?: string;
@@ -176,6 +180,14 @@ export interface AIHProcessingResult {
   processingTime: number;
   hospitalId?: string;
   hospitalName?: string;
+  extractedAIH?: AIH; // AIH extraída para persistência
+  persistenceResult?: {
+    success: boolean;
+    aihId?: string;
+    patientId?: string;
+    message: string;
+    errors?: string[];
+  };
 }
 
 export interface AIHUploadStats {

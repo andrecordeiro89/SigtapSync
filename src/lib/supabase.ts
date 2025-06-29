@@ -101,6 +101,16 @@ export interface PatientDB {
   allergies?: string
   medical_notes?: string
   is_active: boolean
+  
+  // Campos expandidos da AIH
+  medical_record?: string
+  nationality?: string
+  mother_name?: string
+  neighborhood?: string
+  responsible_name?: string
+  document_type?: string
+  document_number?: string
+  
   created_at: string
   updated_at: string
   created_by?: string
@@ -126,6 +136,22 @@ export interface AIHDB {
   requires_manual_review: boolean
   source_file?: string
   import_batch_id?: string
+  
+  // Campos expandidos da AIH real
+  aih_situation?: string
+  aih_type?: string
+  authorization_date?: string
+  cns_authorizer?: string
+  cns_requester?: string
+  cns_responsible?: string
+  procedure_requested?: string
+  procedure_changed?: boolean
+  discharge_reason?: string
+  specialty?: string
+  care_modality?: string
+  care_character?: string
+  estimated_original_value?: number
+  
   created_at: string
   processed_at?: string
   created_by?: string

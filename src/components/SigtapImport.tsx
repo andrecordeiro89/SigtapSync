@@ -127,10 +127,11 @@ const SigtapImport = () => {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Importação Tabela SIGTAP</h2>
-        <p className="text-gray-600 mt-1">Importe a tabela oficial do DATASUS (Excel, ZIP ou PDF) para atualizar os procedimentos</p>
+        <p className="text-gray-600 mt-1">Importe a tabela oficial do DATASUS para atualizar os procedimentos</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Seção 1: Importar Nova Tabela */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -145,21 +146,9 @@ const SigtapImport = () => {
                 <FileIcon className="w-12 h-12 text-blue-400" />
                 <FileText className="w-12 h-12 text-red-400" />
               </div>
-              <p className="text-gray-600 mb-2">
-                Selecione o arquivo da tabela SIGTAP
+              <p className="text-gray-600 mb-4">
+                Selecione arquivo Excel, ZIP ou PDF da tabela SIGTAP
               </p>
-              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-left">
-                <h4 className="font-semibold text-green-800 mb-2">🚀 Sistema de Extração Otimizado</h4>
-                <div className="text-xs text-green-700 space-y-1">
-                  <div><strong>📄 PDF:</strong> Extração sequencial/posicional + IA Gemini (híbrido)</div>
-                  <div><strong>📊 Excel:</strong> Performance ultra (5-30 segundos para 4886+ procedimentos)</div>
-                  <div><strong>📦 ZIP:</strong> Rápido e compacto</div>
-                  <div className="mt-2 pt-2 border-t border-green-300">
-                    <div><strong>Sequencial:</strong> Procedimento, Complexidade, Valores, Idades...</div>
-                    <div><strong>Posicional:</strong> Origem, Modalidade, CBO, CID...</div>
-                  </div>
-                </div>
-              </div>
               <input
                 type="file"
                 accept=".xlsx,.xls,.xlsm,.zip,.pdf"
@@ -176,7 +165,7 @@ const SigtapImport = () => {
                   asChild
                 >
                   <span>
-                    {isLoading ? 'Processando...' : 'Selecionar Arquivo (Excel/ZIP/PDF)'}
+                    {isLoading ? 'Processando...' : 'Selecionar Arquivo'}
                   </span>
                 </Button>
               </label>
@@ -193,7 +182,7 @@ const SigtapImport = () => {
                   <p className="text-sm text-gray-600">
                     <span className="inline-flex items-center space-x-1">
                       <FileSpreadsheet className="w-4 h-4 text-green-600" />
-                      <span>Processando aba Excel: <strong>{currentExcelSheet}</strong> ({totalExcelSheets} abas)</span>
+                      <span>Processando aba: <strong>{currentExcelSheet}</strong> ({totalExcelSheets} abas)</span>
                     </span>
                   </p>
                 )}
@@ -226,6 +215,7 @@ const SigtapImport = () => {
           </CardContent>
         </Card>
 
+        {/* Seção 2: Status da Tabela */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -246,7 +236,7 @@ const SigtapImport = () => {
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent>
             {totalProcedures > 0 ? (
               <div className="bg-green-50 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
@@ -268,95 +258,86 @@ const SigtapImport = () => {
                   <AlertCircle className="w-5 h-5 text-gray-600" />
                 </div>
                 <p className="text-sm text-gray-600">
-                  Importe um arquivo Excel, ZIP ou PDF da tabela SIGTAP para começar a usar o sistema.
+                  Importe um arquivo da tabela SIGTAP para começar a usar o sistema.
                 </p>
               </div>
             )}
-
-            <div className="border-l-4 border-green-400 bg-green-50 p-4 mb-3">
-              <div className="flex items-center space-x-2 mb-2">
-                <FileSpreadsheet className="w-5 h-5 text-green-600" />
-                <span className="font-medium text-green-800">🚀 NOVO: Suporte a Excel (Recomendado)</span>
-              </div>
-              <p className="text-sm text-green-700">
-                <strong>Performance otimizada:</strong> Importe arquivos Excel (.xlsx/.xls) em segundos! 
-                Processamento 1000x mais rápido que PDF, com 100% de precisão nos dados.
-              </p>
-              <p className="text-xs text-green-600 mt-1">
-                ⚡ Excel: ~5-30 segundos • 📄 PDF: 5-15 minutos • 💰 Sem custos de IA
-              </p>
-            </div>
-
-            <div className="border-l-4 border-blue-400 bg-blue-50 p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FileText className="w-5 h-5 text-blue-600" />
-                <span className="font-medium text-blue-800">Suporte a PDF</span>
-              </div>
-              <p className="text-sm text-blue-700">
-                Importe arquivos PDF da tabela SIGTAP com processamento inteligente. 
-                O sistema extrai automaticamente procedimentos de PDFs com milhares de páginas.
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Seção 3: Instruções de Importação */}
       <Card>
         <CardHeader>
           <CardTitle>Instruções de Importação</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3 text-sm text-gray-600">
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">1</div>
-              <p>Acesse o site do DATASUS em <span className="font-mono bg-gray-100 px-1 rounded">datasus.saude.gov.br</span></p>
+          <div className="space-y-4">
+            {/* Passos do DATASUS */}
+            <div className="space-y-3 text-sm text-gray-600">
+              <div className="flex items-start space-x-3">
+                <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">1</div>
+                <p>Acesse <span className="font-mono bg-gray-100 px-1 rounded">datasus.saude.gov.br</span></p>
+              </div>
+              <div className="flex items-start space-x-3">
+                <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">2</div>
+                <p>Navegue: "Sistemas e Aplicativos" → "SIGTAP" → "Downloads"</p>
+              </div>
+              <div className="flex items-start space-x-3">
+                <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">3</div>
+                <p>Baixe o arquivo da versão mais recente</p>
+              </div>
+              <div className="flex items-start space-x-3">
+                <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">4</div>
+                <p>Selecione o arquivo usando o botão acima</p>
+              </div>
             </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">2</div>
-              <p>Navegue até "Sistemas e Aplicativos" → "SIGTAP" → "Downloads"</p>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">3</div>
-              <p>Baixe o arquivo <strong>Excel</strong> (mais rápido), <strong>ZIP</strong> ou <strong>PDF</strong> da versão mais recente</p>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">4</div>
-              <p>Selecione o arquivo baixado usando o botão acima</p>
-            </div>
-            <div className={`p-3 rounded-lg mt-4 ${isGeminiAvailable ? 'bg-green-50' : 'bg-yellow-50'}`}>
-              <p className={`text-sm ${isGeminiAvailable ? 'text-green-800' : 'text-yellow-800'}`}>
-                <strong>🤖 Sistema Híbrido:</strong> {isGeminiAvailable ? 
-                  'IA Gemini ativada! Melhor precisão na extração de dados complexos.' :
-                  'Funcionando no modo tradicional. Configure VITE_GEMINI_API_KEY para ativar IA.'
-                }
-              </p>
-              {isGeminiAvailable && (
-                <p className="text-xs text-green-600 mt-1">
-                  • Fallback inteligente para páginas com baixa confiança<br/>
-                  • Validação cruzada entre métodos tradicionais e IA<br/>
-                  • Custo otimizado (~$0.01-0.05 por PDF de 5000 páginas)
-                </p>
-              )}
-            </div>
-            
-            <div className="bg-green-50 p-3 rounded-lg mt-2">
-              <p className="text-sm text-green-800">
-                <strong>💡 Recomendação:</strong> Use arquivos <strong>Excel</strong> sempre que possível! 
-                Processamento em segundos vs. minutos para PDF/ZIP. Performance incomparável.
-              </p>
-            </div>
-            
-            <div className="bg-yellow-50 p-3 rounded-lg mt-2">
-              <p className="text-sm text-yellow-800">
-                <strong>Dica:</strong> Para arquivos não-Excel: ZIP são mais rápidos que PDFs. 
-                PDFs grandes (4000+ páginas) levam alguns minutos para processar.
-              </p>
+
+            {/* Tecnologias Consolidadas */}
+            <div className="border-t pt-4">
+              <h4 className="font-semibold text-gray-800 mb-3">🚀 Tecnologias de Processamento</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="bg-green-50 p-3 rounded-lg border-l-4 border-green-400">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                    <span className="font-medium text-green-800">Excel (.xlsx, .xls)</span>
+                  </div>
+                  <div className="text-green-700 space-y-1">
+                    <p><strong>Tempo:</strong> 5-30 segundos</p>
+                    <p><strong>Tecnologia:</strong> Análise estrutural</p>
+                    <p><strong>Precisão:</strong> 100%</p>
+                    <p className="text-xs text-green-600">⭐ Recomendado</p>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-400">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <FileIcon className="w-4 h-4 text-blue-600" />
+                    <span className="font-medium text-blue-800">ZIP (.zip)</span>
+                  </div>
+                  <div className="text-blue-700 space-y-1">
+                    <p><strong>Tempo:</strong> 30-120 segundos</p>
+                    <p><strong>Tecnologia:</strong> Extração estruturada</p>
+                    <p><strong>Precisão:</strong> 95-98%</p>
+                  </div>
+                </div>
+
+                <div className="bg-orange-50 p-3 rounded-lg border-l-4 border-orange-400">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <FileText className="w-4 h-4 text-orange-600" />
+                    <span className="font-medium text-orange-800">PDF (.pdf)</span>
+                  </div>
+                  <div className="text-orange-700 space-y-1">
+                    <p><strong>Tempo:</strong> 5-15 minutos</p>
+                    <p><strong>Tecnologia:</strong> OCR + IA {isGeminiAvailable ? 'Gemini' : 'Híbrida'}</p>
+                    <p><strong>Precisão:</strong> 90-95%</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
-
-
     </div>
   );
 };

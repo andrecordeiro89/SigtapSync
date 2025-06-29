@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, Upload, Users, FileText, Home, Search, FileUp, Code, Database } from 'lucide-react';
+import { BarChart3, Upload, Users, FileText, Home, Search, FileUp, TestTube, Database } from 'lucide-react';
 
 interface NavigationProps {
   activeTab: string;
@@ -25,13 +24,6 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       badge: 'Nova versão'
     },
     {
-      id: 'sigtap-official',
-      label: 'SIGTAP Oficial',
-      icon: Database,
-      description: 'Importar dados oficiais do DATASUS',
-      badge: '100% Precisão'
-    },
-    {
       id: 'sigtap-viewer',
       label: 'Consulta SIGTAP',
       icon: Search,
@@ -45,11 +37,11 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       badge: 'NOVO'
     },
     {
-      id: 'excel-analyzer',
-      label: 'Analisar Excel',
-      icon: Code,
-      description: 'Gerar código Python customizado',
-      badge: 'DEV'
+      id: 'aih-pdf-tester',
+      label: 'Teste PDF AIH',
+      icon: TestTube,
+      description: 'Testador PDF AIH',
+      badge: 'TESTE'
     },
     {
       id: 'patients',

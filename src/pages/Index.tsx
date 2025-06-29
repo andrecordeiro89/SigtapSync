@@ -8,6 +8,7 @@ import AIHUpload from '../components/AIHUpload';
 import ExcelAnalyzer from '../components/ExcelAnalyzer';
 import PatientManagement from '../components/PatientManagement';
 import ProcedureRecords from '../components/ProcedureRecords';
+import AIHPDFTester from '../components/AIHPDFTester';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -24,6 +25,8 @@ const Index = () => {
         return <SigtapViewer />;
       case 'aih-upload':
         return <AIHUpload />;
+      case 'aih-pdf-tester':
+        return <AIHPDFTester />;
       case 'excel-analyzer':
         return <ExcelAnalyzer />;
       case 'patients':

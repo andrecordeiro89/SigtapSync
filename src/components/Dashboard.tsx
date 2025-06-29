@@ -1,9 +1,7 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, FileText, DollarSign, AlertCircle } from 'lucide-react';
 import { mockDashboardStats } from '../data/mockData';
 import { formatCurrency } from '../utils/validation';
-import { TestDataPopulator } from './TestDataPopulator';
 
 const Dashboard = () => {
   const stats = mockDashboardStats;
@@ -123,12 +121,6 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Seção de Teste - Popular Dados */}
-      <div className="mt-8">
-        <h3 className="text-lg font-semibold mb-4">🚀 Ferramentas de Desenvolvimento</h3>
-        <TestDataPopulator />
       </div>
     </div>
   );

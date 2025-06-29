@@ -24,8 +24,8 @@ interface AIHUploadResult {
 interface Hospital {
   id: string;
   name: string;
-  city: string;
-  state: string;
+  city?: string;
+  state?: string;
   cnpj: string;
 }
 
@@ -66,6 +66,7 @@ const AIHUpload = () => {
 
     // Validar se hospital foi selecionado
     if (!selectedHospital) {
+      console.error('❌ Hospital não selecionado!');
       toast({
         title: "Hospital não selecionado",
         description: "Por favor, selecione o hospital antes de fazer o upload do arquivo AIH.",
@@ -73,6 +74,8 @@ const AIHUpload = () => {
       });
       return;
     }
+    
+    console.log('🏥 Hospital selecionado para persistência:', selectedHospital);
 
     // Validar tipo de arquivo
     const fileName = file.name.toLowerCase();
@@ -114,10 +117,6 @@ const AIHUpload = () => {
       
       const selectedHospitalData = hospitals.find(h => h.id === selectedHospital);
       
-      // Importar processador dinamicamente
-      const { AIHProcessor } = await import('../utils/aihProcessor');
-      const processor = new AIHProcessor();
-      
       // Callback de progresso
       const progressCallback = (progress: number) => {
         setProcessingProgress(progress);
@@ -126,16 +125,101 @@ const AIHUpload = () => {
       // Simular etapas do processamento com progresso real
       setProcessingProgress(10);
       
-      // Processar arquivo AIH com ID do hospital
-      const processingResult = await processor.processAIHFile(file, {
-        hospitalId: selectedHospital,
-        hospitalName: selectedHospitalData?.name || 'Hospital Selecionado'
-      });
+      let processingResult;
+      
+      // Detectar formato da AIH e usar processador apropriado
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        console.log('🎯 Detectado PDF - usando processador especializado para AIH PDF');
+        
+        // Usar processador especializado para PDF AIH (primeira página)
+        const { AIHPDFProcessor } = await import('../utils/aihPdfProcessor');
+        const pdfProcessor = new AIHPDFProcessor();
+        
+        processingResult = await pdfProcessor.processPDFAIH(file, {
+          hospitalId: selectedHospital,
+          hospitalName: selectedHospitalData?.name || 'Hospital Selecionado'
+        });
+      } else {
+        // Para Excel/CSV, usar processador padrão
+        console.log('📊 Usando processador AIH padrão para Excel/CSV');
+        const { AIHProcessor } = await import('../utils/aihProcessor');
+        const processor = new AIHProcessor();
+        processingResult = await processor.processAIHFile(file, {
+          hospitalId: selectedHospital,
+          hospitalName: selectedHospitalData?.name || 'Hospital Selecionado'
+        });
+      }
       setProcessingProgress(60);
       
-      // Se há AIHs válidas, fazer matching com SIGTAP
+      // 🔍 DEBUG: Verificar estrutura do resultado
+      console.log('🔍 DEBUG - Resultado do processamento:', {
+        validAIHs: processingResult.validAIHs,
+        hasExtractedAIH: !!processingResult.extractedAIH,
+        extractedAIHType: typeof processingResult.extractedAIH,
+        hospitalId: selectedHospital,
+        fileName: file.name
+      });
+      
+      // Se há AIHs válidas e foram extraídas, persistir no banco de dados
+      if (processingResult.validAIHs > 0 && processingResult.extractedAIH) {
+        console.log(`💾 Iniciando persistência da AIH extraída...`);
+        console.log('📄 AIH a ser persistida:', processingResult.extractedAIH);
+        
+        try {
+          // Importar serviço de persistência
+          const { AIHPersistenceService } = await import('../services/aihPersistenceService');
+          
+          // Persistir AIH no banco de dados
+          console.log('🔄 Chamando persistência com parâmetros:', {
+            aih: processingResult.extractedAIH.numeroAIH,
+            hospital: selectedHospital,
+            file: file.name
+          });
+          
+          const persistenceResult = await AIHPersistenceService.persistAIHFromPDF(
+            processingResult.extractedAIH,
+            selectedHospital,
+            file.name
+          );
+          
+          if (persistenceResult.success) {
+            console.log('✅ AIH persistida no banco de dados!');
+            console.log(`📄 AIH ID: ${persistenceResult.aihId}`);
+            console.log(`👤 Paciente ID: ${persistenceResult.patientId}`);
+            
+            // Atualizar resultado com informações de persistência
+            processingResult.persistenceResult = persistenceResult;
+          } else {
+            console.error('❌ Erro na persistência:', persistenceResult.message);
+            processingResult.errors.push({
+              line: 0,
+              field: 'persistence',
+              message: persistenceResult.message
+            });
+          }
+        } catch (persistenceError) {
+          console.error('❌ Erro crítico na persistência:', persistenceError);
+          processingResult.errors.push({
+            line: 0,
+            field: 'persistence',
+            message: `Erro na persistência: ${persistenceError instanceof Error ? persistenceError.message : 'Erro desconhecido'}`
+          });
+        }
+        
+        setProcessingProgress(80);
+      } else {
+        // 🔍 DEBUG: Explicar por que a persistência não foi executada
+        if (processingResult.validAIHs === 0) {
+          console.warn('⚠️ PERSISTÊNCIA NÃO EXECUTADA: Nenhuma AIH válida encontrada');
+        } else if (!processingResult.extractedAIH) {
+          console.warn('⚠️ PERSISTÊNCIA NÃO EXECUTADA: AIH não foi extraída do resultado');
+          console.warn('💡 DICA: Verifique se o processador está retornando extractedAIH');
+        }
+      }
+      
+      // Se há AIHs válidas, preparar para matching futuro com SIGTAP
       if (processingResult.validAIHs > 0) {
-        console.log(`🔄 Iniciando matching para ${processingResult.validAIHs} AIHs...`);
+        console.log(`🔄 AIH pronta para matching futuro com SIGTAP...`);
         
         // TODO: Integrar com sistema de matching SIGTAP
         // const { AIHMatcher } = await import('../utils/aihMatcher');
@@ -143,7 +227,7 @@ const AIHUpload = () => {
         // const matches = await matcher.batchMatchAIHs(validAIHs, progressCallback);
         
         setProcessingProgress(90);
-        console.log('✅ Matching concluído');
+        console.log('✅ Processamento completo');
       }
       
       setProcessingProgress(100);
