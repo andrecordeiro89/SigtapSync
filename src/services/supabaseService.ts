@@ -63,38 +63,60 @@ export class SigtapService {
     
     console.log(`💾 ${uniqueProcedures.length} procedimentos únicos após deduplicação`);
     
-    const dbProcedures = uniqueProcedures.map(proc => ({
-      version_id: versionId,
-      code: proc.code,
-      description: proc.description,
-      origem: proc.origem || null,
-      complexity: proc.complexity || null,
-      modality: proc.modality || null,
-      registration_instrument: proc.registrationInstrument || null,
-      financing: proc.financing || null,
-      value_amb: reaisToCentavos(proc.valueAmb || 0),
-      value_amb_total: reaisToCentavos(proc.valueAmbTotal || 0),
-      value_hosp: reaisToCentavos(proc.valueHosp || 0),
-      value_prof: reaisToCentavos(proc.valueProf || 0),
-      value_hosp_total: reaisToCentavos(proc.valueHospTotal || 0),
-      complementary_attribute: proc.complementaryAttribute || null,
-      service_classification: proc.serviceClassification || null,
-      especialidade_leito: proc.especialidadeLeito || null,
-      gender: proc.gender && proc.gender.trim() !== '' ? proc.gender : null,
-      min_age: proc.minAge && proc.minAge > 0 ? proc.minAge : null,
-      min_age_unit: proc.minAgeUnit && proc.minAgeUnit.trim() !== '' ? proc.minAgeUnit : null,
-      max_age: proc.maxAge && proc.maxAge > 0 ? proc.maxAge : null,
-      max_age_unit: proc.maxAgeUnit && proc.maxAgeUnit.trim() !== '' ? proc.maxAgeUnit : null,
-      max_quantity: proc.maxQuantity || null,
-      average_stay: proc.averageStay || null,
-      points: proc.points || null,
-      cbo: proc.cbo || [],
-      cid: proc.cid || [],
-      habilitation: proc.habilitation || null,
-      habilitation_group: proc.habilitationGroup || [],
-      extraction_confidence: 100,
-      validation_status: 'valid'
-    }));
+    const dbProcedures = uniqueProcedures.map(proc => {
+      // 🔧 VALIDAÇÃO E SANITIZAÇÃO DE DADOS
+      const sanitizedProc = {
+        version_id: versionId,
+        code: proc.code,
+        description: proc.description,
+        origem: proc.origem || null,
+        complexity: proc.complexity || null,
+        modality: proc.modality || null,
+        registration_instrument: proc.registrationInstrument || null,
+        financing: proc.financing || null,
+        value_amb: reaisToCentavos(proc.valueAmb || 0),
+        value_amb_total: reaisToCentavos(proc.valueAmbTotal || 0),
+        value_hosp: reaisToCentavos(proc.valueHosp || 0),
+        value_prof: reaisToCentavos(proc.valueProf || 0),
+        value_hosp_total: reaisToCentavos(proc.valueHospTotal || 0),
+        complementary_attribute: proc.complementaryAttribute || null,
+        service_classification: proc.serviceClassification || null,
+        especialidade_leito: proc.especialidadeLeito || null,
+        gender: proc.gender && proc.gender.trim() !== '' ? proc.gender : null,
+        min_age: proc.minAge && proc.minAge > 0 ? Math.min(proc.minAge, 150) : null,
+        min_age_unit: proc.minAgeUnit && proc.minAgeUnit.trim() !== '' ? proc.minAgeUnit : null,
+        max_age: proc.maxAge && proc.maxAge > 0 ? Math.min(proc.maxAge, 150) : null,
+        max_age_unit: proc.maxAgeUnit && proc.maxAgeUnit.trim() !== '' ? proc.maxAgeUnit : null,
+        max_quantity: proc.maxQuantity ? Math.min(proc.maxQuantity, 999999) : null,
+        average_stay: proc.averageStay && proc.averageStay > 0 ? Math.min(proc.averageStay, 999.99) : null,
+        points: proc.points ? Math.min(proc.points, 2000000000) : null,
+        cbo: proc.cbo || [],
+        cid: proc.cid || [],
+        habilitation: proc.habilitation || null,
+        habilitation_group: proc.habilitationGroup || [],
+        extraction_confidence: 100,
+        validation_status: 'valid'
+      };
+
+      // 🚨 LOG DE VALORES TRUNCADOS
+      if (proc.minAge && proc.minAge > 150) {
+        console.warn(`⚠️ VALOR TRUNCADO - Procedimento ${proc.code}: min_age ${proc.minAge} → 150`);
+      }
+      if (proc.maxAge && proc.maxAge > 150) {
+        console.warn(`⚠️ VALOR TRUNCADO - Procedimento ${proc.code}: max_age ${proc.maxAge} → 150`);
+      }
+      if (proc.maxQuantity && proc.maxQuantity > 999999) {
+        console.warn(`⚠️ VALOR TRUNCADO - Procedimento ${proc.code}: max_quantity ${proc.maxQuantity} → 999999`);
+      }
+      if (proc.averageStay && proc.averageStay > 999.99) {
+        console.warn(`⚠️ VALOR TRUNCADO - Procedimento ${proc.code}: average_stay ${proc.averageStay} → 999.99`);
+      }
+      if (proc.points && proc.points > 2000000000) {
+        console.warn(`⚠️ VALOR TRUNCADO - Procedimento ${proc.code}: points ${proc.points} → 2000000000`);
+      }
+
+      return sanitizedProc;
+    });
 
     const batchSize = 50; // Reduzir batch size para evitar timeouts
     console.log(`💾 Salvando em batches de ${batchSize}...`);
@@ -119,20 +141,45 @@ export class SigtapService {
 
   static async getActiveProcedures(): Promise<SigtapProcedure[]> {
     try {
-      // 🔧 CORREÇÃO PERMANENTE: SEMPRE usar tabela oficial para evitar dados corrompidos
-      console.log('🔧 CORREÇÃO ATIVA: Usando EXCLUSIVAMENTE tabela oficial (dados íntegros)');
+      console.log('📊 CARREGANDO DADOS DA EXTRAÇÃO PDF - Tabela sigtap_procedures');
       
-      const officialData = await this.getActiveProceduresFromOfficial();
-      if (officialData.length > 0) {
-        console.log(`✅ ${officialData.length} procedimentos carregados da tabela OFICIAL (valores corretos)`);
-        return officialData;
+      // PASSO 1: Buscar a versão ativa
+      const activeVersion = await this.getActiveVersion();
+      if (!activeVersion) {
+        console.warn('⚠️ Nenhuma versão ativa encontrada');
+        return [];
       }
       
-      console.warn('⚠️ Nenhum dado encontrado na tabela oficial');
-      return [];
+      console.log(`🔄 Carregando procedimentos da versão ativa: ${activeVersion.version_name}`);
+      
+      // PASSO 2: Carregar dados da tabela onde o PDF foi salvo
+      const { data, error } = await supabase
+        .from('sigtap_procedures')  // ✅ TABELA CORRETA ONDE OS DADOS DO PDF SÃO SALVOS
+        .select('*')
+        .eq('version_id', activeVersion.id)
+        .order('code');
+      
+      if (error) {
+        console.error('❌ Erro ao carregar da tabela sigtap_procedures:', error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        console.warn('⚠️ Nenhum procedimento encontrado na versão ativa');
+        console.log('💡 DICA: Importe um arquivo PDF/Excel/ZIP primeiro');
+        return [];
+      }
+      
+      console.log(`✅ ${data.length} procedimentos carregados da EXTRAÇÃO PDF`);
+      
+      // PASSO 3: Converter para formato do frontend
+      const procedures = data.map(proc => this.convertDbToFrontend(proc));
+      
+      console.log(`✅ CONVERSÃO CONCLUÍDA: ${procedures.length} procedimentos prontos para exibição`);
+      return procedures;
       
     } catch (error) {
-      console.error('Erro ao buscar procedimentos ativos:', error);
+      console.error('❌ Erro ao buscar procedimentos ativos:', error);
       return [];
     }
   }

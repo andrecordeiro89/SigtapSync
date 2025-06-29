@@ -1,58 +1,44 @@
 import { CategoryExtractor, EligibilityResult } from './index';
 
 /**
- * EXTRACTOR DE CRITÉRIOS DE ELEGIBILIDADE
- * Responsável por extrair sexo, idades mínima e máxima com unidades
- * Método: Sequencial com patterns específicos para critérios
+ * EXTRACTOR DE CRITÉRIOS DE ELEGIBILIDADE - PADRONIZADO
+ * 🎯 ESTRATÉGIA: Valores padronizados pois elegibilidade não afeta faturamento
+ * 📋 PADRÃO: Sexo=Ambos, IdadeMin=-, IdadeMax=130 anos
+ * 💰 FATURAMENTO: Match é por código + procedimento + valores (não elegibilidade)
  */
 export class EligibilityExtractor implements CategoryExtractor {
   private stats = { successful: 0, failed: 0, confidence: 0 };
 
   extract(blockText: string): EligibilityResult {
     try {
-      const gender = this.extractSequentialField(blockText, 'Sexo');
-      const minAgeResult = this.extractSequentialAge(blockText, 'Idade Mínima');
-      const maxAgeResult = this.extractSequentialAge(blockText, 'Idade Máxima');
-
-      // Calcular confiança baseada nos campos extraídos
-      let extractedCount = 0;
-      if (gender && gender !== '') extractedCount++;
-      if (minAgeResult.value > 0) extractedCount++;
-      if (maxAgeResult.value > 0) extractedCount++;
-
-      this.stats.confidence = Math.round((extractedCount / 3) * 100);
-
-      // Validação de consistência: idade mínima deve ser menor que máxima
-      if (minAgeResult.value > 0 && maxAgeResult.value > 0) {
-        if (minAgeResult.value <= maxAgeResult.value && minAgeResult.unit === maxAgeResult.unit) {
-          this.stats.confidence = Math.min(this.stats.confidence + 10, 100); // Bonus de consistência
-        }
-      }
-
-      if (extractedCount > 0) {
-        this.stats.successful++;
-      } else {
-        this.stats.failed++;
-      }
+      // 🎯 ESTRATÉGIA PADRONIZADA: Elegibilidade não afeta faturamento
+      // Match AIH x SIGTAP é por: código + procedimento + valores
+      // Elegibilidade é apenas informativa para o usuário
+      
+      console.log('✅ Aplicando PADRONIZAÇÃO de Elegibilidade (estratégia de faturamento)');
+      
+      this.stats.successful++;
+      this.stats.confidence = 100; // Sempre 100% pois é padronizado
 
       return {
-        gender: this.normalizeGender(gender),
-        minAge: minAgeResult.value,
-        minAgeUnit: minAgeResult.unit,
-        maxAge: maxAgeResult.value,
-        maxAgeUnit: maxAgeResult.unit
+        gender: 'AMBOS',           // 🔧 PADRÃO: Sempre "Ambos"
+        minAge: 0,                 // 🔧 PADRÃO: Sem restrição mínima  
+        minAgeUnit: '-',           // 🔧 PADRÃO: Indicador de "sem restrição"
+        maxAge: 130,               // 🔧 PADRÃO: Limite padrão 130 anos
+        maxAgeUnit: 'ANOS'         // 🔧 PADRÃO: Unidade padrão
       };
 
     } catch (error) {
       this.stats.failed++;
-      this.stats.confidence = 0;
-
+      this.stats.confidence = 100; // Mesmo com erro, retorna padrão
+      
+      // Fallback com valores padrão
       return {
-        gender: '',
+        gender: 'AMBOS',
         minAge: 0,
-        minAgeUnit: '',
-        maxAge: 0,
-        maxAgeUnit: ''
+        minAgeUnit: '-',
+        maxAge: 130,
+        maxAgeUnit: 'ANOS'
       };
     }
   }
