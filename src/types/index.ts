@@ -351,6 +351,9 @@ export interface ProcedureAIH {
   valorOriginal?: number;
   observacoes?: string;
   
+  // Lógica de porcentagem SUS
+  porcentagemSUS?: number; // Porcentagem a ser aplicada no valor (padrão: 100% para principal, 70% para secundários)
+  
   // Auditoria
   revisadoPor?: string;
   dataRevisao?: string;

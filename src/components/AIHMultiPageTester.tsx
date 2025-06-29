@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -36,7 +36,31 @@ import { AIHCompleteProcessingResult, AIHComplete, ProcedureAIH } from '../types
 // Componente organizado para visualizar AIH completa
 const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComplete; onUpdateAIH: (aih: AIHComplete) => void }) => {
   const [expandedProcedures, setExpandedProcedures] = useState<Set<number>>(new Set());
+  const [editingValues, setEditingValues] = useState<Set<number>>(new Set());
+  const [tempValues, setTempValues] = useState<{[key: number]: {
+    valorAmb: number;
+    valorHosp: number;
+    valorProf: number;
+    porcentagem: number;
+  }}>({});
+  const [defaultPercentage, setDefaultPercentage] = useState<number>(70); // Porcentagem padrão para procedimentos secundários
   const { toast } = useToast();
+
+  // Aplicar lógica de porcentagem SUS quando AIH é carregada
+  useEffect(() => {
+    if (aihCompleta && aihCompleta.procedimentos.length > 0) {
+      // Verificar se já foi aplicada a lógica de porcentagem
+      const needsPercentageSetup = aihCompleta.procedimentos.some(proc => 
+        proc.sigtapProcedure && !proc.porcentagemSUS
+      );
+      
+      if (needsPercentageSetup) {
+        console.log('🔧 Aplicando lógica de porcentagem SUS automaticamente...');
+        const updatedAIH = calculateTotalsWithPercentage(aihCompleta.procedimentos);
+        onUpdateAIH(updatedAIH);
+      }
+    }
+  }, [aihCompleta?.procedimentos.length]); // Só executa quando o número de procedimentos muda
 
   const toggleProcedureExpansion = (sequencia: number) => {
     const newExpanded = new Set(expandedProcedures);
@@ -60,21 +84,156 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
         : proc
     );
 
-    const updatedAIH = {
-      ...aihCompleta,
-      procedimentos: updatedProcedimentos,
-      procedimentosAprovados: updatedProcedimentos.filter(p => p.aprovado).length,
-      procedimentosRejeitados: updatedProcedimentos.filter(p => p.matchStatus === 'rejected').length,
-      valorTotalCalculado: updatedProcedimentos
-        .filter(p => p.aprovado)
-        .reduce((sum, p) => sum + (p.valorCalculado || 0), 0)
-    };
-
+    const updatedAIH = calculateTotalsWithPercentage(updatedProcedimentos);
     onUpdateAIH(updatedAIH);
 
     toast({
       title: action === 'approve' ? "✅ Procedimento aprovado" : "❌ Procedimento rejeitado",
       description: `${procedure.procedimento} foi ${action === 'approve' ? 'aprovado' : 'rejeitado'}`
+    });
+  };
+
+  // Função para calcular totais aplicando lógica de porcentagem SUS
+  const calculateTotalsWithPercentage = (procedimentos: ProcedureAIH[]): AIHComplete => {
+    const procedimentosComPercentagem = procedimentos.map((proc, index) => {
+      if (!proc.sigtapProcedure) return proc;
+
+      // Procedimento principal (primeiro) = 100%, demais = porcentagem definida
+      const isPrincipal = index === 0;
+      const porcentagem = isPrincipal ? 100 : (proc.porcentagemSUS || defaultPercentage);
+      
+      const valorBase = proc.sigtapProcedure.valueHospTotal;
+      const valorCalculado = (valorBase * porcentagem) / 100;
+
+      return {
+        ...proc,
+        porcentagemSUS: porcentagem,
+        valorCalculado,
+        valorOriginal: valorBase
+      };
+    });
+
+    const valorTotalCalculado = procedimentosComPercentagem
+      .filter(p => p.aprovado)
+      .reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
+
+    return {
+      ...aihCompleta,
+      procedimentos: procedimentosComPercentagem,
+      procedimentosAprovados: procedimentosComPercentagem.filter(p => p.aprovado).length,
+      procedimentosRejeitados: procedimentosComPercentagem.filter(p => p.matchStatus === 'rejected').length,
+      valorTotalCalculado
+    };
+  };
+
+  // Iniciar edição de valores
+  const startEditingValues = (sequencia: number, procedure: ProcedureAIH) => {
+    setEditingValues(prev => new Set([...prev, sequencia]));
+    
+    if (procedure.sigtapProcedure) {
+      setTempValues(prev => ({
+        ...prev,
+        [sequencia]: {
+          valorAmb: procedure.sigtapProcedure?.valueAmb || 0,
+          valorHosp: procedure.sigtapProcedure?.valueHosp || 0,
+          valorProf: procedure.sigtapProcedure?.valueProf || 0,
+          porcentagem: procedure.porcentagemSUS || (sequencia === 1 ? 100 : defaultPercentage)
+        }
+      }));
+    }
+  };
+
+  // Salvar edição de valores
+  const saveEditedValues = (sequencia: number) => {
+    const editedValues = tempValues[sequencia];
+    if (!editedValues) return;
+
+    const updatedProcedimentos = aihCompleta.procedimentos.map(proc => {
+      if (proc.sequencia === sequencia && proc.sigtapProcedure) {
+        // Atualizar valores SIGTAP
+        const updatedSigtapProcedure = {
+          ...proc.sigtapProcedure,
+          valueAmb: editedValues.valorAmb,
+          valueHosp: editedValues.valorHosp,
+          valueProf: editedValues.valorProf,
+          valueHospTotal: editedValues.valorAmb + editedValues.valorHosp + editedValues.valorProf
+        };
+
+        // Calcular valor com porcentagem
+        const valorCalculado = (updatedSigtapProcedure.valueHospTotal * editedValues.porcentagem) / 100;
+
+        return {
+          ...proc,
+          sigtapProcedure: updatedSigtapProcedure,
+          porcentagemSUS: editedValues.porcentagem,
+          valorCalculado,
+          valorOriginal: updatedSigtapProcedure.valueHospTotal
+        };
+      }
+      return proc;
+    });
+
+    const updatedAIH = calculateTotalsWithPercentage(updatedProcedimentos);
+    onUpdateAIH(updatedAIH);
+
+    // Finalizar edição
+    setEditingValues(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(sequencia);
+      return newSet;
+    });
+
+    setTempValues(prev => {
+      const newValues = { ...prev };
+      delete newValues[sequencia];
+      return newValues;
+    });
+
+    toast({
+      title: "✅ Valores atualizados",
+      description: `Procedimento ${sequencia} atualizado com ${editedValues.porcentagem}% de cobrança`
+    });
+  };
+
+  // Cancelar edição
+  const cancelEditingValues = (sequencia: number) => {
+    setEditingValues(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(sequencia);
+      return newSet;
+    });
+
+    setTempValues(prev => {
+      const newValues = { ...prev };
+      delete newValues[sequencia];
+      return newValues;
+    });
+  };
+
+  // Atualizar porcentagem padrão para todos os procedimentos secundários
+  const updateDefaultPercentage = (newPercentage: number) => {
+    setDefaultPercentage(newPercentage);
+    
+    const updatedProcedimentos = aihCompleta.procedimentos.map((proc, index) => {
+      if (index > 0 && proc.sigtapProcedure) { // Não alterar o procedimento principal
+        const valorBase = proc.sigtapProcedure.valueHospTotal;
+        const valorCalculado = (valorBase * newPercentage) / 100;
+        
+        return {
+          ...proc,
+          porcentagemSUS: newPercentage,
+          valorCalculado
+        };
+      }
+      return proc;
+    });
+
+    const updatedAIH = calculateTotalsWithPercentage(updatedProcedimentos);
+    onUpdateAIH(updatedAIH);
+
+    toast({
+      title: "📊 Porcentagem atualizada",
+      description: `Todos os procedimentos secundários agora usam ${newPercentage}%`
     });
   };
 
@@ -189,31 +348,79 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
         </Card>
       </div>
 
-      {/* RESUMO FINANCEIRO */}
-      <Card>
+      {/* RESUMO FINANCEIRO PREMIUM */}
+      <Card className="border-2 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <DollarSign className="w-5 h-5 text-green-600" />
-            <span>Resumo Financeiro</span>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <DollarSign className="w-5 h-5 text-green-600" />
+              <span>Resumo Financeiro</span>
+              <Badge variant="outline" className="bg-green-100 text-green-700">Premium</Badge>
+            </div>
+            
+            {/* CONTROLE DE PORCENTAGEM GLOBAL */}
+            <div className="flex items-center space-x-2">
+              <label className="text-sm font-medium text-gray-600">% Secundários:</label>
+              <div className="flex items-center space-x-1">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={defaultPercentage}
+                  onChange={(e) => updateDefaultPercentage(Number(e.target.value))}
+                  className="w-16 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+                <span className="text-sm text-gray-500">%</span>
+              </div>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-gray-600">Total</p>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="text-center p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+              <p className="text-sm text-gray-600">Total Procedimentos</p>
               <p className="text-2xl font-bold text-blue-700">{aihCompleta.totalProcedimentos}</p>
             </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg">
+            <div className="text-center p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
               <p className="text-sm text-gray-600">Aprovados</p>
               <p className="text-2xl font-bold text-green-700">{aihCompleta.procedimentosAprovados}</p>
             </div>
-            <div className="text-center p-4 bg-red-50 rounded-lg">
+            <div className="text-center p-4 bg-red-50 rounded-lg border-l-4 border-red-500">
               <p className="text-sm text-gray-600">Rejeitados</p>
               <p className="text-2xl font-bold text-red-700">{aihCompleta.procedimentosRejeitados}</p>
             </div>
-            <div className="text-center p-4 bg-green-100 rounded-lg">
-              <p className="text-sm text-gray-600">Valor Total</p>
-              <p className="text-xl font-bold text-green-800">{formatCurrency(aihCompleta.valorTotalCalculado || 0)}</p>
+            <div className="text-center p-4 bg-amber-50 rounded-lg border-l-4 border-amber-500">
+              <p className="text-sm text-gray-600">Valor Original</p>
+              <p className="text-xl font-bold text-amber-700">
+                {formatCurrency(aihCompleta.procedimentos
+                  .filter(p => p.aprovado)
+                  .reduce((sum, p) => sum + (p.valorOriginal || 0), 0)
+                )}
+              </p>
+            </div>
+            <div className="text-center p-4 bg-green-100 rounded-lg border-l-4 border-green-600 relative">
+              <p className="text-sm text-gray-600">Valor Final</p>
+              <p className="text-2xl font-bold text-green-800">
+                {formatCurrency(aihCompleta.valorTotalCalculado || 0)}
+              </p>
+              <div className="absolute top-1 right-1">
+                <Badge variant="default" className="text-xs bg-green-600">Final</Badge>
+              </div>
+            </div>
+          </div>
+          
+          {/* RESUMO DE PORCENTAGENS */}
+          <div className="mt-4 p-3 bg-white rounded-lg border">
+            <h4 className="text-sm font-medium text-gray-600 mb-2">Lógica de Cobrança SUS:</h4>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span>Procedimento Principal: <strong>100%</strong></span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                <span>Procedimentos Secundários: <strong>{defaultPercentage}%</strong></span>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -246,7 +453,14 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                       <TableCell className="font-mono text-sm">{procedure.procedimento}</TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{procedure.descricao || `Procedimento ${procedure.procedimento}`}</p>
+                          <div className="flex items-center space-x-2">
+                            <p className="font-medium">{procedure.descricao || `Procedimento ${procedure.procedimento}`}</p>
+                            {procedure.sequencia === 1 && (
+                              <Badge variant="default" className="text-xs bg-green-600 text-white">
+                                Principal
+                              </Badge>
+                            )}
+                          </div>
                           {procedure.sigtapProcedure && (
                             <p className="text-sm text-gray-500 truncate max-w-xs">
                               SIGTAP: {procedure.sigtapProcedure.description}
@@ -255,18 +469,132 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                         </div>
                       </TableCell>
                       <TableCell>
-                        {procedure.valorCalculado ? (
-                          <div className="text-sm">
-                            <p className="font-semibold text-green-600">{formatCurrency(procedure.valorCalculado)}</p>
-                            {procedure.sigtapProcedure && (
-                              <div className="text-xs text-gray-500">
-                                <p>SA: {formatCurrency(procedure.sigtapProcedure.valueAmb)}</p>
-                                <p>SH: {formatCurrency(procedure.sigtapProcedure.valueHosp)}</p>
+                        {editingValues.has(procedure.sequencia) ? (
+                          // MODO EDIÇÃO PREMIUM
+                          <div className="space-y-2 p-2 bg-yellow-50 rounded border-2 border-yellow-200">
+                            <div className="text-xs font-medium text-gray-600 mb-1">Editando Valores:</div>
+                            <div className="space-y-1">
+                              <div className="flex items-center space-x-1">
+                                <span className="text-xs w-8">SA:</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={tempValues[procedure.sequencia]?.valorAmb || 0}
+                                  onChange={(e) => setTempValues(prev => ({
+                                    ...prev,
+                                    [procedure.sequencia]: {
+                                      ...prev[procedure.sequencia],
+                                      valorAmb: Number(e.target.value)
+                                    }
+                                  }))}
+                                  className="w-20 px-1 py-0.5 text-xs border rounded"
+                                />
                               </div>
-                            )}
+                              <div className="flex items-center space-x-1">
+                                <span className="text-xs w-8">SH:</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={tempValues[procedure.sequencia]?.valorHosp || 0}
+                                  onChange={(e) => setTempValues(prev => ({
+                                    ...prev,
+                                    [procedure.sequencia]: {
+                                      ...prev[procedure.sequencia],
+                                      valorHosp: Number(e.target.value)
+                                    }
+                                  }))}
+                                  className="w-20 px-1 py-0.5 text-xs border rounded"
+                                />
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <span className="text-xs w-8">SP:</span>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={tempValues[procedure.sequencia]?.valorProf || 0}
+                                  onChange={(e) => setTempValues(prev => ({
+                                    ...prev,
+                                    [procedure.sequencia]: {
+                                      ...prev[procedure.sequencia],
+                                      valorProf: Number(e.target.value)
+                                    }
+                                  }))}
+                                  className="w-20 px-1 py-0.5 text-xs border rounded"
+                                />
+                              </div>
+                              <div className="flex items-center space-x-1 pt-1 border-t">
+                                <span className="text-xs w-8 font-medium">%:</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={tempValues[procedure.sequencia]?.porcentagem || 100}
+                                  onChange={(e) => setTempValues(prev => ({
+                                    ...prev,
+                                    [procedure.sequencia]: {
+                                      ...prev[procedure.sequencia],
+                                      porcentagem: Number(e.target.value)
+                                    }
+                                  }))}
+                                  className="w-16 px-1 py-0.5 text-xs border rounded"
+                                />
+                                <span className="text-xs">%</span>
+                              </div>
+                            </div>
+                            <div className="flex space-x-1 mt-2">
+                              <Button size="sm" onClick={() => saveEditedValues(procedure.sequencia)} className="h-6 px-2 text-xs">
+                                <Check className="w-3 h-3" />
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => cancelEditingValues(procedure.sequencia)} className="h-6 px-2 text-xs">
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : procedure.valorCalculado && procedure.sigtapProcedure ? (
+                          // MODO VISUALIZAÇÃO
+                          <div className="text-sm relative group">
+                            <div className="flex items-center space-x-1">
+                              <div>
+                                <p className="font-semibold text-green-600">
+                                  {formatCurrency(procedure.valorCalculado)}
+                                </p>
+                                <div className="text-xs text-gray-500 space-y-0.5">
+                                  <p>SA: {formatCurrency(procedure.sigtapProcedure.valueAmb)}</p>
+                                  <p>SH: {formatCurrency(procedure.sigtapProcedure.valueHosp)}</p>
+                                  <p>SP: {formatCurrency(procedure.sigtapProcedure.valueProf)}</p>
+                                </div>
+                              </div>
+                              <div className="ml-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {procedure.porcentagemSUS || (procedure.sequencia === 1 ? 100 : defaultPercentage)}%
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            {/* Botão de edição (aparece no hover) */}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => startEditingValues(procedure.sequencia, procedure)}
+                              className="absolute -top-1 -right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-yellow-100 hover:bg-yellow-200"
+                            >
+                              <Edit className="w-3 h-3" />
+                            </Button>
                           </div>
                         ) : (
-                          <span className="text-gray-400">Não calculado</span>
+                          <div className="text-gray-400 text-sm">
+                            <span>Não calculado</span>
+                            {procedure.sigtapProcedure && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => startEditingValues(procedure.sequencia, procedure)}
+                                className="ml-2 h-6 w-6 p-0 bg-blue-100 hover:bg-blue-200"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </TableCell>
                       <TableCell>{getStatusBadge(procedure.matchStatus, procedure.matchConfidence)}</TableCell>
@@ -317,23 +645,57 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                               </div>
                             </div>
                             
-                            {procedure.sigtapProcedure && (
-                              <div>
-                                <h5 className="font-medium text-sm text-gray-600 mb-2">Match SIGTAP</h5>
-                                <div className="bg-white p-3 rounded border text-sm space-y-1">
-                                  <p><span className="font-medium">Código:</span> {procedure.sigtapProcedure.code}</p>
-                                  <p><span className="font-medium">Descrição:</span> {procedure.sigtapProcedure.description}</p>
-                                  <p><span className="font-medium">Complexidade:</span> {procedure.sigtapProcedure.complexity}</p>
-                                  <div className="pt-2 border-t text-green-700">
-                                    <p className="font-medium">Valores:</p>
-                                    <p>• Ambulatorial: {formatCurrency(procedure.sigtapProcedure.valueAmb)}</p>
-                                    <p>• Hospitalar: {formatCurrency(procedure.sigtapProcedure.valueHosp)}</p>
-                                    <p>• Profissional: {formatCurrency(procedure.sigtapProcedure.valueProf)}</p>
-                                    <p className="font-semibold">• Total: {formatCurrency(procedure.sigtapProcedure.valueHospTotal)}</p>
+                                                          {procedure.sigtapProcedure && (
+                                <div>
+                                  <h5 className="font-medium text-sm text-gray-600 mb-2">Match SIGTAP</h5>
+                                  <div className="bg-white p-3 rounded border text-sm space-y-1">
+                                    <p><span className="font-medium">Código:</span> {procedure.sigtapProcedure.code}</p>
+                                    <p><span className="font-medium">Descrição:</span> {procedure.sigtapProcedure.description}</p>
+                                    <p><span className="font-medium">Complexidade:</span> {procedure.sigtapProcedure.complexity}</p>
+                                    
+                                    <div className="pt-2 border-t">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <p className="font-medium text-green-700">Valores SIGTAP:</p>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => startEditingValues(procedure.sequencia, procedure)}
+                                          className="h-6 px-2 text-xs bg-yellow-100 hover:bg-yellow-200"
+                                        >
+                                          <Edit className="w-3 h-3 mr-1" />
+                                          Editar
+                                        </Button>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <p>• Ambulatorial: {formatCurrency(procedure.sigtapProcedure.valueAmb)}</p>
+                                          <p>• Hospitalar: {formatCurrency(procedure.sigtapProcedure.valueHosp)}</p>
+                                          <p>• Profissional: {formatCurrency(procedure.sigtapProcedure.valueProf)}</p>
+                                          <p className="font-semibold border-t pt-1">• Total SIGTAP: {formatCurrency(procedure.sigtapProcedure.valueHospTotal)}</p>
+                                        </div>
+                                        <div className="bg-green-50 p-2 rounded">
+                                          <p className="font-medium text-green-700 mb-1">Lógica SUS:</p>
+                                          <div className="flex items-center space-x-2">
+                                            <span className={`w-3 h-3 rounded-full ${procedure.sequencia === 1 ? 'bg-green-500' : 'bg-blue-500'}`}></span>
+                                            <span className="text-sm">
+                                              {procedure.sequencia === 1 ? 'Principal' : 'Secundário'}: 
+                                              <strong className="ml-1">
+                                                {procedure.porcentagemSUS || (procedure.sequencia === 1 ? 100 : defaultPercentage)}%
+                                              </strong>
+                                            </span>
+                                          </div>
+                                          <p className="text-sm mt-1">
+                                            <span className="font-medium">Valor Final:</span>
+                                            <span className="ml-1 font-semibold text-green-600">
+                                              {formatCurrency(procedure.valorCalculado || 0)}
+                                            </span>
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
                           </div>
                         </TableCell>
                       </TableRow>
