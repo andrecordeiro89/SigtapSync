@@ -290,7 +290,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         
         {/* Card Unificado: Dados da AIH + Identificação do Paciente */}
-        <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-cyan-50">
+        <Card className="xl:col-span-2 border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-cyan-50">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <FileText className="w-5 h-5 text-blue-600" />
