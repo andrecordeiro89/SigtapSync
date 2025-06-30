@@ -111,18 +111,19 @@ function AppContent() {
     );
   }
 
-  if (!user) {
-    return <LoginForm />;
-  }
+  // AUTENTICAÇÃO TEMPORARIAMENTE DESABILITADA PARA DESENVOLVIMENTO
+  // if (!user) {
+  //   return <LoginForm />;
+  // }
 
   return (
     <div className="min-h-screen bg-background">
-      <ProtectedRoute requiredRole="admin">
+      {/* <ProtectedRoute requiredRole="admin"> */}
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </ProtectedRoute>
+      {/* </ProtectedRoute> */}
     </div>
   );
 }

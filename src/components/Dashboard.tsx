@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { PatientService, AIHService } from '../services/supabaseService';
 import { useSigtapContext } from '../contexts/SigtapContext';
 import { formatCurrency } from '../utils/validation';
+import SigtapDebugger from './SigtapDebugger';
 
 interface DashboardStats {
   totalPatients: number;
@@ -127,19 +128,20 @@ const Dashboard = () => {
     }
   ];
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Users className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-semibold text-gray-900">Acesso restrito</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Faça login para acessar o dashboard
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // MODO DESENVOLVEDOR: permitir acesso sem autenticação
+  // if (!user) {
+  //   return (
+  //     <div className="flex items-center justify-center h-64">
+  //       <div className="text-center">
+  //         <Users className="mx-auto h-12 w-12 text-gray-400" />
+  //         <h3 className="mt-2 text-sm font-semibold text-gray-900">Acesso restrito</h3>
+  //         <p className="mt-1 text-sm text-gray-500">
+  //           Faça login para acessar o dashboard
+  //         </p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="space-y-6">
@@ -288,6 +290,12 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Debugger temporário para diagnóstico */}
+      <div className="border-t pt-6">
+        <h3 className="text-lg font-semibold mb-4 text-gray-800">🔧 Diagnóstico de Persistência (Temporário)</h3>
+        <SigtapDebugger />
       </div>
     </div>
   );

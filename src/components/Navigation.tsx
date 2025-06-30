@@ -104,7 +104,73 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
     return 'U';
   };
 
-  if (!user || !profile || !roleConfig) {
+  // MODO DESENVOLVEDOR: usar valores padrão se não autenticado
+  const devMode = !user || !profile;
+  if (devMode) {
+    // Valores padrão para modo desenvolvimento
+    const devUser = { email: 'developer@test.com' };
+    const devProfile = { 
+      full_name: 'Desenvolvedor', 
+      email: 'developer@test.com', 
+      role: 'admin',
+      avatar_url: null 
+    };
+    const devRoleConfig = {
+      icon: Code,
+      label: 'DEV MODE',
+      color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      description: 'Modo desenvolvedor ativo'
+    };
+    
+    // Usar valores de desenvolvimento
+    const finalUser = devUser;
+    const finalProfile = devProfile;
+    const finalRoleConfig = devRoleConfig;
+    
+    // Continuar renderização com valores de desenvolvimento
+    const RoleIcon = finalRoleConfig.icon;
+    
+    return (
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo e título - lado esquerdo */}
+            <div className="flex items-center space-x-2">
+              <BarChart3 className="w-8 h-8 text-blue-600" />
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">SIGTAP Sync</h1>
+                <p className="text-xs text-gray-500 hidden sm:block">Sistema de Faturamento Hospitalar</p>
+              </div>
+            </div>
+            
+            {/* Navegação - centro */}
+            <nav className="hidden lg:flex space-x-0.5">
+              {tabs.map((tab) => (
+                <Button
+                  key={tab.id}
+                  variant={activeTab === tab.id ? "default" : "ghost"}
+                  onClick={() => onTabChange(tab.id)}
+                  className="flex items-center space-x-1.5 px-2.5 py-1.5 text-sm"
+                  size="sm"
+                >
+                  <tab.icon className="w-4 h-4" />
+                  <span className="hidden xl:inline">{tab.label}</span>
+                </Button>
+              ))}
+            </nav>
+
+            {/* Badge do Role */}
+            <Badge className={`${finalRoleConfig.color} flex items-center gap-1 px-2 py-1 text-xs font-medium`}>
+              <RoleIcon className="h-3 w-3" />
+              <span className="hidden sm:inline">{finalRoleConfig.label}</span>
+            </Badge>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!roleConfig) {
     return null;
   }
 

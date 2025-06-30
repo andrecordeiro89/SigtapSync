@@ -46,21 +46,21 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
     if (!isSupabaseEnabled) return;
     
     try {
-      console.log('📥 🔧 CARREGAMENTO FORÇADO - APENAS DADOS OFICIAIS CORRETOS...');
+      console.log('📥 🔧 CARREGAMENTO INTELIGENTE - DETECTANDO FONTE DE DADOS...');
       
       // Import dinâmico para evitar problemas de módulo
       const { SigtapService } = await import('../services/supabaseService');
       
-      // FORÇAR uso EXCLUSIVO da tabela oficial (valores corretos)
-      console.log('🎯 Carregando EXCLUSIVAMENTE da tabela oficial (valores íntegros)...');
-      const officialProcedures = await SigtapService.getActiveProceduresFromOfficial();
+      // ESTRATÉGIA INTELIGENTE: Tentar carregar da tabela de UPLOAD primeiro
+      console.log('🎯 TENTATIVA 1: Carregando da tabela sigtap_procedures (dados do upload)...');
+      const uploadedProcedures = await SigtapService.getActiveProcedures();
       
-      if (officialProcedures && officialProcedures.length > 0) {
-        console.log(`✅ ${officialProcedures.length} procedimentos OFICIAIS carregados (valores corretos)`);
+      if (uploadedProcedures && uploadedProcedures.length > 0) {
+        console.log(`✅ ${uploadedProcedures.length} procedimentos carregados da TABELA DE UPLOAD`);
         
         // Debug dos primeiros valores para confirmar correção
-        console.log('🔍 VALORES DE TESTE (primeiros 3 procedimentos):');
-        officialProcedures.slice(0, 3).forEach((proc, index) => {
+        console.log('🔍 VALORES DE TESTE (primeiros 3 procedimentos do upload):');
+        uploadedProcedures.slice(0, 3).forEach((proc, index) => {
           console.log(`${index + 1}. ${proc.code}: SA=${proc.valueAmb}, SH=${proc.valueHosp}, SP=${proc.valueProf}`);
         });
         
@@ -70,15 +70,38 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
         // Aguardar um momento para garantir limpeza
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        // Carregar APENAS dados oficiais corretos
+        // Carregar dados do upload
+        await sigtapData.importSigtapFile(null, uploadedProcedures);
+        
+        console.log('✅ CARREGAMENTO UPLOAD CONCLUÍDO - dados persistentes carregados');
+        return; // ✅ SUCESSO - sair da função
+      }
+      
+      // FALLBACK: Se não há dados no upload, tentar tabela oficial
+      console.log('⚠️ Nenhum dado na tabela de upload, tentando tabela oficial...');
+      console.log('🎯 TENTATIVA 2: Carregando da tabela sigtap_procedimentos_oficial...');
+      const officialProcedures = await SigtapService.getActiveProceduresFromOfficial();
+      
+      if (officialProcedures && officialProcedures.length > 0) {
+        console.log(`✅ ${officialProcedures.length} procedimentos carregados da TABELA OFICIAL`);
+        
+        // Limpar dados antigos ANTES de carregar novos
+        sigtapData.clearData();
+        
+        // Aguardar um momento para garantir limpeza
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Carregar dados oficiais
         await sigtapData.importSigtapFile(null, officialProcedures);
         
-        console.log('✅ CARREGAMENTO OFICIAL CONCLUÍDO - valores corretos garantidos');
+        console.log('✅ CARREGAMENTO OFICIAL CONCLUÍDO - dados oficiais carregados');
       } else {
-        console.error('❌ Nenhum procedimento encontrado na tabela oficial');
+        console.error('❌ ERRO: Nenhum procedimento encontrado em NENHUMA tabela');
+        console.log('💡 SOLUÇÃO: Importe um arquivo PDF/Excel/ZIP primeiro');
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar dados oficiais:', error);
+      console.error('❌ Erro ao carregar dados do Supabase:', error);
+      console.error('❌ Detalhes completos do erro:', JSON.stringify(error, null, 2));
     }
   };
 

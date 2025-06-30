@@ -29,6 +29,8 @@ import {
   Database,
   Save
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { useToast } from '../hooks/use-toast';
 import { AIHCompleteProcessor } from '../utils/aihCompleteProcessor';
 import { ProcedureMatchingService } from '../services/procedureMatchingService';
@@ -37,6 +39,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
 import { AIHCompleteProcessingResult, AIHComplete, ProcedureAIH } from '../types';
 
+// Declaração de tipo para jsPDF com autoTable
+declare module 'jspdf' {
+  interface jsPDF {
+    lastAutoTable: {
+      finalY: number;
+    };
+  }
+}
 
 // Componente organizado para visualizar AIH completa
 const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComplete; onUpdateAIH: (aih: AIHComplete) => void }) => {
@@ -726,6 +736,10 @@ const AIHMultiPageTester = () => {
   const { toast } = useToast();
   const { procedures: sigtapProcedures, isLoading: sigtapLoading, totalProcedures } = useSigtapContext();
   const { user, currentHospital } = useAuth();
+  
+  // MODO DESENVOLVIMENTO: valores padrão se não autenticado
+  const safeUser = user || { id: 'dev-user', email: 'developer@test.com' };
+  const safeHospital = currentHospital || { id: 'dev-hospital', name: 'Hospital de Desenvolvimento' };
 
   const processor = new AIHCompleteProcessor();
   const matchingService = new ProcedureMatchingService(sigtapProcedures);
@@ -973,6 +987,182 @@ const AIHMultiPageTester = () => {
     link.click();
   };
 
+  const handleGenerateExecutiveReport = () => {
+    if (!aihCompleta || !result) {
+      toast({
+        title: "Não é possível gerar relatório",
+        description: "Primeiro processe uma AIH com sucesso.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Usar dados reais da AIH processada
+    const procedimentosAprovados = aihCompleta.procedimentos.filter(p => p.aprovado);
+    const totalOriginal = procedimentosAprovados.reduce((sum, p) => sum + (p.valorOriginal || 0), 0);
+    const totalSigtap = procedimentosAprovados.reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
+    const totalDiferenca = totalOriginal - totalSigtap;
+    const dataAtual = new Date().toLocaleDateString('pt-BR');
+    const horaAtual = new Date().toLocaleTimeString('pt-BR');
+
+    // Criar PDF
+    const pdf = new jsPDF();
+    
+    // Configurar fonte
+    pdf.setFont('helvetica');
+    
+    // CABEÇALHO
+    pdf.setFillColor(41, 128, 185); // Azul
+    pdf.rect(0, 0, 210, 40, 'F');
+    
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(20);
+    pdf.text('RELATÓRIO EXECUTIVO - PROCESSAMENTO AIH', 15, 20);
+    
+    pdf.setFontSize(12);
+    pdf.text(`Sistema SIGTAP Sync | ${dataAtual} ${horaAtual}`, 15, 30);
+    
+    // Reset cor do texto
+    pdf.setTextColor(0, 0, 0);
+    
+    let yPos = 50;
+
+    // INFORMAÇÕES DO PROCESSAMENTO
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('INFORMAÇÕES DO PROCESSAMENTO', 15, yPos);
+    
+    yPos += 10;
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    
+    pdf.text(`AIH: ${aihCompleta.numeroAIH}`, 15, yPos);
+    yPos += 6;
+    pdf.text(`Paciente: ${aihCompleta.nomePaciente}`, 15, yPos);
+    yPos += 6;
+    pdf.text(`Arquivo Processado: ${selectedFile?.name || 'arquivo.pdf'}`, 15, yPos);
+    yPos += 6;
+    pdf.text(`Tempo de Processamento: ${result.processingTime} ms`, 15, yPos);
+    
+    yPos += 15;
+
+    // RESUMO EXECUTIVO
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('RESUMO EXECUTIVO', 15, yPos);
+    
+    yPos += 15;
+    
+    // Criar tabela de resumo
+    const resumoData = [
+      ['Total Procedimentos', aihCompleta.totalProcedimentos.toString()],
+      ['Procedimentos Aprovados', aihCompleta.procedimentosAprovados.toString()],
+      ['Valor Total Original', `R$ ${totalOriginal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ['Valor Total SIGTAP', `R$ ${totalSigtap.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
+      ['Diferença', `R$ ${totalDiferenca.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${totalOriginal > 0 ? ((totalDiferenca/totalOriginal)*100).toFixed(2) : '0.00'}%)`]
+    ];
+
+    autoTable(pdf, {
+      startY: yPos,
+      head: [['Métrica', 'Valor']],
+      body: resumoData,
+      theme: 'grid',
+      headStyles: { fillColor: [52, 152, 219], textColor: 255, fontSize: 10 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 80, fontStyle: 'bold' },
+        1: { cellWidth: 80, halign: 'right' }
+      },
+      margin: { left: 15, right: 15 }
+    });
+
+    yPos = pdf.lastAutoTable.finalY + 20;
+
+    // DETALHAMENTO POR PROCEDIMENTO
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('DETALHAMENTO POR PROCEDIMENTO', 15, yPos);
+    
+    yPos += 10;
+    
+    // Preparar dados da tabela
+    const tableData = procedimentosAprovados.map(proc => [
+      proc.sequencia.toString(),
+      proc.procedimento,
+      proc.descricao ? (proc.descricao.length > 30 ? proc.descricao.substring(0, 27) + '...' : proc.descricao) : 'N/A',
+      proc.data,
+      `R$ ${(proc.valorOriginal || 0).toFixed(2)}`,
+      `R$ ${(proc.valorCalculado || 0).toFixed(2)}`,
+      `R$ ${((proc.valorOriginal || 0) - (proc.valorCalculado || 0)).toFixed(2)}`,
+      `${proc.porcentagemSUS || 100}%`,
+      proc.matchStatus
+    ]);
+
+    // Adicionar linha de totais
+    tableData.push([
+      '', '', '', 'TOTAL GERAL:',
+      `R$ ${totalOriginal.toFixed(2)}`,
+      `R$ ${totalSigtap.toFixed(2)}`,
+      `R$ ${totalDiferenca.toFixed(2)}`,
+      '', ''
+    ]);
+
+    autoTable(pdf, {
+      startY: yPos,
+      head: [['Seq', 'Código', 'Descrição', 'Data', 'Original', 'SIGTAP', 'Diferença', '%SUS', 'Status']],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { 
+        fillColor: [46, 204, 113], 
+        textColor: 255, 
+        fontSize: 8,
+        halign: 'center'
+      },
+      bodyStyles: { fontSize: 7 },
+      columnStyles: {
+        0: { cellWidth: 15 }, // Seq
+        1: { cellWidth: 25 }, // Código
+        2: { cellWidth: 35 }, // Descrição
+        3: { cellWidth: 20 }, // Data
+        4: { cellWidth: 20, halign: 'right' }, // Original
+        5: { cellWidth: 20, halign: 'right' }, // SIGTAP
+        6: { cellWidth: 20, halign: 'right' }, // Diferença
+        7: { cellWidth: 15, halign: 'center' }, // %SUS
+        8: { cellWidth: 20 }  // Status
+      },
+      margin: { left: 10, right: 10 },
+      // Destacar linha de totais
+      didParseCell: function (data: any) {
+        if (data.row.index === tableData.length - 1) {
+          data.cell.styles.fillColor = [231, 76, 60];
+          data.cell.styles.textColor = 255;
+          data.cell.styles.fontStyle = 'bold';
+        }
+      }
+    });
+
+    // RODAPÉ
+    const pageHeight = pdf.internal.pageSize.height;
+    
+    pdf.setFillColor(52, 73, 94);
+    pdf.rect(0, pageHeight - 25, 210, 25, 'F');
+    
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(8);
+    pdf.text('• Valores calculados conforme Tabela SIGTAP vigente com percentuais SUS', 15, pageHeight - 15);
+    pdf.text('• Relatório gerado automaticamente pelo Sistema SIGTAP Sync', 15, pageHeight - 10);
+    pdf.text('• Para dúvidas, entre em contato com o departamento de faturamento', 15, pageHeight - 5);
+
+    // Salvar PDF
+    const fileName = `relatorio-executivo-aih-${aihCompleta.numeroAIH}-${dataAtual.replace(/\//g, '-')}.pdf`;
+    pdf.save(fileName);
+
+    toast({
+      title: "📊 Relatório PDF Gerado!",
+      description: `Relatório executivo premium gerado para AIH ${aihCompleta.numeroAIH} com ${procedimentosAprovados.length} procedimentos aprovados.`,
+    });
+  };
+
   const getStatusBadge = (status: ProcedureAIH['matchStatus']) => {
     const variants = {
       pending: { variant: 'secondary' as const, icon: Clock, text: 'Pendente', color: 'text-yellow-600' },
@@ -1092,6 +1282,11 @@ const AIHMultiPageTester = () => {
                       Refazer Matching
                     </>
                   )}
+                </Button>
+                
+                <Button onClick={handleGenerateExecutiveReport} variant="outline">
+                  <FileText className="w-4 h-4 mr-2" />
+                  📊 Relatório Diretores
                 </Button>
                 
                 <Button onClick={exportDetailedReport} variant="outline">
