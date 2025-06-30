@@ -306,7 +306,9 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                 <div className="w-4 h-4 bg-blue-500 rounded"></div>
                 <h4 className="text-sm font-semibold text-gray-700">🆔 Dados da AIH</h4>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              
+              {/* Linha 1: Dados Básicos da AIH */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600">Número AIH</label>
                   <p className="text-gray-900 font-mono text-sm font-semibold bg-blue-50 px-2 py-1 rounded">
@@ -325,6 +327,10 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                   <label className="text-xs font-medium text-gray-600">Data Autorização</label>
                   <p className="text-gray-900 text-sm font-mono">{aihCompleta.dataAutorizacao}</p>
                 </div>
+              </div>
+              
+              {/* Linha 2: Datas de Internação */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600">Data Início</label>
                   <p className="text-gray-900 text-sm font-mono">{aihCompleta.dataInicio}</p>
@@ -334,12 +340,39 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                   <p className="text-gray-900 text-sm font-mono">{aihCompleta.dataFim}</p>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-600">CNS Autorizador</label>
-                  <p className="text-gray-900 text-sm font-mono">{aihCompleta.cnsAutorizador || 'N/A'}</p>
-                </div>
-                <div>
                   <label className="text-xs font-medium text-gray-600">Motivo Encerramento</label>
                   <p className="text-gray-900 text-sm">{aihCompleta.motivoEncerramento || 'N/A'}</p>
+                </div>
+              </div>
+              
+              {/* Linha 3: CNS dos Médicos - Seção Destacada */}
+              <div className="bg-gray-50 p-3 rounded border mt-3">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <h5 className="text-xs font-semibold text-gray-700">👨‍⚕️ Médicos Responsáveis</h5>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">CNS Autorizador</label>
+                    <p className="text-gray-900 text-sm font-mono bg-green-50 px-2 py-1 rounded">
+                      {aihCompleta.cnsAutorizador || 'N/A'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Médico que autorizou</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">CNS Solicitante</label>
+                    <p className="text-gray-900 text-sm font-mono bg-blue-50 px-2 py-1 rounded">
+                      {aihCompleta.cnsSolicitante || 'N/A'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Médico solicitante</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">CNS Responsável</label>
+                    <p className="text-gray-900 text-sm font-mono bg-purple-50 px-2 py-1 rounded">
+                      {aihCompleta.cnsResponsavel || 'N/A'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Médico responsável</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -474,72 +507,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
               </div>
             </div>
 
-            {/* SEÇÃO 2: FATURAMENTO SUS */}
-            <div className="bg-white p-4 rounded-lg border border-purple-100">
-              <div className="flex items-center space-x-2 mb-3">
-                <div className="w-4 h-4 bg-green-500 rounded"></div>
-                <h4 className="text-sm font-semibold text-gray-700">💰 Dados de Faturamento SUS</h4>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
-                  <div className="flex items-center justify-center space-x-1 mb-1">
-                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <p className="text-xs font-medium text-red-600">UTI</p>
-                  </div>
-                  <p className="text-lg font-bold text-red-700">
-                    {aihCompleta.utiDias || 0}
-                  </p>
-                  <p className="text-xs text-red-600">dias</p>
-                </div>
-                
-                <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center justify-center space-x-1 mb-1">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <p className="text-xs font-medium text-blue-600">Permanência</p>
-                  </div>
-                  <p className="text-lg font-bold text-blue-700">
-                    {aihCompleta.permanenciaDias || 0}
-                  </p>
-                  <p className="text-xs text-blue-600">dias</p>
-                </div>
-                
-                <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
-                  <div className="flex items-center justify-center space-x-1 mb-1">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    <p className="text-xs font-medium text-purple-600">Valor Diária</p>
-                  </div>
-                  <p className="text-sm font-bold text-purple-700">
-                    {aihCompleta.valorDiaria ? `R$ ${aihCompleta.valorDiaria.toFixed(2)}` : 'N/A'}
-                  </p>
-                </div>
-                
-                <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
-                  <div className="flex items-center justify-center space-x-1 mb-1">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    <p className="text-xs font-medium text-orange-600">Complexidade</p>
-                  </div>
-                  <p className="text-xs font-bold text-orange-700">
-                    {aihCompleta.complexidadeEspecifica || 'N/A'}
-                  </p>
-                </div>
-              </div>
-              
-              {aihCompleta.atosMedicos && (
-                <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
-                  <label className="text-sm font-medium text-yellow-700">Atos Médicos:</label>
-                  <p className="text-sm text-yellow-800 mt-1">{aihCompleta.atosMedicos}</p>
-                </div>
-              )}
-              
-              {aihCompleta.observacoesFaturamento && (
-                <div className="mt-3 p-2 bg-gray-50 rounded border border-gray-200">
-                  <label className="text-sm font-medium text-gray-700">Observações Faturamento:</label>
-                  <p className="text-sm text-gray-800 mt-1">{aihCompleta.observacoesFaturamento}</p>
-                </div>
-              )}
-            </div>
-
-            {/* SEÇÃO 3: CLASSIFICAÇÃO CLÍNICA */}
+            {/* SEÇÃO 2: CLASSIFICAÇÃO CLÍNICA */}
             <div className="bg-white p-4 rounded-lg border border-purple-100">
               <div className="flex items-center space-x-2 mb-3">
                 <div className="w-4 h-4 bg-teal-500 rounded"></div>
