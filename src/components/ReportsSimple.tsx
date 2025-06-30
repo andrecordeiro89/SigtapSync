@@ -57,10 +57,16 @@ const ReportsSimple: React.FC = () => {
 
   const { user, profile } = useAuth();
   
-  // Hospital atual (simplificado para Fase 1)
-  const currentHospital = profile?.hospital_access?.[0] 
-    ? { id: profile.hospital_access[0], name: 'Hospital Principal' }
-    : { id: 'a0000000-0000-0000-0000-000000000001', name: 'Hospital Demo' };
+  // MODO DESENVOLVIMENTO: Hospital padrão
+  const currentHospital = { 
+    id: 'a0000000-0000-0000-0000-000000000001', 
+    name: 'Hospital Demo - Desenvolvimento' 
+  };
+  
+  // Original code comentado para modo desenvolvimento:
+  // const currentHospital = profile?.hospital_access?.[0] 
+  //   ? { id: profile.hospital_access[0], name: 'Hospital Principal' }
+  //   : { id: 'a0000000-0000-0000-0000-000000000001', name: 'Hospital Demo' };
 
   // Carregar dados reais do relatório
   const loadReportData = async () => {
@@ -170,19 +176,20 @@ const ReportsSimple: React.FC = () => {
     toast.success('📄 Relatório PDF Premium gerado com sucesso!');
   };
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <BarChart4 className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-semibold text-gray-900">Acesso restrito</h3>
-          <p className="mt-1 text-sm text-gray-500">
-            Faça login para acessar os relatórios
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // MODO DESENVOLVIMENTO: Acesso livre aos relatórios
+  // if (!user) {
+  //   return (
+  //     <div className="flex items-center justify-center h-64">
+  //       <div className="text-center">
+  //         <BarChart4 className="mx-auto h-12 w-12 text-gray-400" />
+  //         <h3 className="mt-2 text-sm font-semibold text-gray-900">Acesso restrito</h3>
+  //         <p className="mt-1 text-sm text-gray-500">
+  //           Faça login para acessar os relatórios
+  //         </p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">

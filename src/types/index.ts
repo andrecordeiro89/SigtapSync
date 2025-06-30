@@ -86,49 +86,60 @@ export interface AIH {
   
   // Apresentação da AIH
   numeroAIH: string;
-  situacao?: string;
-  tipo?: string;
-  dataAutorizacao?: string;
+  situacao: string;
+  tipo: string;
+  dataAutorizacao: string;
   apresentacao?: string;
   
   // Dados da AIH
   dataInicio: string;
-  dataFim?: string;
-  motivoEncerramento?: string;
-  cnsAutorizador?: string;
-  cnsSolicitante?: string;
-  cnsResponsavel?: string;
-  aihAnterior?: string;
-  aihPosterior?: string;
+  dataFim: string;
+  motivoEncerramento: string;
+  cnsAutorizador: string;
+  cnsSolicitante: string;
+  cnsResponsavel: string;
+  aihAnterior: string;
+  aihPosterior: string;
   
   // Identificação do paciente
-  prontuario?: string;
+  prontuario: string;
   nomePaciente: string;
-  cns?: string; // CNS do paciente
+  cns: string;
   nascimento: string;
-  sexo: 'M' | 'F';
-  nacionalidade?: string;
-  tipoDocumento?: string;
-  documento?: string;
-  nomeResponsavel?: string;
-  nomeMae?: string;
-  endereco?: string;
-  numero?: string;
-  complemento?: string;
-  bairro?: string;
-  municipio?: string;
-  uf?: string;
-  cep?: string;
-  telefone?: string;
+  sexo: string;
+  nacionalidade: string;
+  racaCor: string;
+  tipoDocumento: string;
+  documento: string;
+  nomeResponsavel: string;
+  nomeMae: string;
+  endereco: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  municipio: string;
+  uf: string;
+  cep: string;
+  telefone: string;
   
   // Dados da internação
-  procedimentoSolicitado?: string;
-  mudancaProc?: boolean;
+  procedimentoSolicitado: string;
+  mudancaProc: boolean;
   procedimentoPrincipal: string;
-  cidPrincipal?: string;
-  especialidade?: string;
-  modalidade?: string;
-  caracterAtendimento?: string;
+  cidPrincipal: string;
+  especialidade: string;
+  modalidade: string;
+  caracterAtendimento: string;
+  
+  // Dados específicos de faturamento SUS
+  utiDias?: number;                    // Dias em UTI
+  atosMedicos?: string;                // Atos médicos realizados
+  permanenciaDias?: number;            // Dias de permanência total
+  complexidadeEspecifica?: string;     // Complexidade específica do procedimento
+  procedimentoSequencial?: boolean;    // Se é procedimento sequencial
+  procedimentoEspecial?: boolean;      // Se é procedimento especial
+  valorDiaria?: number;                // Valor da diária
+  observacoesFaturamento?: string;     // Observações específicas para faturamento
   
   // Procedimentos realizados
   procedimentosRealizados: AIHProcedureRealized[];

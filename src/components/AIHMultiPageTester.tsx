@@ -59,6 +59,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     porcentagem: number;
   }}>({});
   const [defaultPercentage, setDefaultPercentage] = useState<number>(70); // Porcentagem padrão para procedimentos secundários
+  const [expandedSections, setExpandedSections] = useState<{endereco: boolean}>({endereco: false}); // NOVO ESTADO
   const { toast } = useToast();
 
   // Aplicar lógica de porcentagem SUS quando AIH é carregada
@@ -285,80 +286,296 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
 
   return (
     <div className="space-y-6">
-      {/* CARDS: DADOS DO PACIENTE E AIH */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Card: Dados do Paciente */}
-        <Card>
+      {/* CARDS REORGANIZADOS: DADOS COMPLETOS DA AIH */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        
+        {/* Card Unificado: Dados da AIH + Identificação do Paciente */}
+        <Card className="border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-cyan-50">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <User className="w-5 h-5 text-blue-600" />
-              <span>Dados do Paciente</span>
+              <FileText className="w-5 h-5 text-blue-600" />
+              <span>📋 Dados da AIH & Paciente</span>
+              <Badge variant="outline" className="bg-blue-100 text-blue-700">Completo</Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <label className="text-sm font-medium text-gray-600">Nome Completo</label>
-              <p className="text-lg font-semibold text-gray-900">{aihCompleta.nomePaciente}</p>
-            </div>
+          <CardContent className="space-y-6">
             
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-600">CNS</label>
-                <p className="text-gray-900 font-mono text-sm">{aihCompleta.cns || 'N/A'}</p>
+            {/* SEÇÃO 1: DADOS DA AIH */}
+            <div className="bg-white p-4 rounded-lg border border-blue-100">
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-4 h-4 bg-blue-500 rounded"></div>
+                <h4 className="text-sm font-semibold text-gray-700">🆔 Dados da AIH</h4>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Número AIH</label>
+                  <p className="text-gray-900 font-mono text-sm font-semibold bg-blue-50 px-2 py-1 rounded">
+                    {aihCompleta.numeroAIH}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Situação</label>
+                  <p className="text-gray-900 text-sm">{aihCompleta.situacao}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Tipo</label>
+                  <p className="text-gray-900 text-sm">{aihCompleta.tipo}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Data Autorização</label>
+                  <p className="text-gray-900 text-sm font-mono">{aihCompleta.dataAutorizacao}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Data Início</label>
+                  <p className="text-gray-900 text-sm font-mono">{aihCompleta.dataInicio}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Data Fim</label>
+                  <p className="text-gray-900 text-sm font-mono">{aihCompleta.dataFim}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">CNS Autorizador</label>
+                  <p className="text-gray-900 text-sm font-mono">{aihCompleta.cnsAutorizador || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Motivo Encerramento</label>
+                  <p className="text-gray-900 text-sm">{aihCompleta.motivoEncerramento || 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO 2: IDENTIFICAÇÃO DO PACIENTE */}
+            <div className="bg-white p-4 rounded-lg border border-blue-100">
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-4 h-4 bg-green-500 rounded"></div>
+                <h4 className="text-sm font-semibold text-gray-700">👤 Identificação do Paciente</h4>
               </div>
               
-              <div>
-                <label className="text-sm font-medium text-gray-600">Sexo</label>
-                <p className="text-gray-900">{aihCompleta.sexo === 'M' ? 'Masculino' : 'Feminino'}</p>
+              {/* Dados Principais do Paciente */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Nome do Paciente</label>
+                  <p className="text-gray-900 text-sm font-semibold bg-green-50 px-2 py-1 rounded">
+                    {aihCompleta.nomePaciente}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">CNS</label>
+                  <p className="text-gray-900 text-sm font-mono">{aihCompleta.cns}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Prontuário</label>
+                  <p className="text-gray-900 text-sm font-mono">{aihCompleta.prontuario || 'N/A'}</p>
+                </div>
+              </div>
+              
+              {/* Dados Demográficos Compactos */}
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mt-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Nascimento</label>
+                  <p className="text-gray-900 text-sm">{aihCompleta.nascimento}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Sexo</label>
+                  <Badge variant="outline" className={aihCompleta.sexo === 'M' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700'}>
+                    {aihCompleta.sexo === 'M' ? 'Masculino' : 'Feminino'}
+                  </Badge>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Nacionalidade</label>
+                  <p className="text-gray-900 text-sm">{aihCompleta.nacionalidade || 'BRASIL'}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Raça/Cor</label>
+                  <p className="text-gray-900 text-sm">{aihCompleta.racaCor || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Tipo Doc.</label>
+                  <p className="text-gray-900 text-sm">{aihCompleta.tipoDocumento || 'N/A'}</p>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">Documento</label>
+                  <p className="text-gray-900 text-sm font-mono">{aihCompleta.documento || 'N/A'}</p>
+                </div>
+              </div>
+
+              {/* Endereço Compacto (sempre visível) */}
+              <div className="mt-3 p-2 bg-gray-50 rounded border">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="col-span-2">
+                    <label className="text-xs font-medium text-gray-600">📍 Endereço</label>
+                    <p className="text-gray-900 text-sm">{aihCompleta.endereco || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Município</label>
+                    <p className="text-gray-900 text-sm">{aihCompleta.municipio || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">UF</label>
+                    <p className="text-gray-900 text-sm font-mono">{aihCompleta.uf || 'N/A'}</p>
+                  </div>
+                </div>
               </div>
             </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-600">Data de Nascimento</label>
-              <div className="flex items-center space-x-2">
-                <Calendar className="w-4 h-4 text-gray-400" />
-                <p className="text-gray-900">{aihCompleta.nascimento}</p>
-              </div>
-            </div>
+
           </CardContent>
         </Card>
 
-        {/* Card: Dados da AIH */}
-        <Card>
+        {/* Card 3: Dados da Internação - Layout Premium Expandido */}
+        <Card className="xl:col-span-2 border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-violet-50">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <FileText className="w-5 h-5 text-green-600" />
-              <span>Dados da AIH</span>
+              <Stethoscope className="w-5 h-5 text-purple-600" />
+              <span>🏥 Dados da Internação & Faturamento</span>
+              <Badge variant="outline" className="bg-purple-100 text-purple-700">SUS</Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <label className="text-sm font-medium text-gray-600">Número da AIH</label>
-              <div className="flex items-center space-x-2">
-                <CreditCard className="w-4 h-4 text-gray-400" />
-                <p className="text-lg font-bold text-green-700 font-mono">{aihCompleta.numeroAIH}</p>
+          <CardContent className="space-y-6">
+            
+            {/* SEÇÃO 1: PROCEDIMENTOS */}
+            <div className="bg-white p-4 rounded-lg border border-purple-100">
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-4 h-4 bg-blue-500 rounded"></div>
+                <h4 className="text-sm font-semibold text-gray-700">🔬 Procedimentos</h4>
+              </div>
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Procedimento Principal</label>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <Stethoscope className="w-4 h-4 text-blue-500" />
+                    <p className="text-gray-900 font-mono text-sm font-semibold bg-blue-50 px-2 py-1 rounded">
+                      {aihCompleta.procedimentoPrincipal || 'N/A'}
+                    </p>
+                    {aihCompleta.procedimentoSequencial && (
+                      <Badge variant="secondary" className="bg-orange-100 text-orange-700">Sequencial</Badge>
+                    )}
+                    {aihCompleta.procedimentoEspecial && (
+                      <Badge variant="secondary" className="bg-red-100 text-red-700">Especial</Badge>
+                    )}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Procedimento Solicitado</label>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <div className="flex items-center space-x-3">
+                      <p className="text-gray-900 font-mono text-sm bg-gray-50 px-2 py-1 rounded">
+                        {aihCompleta.procedimentoSolicitado || 'N/A'}
+                      </p>
+                      <div className="flex items-center space-x-2">
+                        <label className="text-sm font-medium text-gray-600">Mudança?</label>
+                        <Badge variant={aihCompleta.mudancaProc ? "destructive" : "outline"}>
+                          {aihCompleta.mudancaProc ? "Sim" : "Não"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-600">Data Início</label>
-                <p className="text-gray-900">{aihCompleta.dataInicio}</p>
+
+            {/* SEÇÃO 2: FATURAMENTO SUS */}
+            <div className="bg-white p-4 rounded-lg border border-purple-100">
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-4 h-4 bg-green-500 rounded"></div>
+                <h4 className="text-sm font-semibold text-gray-700">💰 Dados de Faturamento SUS</h4>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
+                  <div className="flex items-center justify-center space-x-1 mb-1">
+                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                    <p className="text-xs font-medium text-red-600">UTI</p>
+                  </div>
+                  <p className="text-lg font-bold text-red-700">
+                    {aihCompleta.utiDias || 0}
+                  </p>
+                  <p className="text-xs text-red-600">dias</p>
+                </div>
+                
+                <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center justify-center space-x-1 mb-1">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <p className="text-xs font-medium text-blue-600">Permanência</p>
+                  </div>
+                  <p className="text-lg font-bold text-blue-700">
+                    {aihCompleta.permanenciaDias || 0}
+                  </p>
+                  <p className="text-xs text-blue-600">dias</p>
+                </div>
+                
+                <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex items-center justify-center space-x-1 mb-1">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    <p className="text-xs font-medium text-purple-600">Valor Diária</p>
+                  </div>
+                  <p className="text-sm font-bold text-purple-700">
+                    {aihCompleta.valorDiaria ? `R$ ${aihCompleta.valorDiaria.toFixed(2)}` : 'N/A'}
+                  </p>
+                </div>
+                
+                <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+                  <div className="flex items-center justify-center space-x-1 mb-1">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    <p className="text-xs font-medium text-orange-600">Complexidade</p>
+                  </div>
+                  <p className="text-xs font-bold text-orange-700">
+                    {aihCompleta.complexidadeEspecifica || 'N/A'}
+                  </p>
+                </div>
               </div>
               
-              <div>
-                <label className="text-sm font-medium text-gray-600">Data Fim</label>
-                <p className="text-gray-900">{aihCompleta.dataFim || 'Em andamento'}</p>
+              {aihCompleta.atosMedicos && (
+                <div className="mt-3 p-2 bg-yellow-50 rounded border border-yellow-200">
+                  <label className="text-sm font-medium text-yellow-700">Atos Médicos:</label>
+                  <p className="text-sm text-yellow-800 mt-1">{aihCompleta.atosMedicos}</p>
+                </div>
+              )}
+              
+              {aihCompleta.observacoesFaturamento && (
+                <div className="mt-3 p-2 bg-gray-50 rounded border border-gray-200">
+                  <label className="text-sm font-medium text-gray-700">Observações Faturamento:</label>
+                  <p className="text-sm text-gray-800 mt-1">{aihCompleta.observacoesFaturamento}</p>
+                </div>
+              )}
+            </div>
+
+            {/* SEÇÃO 3: CLASSIFICAÇÃO CLÍNICA */}
+            <div className="bg-white p-4 rounded-lg border border-purple-100">
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="w-4 h-4 bg-teal-500 rounded"></div>
+                <h4 className="text-sm font-semibold text-gray-700">📋 Classificação Clínica</h4>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-600">CID Principal</label>
+                  <p className="text-gray-900 font-mono text-sm bg-teal-50 px-2 py-1 rounded mt-1">
+                    {aihCompleta.cidPrincipal || 'N/A'}
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Especialidade</label>
+                  <p className="text-gray-900 text-sm bg-gray-50 px-2 py-1 rounded mt-1">
+                    {aihCompleta.especialidade || 'N/A'}
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Modalidade</label>
+                  <p className="text-gray-900 text-sm bg-gray-50 px-2 py-1 rounded mt-1">
+                    {aihCompleta.modalidade || 'N/A'}
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Caráter Atendimento</label>
+                  <p className="text-gray-900 text-sm bg-gray-50 px-2 py-1 rounded mt-1">
+                    {aihCompleta.caracterAtendimento || 'N/A'}
+                  </p>
+                </div>
               </div>
             </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-600">Procedimento Principal</label>
-              <div className="flex items-center space-x-2">
-                <Stethoscope className="w-4 h-4 text-gray-400" />
-                <p className="text-gray-900 font-mono text-sm">{aihCompleta.procedimentoPrincipal}</p>
-              </div>
-            </div>
+
           </CardContent>
         </Card>
       </div>
@@ -735,11 +952,11 @@ const AIHMultiPageTester = () => {
   const [aihSaved, setAihSaved] = useState(false);
   const { toast } = useToast();
   const { procedures: sigtapProcedures, isLoading: sigtapLoading, totalProcedures } = useSigtapContext();
-  const { user, currentHospital } = useAuth();
+  const { user } = useAuth();
   
   // MODO DESENVOLVIMENTO: valores padrão se não autenticado
   const safeUser = user || { id: 'dev-user', email: 'developer@test.com' };
-  const safeHospital = currentHospital || { id: 'dev-hospital', name: 'Hospital de Desenvolvimento' };
+  const safeHospital = { id: 'dev-hospital', name: 'Hospital de Desenvolvimento' };
 
   const processor = new AIHCompleteProcessor();
   const matchingService = new ProcedureMatchingService(sigtapProcedures);
@@ -804,12 +1021,12 @@ const AIHMultiPageTester = () => {
       });
 
       // Persistir AIH processada no banco de dados
-      if (processingResult.aihCompleta && user && currentHospital) {
+      if (processingResult.aihCompleta && user && safeHospital) {
         try {
           console.log('💾 Salvando AIH no banco de dados...');
           const persistenceResult = await AIHPersistenceService.persistAIHFromPDF(
             processingResult.aihCompleta,
-            currentHospital.id,
+            safeHospital.id,
             selectedFile.name
           );
           

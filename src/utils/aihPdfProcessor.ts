@@ -18,6 +18,8 @@ interface AIHPDFData {
   cnsAutorizador: string;
   cnsSolicitante: string;
   cnsResponsavel: string;
+  aihAnterior: string;
+  aihPosterior: string;
 
   // Identificação do paciente
   prontuario: string;
@@ -26,6 +28,9 @@ interface AIHPDFData {
   nascimento: string;
   sexo: string;
   nacionalidade: string;
+  racaCor: string;
+  tipoDocumento: string;
+  documento: string;
   nomeResponsavel: string;
   nomeMae: string;
   endereco: string;
@@ -45,6 +50,16 @@ interface AIHPDFData {
   especialidade: string;
   modalidade: string;
   caracterAtendimento: string;
+  
+  // Dados específicos de faturamento SUS
+  utiDias: string;
+  atosMedicos: string;
+  permanenciaDias: string;
+  complexidadeEspecifica: string;
+  procedimentoSequencial: string;
+  procedimentoEspecial: string;
+  valorDiaria: string;
+  observacoesFaturamento: string;
 }
 
 export class AIHPDFProcessor {
@@ -258,6 +273,16 @@ export class AIHPDFProcessor {
           /responsável[:\s]*([\d.]+)/i,
           /responsavel[:\s]*([\d.]+)/i
         ],
+        aihAnterior: [
+          /AIH anterior[:\s]*([0-9-]+)/i,
+          /AIH\s+anterior[:\s]*([0-9-]+)/i,
+          /anterior[:\s]*([0-9-]+)/i
+        ],
+        aihPosterior: [
+          /AIH posterior[:\s]*([0-9-]+)/i,
+          /AIH\s+posterior[:\s]*([0-9-]+)/i,
+          /posterior[:\s]*([0-9-]+)/i
+        ],
 
         // IDENTIFICAÇÃO DO PACIENTE
         prontuario: [
@@ -288,8 +313,26 @@ export class AIHPDFProcessor {
         ],
         nacionalidade: [
           /Nacionalidade[:\s]*([^N]+?)(?=\s+Nome)/i,
+          /Nacionalidade[:\s]*([^R]+?)(?=\s+Raça)/i,
           /Nacionalidade[:\s]*([A-Z]+)/i,
           /(BRASIL|BRASILEIRA?)/i
+        ],
+        racaCor: [
+          /Raça\/Cor[:\s]*([^T]+?)(?=\s+Tipo)/i,
+          /Raca\/Cor[:\s]*([^T]+?)(?=\s+Tipo)/i,
+          /Raça[:\s]*([^T]+?)(?=\s+Tipo)/i,
+          /Raca[:\s]*([^T]+?)(?=\s+Tipo)/i,
+          /(Parda|Branca|Preta|Amarela|Indígena|Ignorado)/i
+        ],
+        tipoDocumento: [
+          /Tipo documento[:\s]*([^D]+?)(?=\s+Documento)/i,
+          /Tipo\s+documento[:\s]*([^D]+?)(?=\s+Documento)/i,
+          /(RG|CPF|Ignorado)/i
+        ],
+        documento: [
+          /Documento[:\s]*([0-9.-]+?)(?=\s+Nome)/i,
+          /Tipo documento[:\s]*[^D]*Documento[:\s]*([0-9.-]+)/i,
+          /(?:RG|CPF)[:\s]*([0-9.-]+)/i
         ],
         nomeResponsavel: [
           /Nome responsável[:\s]*([A-Z\s]+?)(?=\s+Nome mãe)/i,
@@ -344,12 +387,13 @@ export class AIHPDFProcessor {
           /(\(\d{2}\)\d{8,9})/i
         ],
 
-        // DADOS DA INTERNAÇÃO - Patterns mais flexíveis
+        // DADOS DA INTERNAÇÃO - Patterns expandidos para código + nome
         procedimentoSolicitado: [
-          /Procedimento\s+solicitado[:\s]*([\d.-]+[^M]*?)(?=\s+Mudança)/i,
-          /Proc.*solicitado[:\s]*([\d.-]+[^M]*?)(?=\s+Mudanca)/i,
-          /solicitado[:\s]*([\d.-]+[^M]*?)(?=\s+Mudança)/i,
-          /solicitado[:\s]*([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/i
+          /Procedimento\s+solicitado[:\s]*([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d]\s*-\s*[^M]+?)(?=\s+Mudança)/i,
+          /Proc.*solicitado[:\s]*([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d]\s*-\s*[^M]+?)(?=\s+Mudanca)/i,
+          /solicitado[:\s]*([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d]\s*-\s*[^M]+?)(?=\s+Mudança)/i,
+          /solicitado[:\s]*([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d][^M]*?)(?=\s+Mudança)/i,
+          /solicitado[:\s]*([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/i // Fallback só código
         ],
         mudancaProc: [
           /Mudança de proc\.?\s*(Sim|Não|S|N)/i,
@@ -358,11 +402,12 @@ export class AIHPDFProcessor {
           /proc\.\?\s*(Sim|Não)/i
         ],
         procedimentoPrincipal: [
-          /Procedimento\s+principal[:\s]*([\d.-]+[^C]*?)(?=\s+CID)/i,
-          /Proc.*principal[:\s]*([\d.-]+[^C]*?)(?=\s+CID)/i,
-          /principal[:\s]*([\d.-]+[^C]*?)(?=\s+CID)/i,
-          /principal[:\s]*([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/i,
-          /([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d]\s*-\s*[A-Z\s]+)/i // Pattern mais direto
+          /Procedimento\s+principal[:\s]*([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d]\s*-\s*[^C]+?)(?=\s+CID)/i,
+          /Proc.*principal[:\s]*([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d]\s*-\s*[^C]+?)(?=\s+CID)/i,
+          /principal[:\s]*([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d]\s*-\s*[^C]+?)(?=\s+CID)/i,
+          /principal[:\s]*([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d][^C]*?)(?=\s+CID)/i,
+          /([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d]\s*-\s*[A-Z\s]+)/i, // Pattern direto completo
+          /principal[:\s]*([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/i // Fallback só código
         ],
         cidPrincipal: [
           /CID principal[:\s]*([A-Z]\d+\s*-\s*[^E]+?)(?=\s+Especialidade)/i,
@@ -388,6 +433,59 @@ export class AIHPDFProcessor {
           /Carater.*atendimento[:\s]*(.+?)(?=\s|$)/i,
           /atendimento[:\s]*(.+?)(?=\s|$)/i,
           /(\d+\s*-\s*[A-Z\s]+)$/i // Pattern final da linha
+        ],
+
+        // DADOS ESPECÍFICOS DE FATURAMENTO SUS
+        utiDias: [
+          /UTI[:\s]*(\d+)\s*dias?/i,
+          /Unidade.*Terapia.*Intensiva[:\s]*(\d+)/i,
+          /Dias.*UTI[:\s]*(\d+)/i,
+          /Permanência.*UTI[:\s]*(\d+)/i,
+          /(\d+)\s*dias?.*UTI/i
+        ],
+        atosMedicos: [
+          /Atos\s+médicos[:\s]*([^P]+?)(?=\s+Permanência|$)/i,
+          /Atos.*medicos[:\s]*([^P]+?)(?=\s+Permanencia|$)/i,
+          /medicos[:\s]*([^P]+)/i,
+          /Atos[:\s]*(\d+)/i
+        ],
+        permanenciaDias: [
+          /Permanência[:\s]*(\d+)\s*dias?/i,
+          /Permanencia[:\s]*(\d+)\s*dias?/i,
+          /Dias.*permanência[:\s]*(\d+)/i,
+          /Dias.*permanencia[:\s]*(\d+)/i,
+          /(\d+)\s*dias?.*permanência/i,
+          /(\d+)\s*dias?.*permanencia/i
+        ],
+        complexidadeEspecifica: [
+          /Complexidade\s+específica[:\s]*([^V]+?)(?=\s+Valor|$)/i,
+          /Complexidade.*especifica[:\s]*([^V]+?)(?=\s+Valor|$)/i,
+          /específica[:\s]*([A-Z\s]+)/i,
+          /especifica[:\s]*([A-Z\s]+)/i
+        ],
+        procedimentoSequencial: [
+          /Procedimento\s+sequencial[:\s]*(Sim|Não|S|N)/i,
+          /sequencial[:\s]*(Sim|Não|S|N)/i,
+          /(PROCEDIMENTOS?\s+SEQUENCIAIS?)/i,
+          /SEQUENCIAL/i
+        ],
+        procedimentoEspecial: [
+          /Procedimento\s+especial[:\s]*(Sim|Não|S|N)/i,
+          /especial[:\s]*(Sim|Não|S|N)/i,
+          /(PROCEDIMENTOS?\s+ESPECIAIS?)/i,
+          /ESPECIAL/i
+        ],
+        valorDiaria: [
+          /Valor\s+diária[:\s]*R\$\s*([\d,]+\.?\d*)/i,
+          /Valor.*diaria[:\s]*R\$\s*([\d,]+\.?\d*)/i,
+          /diária[:\s]*R\$\s*([\d,]+\.?\d*)/i,
+          /diaria[:\s]*R\$\s*([\d,]+\.?\d*)/i
+        ],
+        observacoesFaturamento: [
+          /Observações\s+faturamento[:\s]*([^$]+)/i,
+          /Observacoes.*faturamento[:\s]*([^$]+)/i,
+          /faturamento[:\s]*([^$]+)/i,
+          /Obs\.?\s*faturamento[:\s]*([^$]+)/i
         ]
       };
 
@@ -418,7 +516,7 @@ export class AIHPDFProcessor {
         }
       }
 
-      console.log(`📊 Total de campos extraídos: ${extractedCount}/25`);
+      console.log(`📊 Total de campos extraídos: ${extractedCount}/33`);
 
       // Validar campos obrigatórios com fallback
       const requiredFields = ['numeroAIH', 'nomePaciente', 'procedimentoPrincipal'];
@@ -447,18 +545,18 @@ export class AIHPDFProcessor {
         }
       }
 
-      console.log(`🔧 Após fallbacks: ${extractedCount}/25 campos, faltando: ${missingRequired.join(', ')}`);
+      console.log(`🔧 Após fallbacks: ${extractedCount}/33 campos, faltando: ${missingRequired.join(', ')}`);
       
       if (missingRequired.length > 0) {
         console.error('❌ Campos obrigatórios faltando:', missingRequired);
-        // Não falhar por campos obrigatórios se temos pelo menos 15 campos
-        if (extractedCount < 15) {
+        // Não falhar por campos obrigatórios se temos pelo menos 18 campos
+        if (extractedCount < 18) {
           throw new Error(`Campos obrigatórios não encontrados: ${missingRequired.join(', ')}`);
         }
       }
 
-      // Retornar dados se temos pelo menos 15 campos ou nenhum obrigatório faltando
-      if (extractedCount >= 15 || missingRequired.length === 0) {
+      // Retornar dados se temos pelo menos 18 campos ou nenhum obrigatório faltando
+      if (extractedCount >= 18 || missingRequired.length === 0) {
         console.log('✅ Extração bem-sucedida');
         return data as AIHPDFData;
       } else {
@@ -484,10 +582,11 @@ export class AIHPDFProcessor {
                    data.sexo?.toLowerCase().includes('feminino') ? 'F' : 
                    data.sexo?.toUpperCase().includes('M') ? 'M' : 'F';
     
-    // Extrair código do procedimento principal
-    const procedureCode = data.procedimentoPrincipal?.match(/^([\d.-]+)/)?.[1] || '';
+    // Manter procedimentos completos (código + descrição) - NÃO extrair apenas código
+    const procedimentoPrincipalCompleto = data.procedimentoPrincipal || '';
+    const procedimentoSolicitadoCompleto = data.procedimentoSolicitado || '';
     
-    // Extrair código do CID principal
+    // Extrair apenas código do CID principal
     const cidCode = data.cidPrincipal?.match(/^([A-Z]\d+)/)?.[1] || '';
 
     const aih: AIH = {
@@ -507,6 +606,8 @@ export class AIHPDFProcessor {
       cnsAutorizador: this.cleanCNS(data.cnsAutorizador),
       cnsSolicitante: this.cleanCNS(data.cnsSolicitante),
       cnsResponsavel: this.cleanCNS(data.cnsResponsavel),
+      aihAnterior: data.aihAnterior || '',
+      aihPosterior: data.aihPosterior || '',
       
       // Identificação do paciente
       prontuario: data.prontuario || '',
@@ -515,19 +616,40 @@ export class AIHPDFProcessor {
       nascimento: this.convertDate(data.nascimento),
       sexo: gender,
       nacionalidade: data.nacionalidade || 'BRASIL',
+      racaCor: data.racaCor || '',
+      tipoDocumento: data.tipoDocumento || '',
+      documento: data.documento || '',
       nomeResponsavel: data.nomeResponsavel,
       nomeMae: data.nomeMae,
       endereco: this.buildFullAddress(data),
+      numero: data.numero || '',
+      complemento: data.complemento || '',
+      bairro: data.bairro || '',
+      municipio: data.municipio || '',
+      uf: data.uf || '',
+      cep: data.cep || '',
       telefone: this.cleanPhone(data.telefone),
       
-      // Dados da internação
-      procedimentoSolicitado: data.procedimentoSolicitado || '',
+      // Dados da internação - USAR PROCEDIMENTOS COMPLETOS
+      procedimentoSolicitado: procedimentoSolicitadoCompleto,
       mudancaProc: data.mudancaProc?.toLowerCase() === 'sim',
-      procedimentoPrincipal: procedureCode,
+      procedimentoPrincipal: procedimentoPrincipalCompleto,
       cidPrincipal: cidCode,
       especialidade: data.especialidade || '',
       modalidade: data.modalidade || '',
       caracterAtendimento: data.caracterAtendimento || '',
+      
+      // Dados específicos de faturamento SUS
+      utiDias: data.utiDias ? parseInt(data.utiDias) : undefined,
+      atosMedicos: data.atosMedicos || undefined,
+      permanenciaDias: data.permanenciaDias ? parseInt(data.permanenciaDias) : undefined,
+      complexidadeEspecifica: data.complexidadeEspecifica || undefined,
+      procedimentoSequencial: data.procedimentoSequencial?.toLowerCase().includes('sim') || 
+                              data.procedimentoSequencial?.includes('SEQUENCIAL') || false,
+      procedimentoEspecial: data.procedimentoEspecial?.toLowerCase().includes('sim') || 
+                           data.procedimentoEspecial?.includes('ESPECIAL') || false,
+      valorDiaria: data.valorDiaria ? parseFloat(data.valorDiaria.replace(',', '.')) : undefined,
+      observacoesFaturamento: data.observacoesFaturamento || undefined,
       
       // Arrays vazios para procedimentos realizados
       procedimentosRealizados: [],
@@ -540,7 +662,7 @@ export class AIHPDFProcessor {
     console.log('🔄 AIH convertida:', {
       numeroAIH: aih.numeroAIH,
       paciente: aih.nomePaciente,
-      procedimento: aih.procedimentoPrincipal,
+      procedimentoPrincipal: aih.procedimentoPrincipal, // Mostrar completo no log
       cid: aih.cidPrincipal
     });
 
@@ -628,11 +750,11 @@ export class AIHPDFProcessor {
       }
     }
 
-    console.log(`✅ Validação: ${errors.length === 0 ? 'SUCESSO' : errors.length + ' erros encontrados'}`);
+    console.log(`✅ Validação AIH concluída: ${errors.length} erros encontrados`);
 
     return {
       isValid: errors.length === 0,
       errors
     };
   }
-} 
+}

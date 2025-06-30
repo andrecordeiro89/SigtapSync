@@ -60,4 +60,59 @@ COMMENT ON COLUMN patients.mother_name IS 'Nome da mãe do paciente';
 COMMENT ON COLUMN patients.neighborhood IS 'Bairro de residência do paciente';
 COMMENT ON COLUMN patients.responsible_name IS 'Nome do responsável pelo paciente';
 COMMENT ON COLUMN patients.document_type IS 'Tipo do documento: CPF, RG, etc.';
-COMMENT ON COLUMN patients.document_number IS 'Número do documento do paciente'; 
+COMMENT ON COLUMN patients.document_number IS 'Número do documento do paciente';
+
+-- ================================================
+-- EXPANSÃO SCHEMA - CAMPOS ADICIONAIS AIH
+-- Sistema SIGTAP Billing Wizard
+-- ================================================
+
+-- 1. ADICIONAR CAMPOS FALTANTES NA TABELA AIHs
+ALTER TABLE aihs ADD COLUMN IF NOT EXISTS aih_anterior VARCHAR(50);
+ALTER TABLE aihs ADD COLUMN IF NOT EXISTS aih_posterior VARCHAR(50);
+
+-- 2. ADICIONAR CAMPOS FALTANTES NA TABELA PATIENTS
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS nationality VARCHAR(50) DEFAULT 'BRASIL';
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS race_color VARCHAR(50);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS document_type VARCHAR(20);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS document_number VARCHAR(50);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS responsible_name VARCHAR(255);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS mother_name VARCHAR(255);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS address_complement VARCHAR(100);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS neighborhood VARCHAR(100);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS municipality VARCHAR(100);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS state_uf VARCHAR(2);
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS postal_code VARCHAR(10);
+
+-- 3. CRIAR ÍNDICES PARA OS NOVOS CAMPOS
+CREATE INDEX IF NOT EXISTS idx_aihs_anterior ON aihs(aih_anterior);
+CREATE INDEX IF NOT EXISTS idx_aihs_posterior ON aihs(aih_posterior);
+CREATE INDEX IF NOT EXISTS idx_patients_document ON patients(document_type, document_number);
+CREATE INDEX IF NOT EXISTS idx_patients_mother ON patients(mother_name);
+CREATE INDEX IF NOT EXISTS idx_patients_nationality ON patients(nationality);
+
+-- 4. ATUALIZAR COMENTÁRIOS DAS TABELAS
+COMMENT ON COLUMN aihs.aih_anterior IS 'Número da AIH anterior relacionada';
+COMMENT ON COLUMN aihs.aih_posterior IS 'Número da AIH posterior relacionada';
+COMMENT ON COLUMN patients.nationality IS 'Nacionalidade do paciente';
+COMMENT ON COLUMN patients.race_color IS 'Raça/Cor do paciente (Parda, Branca, Preta, Amarela, Indígena)';
+COMMENT ON COLUMN patients.document_type IS 'Tipo do documento (RG, CPF, etc.)';
+COMMENT ON COLUMN patients.document_number IS 'Número do documento';
+COMMENT ON COLUMN patients.responsible_name IS 'Nome do responsável pelo paciente';
+COMMENT ON COLUMN patients.mother_name IS 'Nome da mãe do paciente';
+COMMENT ON COLUMN patients.address_complement IS 'Complemento do endereço';
+COMMENT ON COLUMN patients.neighborhood IS 'Bairro do paciente';
+COMMENT ON COLUMN patients.municipality IS 'Município do paciente';
+COMMENT ON COLUMN patients.state_uf IS 'UF do estado do paciente';
+COMMENT ON COLUMN patients.postal_code IS 'CEP do paciente';
+
+-- 5. VERIFICAÇÃO DE DADOS
+SELECT 
+  'Expansão concluída!' as status,
+  COUNT(*) as total_aihs
+FROM aihs;
+
+SELECT 
+  'Campos adicionados!' as status,
+  COUNT(*) as total_patients  
+FROM patients; 
