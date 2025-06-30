@@ -31,6 +31,7 @@ export interface AuthContextType {
   hasHospitalAccess: (hospitalId: string) => boolean;
   isDeveloper: () => boolean;
   isAdmin: () => boolean;
+  forceSessionReset: () => void; // ✅ FUNÇÃO PARA RESET MANUAL
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -149,9 +150,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // RESET FORÇADO - Detectar se sessão está travada
+  const forceSessionReset = () => {
+    console.log('🧹 RESET FORÇADO: Limpando sessão travada...');
+    
+    // Limpar estado local
+    setLoading(false);
+    setSession(null);
+    setUser(null);
+    setProfile(null);
+    
+    // Limpar storage local
+    try {
+      localStorage.removeItem('supabase.auth.token');
+      sessionStorage.clear();
+    } catch (e) {
+      console.warn('Erro ao limpar storage:', e);
+    }
+    
+    // Forçar logout no Supabase
+    supabase.auth.signOut().catch(e => console.warn('Erro no signOut:', e));
+    
+    toast.error('Sessão resetada. Tela de login disponível.');
+  };
+
   // Configurar sessão inicial
   useEffect(() => {
     console.log('🚀 AuthContext: Iniciando configuração da sessão...');
+    
+    // TIMEOUT DE SEGURANÇA: Se loading não terminar em 10s, forçar reset
+    const safetyTimeout = setTimeout(() => {
+      console.warn('🚨 TIMEOUT DE SEGURANÇA: Loading travado por 10s - forçando reset!');
+      forceSessionReset();
+    }, 10000); // 10 segundos
     
     // Buscar sessão atual
     supabase.auth.getSession().then(({ data: { session }, error }) => {
@@ -178,20 +209,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             profilePermissions: profile?.permissions
           });
           setProfile(profile);
+          setLoading(false);
+          clearTimeout(safetyTimeout); // ✅ LIMPAR timeout - sucesso
         }).catch(error => {
           console.error('❌ Erro crítico na busca do perfil:', error);
-          setProfile(null);
+          console.warn('🚨 SESSÃO CORROMPIDA - Fazendo logout forçado para mostrar tela de login');
+          
+          supabase.auth.signOut().then(() => {
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            setLoading(false);
+            clearTimeout(safetyTimeout); // ✅ LIMPAR timeout - erro perfil
+            toast.error('Sessão corrompida. Faça login novamente.');
+          });
         });
       } else {
         console.log('❌ Nenhum usuário na sessão');
         setProfile(null);
+        setLoading(false);
+        clearTimeout(safetyTimeout); // ✅ LIMPAR timeout - sem usuário
       }
-      
-      console.log('✅ Finalizando loading inicial...');
-      setLoading(false);
     }).catch(error => {
       console.error('❌ Erro crítico ao buscar sessão:', error);
+      
+      setSession(null);
+      setUser(null);
+      setProfile(null);
       setLoading(false);
+      clearTimeout(safetyTimeout); // ✅ LIMPAR timeout - erro sessão
     });
 
     // Escutar mudanças de autenticação
@@ -220,6 +266,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setProfile(userProfile);
           } catch (error) {
             console.error('❌ Erro ao buscar perfil na mudança de estado:', error);
+            
+            console.warn('🚨 ERRO NA MUDANÇA DE ESTADO - Fazendo logout forçado');
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
             setProfile(null);
           }
         } else {
@@ -235,6 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       console.log('🧹 Limpando subscription do AuthContext');
       subscription.unsubscribe();
+      clearTimeout(safetyTimeout); // ✅ LIMPAR timeout no cleanup
     };
   }, []);
 
@@ -266,6 +318,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string, userData: Partial<UserProfile>) => {
     try {
       setLoading(true);
+      console.log('🔄 Iniciando cadastro para:', email);
       
       // Criar usuário no Auth
       const { data, error } = await supabase.auth.signUp({
@@ -274,32 +327,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
+        console.error('❌ Erro no Auth signup:', error);
         toast.error(`Erro no cadastro: ${error.message}`);
         return { error };
       }
 
+      console.log('✅ Usuário criado no Auth:', data.user?.id);
+
       // Criar perfil do usuário
       if (data.user) {
+        console.log('🔄 Criando perfil do usuário...');
+        
+        const profileData = {
+          id: data.user.id,
+          email: data.user.email,
+          role: userData.role || 'developer',
+          full_name: userData.full_name || 'Developer SIGTAP',
+          hospital_access: userData.hospital_access || [],
+          permissions: userData.permissions || ['all'],
+        };
+
         const { error: profileError } = await supabase
           .from('user_profiles')
-          .insert({
-            id: data.user.id,
-            email: data.user.email,
-            role: userData.role || 'user',
-            full_name: userData.full_name,
-            hospital_access: userData.hospital_access || [],
-            permissions: userData.permissions || [],
-          });
+          .insert(profileData);
 
         if (profileError) {
-          console.error('Erro ao criar perfil:', profileError);
-          toast.error('Usuário criado mas erro ao salvar perfil');
+          console.error('❌ Erro ao criar perfil:', profileError);
+          
+          // Se erro for conflito (409), tentar atualizar ao invés de inserir
+          if (profileError.code === '23505') { // Unique constraint violation
+            console.log('🔄 Perfil já existe, tentando atualizar...');
+            const { error: updateError } = await supabase
+              .from('user_profiles')
+              .update(profileData)
+              .eq('id', data.user.id);
+              
+            if (updateError) {
+              console.error('❌ Erro ao atualizar perfil:', updateError);
+              toast.error('Erro ao salvar perfil do usuário');
+            } else {
+              console.log('✅ Perfil atualizado com sucesso');
+            }
+          } else {
+            toast.error('Erro ao criar perfil do usuário');
+          }
+        } else {
+          console.log('✅ Perfil criado com sucesso');
         }
       }
 
       toast.success('Cadastro realizado com sucesso!');
       return { error: null };
     } catch (error: any) {
+      console.error('❌ Erro inesperado no cadastro:', error);
       toast.error('Erro inesperado no cadastro');
       return { error };
     } finally {
@@ -397,7 +477,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     hasPermission,
     hasHospitalAccess,
     isDeveloper,
-    isAdmin
+    isAdmin,
+    forceSessionReset
   };
 
   return (

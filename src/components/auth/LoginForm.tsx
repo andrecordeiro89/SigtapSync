@@ -50,7 +50,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
           full_name: formData.fullName,
           role: formData.role,
           hospital_access: [], // Admin/Dev terão acesso configurado pelo sistema
-          permissions: formData.role === 'developer' ? ['*'] : ['admin:*']
+          permissions: formData.role === 'developer' ? ['all'] : ['admin']
         });
         if (error) {
           setError(error.message);
@@ -69,10 +69,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
     setError(''); // Limpar erro ao digitar
   };
 
-  // Credenciais de demonstração
+  // Credenciais de demonstração - USUÁRIO ÚNICO  
   const demoCredentials = [
-    { role: 'developer', email: 'dev@sigtap.com', password: 'dev123456', name: 'Developer', icon: Code },
-    { role: 'admin', email: 'admin@sigtap.com', password: 'admin123456', name: 'Administrador', icon: Crown }
+    { role: 'developer', email: 'developer@gmail.com', password: 'dev123456', name: 'Developer', icon: Code }
   ];
 
   const fillDemoCredentials = (role: 'developer' | 'admin') => {
@@ -116,18 +115,18 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
             {/* Credenciais Demo */}
             {isLoginMode && (
               <div className="space-y-3">
-                <Label className="text-sm font-medium text-gray-600">Acesso Rápido (Demo):</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <Label className="text-sm font-medium text-gray-600">Acesso Rápido:</Label>
+                <div className="grid grid-cols-1 gap-2">
                   {demoCredentials.map((cred) => (
                     <Button
                       key={cred.role}
                       variant="outline"
                       size="sm"
                       onClick={() => fillDemoCredentials(cred.role as 'developer' | 'admin')}
-                      className="flex items-center gap-2 text-xs"
+                      className="flex items-center gap-2 text-sm justify-center"
                     >
-                      <cred.icon className="h-3 w-3" />
-                      {cred.name}
+                      <cred.icon className="h-4 w-4" />
+                      {cred.name} - {cred.email}
                     </Button>
                   ))}
                 </div>

@@ -54,12 +54,16 @@ export class FastExtractor {
 
   constructor(geminiApiKey?: string) {
     this.config = {
-      useGemini: Boolean(geminiApiKey && geminiApiKey !== 'your_gemini_api_key_here'),
-      confidenceThreshold: 60,
-      maxGeminiPages: 5
+      useGemini: false, // 🚨 DESABILITADO TEMPORARIAMENTE - RATE LIMIT 429
+      confidenceThreshold: 80, // ⬆️ Threshold mais alto para usar menos Gemini
+      maxGeminiPages: 1  // ⬇️ Reduzido para evitar rate limit
     };
 
-    if (this.config.useGemini) {
+    // 🚨 GEMINI TEMPORARIAMENTE DESABILITADO DEVIDO A RATE LIMIT 429
+    console.log('🚀 FastExtractor: Modo tradicional (Gemini desabilitado - rate limit)');
+    
+    /* CÓDIGO ORIGINAL COMENTADO - REATIVAR QUANDO RESOLVER RATE LIMIT
+    if (this.config.useGemini && geminiApiKey && geminiApiKey !== 'your_gemini_api_key_here') {
       try {
         this.geminiExtractor = new GeminiExtractor(geminiApiKey!, {
           model: 'gemini-1.5-flash',
@@ -74,6 +78,7 @@ export class FastExtractor {
     } else {
       console.log('🚀 FastExtractor: Modo tradicional');
     }
+    */
   }
 
   async extractFromText(textContent: any, pageNumber: number): Promise<SigtapProcedure[]> {

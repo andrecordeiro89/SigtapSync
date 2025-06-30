@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Limpeza de Sessão - SIGTAP Sync</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .success { color: #22c55e; }
+        .warning { color: #f59e0b; }
+        .error { color: #ef4444; }
+        button { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 10px; }
+        button:hover { background: #2563eb; }
+        .danger { background: #ef4444; }
+        .danger:hover { background: #dc2626; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Limpeza de Sessão SIGTAP</h1>
+        <p class="warning">Esta página limpa completamente todas as sessões e dados salvos localmente.</p>
+        
+        <div id="status">
+            <p>Clique no botão abaixo para limpar a sessão travada:</p>
+        </div>
+        
+        <button onclick="clearCompleteSession()" class="danger">🧹 Limpar Sessão Completa</button>
+        <button onclick="goToApp()">📱 Ir para o App</button>
+        
+        <div id="result" style="margin-top: 20px;"></div>
+    </div>
+
+    <script>
+        function clearCompleteSession() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p class="warning">🔄 Limpando...</p>';
+            
+            try {
+                // Limpar localStorage
+                localStorage.clear();
+                
+                // Limpar sessionStorage
+                sessionStorage.clear();
+                
+                // Limpar cookies específicos do Supabase
+                document.cookie.split(";").forEach(function(c) { 
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                });
+                
+                // Limpar IndexedDB (se usado pelo Supabase)
+                if ('indexedDB' in window) {
+                    indexedDB.deleteDatabase('supabase-js-db');
+                }
+                
+                // Forçar reload da página após limpeza
+                setTimeout(() => {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Sessão Limpa com Sucesso!</h3>
+                            <p>Todos os dados locais foram removidos.</p>
+                            <p><strong>Agora você pode ir para o app e verá a tela de login.</strong></p>
+                        </div>
+                    `;
+                }, 1000);
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Erro na Limpeza</h3>
+                        <p>Erro: ${error.message}</p>
+                        <p>Tente fechar todas as abas e limpar cookies manualmente.</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function goToApp() {
+            window.location.href = '/';
+        }
+        
+        // Executar limpeza automática se parâmetro estiver presente
+        if (window.location.search.includes('auto=true')) {
+            setTimeout(clearCompleteSession, 1000);
+        }
+    </script>
+</body>
+</html> 

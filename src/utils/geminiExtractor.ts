@@ -186,16 +186,61 @@ IMPORTANTE: Retorne apenas o JSON válido. Não adicione explicações ou texto 
    */
   private async executeWithRetry(model: any, prompt: string, attempt = 1): Promise<any> {
     try {
+      // 🚨 RATE LIMIT PROTECTION: Cooldown entre requests
+      if (attempt === 1) {
+        const cooldown = 2000; // 2 segundos base
+        console.log(`⏱️ Aguardando ${cooldown}ms antes do request...`);
+        await new Promise(resolve => setTimeout(resolve, cooldown));
+      }
+      
       const result = await model.generateContent(prompt);
       return result.response.text();
-    } catch (error) {
+      
+    } catch (error: any) {
+      console.error(`❌ Erro Gemini tentativa ${attempt}:`, error);
+      
+      // 🚨 TRATAMENTO ESPECÍFICO PARA RATE LIMIT 429
+      if (error.status === 429 || error.message?.includes('429') || error.message?.includes('quota')) {
+        const waitTime = this.calculateRateLimitBackoff(attempt);
+        console.log(`🚨 RATE LIMIT DETECTADO - Aguardando ${waitTime/1000}s antes de tentar novamente...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+      
+      // 🔄 RETRY COM BACKOFF EXPONENCIAL
       if (attempt < this.config.retryAttempts) {
-        console.log(`⚠️ Tentativa ${attempt} falhou, tentando novamente...`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Backoff
+        const backoffTime = this.calculateBackoffTime(attempt, error);
+        console.log(`⚠️ Tentativa ${attempt} falhou, aguardando ${backoffTime/1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, backoffTime));
         return this.executeWithRetry(model, prompt, attempt + 1);
       }
-      throw error;
+      
+      // 🚫 FALHA FINAL
+      console.error(`💥 Gemini falhou após ${this.config.retryAttempts} tentativas`);
+      throw new Error(`Gemini API Error após ${this.config.retryAttempts} tentativas: ${error.message}`);
     }
+  }
+
+  /**
+   * Calcula tempo de espera para rate limit (progressive backoff)
+   */
+  private calculateRateLimitBackoff(attempt: number): number {
+    // Rate limit: espera progressiva
+    const baseWait = 60000; // 1 minuto base
+    const multiplier = Math.min(attempt, 5); // máximo 5x
+    return baseWait * multiplier;
+  }
+
+  /**
+   * Calcula tempo de backoff baseado no tipo de erro
+   */
+  private calculateBackoffTime(attempt: number, error: any): number {
+    // Para rate limit: tempo maior
+    if (error.status === 429 || error.message?.includes('429')) {
+      return 30000 * attempt; // 30s, 60s, 90s...
+    }
+    
+    // Para outros erros: backoff padrão
+    return Math.min(1000 * Math.pow(2, attempt), 10000); // máximo 10s
   }
 
   /**
