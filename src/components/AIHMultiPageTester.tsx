@@ -147,12 +147,18 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     setEditingValues(prev => new Set([...prev, sequencia]));
     
     if (procedure.sigtapProcedure) {
+      // 🔧 CORREÇÃO: O valueHosp extraído é na verdade o VALOR TOTAL SIGTAP
+      // Vamos reinterpretar os dados corretamente para edição
+      const valorTotalSigtap = procedure.sigtapProcedure.valueHosp; // O que foi extraído como "SH" é o total
+      const valorSP = procedure.sigtapProcedure.valueProf;          // SP está correto
+      const valorSH = valorTotalSigtap - valorSP;                   // SH = Total - SP
+      
       setTempValues(prev => ({
         ...prev,
         [sequencia]: {
           valorAmb: procedure.sigtapProcedure?.valueAmb || 0,
-          valorHosp: procedure.sigtapProcedure?.valueHosp || 0,
-          valorProf: procedure.sigtapProcedure?.valueProf || 0,
+          valorHosp: valorSH, // 🔧 Usar o SH calculado correto
+          valorProf: valorSP, // 🔧 Usar o SP correto
           porcentagem: procedure.porcentagemSUS || (sequencia === 1 ? 100 : defaultPercentage)
         }
       }));
@@ -166,13 +172,17 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
 
     const updatedProcedimentos = aihCompleta.procedimentos.map(proc => {
       if (proc.sequencia === sequencia && proc.sigtapProcedure) {
-        // Atualizar valores SIGTAP
+        // 🔧 CORREÇÃO: Reinterpretar os valores editados corretamente
+        // O usuário editou: SA, SH e SP
+        // Precisamos salvar: valueAmb = SA, valueHosp = Total (SH + SP), valueProf = SP
+        const valorTotal = editedValues.valorHosp + editedValues.valorProf; // SH + SP = Total
+        
         const updatedSigtapProcedure = {
           ...proc.sigtapProcedure,
-          valueAmb: editedValues.valorAmb,
-          valueHosp: editedValues.valorHosp,
-          valueProf: editedValues.valorProf,
-          valueHospTotal: editedValues.valorAmb + editedValues.valorHosp + editedValues.valorProf
+          valueAmb: editedValues.valorAmb,        // SA correto
+          valueHosp: valorTotal,                  // 🔧 Total (será interpretado como total na exibição)
+          valueProf: editedValues.valorProf,      // SP correto
+          valueHospTotal: valorTotal              // Total hospitalar = SH + SP
         };
 
         // Calcular valor com porcentagem
@@ -759,9 +769,24 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                   {formatCurrency(procedure.valorCalculado)}
                                 </p>
                                 <div className="text-xs text-gray-500 space-y-0.5">
-                                  <p>SA: {formatCurrency(procedure.sigtapProcedure.valueAmb)}</p>
-                                  <p>SH: {formatCurrency(procedure.sigtapProcedure.valueHosp)}</p>
-                                  <p>SP: {formatCurrency(procedure.sigtapProcedure.valueProf)}</p>
+                                  {(() => {
+                                    // 🔧 CORREÇÃO: O valueHosp extraído é na verdade o VALOR TOTAL SIGTAP
+                                    // Vamos reinterpretar os dados corretamente
+                                    const valorTotalSigtap = procedure.sigtapProcedure.valueHosp; // O que foi extraído como "SH" é o total
+                                    const valorSP = procedure.sigtapProcedure.valueProf;          // SP está correto
+                                    const valorSH = valorTotalSigtap - valorSP;                   // SH = Total - SP
+                                    
+                                    return (
+                                      <>
+                                        <p>SA: {formatCurrency(procedure.sigtapProcedure.valueAmb)}</p>
+                                        <p>SH: {formatCurrency(valorSH)}</p>
+                                        <p>SP: {formatCurrency(valorSP)}</p>
+                                        <p className="font-medium text-blue-600 border-t pt-0.5">
+                                          Total: {formatCurrency(valorTotalSigtap)}
+                                        </p>
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                               <div className="ml-2">
@@ -868,10 +893,21 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                       </div>
                                       <div className="grid grid-cols-2 gap-2">
                                         <div>
-                                          <p>• Ambulatorial: {formatCurrency(procedure.sigtapProcedure.valueAmb)}</p>
-                                          <p>• Hospitalar: {formatCurrency(procedure.sigtapProcedure.valueHosp)}</p>
-                                          <p>• Profissional: {formatCurrency(procedure.sigtapProcedure.valueProf)}</p>
-                                          <p className="font-semibold border-t pt-1">• Total SIGTAP: {formatCurrency(procedure.sigtapProcedure.valueHospTotal)}</p>
+                                          {(() => {
+                                            // 🔧 CORREÇÃO: O valueHosp extraído é na verdade o VALOR TOTAL SIGTAP
+                                            const valorTotalSigtap = procedure.sigtapProcedure.valueHosp;
+                                            const valorSP = procedure.sigtapProcedure.valueProf;
+                                            const valorSH = valorTotalSigtap - valorSP;
+                                            
+                                            return (
+                                              <>
+                                                <p>• Ambulatorial: {formatCurrency(procedure.sigtapProcedure.valueAmb)}</p>
+                                                <p>• Hospitalar (SH): {formatCurrency(valorSH)}</p>
+                                                <p>• Profissional (SP): {formatCurrency(valorSP)}</p>
+                                                <p className="font-semibold border-t pt-1 text-blue-600">• Total SIGTAP: {formatCurrency(valorTotalSigtap)}</p>
+                                              </>
+                                            );
+                                          })()}
                                         </div>
                                         <div className="bg-green-50 p-2 rounded">
                                           <p className="font-medium text-green-700 mb-1">Lógica SUS:</p>
