@@ -109,6 +109,25 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     });
   };
 
+  // Função para remover procedimento
+  const handleRemoveProcedure = (sequencia: number) => {
+    const updatedProcedimentos = aihCompleta.procedimentos.filter(proc => proc.sequencia !== sequencia);
+    
+    // Resequenciar procedimentos
+    const resequencedProcedimentos = updatedProcedimentos.map((proc, index) => ({
+      ...proc,
+      sequencia: index + 1
+    }));
+
+    const updatedAIH = calculateTotalsWithPercentage(resequencedProcedimentos);
+    onUpdateAIH(updatedAIH);
+
+    toast({
+      title: "🗑️ Procedimento removido",
+      description: `Procedimento removido com sucesso`
+    });
+  };
+
   // Função para calcular totais aplicando lógica de porcentagem SUS
   const calculateTotalsWithPercentage = (procedimentos: ProcedureAIH[]): AIHComplete => {
     const procedimentosComPercentagem = procedimentos.map((proc, index) => {
@@ -646,33 +665,32 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50">
-                  <TableHead className="w-16">Seq</TableHead>
-                  <TableHead className="w-32">Código</TableHead>
+                  <TableHead className="w-12">Seq</TableHead>
+                  <TableHead className="w-28">Código</TableHead>
                   <TableHead>Procedimento</TableHead>
-                  <TableHead className="w-32">Valores</TableHead>
-                  <TableHead className="w-24">Status</TableHead>
-                  <TableHead className="w-24">Ações</TableHead>
-                  <TableHead className="w-16">+</TableHead>
+                  <TableHead className="w-80">Valores</TableHead>
+                  <TableHead className="w-12">+</TableHead>
+                  <TableHead className="w-8"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {aihCompleta.procedimentos.map((procedure) => (
                   <React.Fragment key={procedure.sequencia}>
                     <TableRow className="hover:bg-gray-50">
-                      <TableCell className="font-medium">{procedure.sequencia}</TableCell>
+                      <TableCell className="font-medium text-center">{procedure.sequencia}</TableCell>
                       <TableCell className="font-mono text-sm">{procedure.procedimento}</TableCell>
                       <TableCell>
-                        <div>
+                        <div className="space-y-1">
                           <div className="flex items-center space-x-2">
-                            <p className="font-medium">{procedure.descricao || `Procedimento ${procedure.procedimento}`}</p>
+                            <p className="font-medium text-sm leading-tight">{procedure.descricao || `Procedimento ${procedure.procedimento}`}</p>
                             {procedure.sequencia === 1 && (
-                              <Badge variant="default" className="text-xs bg-green-600 text-white">
+                              <Badge variant="default" className="text-xs bg-green-600 text-white px-2 py-0.5">
                                 Principal
                               </Badge>
                             )}
                           </div>
                           {procedure.sigtapProcedure && (
-                            <p className="text-sm text-gray-500 truncate max-w-xs">
+                            <p className="text-xs text-gray-500 leading-tight">
                               SIGTAP: {procedure.sigtapProcedure.description}
                             </p>
                           )}
@@ -681,11 +699,11 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                       <TableCell>
                         {editingValues.has(procedure.sequencia) ? (
                           // MODO EDIÇÃO PREMIUM
-                          <div className="space-y-2 p-2 bg-yellow-50 rounded border-2 border-yellow-200">
-                            <div className="text-xs font-medium text-gray-600 mb-1">Editando Valores:</div>
-                            <div className="space-y-1">
-                              <div className="flex items-center space-x-1">
-                                <span className="text-xs w-8">SA:</span>
+                          <div className="bg-yellow-50 rounded border-2 border-yellow-200 p-3">
+                            <div className="text-xs font-medium text-gray-600 mb-2">Editando Valores:</div>
+                            <div className="grid grid-cols-3 gap-2 mb-2">
+                              <div className="text-center">
+                                <label className="text-xs font-medium text-gray-600">SA</label>
                                 <input
                                   type="number"
                                   step="0.01"
@@ -697,11 +715,11 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                       valorAmb: Number(e.target.value)
                                     }
                                   }))}
-                                  className="w-20 px-1 py-0.5 text-xs border rounded"
+                                  className="w-full px-2 py-1 text-xs border rounded text-center"
                                 />
                               </div>
-                              <div className="flex items-center space-x-1">
-                                <span className="text-xs w-8">SH:</span>
+                              <div className="text-center">
+                                <label className="text-xs font-medium text-gray-600">SH</label>
                                 <input
                                   type="number"
                                   step="0.01"
@@ -713,11 +731,11 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                       valorHosp: Number(e.target.value)
                                     }
                                   }))}
-                                  className="w-20 px-1 py-0.5 text-xs border rounded"
+                                  className="w-full px-2 py-1 text-xs border rounded text-center"
                                 />
                               </div>
-                              <div className="flex items-center space-x-1">
-                                <span className="text-xs w-8">SP:</span>
+                              <div className="text-center">
+                                <label className="text-xs font-medium text-gray-600">SP</label>
                                 <input
                                   type="number"
                                   step="0.01"
@@ -729,69 +747,77 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                       valorProf: Number(e.target.value)
                                     }
                                   }))}
-                                  className="w-20 px-1 py-0.5 text-xs border rounded"
+                                  className="w-full px-2 py-1 text-xs border rounded text-center"
                                 />
-                              </div>
-                              <div className="flex items-center space-x-1 pt-1 border-t">
-                                <span className="text-xs w-8 font-medium">%:</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={tempValues[procedure.sequencia]?.porcentagem || 100}
-                                  onChange={(e) => setTempValues(prev => ({
-                                    ...prev,
-                                    [procedure.sequencia]: {
-                                      ...prev[procedure.sequencia],
-                                      porcentagem: Number(e.target.value)
-                                    }
-                                  }))}
-                                  className="w-16 px-1 py-0.5 text-xs border rounded"
-                                />
-                                <span className="text-xs">%</span>
                               </div>
                             </div>
-                            <div className="flex space-x-1 mt-2">
-                              <Button size="sm" onClick={() => saveEditedValues(procedure.sequencia)} className="h-6 px-2 text-xs">
-                                <Check className="w-3 h-3" />
+                            <div className="flex items-center justify-center space-x-2 pt-2 border-t">
+                              <span className="text-xs font-medium">%:</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={tempValues[procedure.sequencia]?.porcentagem || 100}
+                                onChange={(e) => setTempValues(prev => ({
+                                  ...prev,
+                                  [procedure.sequencia]: {
+                                    ...prev[procedure.sequencia],
+                                    porcentagem: Number(e.target.value)
+                                  }
+                                }))}
+                                className="w-16 px-2 py-1 text-xs border rounded text-center"
+                              />
+                              <span className="text-xs">%</span>
+                            </div>
+                            <div className="flex justify-center space-x-1 mt-3">
+                              <Button size="sm" onClick={() => saveEditedValues(procedure.sequencia)} className="h-7 px-3 text-xs">
+                                <Check className="w-3 h-3 mr-1" />
+                                Salvar
                               </Button>
-                              <Button size="sm" variant="outline" onClick={() => cancelEditingValues(procedure.sequencia)} className="h-6 px-2 text-xs">
-                                <X className="w-3 h-3" />
+                              <Button size="sm" variant="outline" onClick={() => cancelEditingValues(procedure.sequencia)} className="h-7 px-3 text-xs">
+                                <X className="w-3 h-3 mr-1" />
+                                Cancelar
                               </Button>
                             </div>
                           </div>
                         ) : procedure.valorCalculado && procedure.sigtapProcedure ? (
-                          // MODO VISUALIZAÇÃO
-                          <div className="text-sm relative group">
-                            <div className="flex items-center space-x-1">
-                              <div>
-                                <p className="font-semibold text-green-600">
-                                  {formatCurrency(procedure.valorCalculado)}
-                                </p>
-                                <div className="text-xs text-gray-500 space-y-0.5">
-                                  {(() => {
-                                    // 🔧 CORREÇÃO: O valueHosp extraído é na verdade o VALOR TOTAL SIGTAP
-                                    // Vamos reinterpretar os dados corretamente
-                                    const valorTotalSigtap = procedure.sigtapProcedure.valueHosp; // O que foi extraído como "SH" é o total
-                                    const valorSP = procedure.sigtapProcedure.valueProf;          // SP está correto
-                                    const valorSH = valorTotalSigtap - valorSP;                   // SH = Total - SP
-                                    
-                                    return (
-                                      <>
-                                        <p>SA: {formatCurrency(procedure.sigtapProcedure.valueAmb)}</p>
-                                        <p>SH: {formatCurrency(valorSH)}</p>
-                                        <p>SP: {formatCurrency(valorSP)}</p>
-                                        <p className="font-medium text-blue-600 border-t pt-0.5">
-                                          Total: {formatCurrency(valorTotalSigtap)}
-                                        </p>
-                                      </>
-                                    );
-                                  })()}
+                          // MODO VISUALIZAÇÃO HORIZONTAL
+                          <div className="relative group">
+                            <div className="bg-gray-50 rounded-lg p-3 border">
+                              <div className="grid grid-cols-4 gap-3 text-xs">
+                                <div className="text-center">
+                                  <div className="text-gray-500 font-medium mb-1">SA</div>
+                                  <div className="font-semibold text-blue-600">
+                                    {formatCurrency(procedure.sigtapProcedure.valueAmb)}
+                                  </div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-gray-500 font-medium mb-1">SH</div>
+                                  <div className="font-semibold text-blue-600">
+                                    {(() => {
+                                      const valorTotalSigtap = procedure.sigtapProcedure.valueHosp;
+                                      const valorSP = procedure.sigtapProcedure.valueProf;
+                                      const valorSH = valorTotalSigtap - valorSP;
+                                      return formatCurrency(valorSH);
+                                    })()}
+                                  </div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-gray-500 font-medium mb-1">SP</div>
+                                  <div className="font-semibold text-blue-600">
+                                    {formatCurrency(procedure.sigtapProcedure.valueProf)}
+                                  </div>
+                                </div>
+                                <div className="text-center border-l pl-3">
+                                  <div className="text-gray-500 font-medium mb-1">Total</div>
+                                  <div className="font-bold text-green-600">
+                                    {formatCurrency(procedure.valorCalculado)}
+                                  </div>
                                 </div>
                               </div>
-                              <div className="ml-2">
-                                <Badge variant="outline" className="text-xs">
-                                  {procedure.porcentagemSUS || (procedure.sequencia === 1 ? 100 : defaultPercentage)}%
+                              <div className="flex items-center justify-center mt-2 pt-2 border-t">
+                                <Badge variant="outline" className="text-xs px-2">
+                                  {procedure.porcentagemSUS || (procedure.sequencia === 1 ? 100 : defaultPercentage)}% SUS
                                 </Badge>
                               </div>
                             </div>
@@ -801,14 +827,14 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                               size="sm"
                               variant="ghost"
                               onClick={() => startEditingValues(procedure.sequencia, procedure)}
-                              className="absolute -top-1 -right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-yellow-100 hover:bg-yellow-200"
+                              className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-yellow-100 hover:bg-yellow-200"
                             >
                               <Edit className="w-3 h-3" />
                             </Button>
                           </div>
                         ) : (
-                          <div className="text-gray-400 text-sm">
-                            <span>Não calculado</span>
+                          <div className="text-center py-4">
+                            <span className="text-gray-400 text-sm">Não calculado</span>
                             {procedure.sigtapProcedure && (
                               <Button
                                 size="sm"
@@ -822,27 +848,12 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                           </div>
                         )}
                       </TableCell>
-                      <TableCell>{getStatusBadge(procedure.matchStatus, procedure.matchConfidence)}</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-1">
-                          {procedure.matchStatus === 'matched' && !procedure.aprovado && (
-                            <Button size="sm" variant="outline" onClick={() => handleProcedureAction(procedure, 'approve')} className="h-7 px-2">
-                              <Check className="w-3 h-3" />
-                            </Button>
-                          )}
-                          {procedure.matchStatus !== 'rejected' && (
-                            <Button size="sm" variant="outline" onClick={() => handleProcedureAction(procedure, 'reject')} className="h-7 px-2">
-                              <X className="w-3 h-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => toggleProcedureExpansion(procedure.sequencia)}
-                          className="h-7 w-7 p-0"
+                          className="h-8 w-8 p-0 hover:bg-gray-100"
                         >
                           {expandedProcedures.has(procedure.sequencia) ? 
                             <ChevronDown className="w-4 h-4" /> : 
@@ -850,12 +861,23 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                           }
                         </Button>
                       </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveProcedure(procedure.sequencia)}
+                          className="h-6 w-6 p-0 hover:bg-red-100 text-red-500 hover:text-red-700"
+                          title="Remover procedimento"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                     
                     {/* DETALHES EXPANDIDOS */}
                     {expandedProcedures.has(procedure.sequencia) && (
                       <TableRow>
-                        <TableCell colSpan={7} className="bg-gray-50 p-4">
+                        <TableCell colSpan={6} className="bg-gray-50 p-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                               <h5 className="font-medium text-sm text-gray-600 mb-2">Informações Técnicas</h5>
