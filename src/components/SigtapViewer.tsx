@@ -419,14 +419,19 @@ const SigtapViewer = () => {
                         {formatCurrency(procedure.valueProf)}
                       </TableCell>
                       <TableCell className="text-right text-sm font-medium text-blue-700">
-                        {formatCurrency(procedure.valueHosp)}
+                        {(() => {
+                          // 🔧 CORREÇÃO: Calcular SH correto = Total - SP
+                          const valorTotalSigtap = procedure.valueHosp;
+                          const valorSP = procedure.valueProf;
+                          const valorSH = valorTotalSigtap - valorSP;
+                          return formatCurrency(valorSH);
+                        })()}
                       </TableCell>
                       <TableCell className="text-right text-sm font-bold text-purple-600">
-                        {formatCurrency(
-                          procedure.valueAmb + 
-                          procedure.valueHosp + 
-                          procedure.valueProf
-                        )}
+                        {(() => {
+                          // 🔧 CORREÇÃO: O procedure.valueHosp já é o VALOR TOTAL SIGTAP
+                          return formatCurrency(procedure.valueHosp);
+                        })()}
                       </TableCell>
                       <TableCell className="text-center">
                       <Button
@@ -524,41 +529,49 @@ const SigtapViewer = () => {
                                 <div className="bg-white p-4 rounded-lg border">
                                   <h5 className="font-medium text-gray-700 mb-3 border-b pb-2">🏥 Valores Hospitalares</h5>
                                   <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                      <span className="text-gray-600">Serviço Hosp. (SH):</span>
-                                      <span className="font-semibold text-blue-600">
-                                        {formatCurrency(procedure.valueHosp)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-gray-600">Serviço Prof. (SP):</span>
-                                      <span className="font-semibold text-blue-600">
-                                        {formatCurrency(procedure.valueProf)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between border-t pt-2 mt-2">
-                                      <span className="text-gray-600">Subtotal Hospitalar:</span>
-                                      <span className="font-semibold text-blue-700">
-                                        {formatCurrency(procedure.valueHospTotal)}
-                                      </span>
-                                    </div>
-                                    <hr className="my-3" />
-                                    <div className="flex justify-between text-base font-bold bg-purple-50 p-2 rounded">
-                                      <span>💰 VALOR TOTAL SIGTAP:</span>
-                                      <span className="text-purple-600">
-                                        {formatCurrency(
-                                          procedure.valueAmb + 
-                                          procedure.valueHosp + 
-                                          procedure.valueProf
-                                        )}
-                                      </span>
-                                    </div>
-                                    <div className="text-xs text-gray-500 mt-2 bg-gray-50 p-2 rounded">
-                                      <div className="font-medium mb-1">Composição:</div>
-                                      <div>• SA: {formatCurrency(procedure.valueAmb)}</div>
-                                      <div>• SH: {formatCurrency(procedure.valueHosp)}</div>
-                                      <div>• SP: {formatCurrency(procedure.valueProf)}</div>
-                                    </div>
+                                    {(() => {
+                                      // 🔧 CORREÇÃO: O valueHosp extraído é na verdade o VALOR TOTAL SIGTAP
+                                      // Vamos reinterpretar os dados corretamente
+                                      const valorTotalSigtap = procedure.valueHosp; // O que foi extraído como "SH" é o total
+                                      const valorSP = procedure.valueProf;          // SP está correto
+                                      const valorSH = valorTotalSigtap - valorSP;   // SH = Total - SP
+                                      
+                                      return (
+                                        <>
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Serviço Hosp. (SH):</span>
+                                            <span className="font-semibold text-blue-600">
+                                              {formatCurrency(valorSH)}
+                                            </span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-gray-600">Serviço Prof. (SP):</span>
+                                            <span className="font-semibold text-blue-600">
+                                              {formatCurrency(valorSP)}
+                                            </span>
+                                          </div>
+                                          <div className="flex justify-between border-t pt-2 mt-2">
+                                            <span className="text-gray-600">Subtotal Hospitalar:</span>
+                                            <span className="font-semibold text-blue-700">
+                                              {formatCurrency(valorSH + valorSP)}
+                                            </span>
+                                          </div>
+                                          <hr className="my-3" />
+                                          <div className="flex justify-between text-base font-bold bg-purple-50 p-2 rounded">
+                                            <span>💰 VALOR TOTAL SIGTAP:</span>
+                                            <span className="text-purple-600">
+                                              {formatCurrency(valorTotalSigtap)}
+                                            </span>
+                                          </div>
+                                          <div className="text-xs text-gray-500 mt-2 bg-gray-50 p-2 rounded">
+                                            <div className="font-medium mb-1">Composição:</div>
+                                            <div>• SA: {formatCurrency(procedure.valueAmb)}</div>
+                                            <div>• SH: {formatCurrency(valorSH)}</div>
+                                            <div>• SP: {formatCurrency(valorSP)}</div>
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
                                   </div>
                                 </div>
                               </div>
