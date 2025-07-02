@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Badge } from '../ui/badge';
-import { Loader2, Lock, Shield, AlertTriangle } from 'lucide-react';
+import { Loader2, Lock, Shield, AlertTriangle, Building2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -40,7 +40,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Usuário não logado
-  if (!user || !profile) {
+  if (!user) {
     return fallback || (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Card className="w-full max-w-md">
@@ -97,11 +97,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                 </AlertDescription>
               </Alert>
               
-              <div className="text-center">
-                <p className="text-sm text-gray-600 mb-2">Seu nível atual:</p>
+              <div className="text-center space-y-2">
+                <p className="text-sm text-gray-600">Seu nível atual:</p>
                 <Badge variant="secondary" className="capitalize">
-                  {profile.role}
+                  {user.role}
                 </Badge>
+                
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <div className="flex items-center justify-center text-sm text-blue-700">
+                    <Building2 className="h-4 w-4 mr-2" />
+                    Logado em: {user.hospital_id ? 'Hospital Selecionado' : 'Nenhum hospital'}
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -131,6 +138,19 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                 </code>
               </AlertDescription>
             </Alert>
+            
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <div className="text-center">
+                <p className="text-sm text-blue-700 mb-1">Suas permissões:</p>
+                <div className="flex flex-wrap gap-1 justify-center">
+                  {user.permissions.map((perm, index) => (
+                    <Badge key={index} variant="outline" className="text-xs">
+                      {perm}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -144,7 +164,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4">
-              <Shield className="h-12 w-12 text-orange-500" />
+              <Building2 className="h-12 w-12 text-orange-500" />
             </div>
             <CardTitle className="text-orange-700">Acesso ao Hospital Negado</CardTitle>
           </CardHeader>
@@ -155,6 +175,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
                 Você não tem acesso aos dados deste hospital específico.
               </AlertDescription>
             </Alert>
+            
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-700 text-center">
+                Hospitais com acesso: {user.hospital_access.length}
+              </p>
+              <p className="text-xs text-blue-600 text-center mt-1">
+                Hospital atual: {user.hospital_id}
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

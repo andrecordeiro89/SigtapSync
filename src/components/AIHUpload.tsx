@@ -1,803 +1,309 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, FileText, AlertCircle, CheckCircle, Clock, Download, Eye, Building } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Progress } from './ui/progress';
-import { Alert, AlertDescription } from './ui/alert';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { useToast } from '../hooks/use-toast';
-import { HospitalService } from '../services/supabaseService';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-
-interface AIHUploadResult {
-  success: boolean;
-  message: string;
-  totalProcessed: number;
-  validAIHs: number;
-  invalidAIHs: number;
-  errors: string[];
-  processingTime: number;
-  hospitalId?: string;
-  hospitalName?: string;
-}
-
-interface Hospital {
-  id: string;
-  name: string;
-  city?: string;
-  state?: string;
-  cnpj: string;
-}
+import { Alert, AlertDescription } from './ui/alert';
+import { Badge } from './ui/badge';
+import { useAuth } from '../contexts/AuthContext';
+import { useSupabaseAIH, AIHData } from '../hooks/useSupabase';
+import { FileText, Upload, CheckCircle, AlertCircle, Activity, Building2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const AIHUpload = () => {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingProgress, setProcessingProgress] = useState(0);
-  const [lastResult, setLastResult] = useState<AIHUploadResult | null>(null);
-  const [currentFile, setCurrentFile] = useState<File | null>(null);
-  const [selectedHospital, setSelectedHospital] = useState<string>('');
-  const [hospitals, setHospitals] = useState<Hospital[]>([]);
-  const [loadingHospitals, setLoadingHospitals] = useState(true);
-  const { toast } = useToast();
+  const { user, getCurrentHospital } = useAuth();
+  const { processAIH, loading } = useSupabaseAIH();
+  
+  const [formData, setFormData] = useState({
+    aih_number: '',
+    patient_name: '',
+    procedure_code: '',
+    admission_date: '',
+  });
+  const [result, setResult] = useState<any>(null);
 
-  // Carregar lista de hospitais
-  useEffect(() => {
-    const loadHospitals = async () => {
-      try {
-        const hospitalData = await HospitalService.getHospitals();
-        setHospitals(hospitalData);
-      } catch (error) {
-        console.error('Erro ao carregar hospitais:', error);
-        toast({
-          title: "Erro ao carregar hospitais",
-          description: "Não foi possível carregar a lista de hospitais. Verifique sua conexão.",
-          variant: "destructive"
-        });
-      } finally {
-        setLoadingHospitals(false);
-      }
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!user?.hospital_id) {
+      toast.error('Hospital não selecionado');
+      return;
+    }
+
+    if (!formData.aih_number || !formData.patient_name) {
+      toast.error('Preencha pelo menos o número da AIH e nome do paciente');
+      return;
+    }
+
+    const aihData: AIHData = {
+      ...formData,
+      hospital_id: user.hospital_id,
+      processed_by: user.id,
+      processing_timestamp: new Date().toISOString()
     };
 
-    loadHospitals();
-  }, []);
+    const result = await processAIH(aihData);
+    setResult(result);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Validar se hospital foi selecionado
-    if (!selectedHospital) {
-      console.error('❌ Hospital não selecionado!');
-      toast({
-        title: "Hospital não selecionado",
-        description: "Por favor, selecione o hospital antes de fazer o upload do arquivo AIH.",
-        variant: "destructive"
+    if (result.success) {
+      // Limpar formulário
+      setFormData({
+        aih_number: '',
+        patient_name: '',
+        procedure_code: '',
+        admission_date: '',
       });
-      return;
-    }
-    
-    console.log('🏥 Hospital selecionado para persistência:', selectedHospital);
-
-    // Validar tipo de arquivo
-    const fileName = file.name.toLowerCase();
-    const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
-    const isCsv = fileName.endsWith('.csv');
-    const isPdf = fileName.endsWith('.pdf');
-    
-    if (!isExcel && !isCsv && !isPdf) {
-      toast({
-        title: "Arquivo inválido",
-        description: "Por favor, selecione um arquivo Excel (.xlsx/.xls), CSV ou PDF com dados de AIH.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validar tamanho do arquivo (limite de 50MB)
-    const maxSize = 50 * 1024 * 1024; // 50MB
-    if (file.size > maxSize) {
-      toast({
-        title: "Arquivo muito grande",
-        description: "O arquivo deve ter no máximo 50MB.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setCurrentFile(file);
-    await processAIHFile(file);
-  };
-
-  const processAIHFile = async (file: File) => {
-    setIsProcessing(true);
-    setProcessingProgress(0);
-    
-    try {
-      console.log('🚀 Iniciando processamento de AIH:', file.name);
-      console.log('🏥 Hospital selecionado:', selectedHospital);
-      
-      const selectedHospitalData = hospitals.find(h => h.id === selectedHospital);
-      
-      // Callback de progresso
-      const progressCallback = (progress: number) => {
-        setProcessingProgress(progress);
-      };
-
-      // Simular etapas do processamento com progresso real
-      setProcessingProgress(10);
-      
-      let processingResult;
-      
-      // Detectar formato da AIH e usar processador apropriado
-      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-        console.log('🎯 Detectado PDF - usando processador especializado para AIH PDF');
-        
-        // Usar processador especializado para PDF AIH (primeira página)
-        const { AIHPDFProcessor } = await import('../utils/aihPdfProcessor');
-        const pdfProcessor = new AIHPDFProcessor();
-        
-        processingResult = await pdfProcessor.processPDFAIH(file, {
-          hospitalId: selectedHospital,
-          hospitalName: selectedHospitalData?.name || 'Hospital Selecionado'
-        });
-      } else {
-        // Para Excel/CSV, usar processador padrão
-        console.log('📊 Usando processador AIH padrão para Excel/CSV');
-        const { AIHProcessor } = await import('../utils/aihProcessor');
-        const processor = new AIHProcessor();
-        processingResult = await processor.processAIHFile(file, {
-          hospitalId: selectedHospital,
-          hospitalName: selectedHospitalData?.name || 'Hospital Selecionado'
-        });
-      }
-      setProcessingProgress(60);
-      
-      // 🔍 DEBUG: Verificar estrutura do resultado
-      console.log('🔍 DEBUG - Resultado do processamento:', {
-        validAIHs: processingResult.validAIHs,
-        hasExtractedAIH: !!processingResult.extractedAIH,
-        extractedAIHType: typeof processingResult.extractedAIH,
-        hospitalId: selectedHospital,
-        fileName: file.name
-      });
-      
-      // Se há AIHs válidas e foram extraídas, persistir no banco de dados
-      if (processingResult.validAIHs > 0 && processingResult.extractedAIH) {
-        console.log(`💾 Iniciando persistência da AIH extraída...`);
-        console.log('📄 AIH a ser persistida:', processingResult.extractedAIH);
-        
-        try {
-          // Importar serviço de persistência
-          const { AIHPersistenceService } = await import('../services/aihPersistenceService');
-          
-          // Persistir AIH no banco de dados
-          console.log('🔄 Chamando persistência com parâmetros:', {
-            aih: processingResult.extractedAIH.numeroAIH,
-            hospital: selectedHospital,
-            file: file.name
-          });
-          
-          const persistenceResult = await AIHPersistenceService.persistAIHFromPDF(
-            processingResult.extractedAIH,
-            selectedHospital,
-            file.name
-          );
-          
-          if (persistenceResult.success) {
-            console.log('✅ AIH persistida no banco de dados!');
-            console.log(`📄 AIH ID: ${persistenceResult.aihId}`);
-            console.log(`👤 Paciente ID: ${persistenceResult.patientId}`);
-            
-            // Atualizar resultado com informações de persistência
-            processingResult.persistenceResult = persistenceResult;
-          } else {
-            console.error('❌ Erro na persistência:', persistenceResult.message);
-            processingResult.errors.push({
-              line: 0,
-              field: 'persistence',
-              message: persistenceResult.message
-            });
-          }
-        } catch (persistenceError) {
-          console.error('❌ Erro crítico na persistência:', persistenceError);
-          processingResult.errors.push({
-            line: 0,
-            field: 'persistence',
-            message: `Erro na persistência: ${persistenceError instanceof Error ? persistenceError.message : 'Erro desconhecido'}`
-          });
-        }
-        
-        setProcessingProgress(80);
-      } else {
-        // 🔍 DEBUG: Explicar por que a persistência não foi executada
-        if (processingResult.validAIHs === 0) {
-          console.warn('⚠️ PERSISTÊNCIA NÃO EXECUTADA: Nenhuma AIH válida encontrada');
-        } else if (!processingResult.extractedAIH) {
-          console.warn('⚠️ PERSISTÊNCIA NÃO EXECUTADA: AIH não foi extraída do resultado');
-          console.warn('💡 DICA: Verifique se o processador está retornando extractedAIH');
-        }
-      }
-      
-      // Se há AIHs válidas, preparar para matching futuro com SIGTAP
-      if (processingResult.validAIHs > 0) {
-        console.log(`🔄 AIH pronta para matching futuro com SIGTAP...`);
-        
-        // TODO: Integrar com sistema de matching SIGTAP
-        // const { AIHMatcher } = await import('../utils/aihMatcher');
-        // const matcher = new AIHMatcher(sigtapProcedures);
-        // const matches = await matcher.batchMatchAIHs(validAIHs, progressCallback);
-        
-        setProcessingProgress(90);
-        console.log('✅ Processamento completo');
-      }
-      
-      setProcessingProgress(100);
-
-      // Converter resultado para interface do componente
-      const mockResult: AIHUploadResult = {
-        success: processingResult.success,
-        message: processingResult.success 
-          ? `Arquivo ${file.name} processado com sucesso para ${selectedHospitalData?.name}!`
-          : `Erro ao processar ${file.name}`,
-        totalProcessed: processingResult.totalProcessed,
-        validAIHs: processingResult.validAIHs,
-        invalidAIHs: processingResult.invalidAIHs,
-        errors: processingResult.errors.map(error => 
-          `Linha ${error.line}: ${error.message}${error.value ? ` (${error.value})` : ''}`
-        ),
-        processingTime: processingResult.processingTime,
-        hospitalId: selectedHospital,
-        hospitalName: selectedHospitalData?.name
-      };
-
-      setLastResult(mockResult);
-      
-      if (mockResult.success) {
-        toast({
-          title: "🎉 Processamento concluído!",
-          description: `${mockResult.validAIHs} AIHs processadas para ${selectedHospitalData?.name}.`
-        });
-      } else {
-        toast({
-          title: "⚠️ Processamento concluído com erros",
-          description: `${mockResult.validAIHs} válidas, ${mockResult.invalidAIHs} com problemas.`,
-          variant: "destructive"
-        });
-      }
-
-    } catch (error) {
-      console.error('❌ Erro no processamento:', error);
-      
-      const errorResult: AIHUploadResult = {
-        success: false,
-        message: `Erro ao processar arquivo: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
-        totalProcessed: 0,
-        validAIHs: 0,
-        invalidAIHs: 0,
-        errors: [error instanceof Error ? error.message : 'Erro desconhecido'],
-        processingTime: 0,
-        hospitalId: selectedHospital
-      };
-      
-      setLastResult(errorResult);
-      
-      toast({
-        title: "Erro no processamento",
-        description: errorResult.message,
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
     }
   };
 
-  const handleDownloadErrorReport = () => {
-    if (!lastResult || !lastResult.errors.length) return;
+  const generateSampleData = () => {
+    const sampleNumber = `AIH${Date.now().toString().slice(-6)}`;
+    const sampleNames = ['João Silva', 'Maria Santos', 'Pedro Oliveira', 'Ana Costa'];
+    const sampleProcedures = ['03.03.01.001-2', '03.01.01.007-0', '04.07.01.028-1'];
     
-    const selectedHospitalData = hospitals.find(h => h.id === selectedHospital);
-    
-    const errorReport = [
-      'RELATÓRIO DE ERROS - PROCESSAMENTO AIH',
-      '=' .repeat(50),
-      `Arquivo: ${currentFile?.name || 'Desconhecido'}`,
-      `Hospital: ${selectedHospitalData?.name || 'Não informado'}`,
-      `Cidade: ${selectedHospitalData?.city}/${selectedHospitalData?.state}`,
-      `Data: ${new Date().toLocaleString('pt-BR')}`,
-      `Total processado: ${lastResult.totalProcessed}`,
-      `AIHs válidas: ${lastResult.validAIHs}`,
-      `AIHs com erro: ${lastResult.invalidAIHs}`,
-      `Taxa de sucesso: ${((lastResult.validAIHs / lastResult.totalProcessed) * 100).toFixed(1)}%`,
-      '',
-      'DETALHES DOS ERROS:',
-      '-'.repeat(30),
-      ...lastResult.errors.map((error, index) => `${index + 1}. ${error}`),
-      '',
-      'AÇÕES RECOMENDADAS:',
-      '• Verificar formato dos dados de entrada',
-      '• Confirmar se os códigos de procedimento existem na tabela SIGTAP',
-      '• Validar CNS dos pacientes',
-      '• Revisar datas de internação e alta',
-      '• Verificar se o hospital está correto'
-    ].join('\n');
-
-    const blob = new Blob([errorReport], { type: 'text/plain;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `aih_errors_${selectedHospitalData?.name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.txt`;
-    link.click();
-  };
-
-  const handleGenerateExecutiveReport = () => {
-    if (!lastResult || !lastResult.success) {
-      toast({
-        title: "Não é possível gerar relatório",
-        description: "Primeiro faça o upload de um arquivo AIH com sucesso.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Dados exemplo para demonstração (baseados no resultado do upload)
-    const sampleData = [
-      {
-        nomePaciente: 'Maria Silva Santos',
-        numeroAIH: '2024001234',
-        dataInternacao: '15/06/2024',
-        procedimentoPrincipal: '03.07.01.007-2',
-        descricaoProcedimento: 'Revascularização miocárdica c/ uso de extracorpórea c/ 2 ou mais anastomoses',
-        valorOriginal: 15487.50,
-        valorSigtap: 14203.25,
-        diferenca: -1284.25,
-        status: 'Aprovado',
-        especialidade: 'Cirurgia Cardiovascular'
-      },
-      {
-        nomePaciente: 'João Carlos Oliveira',
-        numeroAIH: '2024001235',
-        dataInternacao: '16/06/2024',
-        procedimentoPrincipal: '04.03.01.001-8',
-        descricaoProcedimento: 'Tratamento de pneumonia em paciente de 1 a 4 anos',
-        valorOriginal: 2456.78,
-        valorSigtap: 2234.50,
-        diferenca: -222.28,
-        status: 'Aprovado',
-        especialidade: 'Pediatria'
-      },
-      {
-        nomePaciente: 'Ana Costa Ferreira',
-        numeroAIH: '2024001236',
-        dataInternacao: '17/06/2024',
-        procedimentoPrincipal: '02.11.06.002-1',
-        descricaoProcedimento: 'Radiografia de tórax (PA e perfil)',
-        valorOriginal: 567.89,
-        valorSigtap: 567.89,
-        diferenca: 0,
-        status: 'Aprovado',
-        especialidade: 'Radiologia'
-      }
-    ];
-
-    // Calcular totais
-    const totalOriginal = sampleData.reduce((sum, item) => sum + item.valorOriginal, 0);
-    const totalSigtap = sampleData.reduce((sum, item) => sum + item.valorSigtap, 0);
-    const totalDiferenca = totalOriginal - totalSigtap;
-    const taxaSucesso = (lastResult.validAIHs / lastResult.totalProcessed * 100).toFixed(1);
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
-    const horaAtual = new Date().toLocaleTimeString('pt-BR');
-
-    // Criar PDF
-    const pdf = new jsPDF();
-    
-    // Configurar fonte
-    pdf.setFont('helvetica');
-    
-    // CABEÇALHO
-    pdf.setFillColor(41, 128, 185); // Azul
-    pdf.rect(0, 0, 210, 40, 'F');
-    
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(20);
-    pdf.text('RELATÓRIO EXECUTIVO - PROCESSAMENTO AIH', 15, 20);
-    
-    pdf.setFontSize(12);
-    pdf.text(`Sistema SIGTAP Sync | ${dataAtual} ${horaAtual}`, 15, 30);
-    
-    // Reset cor do texto
-    pdf.setTextColor(0, 0, 0);
-    
-    let yPos = 50;
-
-    // INFORMAÇÕES DO PROCESSAMENTO
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('INFORMAÇÕES DO PROCESSAMENTO', 15, yPos);
-    
-    yPos += 10;
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    
-    pdf.text(`Hospital: ${lastResult.hospitalName || 'Hospital Principal'}`, 15, yPos);
-    yPos += 6;
-    pdf.text(`Arquivo Processado: ${currentFile?.name || 'arquivo.pdf'}`, 15, yPos);
-    yPos += 6;
-    pdf.text(`Tempo de Processamento: ${(lastResult.processingTime / 1000).toFixed(2)} segundos`, 15, yPos);
-    
-    yPos += 15;
-
-    // RESUMO EXECUTIVO
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('RESUMO EXECUTIVO', 15, yPos);
-    
-    yPos += 15;
-    
-    // Criar tabela de resumo
-    const resumoData = [
-      ['Total AIHs Processadas', lastResult.totalProcessed.toString()],
-      ['AIHs Válidas', lastResult.validAIHs.toString()],
-      ['Taxa de Sucesso', `${taxaSucesso}%`],
-      ['Valor Total Original', `R$ ${totalOriginal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-      ['Valor Total SIGTAP', `R$ ${totalSigtap.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-      ['Diferença', `R$ ${totalDiferenca.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${((totalDiferenca/totalOriginal)*100).toFixed(2)}%)`]
-    ];
-
-    autoTable({
-      startY: yPos,
-      head: [['Métrica', 'Valor']],
-      body: resumoData,
-      theme: 'grid',
-      headStyles: { fillColor: [52, 152, 219], textColor: 255, fontSize: 10 },
-      bodyStyles: { fontSize: 9 },
-      columnStyles: {
-        0: { cellWidth: 80, fontStyle: 'bold' },
-        1: { cellWidth: 80, halign: 'right' }
-      },
-      margin: { left: 15, right: 15 }
-    });
-
-    yPos = pdf.lastAutoTable.finalY + 20;
-
-    // DETALHAMENTO POR PACIENTE
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('DETALHAMENTO POR PACIENTE', 15, yPos);
-    
-    yPos += 10;
-    
-    // Preparar dados da tabela
-    const tableData = sampleData.map(item => [
-      item.nomePaciente,
-      item.numeroAIH,
-      item.dataInternacao,
-      item.procedimentoPrincipal,
-      item.descricaoProcedimento.length > 40 ? 
-        item.descricaoProcedimento.substring(0, 37) + '...' : 
-        item.descricaoProcedimento,
-      `R$ ${item.valorOriginal.toFixed(2)}`,
-      `R$ ${item.valorSigtap.toFixed(2)}`,
-      `R$ ${item.diferenca.toFixed(2)}`,
-      item.status,
-      item.especialidade
-    ]);
-
-    // Adicionar linha de totais
-    tableData.push([
-      '', '', '', '', 'TOTAL GERAL:',
-      `R$ ${totalOriginal.toFixed(2)}`,
-      `R$ ${totalSigtap.toFixed(2)}`,
-      `R$ ${totalDiferenca.toFixed(2)}`,
-      '', ''
-    ]);
-
-    autoTable({
-      startY: yPos,
-      head: [['Paciente', 'Nº AIH', 'Data', 'Código', 'Procedimento', 'Original', 'SIGTAP', 'Diferença', 'Status', 'Especialidade']],
-      body: tableData,
-      theme: 'striped',
-      headStyles: { 
-        fillColor: [46, 204, 113], 
-        textColor: 255, 
-        fontSize: 8,
-        halign: 'center'
-      },
-      bodyStyles: { fontSize: 7 },
-      columnStyles: {
-        0: { cellWidth: 25 }, // Paciente
-        1: { cellWidth: 18 }, // AIH
-        2: { cellWidth: 15 }, // Data
-        3: { cellWidth: 20 }, // Código
-        4: { cellWidth: 35 }, // Procedimento
-        5: { cellWidth: 18, halign: 'right' }, // Original
-        6: { cellWidth: 18, halign: 'right' }, // SIGTAP
-        7: { cellWidth: 18, halign: 'right' }, // Diferença
-        8: { cellWidth: 15 }, // Status
-        9: { cellWidth: 20 }  // Especialidade
-      },
-      margin: { left: 10, right: 10 },
-      // Destacar linha de totais
-      didParseCell: function (data: any) {
-        if (data.row.index === tableData.length - 1) {
-          data.cell.styles.fillColor = [231, 76, 60];
-          data.cell.styles.textColor = 255;
-          data.cell.styles.fontStyle = 'bold';
-        }
-      }
-    });
-
-    // RODAPÉ
-    const pageHeight = pdf.internal.pageSize.height;
-    
-    pdf.setFillColor(52, 73, 94);
-    pdf.rect(0, pageHeight - 25, 210, 25, 'F');
-    
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(8);
-    pdf.text('• Valores calculados conforme Tabela SIGTAP vigente', 15, pageHeight - 15);
-    pdf.text('• Relatório gerado automaticamente pelo Sistema SIGTAP Sync', 15, pageHeight - 10);
-    pdf.text('• Para dúvidas, entre em contato com o departamento de faturamento', 15, pageHeight - 5);
-
-    // Salvar PDF
-    const fileName = `relatorio-executivo-aih-${dataAtual.replace(/\//g, '-')}.pdf`;
-    pdf.save(fileName);
-
-    toast({
-      title: "📊 Relatório PDF Gerado!",
-      description: `Relatório executivo premium gerado com ${sampleData.length} AIHs exemplo. Arquivo PDF baixado com sucesso.`,
+    setFormData({
+      aih_number: sampleNumber,
+      patient_name: sampleNames[Math.floor(Math.random() * sampleNames.length)],
+      procedure_code: sampleProcedures[Math.floor(Math.random() * sampleProcedures.length)],
+      admission_date: new Date().toISOString().split('T')[0],
     });
   };
+
+  if (!user) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Acesso Negado</h3>
+          <p className="text-gray-500">Você precisa estar logado para processar AIHs.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Upload de AIHs</h2>
-        <p className="text-gray-600 mt-1">
-          Importe arquivos de Autorização de Internação Hospitalar para processamento automático e matching com SIGTAP
-        </p>
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white">
+        <div className="flex items-center gap-3">
+          <FileText className="h-8 w-8" />
+          <div>
+            <h1 className="text-2xl font-bold">Upload de AIH</h1>
+            <p className="text-blue-100">
+              Processamento com rastreabilidade completa
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Card de Upload */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Upload className="w-5 h-5 text-blue-600" />
-              <span>Importar Arquivo AIH</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Seleção de Hospital */}
-            <div className="space-y-2">
-              <Label htmlFor="hospital-select" className="flex items-center space-x-2">
-                <Building className="w-4 h-4" />
-                <span>Selecionar Hospital *</span>
-              </Label>
-              <Select value={selectedHospital} onValueChange={setSelectedHospital} disabled={loadingHospitals}>
-                <SelectTrigger id="hospital-select">
-                  <SelectValue placeholder={loadingHospitals ? "Carregando hospitais..." : "Selecione o hospital"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {hospitals.map((hospital) => (
-                    <SelectItem key={hospital.id} value={hospital.id}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{hospital.name}</span>
-                        <span className="text-xs text-gray-500">{hospital.city}/{hospital.state} - CNPJ: {hospital.cnpj}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {!selectedHospital && (
-                <p className="text-xs text-amber-600">
-                  ⚠️ Selecione o hospital antes de fazer o upload
-                </p>
-              )}
+      {/* Informações do Contexto */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Contexto da Sessão
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <p className="text-sm text-gray-500">Usuário</p>
+              <p className="font-medium">{user.full_name || user.email}</p>
+              <Badge variant="outline" className="mt-1 text-xs">
+                {user.role.toUpperCase()}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Hospital</p>
+              <p className="font-medium">{getCurrentHospital()}</p>
+              <p className="text-xs text-gray-500">ID do hospital selecionado</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Rastreabilidade</p>
+              <div className="flex items-center gap-2 mt-1">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-700">Ativa</span>
+              </div>
+              <p className="text-xs text-gray-500">Todas as ações serão registradas</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Formulário de Upload */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Processar Nova AIH
+          </CardTitle>
+          <CardDescription>
+            Insira os dados da AIH para processamento e registro no sistema
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="aih_number">Número da AIH *</Label>
+                <Input
+                  id="aih_number"
+                  placeholder="Ex: AIH123456"
+                  value={formData.aih_number}
+                  onChange={(e) => handleInputChange('aih_number', e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="patient_name">Nome do Paciente *</Label>
+                <Input
+                  id="patient_name"
+                  placeholder="Ex: João Silva"
+                  value={formData.patient_name}
+                  onChange={(e) => handleInputChange('patient_name', e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="procedure_code">Código do Procedimento</Label>
+                <Input
+                  id="procedure_code"
+                  placeholder="Ex: 03.03.01.001-2"
+                  value={formData.procedure_code}
+                  onChange={(e) => handleInputChange('procedure_code', e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="admission_date">Data de Internação</Label>
+                <Input
+                  id="admission_date"
+                  type="date"
+                  value={formData.admission_date}
+                  onChange={(e) => handleInputChange('admission_date', e.target.value)}
+                />
+              </div>
             </div>
 
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
-              <div className="flex justify-center space-x-3 mb-4">
-                <FileText className="w-8 h-8 text-gray-400" />
-                <Upload className="w-8 h-8 text-blue-500" />
-              </div>
-              
-              <div className="space-y-2">
-                <p className="text-lg font-medium text-gray-700">
-                  Selecione um arquivo AIH
-                </p>
-                <p className="text-sm text-gray-500">
-                  Formatos aceitos: Excel (.xlsx/.xls), CSV ou PDF
-                </p>
-                <p className="text-xs text-gray-400">
-                  Tamanho máximo: 50MB
-                </p>
-              </div>
-
-              <input
-                type="file"
-                id="aih-upload"
-                accept=".xlsx,.xls,.csv,.pdf"
-                onChange={handleFileSelect}
-                disabled={isProcessing || !selectedHospital}
-                className="hidden"
-              />
-              
-              <label
-                htmlFor="aih-upload"
-                className={`inline-flex items-center px-4 py-2 mt-4 text-sm font-medium rounded-lg cursor-pointer transition-colors ${
-                  isProcessing || !selectedHospital
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
+            <div className="flex gap-3">
+              <Button 
+                type="submit" 
+                disabled={loading}
+                className="flex items-center gap-2"
               >
-                <Upload className="w-4 h-4 mr-2" />
-                {isProcessing ? 'Processando...' : 'Selecionar Arquivo'}
-              </label>
-            </div>
-
-            {/* Progresso */}
-            {isProcessing && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Processando arquivo...</span>
-                  <span>{processingProgress}%</span>
-                </div>
-                <Progress value={processingProgress} className="w-full" />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Card de Resultado */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              {lastResult?.success ? (
-                <CheckCircle className="w-5 h-5 text-green-600" />
-              ) : lastResult && !lastResult.success ? (
-                <AlertCircle className="w-5 h-5 text-red-600" />
-              ) : (
-                <Clock className="w-5 h-5 text-gray-400" />
-              )}
-              <span>Resultado do Processamento</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!lastResult ? (
-              <div className="text-center py-8 text-gray-500">
-                <Clock className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p>Nenhum arquivo processado ainda</p>
-                <p className="text-sm">Selecione um hospital e faça upload de um arquivo AIH</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <Alert variant={lastResult.success ? "default" : "destructive"}>
-                  <AlertDescription>
-                    <div className="space-y-2">
-                      <p className="font-medium">{lastResult.message}</p>
-                      {lastResult.hospitalName && (
-                        <p className="text-sm">
-                          🏥 <strong>Hospital:</strong> {lastResult.hospitalName}
-                        </p>
-                      )}
-                    </div>
-                  </AlertDescription>
-                </Alert>
-
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-blue-50 p-3 rounded-lg">
-                    <p className="font-semibold text-blue-900">Total Processado</p>
-                    <p className="text-2xl font-bold text-blue-600">{lastResult.totalProcessed}</p>
-                  </div>
-                  <div className="bg-green-50 p-3 rounded-lg">
-                    <p className="font-semibold text-green-900">AIHs Válidas</p>
-                    <p className="text-2xl font-bold text-green-600">{lastResult.validAIHs}</p>
-                  </div>
-                  <div className="bg-red-50 p-3 rounded-lg">
-                    <p className="font-semibold text-red-900">Com Problemas</p>
-                    <p className="text-2xl font-bold text-red-600">{lastResult.invalidAIHs}</p>
-                  </div>
-                  <div className="bg-purple-50 p-3 rounded-lg">
-                    <p className="font-semibold text-purple-900">Taxa de Sucesso</p>
-                    <p className="text-2xl font-bold text-purple-600">
-                      {lastResult.totalProcessed > 0 ? 
-                        ((lastResult.validAIHs / lastResult.totalProcessed) * 100).toFixed(1) : 0}%
-                    </p>
-                  </div>
-                </div>
-
-                {lastResult.errors.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <p className="font-medium text-red-900">Erros Encontrados:</p>
-                      <Button
-                        onClick={handleDownloadErrorReport}
-                        size="sm"
-                        variant="outline"
-                        className="flex items-center space-x-1"
-                      >
-                        <Download className="w-3 h-3" />
-                        <span>Download</span>
-                      </Button>
-                    </div>
-                    <div className="max-h-32 overflow-y-auto bg-red-50 border border-red-200 rounded p-3">
-                      {lastResult.errors.slice(0, 5).map((error, index) => (
-                        <p key={index} className="text-xs text-red-700 mb-1">
-                          {error}
-                        </p>
-                      ))}
-                      {lastResult.errors.length > 5 && (
-                        <p className="text-xs text-red-600 font-medium">
-                          ... e mais {lastResult.errors.length - 5} erros (baixe o relatório completo)
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                {loading ? (
+                  <>
+                    <Activity className="h-4 w-4 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    Processar AIH
+                  </>
                 )}
+              </Button>
+              
+              <Button 
+                type="button" 
+                variant="outline"
+                onClick={generateSampleData}
+                disabled={loading}
+              >
+                Dados de Exemplo
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
-                <div className="text-xs text-gray-500 border-t pt-2">
-                  <p>Processamento concluído em {(lastResult.processingTime / 1000).toFixed(2)}s</p>
-                  {currentFile && <p>Arquivo: {currentFile.name}</p>}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Próximos Passos */}
-      {lastResult?.success && lastResult.validAIHs > 0 && (
+      {/* Resultado do Processamento */}
+      {result && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <span>Próximos Passos</span>
+            <CardTitle className="flex items-center gap-2">
+              {result.success ? (
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              ) : (
+                <AlertCircle className="h-5 w-5 text-red-600" />
+              )}
+              Resultado do Processamento
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
-                <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</div>
-                <div>
-                  <p className="font-medium">Matching com SIGTAP</p>
-                  <p className="text-sm text-gray-600">AIHs serão automaticamente pareadas com procedimentos SIGTAP</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
-                <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</div>
-                <div>
-                  <p className="font-medium">Validação de Valores</p>
-                  <p className="text-sm text-gray-600">Valores serão calculados conforme tabela SIGTAP vigente</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg">
-                <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs font-bold">3</div>
-                <div>
-                  <p className="font-medium">Geração de Faturamento</p>
-                  <p className="text-sm text-gray-600">Relatórios de faturamento serão disponibilizados para {lastResult.hospitalName}</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
-                <div className="w-6 h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold">📊</div>
-                <div className="flex-1">
-                  <p className="font-medium text-amber-800">Relatório para Diretoria</p>
-                  <p className="text-sm text-amber-700">Gere relatório executivo com pacientes e valores para apresentação</p>
-                </div>
-                <Button 
-                  onClick={handleGenerateExecutiveReport}
-                  size="sm"
-                  className="bg-amber-600 hover:bg-amber-700 text-white"
-                >
-                  <Download className="w-3 h-3 mr-1" />
-                  Gerar Relatório
-                </Button>
-              </div>
-            </div>
+            {result.success ? (
+              <Alert className="border-green-200 bg-green-50">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  <div className="space-y-2">
+                    <p className="font-medium">AIH processada com sucesso!</p>
+                    <div className="text-sm space-y-1">
+                      <p>• <strong>ID da AIH:</strong> {result.aih_id}</p>
+                      <p>• <strong>ID de Auditoria:</strong> {result.audit_id}</p>
+                      <p>• <strong>Hospital:</strong> {getCurrentHospital()}</p>
+                      <p>• <strong>Processado por:</strong> {user.email}</p>
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="space-y-2">
+                    <p className="font-medium">Erro no processamento:</p>
+                    <p className="text-sm">{result.error}</p>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
           </CardContent>
         </Card>
       )}
+
+      {/* Informações sobre Rastreabilidade */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-purple-600" />
+            Sistema de Rastreabilidade
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-medium mb-3">O que é registrado:</h4>
+              <div className="space-y-2 text-sm text-gray-600">
+                <p>✅ Início do processamento</p>
+                <p>✅ Dados da AIH enviada</p>
+                <p>✅ Usuário responsável</p>
+                <p>✅ Hospital de origem</p>
+                <p>✅ Timestamp completo</p>
+                <p>✅ Resultado (sucesso/erro)</p>
+                <p>✅ IP e User Agent</p>
+              </div>
+            </div>
+            <div>
+              <h4 className="font-medium mb-3">Benefícios:</h4>
+              <div className="space-y-2 text-sm text-gray-600">
+                <p>🔍 Auditoria completa</p>
+                <p>👤 Responsabilização individual</p>
+                <p>🏥 Controle por hospital</p>
+                <p>⏱️ Histórico temporal</p>
+                <p>🚨 Detecção de problemas</p>
+                <p>📊 Relatórios detalhados</p>
+                <p>✅ Conformidade regulatória</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

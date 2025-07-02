@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '../contexts/AuthContext';
-import { BarChart3, Upload, Users, FileText, Home, Search, FileUp, BarChart4, User, LogOut, Settings, Code, Crown, ChevronDown } from 'lucide-react';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Avatar, AvatarFallback } from './ui/avatar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { Home, Upload, Search, FileUp, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe } from 'lucide-react';
 
 interface NavigationProps {
   activeTab: string;
@@ -13,89 +12,165 @@ interface NavigationProps {
 }
 
 const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
-  const { user, profile, signOut, isDeveloper, isAdmin } = useAuth();
+  const { user, signOut, isDeveloper, isAdmin, isDirector, isCoordinator, isAuditor, isTI, hasFullAccess, canAccessAllHospitals, getCurrentHospital } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const tabs = [
+  // Definir todas as tabs disponíveis - ORDEM OTIMIZADA PARA OPERADORES
+  const allTabs = [
     {
       id: 'dashboard',
       label: 'Dashboard',
       icon: Home,
-      description: 'Visão geral do sistema'
-    },
-    {
-      id: 'sigtap',
-      label: 'SIGTAP',
-      icon: Upload,
-      description: 'Importação da tabela'
+      description: 'Visão geral do sistema',
+      requiresAdmin: false // Todos podem ver
     },
     {
       id: 'sigtap-viewer',
       label: 'Consulta SIGTAP',
       icon: Search,
-      description: 'Visualizar procedimentos'
+      description: 'Visualizar procedimentos',
+      requiresAdmin: false // Todos podem ver
     },
     {
       id: 'aih-multipage-tester',
-      label: 'Upload AIH',
+      label: 'AIH Avançado',
       icon: FileUp,
-      description: 'Upload e processamento de AIHs'
+      description: 'Upload e processamento oficial de AIHs',
+      requiresAdmin: false // Todos podem ver - SISTEMA OFICIAL
     },
     {
       id: 'patients',
       label: 'Pacientes',
       icon: Users,
-      description: 'Cadastro e gerenciamento'
+      description: 'Cadastro e gerenciamento',
+      requiresAdmin: false // Todos podem ver
+    },
+    {
+      id: 'sigtap',
+      label: 'SIGTAP',
+      icon: Upload,
+      description: 'Importação da tabela - Apenas diretoria',
+      requiresAdmin: true // OCULTAR para usuários operadores - apenas diretoria
+    },
+    {
+      id: 'aih-upload',
+      label: 'Upload AIH (Teste)',
+      icon: FileUp,
+      description: 'Teste de rastreabilidade - Apenas desenvolvimento',
+      requiresAdmin: true // OCULTAR para usuários operadores
     },
     {
       id: 'reports',
       label: 'Relatórios',
       icon: BarChart4,
-      description: 'Central de relatórios executivos'
+      description: 'Central de relatórios executivos',
+      requiresAdmin: true // OCULTAR para usuários operadores - apenas gestão
     }
   ];
+
+  // Filtrar tabs baseado no nível de acesso do usuário
+  const getVisibleTabs = () => {
+    if (!user) return [];
+
+    // Se tem acesso total (admin, diretor, coordenador, etc), mostrar todas as tabs
+    if (hasFullAccess()) {
+      return allTabs;
+    }
+
+    // Para usuários operadores, filtrar tabs que requerem admin
+    return allTabs.filter(tab => !tab.requiresAdmin);
+  };
+
+  const tabs = getVisibleTabs();
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
       await signOut();
+      // O sistema irá redirecionar automaticamente para a tela de login
     } finally {
       setIsLoggingOut(false);
     }
   };
 
   const getRoleConfig = () => {
-    if (!profile) return null;
+    if (!user) return null;
     
-    switch (profile.role) {
+    switch (user.role) {
       case 'developer':
         return {
           icon: Code,
           label: 'DEVELOPER',
           color: 'bg-purple-100 text-purple-800 border-purple-200',
-          description: 'Acesso total ao sistema'
+          description: 'Desenvolvedor - Acesso total ao sistema'
         };
       case 'admin':
         return {
           icon: Crown,
           label: 'ADMIN',
           color: 'bg-blue-100 text-blue-800 border-blue-200',
-          description: 'Administrador do sistema'
+          description: 'Administrador - Controle completo'
+        };
+      case 'director':
+        return {
+          icon: Shield,
+          label: 'DIRETOR',
+          color: 'bg-purple-100 text-purple-800 border-purple-200',
+          description: 'Diretoria - Acesso a todos os hospitais'
+        };
+      case 'coordinator':
+        return {
+          icon: UserCheck,
+          label: 'COORDENADOR',
+          color: 'bg-green-100 text-green-800 border-green-200',
+          description: 'Coordenação - Supervisão geral'
+        };
+      case 'auditor':
+        return {
+          icon: Eye,
+          label: 'AUDITOR',
+          color: 'bg-orange-100 text-orange-800 border-orange-200',
+          description: 'Auditoria - Monitoramento completo'
+        };
+      case 'ti':
+        return {
+          icon: Code,
+          label: 'TI',
+          color: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+          description: 'Tecnologia da Informação'
         };
       default:
         return {
           icon: User,
-          label: 'USER',
+          label: 'OPERADOR',
           color: 'bg-gray-100 text-gray-800 border-gray-200',
-          description: 'Usuário padrão'
+          description: 'Usuário operador de hospital'
         };
     }
   };
 
-  const roleConfig = getRoleConfig();
+  const getAccessLevelBadge = () => {
+    if (!user) return null;
+
+    if (canAccessAllHospitals()) {
+      return {
+        icon: Globe,
+        label: 'ACESSO TOTAL',
+        color: 'bg-purple-100 text-purple-800 border-purple-200',
+        description: 'Acesso a todos os hospitais'
+      };
+    } else {
+      return {
+        icon: Building2,
+        label: 'HOSPITAL ESPECÍFICO',
+        color: 'bg-blue-100 text-blue-800 border-blue-200',
+        description: 'Acesso limitado ao hospital'
+      };
+    }
+  };
 
   const getInitials = (name?: string, email?: string) => {
-    if (name) {
+    if (name && name !== email?.split('@')[0]) {
       return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     }
     if (email) {
@@ -104,237 +179,237 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
     return 'U';
   };
 
-  // MODO DESENVOLVEDOR: usar valores padrão se não autenticado
-  const devMode = !user || !profile;
-  if (devMode) {
-    // Valores padrão para modo desenvolvimento
-    const devUser = { email: 'developer@test.com' };
-    const devProfile = { 
-      full_name: 'Desenvolvedor', 
-      email: 'developer@test.com', 
-      role: 'admin',
-      avatar_url: null 
-    };
-    const devRoleConfig = {
-      icon: Code,
-      label: 'DEV MODE',
-      color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      description: 'Modo desenvolvedor ativo'
-    };
-    
-    // Usar valores de desenvolvimento
-    const finalUser = devUser;
-    const finalProfile = devProfile;
-    const finalRoleConfig = devRoleConfig;
-    
-    // Continuar renderização com valores de desenvolvimento
-    const RoleIcon = finalRoleConfig.icon;
-    
-    return (
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo e título - lado esquerdo */}
-            <div className="flex items-center space-x-2">
-              <BarChart3 className="w-8 h-8 text-blue-600" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">SIGTAP Sync</h1>
-                <p className="text-xs text-gray-500 hidden sm:block">Sistema de Faturamento Hospitalar</p>
-              </div>
-            </div>
-            
-            {/* Navegação - centro */}
-            <nav className="hidden lg:flex space-x-0.5">
-              {tabs.map((tab) => (
-                <Button
-                  key={tab.id}
-                  variant={activeTab === tab.id ? "default" : "ghost"}
-                  onClick={() => onTabChange(tab.id)}
-                  className="flex items-center space-x-1.5 px-2.5 py-1.5 text-sm"
-                  size="sm"
-                >
-                  <tab.icon className="w-4 h-4" />
-                  <span className="hidden xl:inline">{tab.label}</span>
-                </Button>
-              ))}
-            </nav>
+  const getHospitalDisplayName = () => {
+    const currentHospital = getCurrentHospital();
+    if (currentHospital === 'ALL') {
+      return 'TODOS OS HOSPITAIS';
+    }
+    return currentHospital || 'Não selecionado';
+  };
 
-            {/* Badge do Role */}
-            <Badge className={`${finalRoleConfig.color} flex items-center gap-1 px-2 py-1 text-xs font-medium`}>
-              <RoleIcon className="h-3 w-3" />
-              <span className="hidden sm:inline">{finalRoleConfig.label}</span>
-            </Badge>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!roleConfig) {
+  // Se não há usuário, não renderizar navegação
+  if (!user) {
     return null;
   }
 
-  const RoleIcon = roleConfig.icon;
+  const roleConfig = getRoleConfig();
+  const accessLevel = getAccessLevelBadge();
+  const currentHospital = getCurrentHospital();
 
   return (
-    <div className="bg-white border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+    <nav className="bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo e título - lado esquerdo */}
-          <div className="flex items-center space-x-2">
-            <BarChart3 className="w-8 h-8 text-blue-600" />
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">SIGTAP Sync</h1>
-              <p className="text-xs text-gray-500 hidden sm:block">Sistema de Faturamento Hospitalar</p>
+        <div className="flex justify-between h-16">
+          {/* Logo e Menu Principal */}
+          <div className="flex">
+            <div className="flex-shrink-0 flex items-center">
+              <Building2 className="h-8 w-8 text-blue-600" />
+              <span className="ml-2 text-xl font-bold text-gray-900">SIGTAP Sync</span>
+              {canAccessAllHospitals() && (
+                <Badge variant="outline" className="ml-2 bg-purple-50 text-purple-700 border-purple-200">
+                  <Globe className="h-3 w-3 mr-1" />
+                  ADMIN
+                </Badge>
+              )}
+            </div>
+            
+            {/* Tabs de Navegação - Agora filtradas por permissão */}
+            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => onTabChange(tab.id)}
+                    className={`${
+                      activeTab === tab.id
+                        ? 'border-blue-500 text-blue-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors inline-flex items-center gap-2 relative`}
+                    title={tab.description}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {tab.label}
+                    
+                    {/* Badge especial para sistema oficial */}
+                    {tab.id === 'aih-multipage-tester' && (
+                      <Badge variant="outline" className="ml-1 text-xs bg-green-50 text-green-700 border-green-200">
+                        OFICIAL
+                      </Badge>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
-          
-          {/* Navegação - centro */}
-          <nav className="hidden lg:flex space-x-0.5">
-            {tabs.map((tab) => (
-              <Button
-                key={tab.id}
-                variant={activeTab === tab.id ? "default" : "ghost"}
-                onClick={() => onTabChange(tab.id)}
-                className="flex items-center space-x-1.5 px-2.5 py-1.5 text-sm"
-                size="sm"
-              >
-                <tab.icon className="w-4 h-4" />
-                <span className="hidden xl:inline">{tab.label}</span>
-              </Button>
-            ))}
-          </nav>
 
-          {/* Navegação tablet - centro */}
-          <nav className="flex lg:hidden md:flex space-x-0.5">
-            {tabs.map((tab) => (
-              <Button
-                key={tab.id}
-                variant={activeTab === tab.id ? "default" : "ghost"}
-                onClick={() => onTabChange(tab.id)}
-                className="flex items-center justify-center p-2"
-                size="sm"
-                title={tab.label}
-              >
-                <tab.icon className="w-4 h-4" />
-              </Button>
-            ))}
-          </nav>
+          {/* Informações do Usuário */}
+          <div className="flex items-center space-x-4">
+            
+            {/* Informações do Usuário Logado - Simplificado */}
+            <div className="hidden sm:flex items-center space-x-3">
+              {/* Email do Usuário */}
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900 leading-none">
+                  {user.full_name || user.email?.split('@')[0]}
+                </p>
+                <p className="text-xs text-gray-500 leading-none mt-0.5">
+                  {user.email}
+                </p>
+              </div>
+            </div>
 
-          {/* Navegação mobile - centro */}
-          <nav className="flex md:hidden space-x-0.5 overflow-x-auto">
-            {tabs.slice(0, 4).map((tab) => (
-              <Button
-                key={tab.id}
-                variant={activeTab === tab.id ? "default" : "ghost"}
-                onClick={() => onTabChange(tab.id)}
-                className="flex items-center justify-center p-2 min-w-[40px]"
-                size="sm"
-                title={tab.label}
-              >
-                <tab.icon className="w-4 h-4" />
-              </Button>
-            ))}
-          </nav>
-
-          {/* Informações do usuário - lado direito */}
-          <div className="flex items-center space-x-2">
-            {/* Badge do Role */}
-            <Badge className={`${roleConfig.color} flex items-center gap-1 px-2 py-1 text-xs font-medium`}>
-              <RoleIcon className="h-3 w-3" />
-              <span className="hidden sm:inline">{roleConfig.label}</span>
-            </Badge>
-
-            {/* Menu do usuário */}
+            {/* Menu do Usuário */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center space-x-2 hover:bg-gray-50 px-2 py-1">
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={profile.avatar_url} alt={profile.full_name || profile.email} />
-                    <AvatarFallback className="bg-blue-100 text-blue-600 text-sm font-medium">
-                      {getInitials(profile.full_name, profile.email)}
+                    <AvatarFallback className={`text-xs font-medium ${
+                      canAccessAllHospitals() 
+                        ? 'bg-purple-100 text-purple-700' 
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {getInitials(user.full_name, user.email)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="text-left hidden md:block">
-                    <div className="text-sm font-medium text-gray-900">
-                      {profile.full_name || profile.email.split('@')[0]}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {profile.email}
-                    </div>
-                  </div>
-                  <ChevronDown className="h-4 w-4 text-gray-400 hidden sm:block" />
                 </Button>
               </DropdownMenuTrigger>
-
-              <DropdownMenuContent align="end" className="w-80">
-                <DropdownMenuLabel>
-                  <div className="flex items-center space-x-3">
-                    <Avatar className="h-12 w-12">
-                      <AvatarImage src={profile.avatar_url} alt={profile.full_name || profile.email} />
-                      <AvatarFallback className="bg-blue-100 text-blue-600 text-lg font-medium">
-                        {getInitials(profile.full_name, profile.email)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="font-medium text-gray-900">
-                        {profile.full_name || 'Usuário'}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {profile.email}
-                      </div>
-                      <Badge className={`${roleConfig.color} text-xs mt-1 inline-flex items-center gap-1`}>
-                        <RoleIcon className="h-3 w-3" />
-                        {roleConfig.label}
-                      </Badge>
+              
+              <DropdownMenuContent className="w-96" align="end" forceMount>
+                {/* Informações do Usuário */}
+                <div className="flex items-center space-x-2 p-4 border-b">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className={`font-medium ${
+                      canAccessAllHospitals() 
+                        ? 'bg-purple-100 text-purple-700' 
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {getInitials(user.full_name, user.email)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {user.full_name || user.email?.split('@')[0]}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                    <div className="flex gap-1 mt-1">
+                      {roleConfig && (
+                        <Badge variant="outline" className={`${roleConfig.color} text-xs`}>
+                          <roleConfig.icon className="h-3 w-3 mr-1" />
+                          {roleConfig.label}
+                        </Badge>
+                      )}
+                      {canAccessAllHospitals() && (
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                          <Shield className="h-3 w-3 mr-1" />
+                          FULL ACCESS
+                        </Badge>
+                      )}
                     </div>
                   </div>
-                </DropdownMenuLabel>
-
-                <DropdownMenuSeparator />
-
-                {/* Informações de acesso */}
-                <div className="p-3">
-                  <Card>
-                    <CardContent className="p-3">
-                      <div className="text-xs text-gray-600 space-y-2">
-                        <div className="flex justify-between">
-                          <span>Nível de acesso:</span>
-                          <span className="font-medium">{roleConfig.description}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Hospitais:</span>
-                          <span className="font-medium">
-                            {isDeveloper() || isAdmin() ? 'Todos' : profile.hospital_access.length}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Permissões:</span>
-                          <span className="font-medium">
-                            {isDeveloper() ? 'Completas' : isAdmin() ? 'Administrativas' : profile.permissions.length}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
                 </div>
 
-                <DropdownMenuSeparator />
+                {/* Informações de Acesso */}
+                <div className={`p-3 border-b ${
+                  canAccessAllHospitals() ? 'bg-purple-50' : 'bg-blue-50'
+                }`}>
+                  <div className={`flex items-center ${
+                    canAccessAllHospitals() ? 'text-purple-700' : 'text-blue-700'
+                  }`}>
+                    {canAccessAllHospitals() ? (
+                      <Globe className="h-4 w-4 mr-2" />
+                    ) : (
+                      <Building2 className="h-4 w-4 mr-2" />
+                    )}
+                    <div>
+                      <p className="text-xs font-medium">
+                        {canAccessAllHospitals() ? 'Acesso Administrativo' : 'Hospital Atual'}
+                      </p>
+                      <p className={`text-xs ${
+                        canAccessAllHospitals() ? 'text-purple-600' : 'text-blue-600'
+                      }`}>
+                        {getHospitalDisplayName()}
+                      </p>
+                    </div>
+                  </div>
+                  <p className={`text-xs mt-1 ${
+                    canAccessAllHospitals() ? 'text-purple-600' : 'text-blue-600'
+                  }`}>
+                    {canAccessAllHospitals() 
+                      ? 'Controle total sobre todos os hospitais' 
+                      : `Acesso a ${user.hospital_access.length} ${user.hospital_access.length === 1 ? 'hospital' : 'hospitais'}`
+                    }
+                  </p>
+                </div>
 
-                {/* Ações */}
-                <DropdownMenuItem disabled>
-                  <Settings className="mr-2 h-4 w-4" />
+                {/* Informações sobre funcionalidades disponíveis */}
+                <div className="p-3 border-b">
+                  <p className="text-xs font-medium text-gray-700 mb-2">Funcionalidades Disponíveis:</p>
+                  <div className="space-y-1">
+                    <p className="text-xs text-green-600">✅ Dashboard</p>
+                    <p className="text-xs text-green-600">✅ Consulta SIGTAP</p>
+                    <p className="text-xs text-green-600">✅ AIH Avançado (Sistema Oficial)</p>
+                    <p className="text-xs text-green-600">✅ Gerenciamento de Pacientes</p>
+                    {hasFullAccess() && (
+                      <>
+                        <p className="text-xs text-blue-600">✅ Importação SIGTAP (Diretoria)</p>
+                        <p className="text-xs text-blue-600">✅ Upload AIH (Testes)</p>
+                        <p className="text-xs text-blue-600">✅ Relatórios Executivos</p>
+                        <p className="text-xs text-purple-600">✅ Todas as funcionalidades administrativas</p>
+                      </>
+                    )}
+                    {!hasFullAccess() && (
+                      <p className="text-xs text-gray-500">ℹ️ Perfil operador - Interface otimizada para uso diário</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Permissões */}
+                <div className="p-3 border-b">
+                  <p className="text-xs font-medium text-gray-700 mb-2">Suas Permissões:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {canAccessAllHospitals() ? (
+                      <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                        TODAS AS PERMISSÕES
+                      </Badge>
+                    ) : (
+                      <>
+                        {user.permissions.slice(0, 3).map((perm, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {perm}
+                          </Badge>
+                        ))}
+                        {user.permissions.length > 3 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{user.permissions.length - 3} mais
+                          </Badge>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Descrição do Role */}
+                {roleConfig && (
+                  <div className="p-3 border-b">
+                    <p className="text-xs text-gray-600">{roleConfig.description}</p>
+                  </div>
+                )}
+
+                {/* Menu Items */}
+                <DropdownMenuItem className="cursor-pointer">
+                  <Settings className="h-4 w-4 mr-2" />
                   <span>Configurações</span>
                 </DropdownMenuItem>
-
+                
                 <DropdownMenuSeparator />
-
+                
                 <DropdownMenuItem 
+                  className="cursor-pointer text-red-600 focus:text-red-600"
                   onClick={handleLogout}
                   disabled={isLoggingOut}
-                  className="text-red-600 focus:text-red-600"
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
+                  <LogOut className="h-4 w-4 mr-2" />
                   <span>{isLoggingOut ? 'Saindo...' : 'Sair'}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -342,7 +417,44 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Menu Mobile - Também filtrado */}
+      <div className="sm:hidden">
+        <div className="pt-2 pb-3 space-y-1 border-t border-gray-200">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onTabChange(tab.id)}
+                className={`${
+                  activeTab === tab.id
+                    ? 'bg-blue-50 border-blue-500 text-blue-700'
+                    : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'
+                } block pl-3 pr-4 py-2 border-l-4 text-base font-medium w-full text-left transition-colors`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Icon className="h-5 w-5 mr-3" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        {tab.label}
+                        {tab.id === 'aih-multipage-tester' && (
+                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                            OFICIAL
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500">{tab.description}</div>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </nav>
   );
 };
 

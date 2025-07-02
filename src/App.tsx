@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -14,7 +13,6 @@ import NotFound from "./pages/NotFound";
 import { Button } from "./components/ui/button";
 import { Card, CardContent } from "./components/ui/card";
 import { RefreshCw, AlertTriangle } from "lucide-react";
-import { supabase } from './lib/supabase';
 import { toast } from 'sonner';
 
 const queryClient = new QueryClient();
@@ -56,9 +54,6 @@ function AppContent() {
       // Limpar sessionStorage
       sessionStorage.clear();
       
-      // Forçar logout no Supabase
-      await supabase.auth.signOut();
-      
       // Limpar cookies
       document.cookie.split(";").forEach(function(c) { 
         document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
@@ -77,13 +72,14 @@ function AppContent() {
     }
   };
 
+  // Mostrar loading enquanto verifica autenticação
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center space-y-4">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="text-gray-600">Carregando sistema...</p>
+            <p className="text-gray-600">Verificando autenticação...</p>
             <p className="text-sm text-gray-500">Tempo: {loadingTime}s</p>
             
             {showResetOption && (
@@ -111,19 +107,20 @@ function AppContent() {
     );
   }
 
-  // AUTENTICAÇÃO TEMPORARIAMENTE DESABILITADA PARA DESENVOLVIMENTO
-  // if (!user) {
-  //   return <LoginForm />;
-  // }
+  // Se não há usuário logado, mostrar tela de login
+  if (!user) {
+    return <LoginForm onSuccess={() => window.location.reload()} />;
+  }
 
+  // Usuário logado - mostrar aplicação protegida
   return (
     <div className="min-h-screen bg-background">
-      {/* <ProtectedRoute requiredRole="admin"> */}
+      <ProtectedRoute>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      {/* </ProtectedRoute> */}
+      </ProtectedRoute>
     </div>
   );
 }

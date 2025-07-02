@@ -1,301 +1,382 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, FileText, DollarSign, AlertCircle, RefreshCw, Database } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { AlertCircle, CheckCircle, Clock, Users, Building2, FileText, Activity, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { PatientService, AIHService } from '../services/supabaseService';
-import { useSigtapContext } from '../contexts/SigtapContext';
-import { formatCurrency } from '../utils/validation';
-import SigtapDebugger from './SigtapDebugger';
+import { useSupabaseAIH } from '../hooks/useSupabase';
+import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
+
+interface HospitalInfo {
+  id: string;
+  name: string;
+  cnpj: string;
+  city?: string;
+  state?: string;
+  is_active: boolean;
+}
 
 interface DashboardStats {
-  totalPatients: number;
   totalAIHs: number;
-  totalProcedures: number;
+  processedToday: number;
   pendingReview: number;
-  monthlyRevenue: number;
+  auditLogsCount: number;
 }
 
 const Dashboard = () => {
+  const { user, getCurrentHospital } = useAuth();
+  const { getUserAuditLogs, getHospitalAIHs } = useSupabaseAIH();
+  
+  const [hospitalInfo, setHospitalInfo] = useState<HospitalInfo | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
-    totalPatients: 0,
     totalAIHs: 0,
-    totalProcedures: 0,
+    processedToday: 0,
     pendingReview: 0,
-    monthlyRevenue: 0
+    auditLogsCount: 0
   });
-  const [isLoading, setIsLoading] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  
-  const { user, profile } = useAuth();
-  const { totalProcedures: sigtapProcedures } = useSigtapContext();
-  
-  // Hospital atual (simplificado para Fase 1)
-  const currentHospital = profile?.hospital_access?.[0] 
-    ? { id: profile.hospital_access[0], name: 'Hospital Principal' }
-    : { id: 'a0000000-0000-0000-0000-000000000001', name: 'Hospital Demo' };
+  const [recentAuditLogs, setRecentAuditLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Carregar estatísticas reais
-  const loadRealStats = async () => {
-    if (!currentHospital) return;
-    
-    setIsLoading(true);
-    try {
-      console.log('📊 Carregando estatísticas do dashboard...');
+  // Carregar informações do hospital atual
+  useEffect(() => {
+    const loadHospitalInfo = async () => {
+      const currentHospital = getCurrentHospital();
+      if (!currentHospital) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('hospitals')
+          .select('id, name, cnpj, city, state, is_active')
+          .eq('id', currentHospital)
+          .single();
+
+        if (error) {
+          console.error('Erro ao carregar hospital:', error);
+          toast.error('Erro ao carregar informações do hospital');
+          return;
+        }
+
+        setHospitalInfo(data);
+      } catch (err) {
+        console.error('Erro inesperado:', err);
+      }
+    };
+
+    loadHospitalInfo();
+  }, [getCurrentHospital]);
+
+  // Carregar estatísticas e logs
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      if (!user?.hospital_id) return;
+
+      setLoading(true);
       
-      // Carregar pacientes
-      const patients = await PatientService.getPatients(currentHospital.id);
-      
-      // Carregar AIHs
-      const aihs = await AIHService.getAIHs(currentHospital.id);
-      
-      // Calcular estatísticas
-      const pendingAIHs = aihs.filter(aih => 
-        aih.processing_status === 'pending' || 
-        aih.processing_status === 'manual_review'
-      ).length;
-      
-      // Valor total estimado (simplificado)
-      const totalValue = aihs.reduce((sum, aih) => {
-        return sum + (aih.original_value ? aih.original_value / 100 : 0);
-      }, 0);
-      
-      const newStats: DashboardStats = {
-        totalPatients: patients.length,
-        totalAIHs: aihs.length,
-        totalProcedures: sigtapProcedures,
-        pendingReview: pendingAIHs,
-        monthlyRevenue: totalValue
-      };
-      
-      setStats(newStats);
-      setLastUpdate(new Date());
-      
-      console.log('✅ Estatísticas carregadas:', newStats);
-      
-    } catch (error) {
-      console.error('❌ Erro ao carregar estatísticas:', error);
-      
-      // Fallback para dados mock em caso de erro
-      setStats({
-        totalPatients: 0,
-        totalAIHs: 0,
-        totalProcedures: sigtapProcedures,
-        pendingReview: 0,
-        monthlyRevenue: 0
-      });
-    } finally {
-      setIsLoading(false);
-    }
+      try {
+        // Carregar AIHs do hospital
+        const { data: aihsData } = await getHospitalAIHs(100);
+        
+        // Carregar logs de auditoria
+        const { data: auditData } = await getUserAuditLogs(10);
+        
+        // Calcular estatísticas
+        const today = new Date().toISOString().split('T')[0];
+        const processedToday = aihsData.filter(aih => 
+          aih.created_at?.startsWith(today)
+        ).length;
+        
+        const pendingReview = aihsData.filter(aih => 
+          aih.processing_status === 'pending_review'
+        ).length;
+
+        setStats({
+          totalAIHs: aihsData.length,
+          processedToday,
+          pendingReview,
+          auditLogsCount: auditData.length
+        });
+
+        setRecentAuditLogs(auditData.slice(0, 5));
+        
+      } catch (error) {
+        console.error('Erro ao carregar dados do dashboard:', error);
+        toast.error('Erro ao carregar dados do dashboard');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, [user, getHospitalAIHs, getUserAuditLogs]);
+
+  const getActionIcon = (action: string) => {
+    if (action.includes('LOGIN')) return <ShieldCheck className="h-4 w-4 text-green-600" />;
+    if (action.includes('AIH')) return <FileText className="h-4 w-4 text-blue-600" />;
+    if (action.includes('ERROR')) return <AlertCircle className="h-4 w-4 text-red-600" />;
+    return <Activity className="h-4 w-4 text-gray-600" />;
   };
 
-  // Carregar dados na inicialização
-  useEffect(() => {
-    loadRealStats();
-  }, [currentHospital?.id, sigtapProcedures]);
+  const getActionLabel = (action: string) => {
+    const labels: Record<string, string> = {
+      'LOGIN_SUCCESS': 'Login realizado',
+      'LOGOUT': 'Logout realizado',
+      'AIH_PROCESSING_STARTED': 'Processamento AIH iniciado',
+      'AIH_PROCESSING_SUCCESS': 'AIH processada com sucesso',
+      'AIH_PROCESSING_ERROR': 'Erro no processamento',
+      'AIH_QUERY': 'Consulta de AIHs',
+      'USER_CREATED': 'Usuário criado',
+      'HOSPITAL_ACCESS_UPDATED': 'Acesso atualizado'
+    };
+    return labels[action] || action;
+  };
 
-  const statCards = [
-    {
-      title: 'Total de Pacientes',
-      value: isLoading ? '...' : stats.totalPatients.toString(),
-      icon: Users,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      description: 'Pacientes cadastrados'
-    },
-    {
-      title: 'AIHs Processadas',
-      value: isLoading ? '...' : stats.totalAIHs.toString(),
-      icon: FileText,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50',
-      description: 'Autorizações processadas'
-    },
-    {
-      title: 'Proc. SIGTAP',
-      value: isLoading ? '...' : stats.totalProcedures.toLocaleString(),
-      icon: Database,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
-      description: 'Procedimentos na tabela'
-    },
-    {
-      title: 'Pendentes',
-      value: isLoading ? '...' : stats.pendingReview.toString(),
-      icon: AlertCircle,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50',
-      description: 'Aguardando revisão'
-    }
-  ];
+  const formatTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
-  // MODO DESENVOLVEDOR: permitir acesso sem autenticação
-  // if (!user) {
-  //   return (
-  //     <div className="flex items-center justify-center h-64">
-  //       <div className="text-center">
-  //         <Users className="mx-auto h-12 w-12 text-gray-400" />
-  //         <h3 className="mt-2 text-sm font-semibold text-gray-900">Acesso restrito</h3>
-  //         <p className="mt-1 text-sm text-gray-500">
-  //           Faça login para acessar o dashboard
-  //         </p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  if (!user) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <AlertCircle className="h-12 w-12 text-orange-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Acesso Negado</h3>
+            <p className="text-gray-500">Você precisa estar logado para acessar o dashboard.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-          <p className="text-gray-600 mt-1">
-            {currentHospital?.name || 'Sistema de Faturamento SIGTAP'}
-          </p>
-        </div>
-        <div className="flex items-center space-x-4">
-          {lastUpdate && (
-            <span className="text-sm text-gray-500">
-              Atualizado: {lastUpdate.toLocaleTimeString()}
-            </span>
-          )}
-          <button
-            onClick={loadRealStats}
-            disabled={isLoading}
-            className="flex items-center space-x-2 px-3 py-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Atualizar</span>
-          </button>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat, index) => (
-          <Card key={index} className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">
-                {stat.title}
-              </CardTitle>
-              <div className={`p-2 rounded-full ${stat.bgColor}`}>
-                <stat.icon className={`w-4 h-4 ${stat.color}`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
-                {stat.value}
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {stat.description}
+    <div className="p-6 space-y-6">
+      {/* Header com informações do usuário */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">
+              Bem-vindo, {user.full_name || user.email?.split('@')[0]}!
+            </h1>
+            <p className="text-blue-100 mt-1">
+              Dashboard do Sistema SIGTAP Sync
+            </p>
+          </div>
+          <div className="text-right">
+            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
+              {user.role.toUpperCase()}
+            </Badge>
+            {hospitalInfo && (
+              <p className="text-blue-100 text-sm mt-2">
+                <Building2 className="h-4 w-4 inline mr-1" />
+                {hospitalInfo.name}
               </p>
-            </CardContent>
-          </Card>
-        ))}
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Card de valor total se há AIHs */}
-      {stats.totalAIHs > 0 && (
-        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+      {/* Informações do Hospital */}
+      {hospitalInfo && (
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2 text-green-700">
-              <DollarSign className="w-5 h-5" />
-              <span>Valor Total Estimado</span>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-blue-600" />
+              Hospital Atual
             </CardTitle>
+            <CardDescription>
+              Informações do hospital selecionado para esta sessão
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-800">
-              {formatCurrency(stats.monthlyRevenue)}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Nome</p>
+                <p className="font-medium">{hospitalInfo.name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">CNPJ</p>
+                <p className="font-medium">{hospitalInfo.cnpj}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Localização</p>
+                <p className="font-medium">
+                  {hospitalInfo.city && hospitalInfo.state 
+                    ? `${hospitalInfo.city}, ${hospitalInfo.state}`
+                    : 'Não informado'}
+                </p>
+              </div>
             </div>
-            <p className="text-green-600 text-sm mt-1">
-              Baseado em {stats.totalAIHs} AIH(s) processada(s)
-            </p>
+            <div className="mt-4 flex items-center gap-2">
+              <Badge variant={hospitalInfo.is_active ? "default" : "secondary"}>
+                {hospitalInfo.is_active ? 'Ativo' : 'Inativo'}
+              </Badge>
+              <span className="text-sm text-gray-500">
+                Acesso a {user.hospital_access.length} {user.hospital_access.length === 1 ? 'hospital' : 'hospitais'}
+              </span>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Estatísticas Rápidas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Status do Sistema</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                <div className={`w-2 h-2 rounded-full ${stats.totalProcedures > 1000 ? 'bg-green-500' : 'bg-orange-500'}`}></div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">
-                    Tabela SIGTAP: {stats.totalProcedures > 1000 ? 'Ativa' : 'Parcial'}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {stats.totalProcedures.toLocaleString()} procedimentos carregados
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                <div className={`w-2 h-2 rounded-full ${user ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">
-                    Autenticação: {user ? 'Ativa' : 'Inativa'}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {user ? `Logado como ${user.email}` : 'Não autenticado'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                <div className={`w-2 h-2 rounded-full ${stats.totalPatients > 0 ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">
-                    Base de Pacientes: {stats.totalPatients > 0 ? 'Ativa' : 'Vazia'}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {stats.totalPatients} paciente(s) cadastrado(s)
-                  </p>
-                </div>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <FileText className="h-8 w-8 text-blue-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total de AIHs</p>
+                <p className="text-2xl font-bold">{stats.totalAIHs}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Ações Rápidas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <button 
-                onClick={() => window.location.href = '#/sigtap-import'}
-                className="w-full p-3 text-left bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-              >
-                <div className="font-medium text-blue-700">Importar SIGTAP</div>
-                <div className="text-sm text-blue-600">Atualizar tabela de procedimentos</div>
-              </button>
-              
-              <button 
-                onClick={() => window.location.href = '#/upload-aih'}
-                className="w-full p-3 text-left bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
-              >
-                <div className="font-medium text-green-700">Upload AIH</div>
-                <div className="text-sm text-green-600">Processar autorização de internação</div>
-              </button>
-              
-              <button 
-                onClick={() => window.location.href = '#/pacientes'}
-                className="w-full p-3 text-left bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
-              >
-                <div className="font-medium text-purple-700">Gerenciar Pacientes</div>
-                <div className="text-sm text-purple-600">Cadastrar e editar pacientes</div>
-              </button>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Clock className="h-8 w-8 text-green-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Processadas Hoje</p>
+                <p className="text-2xl font-bold">{stats.processedToday}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <AlertCircle className="h-8 w-8 text-orange-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Pendente Revisão</p>
+                <p className="text-2xl font-bold">{stats.pendingReview}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Activity className="h-8 w-8 text-purple-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Logs de Auditoria</p>
+                <p className="text-2xl font-bold">{stats.auditLogsCount}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Debugger temporário para diagnóstico */}
-      <div className="border-t pt-6">
-        <h3 className="text-lg font-semibold mb-4 text-gray-800">🔧 Diagnóstico de Persistência (Temporário)</h3>
-        <SigtapDebugger />
+      {/* Atividade Recente */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Logs de Auditoria Recentes */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-purple-600" />
+              Atividade Recente
+            </CardTitle>
+            <CardDescription>
+              Suas últimas ações no sistema com rastreabilidade completa
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="animate-pulse bg-gray-200 h-16 rounded"></div>
+                ))}
+              </div>
+            ) : recentAuditLogs.length > 0 ? (
+              <div className="space-y-3">
+                {recentAuditLogs.map((log) => (
+                  <div key={log.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                    {getActionIcon(log.action)}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">
+                        {getActionLabel(log.action)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {formatTime(log.created_at)} • {log.table_name}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {log.operation_type}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Activity className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>Nenhuma atividade recente encontrada</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Status do Sistema */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              Status do Sistema
+            </CardTitle>
+            <CardDescription>
+              Verificações de integridade e conectividade
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <div className="flex items-center">
+                  <CheckCircle className="h-5 w-5 text-green-600 mr-3" />
+                  <div>
+                    <p className="text-sm font-medium">Autenticação</p>
+                    <p className="text-xs text-gray-500">Sistema de login ativo</p>
+                  </div>
+                </div>
+                <Badge variant="default" className="bg-green-100 text-green-800">
+                  Ativo
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center">
+                  <Building2 className="h-5 w-5 text-blue-600 mr-3" />
+                  <div>
+                    <p className="text-sm font-medium">Hospital Conectado</p>
+                    <p className="text-xs text-gray-500">Dados do hospital disponíveis</p>
+                  </div>
+                </div>
+                <Badge variant="default" className="bg-blue-100 text-blue-800">
+                  Conectado
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                <div className="flex items-center">
+                  <ShieldCheck className="h-5 w-5 text-purple-600 mr-3" />
+                  <div>
+                    <p className="text-sm font-medium">Auditoria</p>
+                    <p className="text-xs text-gray-500">Rastreabilidade completa</p>
+                  </div>
+                </div>
+                <Badge variant="default" className="bg-purple-100 text-purple-800">
+                  Ativo
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

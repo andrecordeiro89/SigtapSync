@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 
-// Tipos de usuário
-export type UserRole = 'developer' | 'admin' | 'user';
+// Tipos de usuário expandidos
+export type UserRole = 'developer' | 'admin' | 'director' | 'coordinator' | 'auditor' | 'ti' | 'user';
 
 export interface UserProfile {
   id: string;
@@ -16,37 +15,75 @@ export interface UserProfile {
   permissions: string[];
   created_at: string;
   updated_at: string;
+  is_active: boolean;
+}
+
+export interface CurrentUser {
+  id: string;
+  email: string;
+  role: UserRole;
+  full_name?: string;
+  hospital_id: string; // Hospital atual selecionado (pode ser 'ALL')
+  hospital_access: string[];
+  permissions: string[];
+  full_access: boolean; // Indica se tem acesso total ao sistema
 }
 
 export interface AuthContextType {
-  user: User | null;
+  user: CurrentUser | null;
   profile: UserProfile | null;
-  session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signUp: (email: string, password: string, userData: Partial<UserProfile>) => Promise<{ error: AuthError | null }>;
+  signIn: (email: string, hospitalId: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ error: any }>;
   hasPermission: (permission: string) => boolean;
   hasHospitalAccess: (hospitalId: string) => boolean;
+  hasFullAccess: () => boolean;
   isDeveloper: () => boolean;
   isAdmin: () => boolean;
-  forceSessionReset: () => void; // ✅ FUNÇÃO PARA RESET MANUAL
+  isDirector: () => boolean;
+  isCoordinator: () => boolean;
+  isAuditor: () => boolean;
+  isTI: () => boolean;
+  getCurrentHospital: () => string | null;
+  canAccessAllHospitals: () => boolean;
+  getAccessibleHospitals: () => string[];
+  logAuditAction: (action: string, details: any) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Buscar perfil do usuário
+  // Carregar usuário da sessão
+  useEffect(() => {
+    const loadUserFromSession = () => {
+      try {
+        const savedUser = sessionStorage.getItem('current_user');
+        if (savedUser) {
+          const userData: CurrentUser = JSON.parse(savedUser);
+          setUser(userData);
+          
+          // Carregar perfil completo do banco
+          fetchUserProfile(userData.id);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar usuário da sessão:', error);
+        sessionStorage.removeItem('current_user');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserFromSession();
+  }, []);
+
+  // Buscar perfil completo do usuário
   const fetchUserProfile = async (userId: string): Promise<UserProfile | null> => {
     try {
-      console.log('🔍 Buscando perfil para userId:', userId);
-      
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -54,334 +91,122 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
-        console.error('❌ Erro detalhado ao buscar perfil:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          userId: userId
-        });
-        
-        // Se a tabela não existe, criar perfil temporário
-        if (error.code === 'PGRST116' || error.message.includes('relation "user_profiles" does not exist')) {
-          console.warn('🚨 Tabela user_profiles não existe! Criando perfil temporário...');
-          toast.warning('Sistema iniciando... Tabela de usuários será criada automaticamente.');
-          
-          // Criar perfil temporário para não travar o sistema
-          const tempProfile: UserProfile = {
-            id: userId,
-            email: 'temp@temp.com',
-            role: 'developer',
-            full_name: 'Usuário Temporário',
-            hospital_access: [],
-            permissions: ['all'],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-          
-          return tempProfile;
-        } else if (error.code === '42501') {
-          console.error('🚨 PROBLEMA: Sem permissão para acessar user_profiles. Verifique RLS.');
-          toast.error('Sem permissão para acessar perfil. Execute o script SQL de correção.');
-          
-          // Perfil temporário com permissões básicas
-          const tempProfile: UserProfile = {
-            id: userId,
-            email: 'temp@temp.com',
-            role: 'user',
-            full_name: 'Usuário Sem Permissão',
-            hospital_access: [],
-            permissions: [],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-          
-          return tempProfile;
-        } else {
-          toast.error(`Erro ao buscar perfil: ${error.message}`);
-        }
-        
+        console.error('Erro ao buscar perfil:', error);
         return null;
       }
 
-      if (!data) {
-        console.warn('⚠️ Nenhum perfil encontrado para userId:', userId);
-        toast.warning('Perfil de usuário não encontrado. Será criado automaticamente.');
-        
-        // Criar perfil padrão
-        const defaultProfile: UserProfile = {
-          id: userId,
-          email: 'novo@usuario.com',
-          role: 'user',
-          full_name: 'Novo Usuário',
-          hospital_access: [],
-          permissions: [],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        
-        return defaultProfile;
-      }
-
-      console.log('✅ Perfil encontrado:', data);
+      setProfile(data);
       return data;
-    } catch (error: any) {
-      console.error('❌ Erro inesperado ao buscar perfil:', {
-        error: error,
-        stack: error?.stack,
-        userId: userId
-      });
-      
-      // Fallback crítico - nunca deixar o sistema travado
-      toast.error('Erro crítico na autenticação. Iniciando modo de emergência...');
-      
-      const emergencyProfile: UserProfile = {
-        id: userId,
-        email: 'emergency@user.com',
-        role: 'developer',
-        full_name: 'Usuário de Emergência',
-        hospital_access: [],
-        permissions: ['all'],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+    } catch (error) {
+      console.error('Erro inesperado ao buscar perfil:', error);
+      return null;
+    }
+  };
+
+  // Verificar se usuário tem acesso total
+  const hasFullAccessRole = (role: UserRole): boolean => {
+    return ['developer', 'admin', 'director', 'coordinator', 'auditor', 'ti'].includes(role);
+  };
+
+  // Registrar ação de auditoria
+  const logAuditAction = async (action: string, details: any) => {
+    try {
+      if (!user) return;
+
+      const userAgent = navigator.userAgent;
+      const ipAddress = '127.0.0.1'; // Será preenchido pelo servidor
+
+      await supabase
+        .from('audit_logs')
+        .insert({
+          table_name: details.table_name || 'system',
+          record_id: details.record_id || user.id,
+          action,
+          old_values: details.old_values || null,
+          new_values: details.new_values || details,
+          changed_fields: details.changed_fields || Object.keys(details),
+          user_id: user.id,
+          hospital_id: user.hospital_id === 'ALL' ? null : user.hospital_id,
+          ip_address: ipAddress,
+          user_agent: userAgent,
+          operation_type: details.operation_type || action,
+          session_id: details.session_id || crypto.randomUUID()
+        });
+
+      console.log(`✅ Auditoria registrada: ${action} pelo usuário ${user.email}`);
+    } catch (auditError) {
+      console.warn('⚠️ Erro ao registrar auditoria (não crítico):', auditError);
+    }
+  };
+
+  // Login simplificado
+  const signIn = async (email: string, hospitalId: string) => {
+    try {
+      setLoading(true);
+
+      // Buscar usuário
+      const { data: userProfile, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (error) {
+        return { error: 'Usuário não encontrado' };
+      }
+
+      // Verificar se usuário está ativo
+      if (!userProfile.is_active) {
+        return { error: 'Usuário inativo. Contate o administrador.' };
+      }
+
+      // Verificar acesso ao hospital
+      const hasAccess = userProfile.hospital_access.includes('ALL') || 
+                       userProfile.hospital_access.includes(hospitalId) ||
+                       hospitalId === 'ALL' && userProfile.hospital_access.includes('ALL');
+
+      if (!hasAccess) {
+        return { error: 'Você não tem acesso a esta opção' };
+      }
+
+      // Determinar se tem acesso total
+      const fullAccess = userProfile.hospital_access.includes('ALL') || 
+                        hasFullAccessRole(userProfile.role);
+
+      // Criar objeto de usuário atual
+      const currentUser: CurrentUser = {
+        id: userProfile.id,
+        email: userProfile.email,
+        role: userProfile.role,
+        full_name: userProfile.full_name,
+        hospital_id: hospitalId,
+        hospital_access: userProfile.hospital_access,
+        permissions: userProfile.permissions,
+        full_access: fullAccess
       };
+
+      // Salvar na sessão
+      sessionStorage.setItem('current_user', JSON.stringify(currentUser));
       
-      return emergencyProfile;
-    }
-  };
+      setUser(currentUser);
+      setProfile(userProfile);
 
-  // RESET FORÇADO - Detectar se sessão está travada
-  const forceSessionReset = () => {
-    console.log('🧹 RESET FORÇADO: Limpando sessão travada...');
-    
-    // Limpar estado local
-    setLoading(false);
-    setSession(null);
-    setUser(null);
-    setProfile(null);
-    
-    // Limpar storage local
-    try {
-      localStorage.removeItem('supabase.auth.token');
-      sessionStorage.clear();
-    } catch (e) {
-      console.warn('Erro ao limpar storage:', e);
-    }
-    
-    // Forçar logout no Supabase
-    supabase.auth.signOut().catch(e => console.warn('Erro no signOut:', e));
-    
-    toast.error('Sessão resetada. Tela de login disponível.');
-  };
-
-  // Configurar sessão inicial
-  useEffect(() => {
-    console.log('🚀 AuthContext: Iniciando configuração da sessão...');
-    
-    // TIMEOUT DE SEGURANÇA: Se loading não terminar em 10s, forçar reset
-    const safetyTimeout = setTimeout(() => {
-      console.warn('🚨 TIMEOUT DE SEGURANÇA: Loading travado por 10s - forçando reset!');
-      forceSessionReset();
-    }, 10000); // 10 segundos
-    
-    // Buscar sessão atual
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      console.log('📡 getSession resultado:', { 
-        hasSession: !!session, 
-        hasUser: !!session?.user,
-        userId: session?.user?.id,
-        userEmail: session?.user?.email,
-        error: error
-      });
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        console.log(`👤 Usuário encontrado na sessão: ${session.user.email} (ID: ${session.user.id})`);
-        console.log('🔍 Iniciando busca do perfil...');
-        
-        fetchUserProfile(session.user.id).then(profile => {
-          console.log('📝 Resultado da busca do perfil:', {
-            profileFound: !!profile,
-            profileRole: profile?.role,
-            profileName: profile?.full_name,
-            profilePermissions: profile?.permissions
-          });
-          setProfile(profile);
-          setLoading(false);
-          clearTimeout(safetyTimeout); // ✅ LIMPAR timeout - sucesso
-        }).catch(error => {
-          console.error('❌ Erro crítico na busca do perfil:', error);
-          console.warn('🚨 SESSÃO CORROMPIDA - Fazendo logout forçado para mostrar tela de login');
-          
-          supabase.auth.signOut().then(() => {
-            setSession(null);
-            setUser(null);
-            setProfile(null);
-            setLoading(false);
-            clearTimeout(safetyTimeout); // ✅ LIMPAR timeout - erro perfil
-            toast.error('Sessão corrompida. Faça login novamente.');
-          });
-        });
-      } else {
-        console.log('❌ Nenhum usuário na sessão');
-        setProfile(null);
-        setLoading(false);
-        clearTimeout(safetyTimeout); // ✅ LIMPAR timeout - sem usuário
-      }
-    }).catch(error => {
-      console.error('❌ Erro crítico ao buscar sessão:', error);
-      
-      setSession(null);
-      setUser(null);
-      setProfile(null);
-      setLoading(false);
-      clearTimeout(safetyTimeout); // ✅ LIMPAR timeout - erro sessão
-    });
-
-    // Escutar mudanças de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🔄 AuthStateChange:', {
-          event,
-          hasSession: !!session,
-          hasUser: !!session?.user,
-          userId: session?.user?.id,
-          userEmail: session?.user?.email
-        });
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          console.log(`👤 Mudança de estado - usuário: ${session.user.email} (ID: ${session.user.id})`);
-          
-          try {
-            const userProfile = await fetchUserProfile(session.user.id);
-            console.log('📝 Perfil obtido na mudança de estado:', {
-              profileFound: !!userProfile,
-              profileRole: userProfile?.role
-            });
-            setProfile(userProfile);
-          } catch (error) {
-            console.error('❌ Erro ao buscar perfil na mudança de estado:', error);
-            
-            console.warn('🚨 ERRO NA MUDANÇA DE ESTADO - Fazendo logout forçado');
-            await supabase.auth.signOut();
-            setSession(null);
-            setUser(null);
-            setProfile(null);
-          }
-        } else {
-          console.log('❌ Nenhum usuário na mudança de estado');
-          setProfile(null);
-        }
-        
-        console.log('✅ Finalizando loading na mudança de estado...');
-        setLoading(false);
-      }
-    );
-
-    return () => {
-      console.log('🧹 Limpando subscription do AuthContext');
-      subscription.unsubscribe();
-      clearTimeout(safetyTimeout); // ✅ LIMPAR timeout no cleanup
-    };
-  }, []);
-
-  // Login
-  const signIn = async (email: string, password: string) => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Registrar login
+      await logAuditAction('LOGIN_SUCCESS', {
+        table_name: 'user_profiles',
+        record_id: userProfile.id,
         email,
-        password,
+        hospital_id: hospitalId,
+        role: userProfile.role,
+        full_access: fullAccess,
+        login_time: new Date().toISOString(),
+        operation_type: 'LOGIN'
       });
 
-      if (error) {
-        toast.error(`Erro no login: ${error.message}`);
-        return { error };
-      }
-
-      toast.success('Login realizado com sucesso!');
       return { error: null };
     } catch (error: any) {
-      toast.error('Erro inesperado no login');
-      return { error };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Cadastro
-  const signUp = async (email: string, password: string, userData: Partial<UserProfile>) => {
-    try {
-      setLoading(true);
-      console.log('🔄 Iniciando cadastro para:', email);
-      
-      // Criar usuário no Auth
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.error('❌ Erro no Auth signup:', error);
-        toast.error(`Erro no cadastro: ${error.message}`);
-        return { error };
-      }
-
-      console.log('✅ Usuário criado no Auth:', data.user?.id);
-
-      // Criar perfil do usuário
-      if (data.user) {
-        console.log('🔄 Criando perfil do usuário...');
-        
-        const profileData = {
-          id: data.user.id,
-          email: data.user.email,
-          role: userData.role || 'developer',
-          full_name: userData.full_name || 'Developer SIGTAP',
-          hospital_access: userData.hospital_access || [],
-          permissions: userData.permissions || ['all'],
-        };
-
-        const { error: profileError } = await supabase
-          .from('user_profiles')
-          .insert(profileData);
-
-        if (profileError) {
-          console.error('❌ Erro ao criar perfil:', profileError);
-          
-          // Se erro for conflito (409), tentar atualizar ao invés de inserir
-          if (profileError.code === '23505') { // Unique constraint violation
-            console.log('🔄 Perfil já existe, tentando atualizar...');
-            const { error: updateError } = await supabase
-              .from('user_profiles')
-              .update(profileData)
-              .eq('id', data.user.id);
-              
-            if (updateError) {
-              console.error('❌ Erro ao atualizar perfil:', updateError);
-              toast.error('Erro ao salvar perfil do usuário');
-            } else {
-              console.log('✅ Perfil atualizado com sucesso');
-            }
-          } else {
-            toast.error('Erro ao criar perfil do usuário');
-          }
-        } else {
-          console.log('✅ Perfil criado com sucesso');
-        }
-      }
-
-      toast.success('Cadastro realizado com sucesso!');
-      return { error: null };
-    } catch (error: any) {
-      console.error('❌ Erro inesperado no cadastro:', error);
-      toast.error('Erro inesperado no cadastro');
-      return { error };
+      console.error('Erro no login:', error);
+      return { error: error.message || 'Erro inesperado no login' };
     } finally {
       setLoading(false);
     }
@@ -390,19 +215,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Logout
   const signOut = async () => {
     try {
-      setLoading(true);
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        toast.error(`Erro no logout: ${error.message}`);
-      } else {
-        toast.success('Logout realizado com sucesso!');
-        setProfile(null);
+      if (user) {
+        // Registrar logout
+        await logAuditAction('LOGOUT', {
+          table_name: 'user_profiles',
+          record_id: user.id,
+          email: user.email,
+          hospital_id: user.hospital_id,
+          logout_time: new Date().toISOString(),
+          operation_type: 'LOGOUT'
+        });
       }
+
+      // Limpar sessão
+      sessionStorage.removeItem('current_user');
+      setUser(null);
+      setProfile(null);
+      
+      toast.success('Logout realizado com sucesso');
     } catch (error) {
-      toast.error('Erro inesperado no logout');
-    } finally {
-      setLoading(false);
+      console.error('Erro no logout:', error);
+      toast.error('Erro no logout');
     }
   };
 
@@ -413,72 +246,150 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const { data, error } = await supabase
         .from('user_profiles')
-        .update(updates)
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', user.id)
         .select()
         .single();
 
       if (error) {
-        toast.error('Erro ao atualizar perfil');
-        return { error };
+        return { error: error.message };
       }
 
       setProfile(data);
+      
+      // Atualizar dados da sessão se necessário
+      if (updates.email || updates.full_name || updates.role) {
+        const updatedUser = {
+          ...user,
+          email: updates.email || user.email,
+          full_name: updates.full_name || user.full_name,
+          role: updates.role || user.role,
+          full_access: updates.role ? hasFullAccessRole(updates.role) : user.full_access
+        };
+        setUser(updatedUser);
+        sessionStorage.setItem('current_user', JSON.stringify(updatedUser));
+      }
+
+      // Registrar atualização
+      await logAuditAction('PROFILE_UPDATED', {
+        table_name: 'user_profiles',
+        record_id: user.id,
+        old_values: profile,
+        new_values: data,
+        changed_fields: Object.keys(updates),
+        operation_type: 'UPDATE'
+      });
+
       toast.success('Perfil atualizado com sucesso!');
       return { error: null };
-    } catch (error) {
-      toast.error('Erro inesperado ao atualizar perfil');
-      return { error };
+    } catch (error: any) {
+      console.error('Erro ao atualizar perfil:', error);
+      return { error: error.message || 'Erro inesperado' };
     }
   };
 
   // Verificar permissão
   const hasPermission = (permission: string): boolean => {
-    if (!profile) return false;
+    if (!user) return false;
+    
+    // Usuários com acesso total têm todas as permissões
+    if (user.full_access) return true;
     
     // Desenvolvedor tem todas as permissões
-    if (profile.role === 'developer') return true;
+    if (user.role === 'developer') return true;
     
-    // Admin tem quase todas as permissões
-    if (profile.role === 'admin') return true;
-    
-    return profile.permissions.includes(permission);
+    return user.permissions.includes(permission) || user.permissions.includes('all');
   };
 
   // Verificar acesso ao hospital
   const hasHospitalAccess = (hospitalId: string): boolean => {
-    if (!profile) return false;
+    if (!user) return false;
     
-    // Developer e Admin têm acesso a todos os hospitais
-    if (profile.role === 'developer' || profile.role === 'admin') return true;
+    // Usuários com acesso total podem acessar qualquer hospital
+    if (user.full_access) return true;
     
-    return profile.hospital_access.includes(hospitalId);
+    return user.hospital_access.includes(hospitalId) || user.hospital_access.includes('ALL');
+  };
+
+  // Verificar se tem acesso total
+  const hasFullAccess = (): boolean => {
+    return user?.full_access || false;
+  };
+
+  // Verificar se pode acessar todos os hospitais
+  const canAccessAllHospitals = (): boolean => {
+    return user?.hospital_access.includes('ALL') || user?.full_access || false;
+  };
+
+  // Obter lista de hospitais acessíveis
+  const getAccessibleHospitals = (): string[] => {
+    if (!user) return [];
+    
+    if (user.full_access || user.hospital_access.includes('ALL')) {
+      return ['ALL']; // Indica acesso total
+    }
+    
+    return user.hospital_access;
   };
 
   // Verificar se é desenvolvedor
   const isDeveloper = (): boolean => {
-    return profile?.role === 'developer';
+    return user?.role === 'developer';
   };
 
   // Verificar se é admin
   const isAdmin = (): boolean => {
-    return profile?.role === 'admin' || profile?.role === 'developer';
+    return user?.role === 'admin' || user?.role === 'developer';
+  };
+
+  // Verificar se é diretor
+  const isDirector = (): boolean => {
+    return user?.role === 'director';
+  };
+
+  // Verificar se é coordenador
+  const isCoordinator = (): boolean => {
+    return user?.role === 'coordinator';
+  };
+
+  // Verificar se é auditor
+  const isAuditor = (): boolean => {
+    return user?.role === 'auditor';
+  };
+
+  // Verificar se é TI
+  const isTI = (): boolean => {
+    return user?.role === 'ti';
+  };
+
+  // Obter hospital atual
+  const getCurrentHospital = (): string | null => {
+    return user?.hospital_id || null;
   };
 
   const value: AuthContextType = {
     user,
     profile,
-    session,
     loading,
     signIn,
-    signUp,
     signOut,
     updateProfile,
     hasPermission,
     hasHospitalAccess,
+    hasFullAccess,
     isDeveloper,
     isAdmin,
-    forceSessionReset
+    isDirector,
+    isCoordinator,
+    isAuditor,
+    isTI,
+    getCurrentHospital,
+    canAccessAllHospitals,
+    getAccessibleHospitals,
+    logAuditAction
   };
 
   return (

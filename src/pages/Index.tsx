@@ -6,6 +6,7 @@ import SigtapViewer from '../components/SigtapViewer';
 import AIHMultiPageTester from '../components/AIHMultiPageTester';
 import PatientManagement from '../components/PatientManagement';
 import ReportsSimple from '../components/ReportsSimple';
+import AIHUpload from '../components/AIHUpload';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -14,12 +15,14 @@ const Index = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
+      case 'aih-upload':
+        return <AIHUpload />;
+      case 'aih-multipage-tester':
+        return <AIHMultiPageTester />;
       case 'sigtap':
         return <SigtapImport />;
       case 'sigtap-viewer':
         return <SigtapViewer />;
-      case 'aih-multipage-tester':
-        return <AIHMultiPageTester />;
       case 'patients':
         return <PatientManagement />;
       case 'reports':
