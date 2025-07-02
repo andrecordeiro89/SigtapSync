@@ -91,7 +91,7 @@ const AIHUpload = () => {
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white">
         <div className="flex items-center gap-3">
           <FileText className="h-8 w-8" />
-          <div>
+      <div>
             <h1 className="text-2xl font-bold">Upload de AIH</h1>
             <p className="text-blue-100">
               Processamento com rastreabilidade completa
@@ -101,13 +101,13 @@ const AIHUpload = () => {
       </div>
 
       {/* Informações do Contexto */}
-      <Card>
-        <CardHeader>
+        <Card>
+          <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5" />
             Contexto da Sessão
-          </CardTitle>
-        </CardHeader>
+            </CardTitle>
+          </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -127,7 +127,7 @@ const AIHUpload = () => {
               <div className="flex items-center gap-2 mt-1">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <span className="text-sm font-medium text-green-700">Ativa</span>
-              </div>
+                      </div>
               <p className="text-xs text-gray-500">Todas as ações serão registradas</p>
             </div>
           </div>
@@ -158,7 +158,7 @@ const AIHUpload = () => {
                   required
                 />
               </div>
-
+              
               <div className="space-y-2">
                 <Label htmlFor="patient_name">Nome do Paciente *</Label>
                 <Input
@@ -178,7 +178,7 @@ const AIHUpload = () => {
                   value={formData.procedure_code}
                   onChange={(e) => handleInputChange('procedure_code', e.target.value)}
                 />
-              </div>
+            </div>
 
               <div className="space-y-2">
                 <Label htmlFor="admission_date">Data de Internação</Label>
@@ -220,8 +220,8 @@ const AIHUpload = () => {
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
       {/* Resultado do Processamento */}
       {result && (
@@ -241,7 +241,7 @@ const AIHUpload = () => {
               <Alert className="border-green-200 bg-green-50">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-800">
-                  <div className="space-y-2">
+                    <div className="space-y-2">
                     <p className="font-medium">AIH processada com sucesso!</p>
                     <div className="text-sm space-y-1">
                       <p>• <strong>ID da AIH:</strong> {result.aih_id}</p>
@@ -268,16 +268,16 @@ const AIHUpload = () => {
       )}
 
       {/* Informações sobre Rastreabilidade */}
-      <Card>
-        <CardHeader>
+        <Card>
+          <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5 text-purple-600" />
             Sistema de Rastreabilidade
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
+                <div>
               <h4 className="font-medium mb-3">O que é registrado:</h4>
               <div className="space-y-2 text-sm text-gray-600">
                 <p>✅ Início do processamento</p>
@@ -287,9 +287,9 @@ const AIHUpload = () => {
                 <p>✅ Timestamp completo</p>
                 <p>✅ Resultado (sucesso/erro)</p>
                 <p>✅ IP e User Agent</p>
+                </div>
               </div>
-            </div>
-            <div>
+                <div>
               <h4 className="font-medium mb-3">Benefícios:</h4>
               <div className="space-y-2 text-sm text-gray-600">
                 <p>🔍 Auditoria completa</p>
@@ -300,10 +300,10 @@ const AIHUpload = () => {
                 <p>📊 Relatórios detalhados</p>
                 <p>✅ Conformidade regulatória</p>
               </div>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
     </div>
   );
 };

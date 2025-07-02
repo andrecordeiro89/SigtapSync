@@ -15,70 +15,85 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
   const { user, signOut, isDeveloper, isAdmin, isDirector, isCoordinator, isAuditor, isTI, hasFullAccess, canAccessAllHospitals, getCurrentHospital } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Definir todas as tabs disponíveis - ORDEM OTIMIZADA PARA OPERADORES
+  // Define todas as tabs disponíveis com ordem específica para cada role
   const allTabs = [
     {
       id: 'dashboard',
       label: 'Dashboard',
       icon: Home,
       description: 'Visão geral do sistema',
-      requiresAdmin: false // Todos podem ver
+      requiresAdmin: false,
+      order: 1
+    },
+    {
+      id: 'sigtap',
+      label: 'SIGTAP',
+      icon: Upload,
+      description: 'Importação da tabela - Apenas diretoria/admin',
+      requiresAdmin: true,
+      order: 2
     },
     {
       id: 'sigtap-viewer',
       label: 'Consulta SIGTAP',
       icon: Search,
       description: 'Visualizar procedimentos',
-      requiresAdmin: false // Todos podem ver
+      requiresAdmin: false,
+      order: 3
     },
     {
       id: 'aih-multipage-tester',
       label: 'AIH Avançado',
       icon: FileUp,
       description: 'Upload e processamento oficial de AIHs',
-      requiresAdmin: false // Todos podem ver - SISTEMA OFICIAL
+      requiresAdmin: false,
+      order: 4
     },
     {
       id: 'patients',
       label: 'Pacientes',
       icon: Users,
       description: 'Cadastro e gerenciamento',
-      requiresAdmin: false // Todos podem ver
-    },
-    {
-      id: 'sigtap',
-      label: 'SIGTAP',
-      icon: Upload,
-      description: 'Importação da tabela - Apenas diretoria',
-      requiresAdmin: true // OCULTAR para usuários operadores - apenas diretoria
-    },
-    {
-      id: 'aih-upload',
-      label: 'Upload AIH (Teste)',
-      icon: FileUp,
-      description: 'Teste de rastreabilidade - Apenas desenvolvimento',
-      requiresAdmin: true // OCULTAR para usuários operadores
+      requiresAdmin: false,
+      order: 5
     },
     {
       id: 'reports',
       label: 'Relatórios',
       icon: BarChart4,
       description: 'Central de relatórios executivos',
-      requiresAdmin: true // OCULTAR para usuários operadores - apenas gestão
+      requiresAdmin: true,
+      order: 6
+    },
+    {
+      id: 'aih-upload',
+      label: 'Upload AIH (Teste)',
+      icon: FileUp,
+      description: 'Teste de rastreabilidade - Apenas desenvolvimento',
+      requiresAdmin: true,
+      requiresDeveloper: true, // Novo flag para desenvolvimento
+      order: 7
     }
   ];
 
-  // Filtrar tabs baseado no nível de acesso do usuário
   const getVisibleTabs = () => {
-    if (!user) return [];
-
-    // Se tem acesso total (admin, diretor, coordenador, etc), mostrar todas as tabs
-    if (hasFullAccess()) {
-      return allTabs;
-    }
-
-    // Para usuários operadores, filtrar tabs que requerem admin
-    return allTabs.filter(tab => !tab.requiresAdmin);
+    const isAdmin = canAccessAllHospitals();
+    const isDeveloper = user?.role === 'developer' || user?.role === 'ti';
+    
+    return allTabs
+      .filter(tab => {
+        // Se não requer admin, todos podem ver
+        if (!tab.requiresAdmin) return true;
+        
+        // Se requer developer, só developer/ti podem ver
+        if (tab.requiresDeveloper) {
+          return isDeveloper;
+        }
+        
+        // Se requer admin, só admin/diretoria podem ver
+        return isAdmin;
+      })
+      .sort((a, b) => a.order - b.order);
   };
 
   const tabs = getVisibleTabs();
@@ -204,9 +219,11 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Building2 className="h-8 w-8 text-blue-600" />
-              <span className="ml-2 text-xl font-bold text-gray-900">SIGTAP Sync</span>
+              <div className="ml-2">
+                <div className="text-xl font-bold text-gray-900">SIGTAP Sync</div>
+              </div>
               {canAccessAllHospitals() && (
-                <Badge variant="outline" className="ml-2 bg-purple-50 text-purple-700 border-purple-200">
+                <Badge variant="outline" className="ml-2 bg-purple-50 text-purple-700 border-purple-200 text-xs px-2 py-1">
                   <Globe className="h-3 w-3 mr-1" />
                   ADMIN
                 </Badge>
@@ -214,9 +231,11 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
             </div>
             
             {/* Tabs de Navegação - Agora filtradas por permissão */}
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+            <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
+                const isDeveloper = user?.role === 'developer' || user?.role === 'ti';
+                
                 return (
                   <button
                     key={tab.id}
@@ -231,8 +250,8 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                     <Icon className="h-4 w-4" />
                     {tab.label}
                     
-                    {/* Badge especial para sistema oficial */}
-                    {tab.id === 'aih-multipage-tester' && (
+                    {/* Badge especial para sistema oficial - apenas para developers/ti */}
+                    {tab.id === 'aih-multipage-tester' && isDeveloper && (
                       <Badge variant="outline" className="ml-1 text-xs bg-green-50 text-green-700 border-green-200">
                         OFICIAL
                       </Badge>

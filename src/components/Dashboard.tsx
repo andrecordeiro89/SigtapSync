@@ -42,8 +42,8 @@ const Dashboard = () => {
   useEffect(() => {
     const loadHospitalInfo = async () => {
       const currentHospital = getCurrentHospital();
-      if (!currentHospital) return;
-
+    if (!currentHospital) return;
+    
       try {
         const { data, error } = await supabase
           .from('hospitals')
@@ -79,8 +79,8 @@ const Dashboard = () => {
         
         // Carregar logs de auditoria
         const { data: auditData } = await getUserAuditLogs(10);
-        
-        // Calcular estatísticas
+      
+      // Calcular estatísticas
         const today = new Date().toISOString().split('T')[0];
         const processedToday = aihsData.filter(aih => 
           aih.created_at?.startsWith(today)
@@ -88,8 +88,8 @@ const Dashboard = () => {
         
         const pendingReview = aihsData.filter(aih => 
           aih.processing_status === 'pending_review'
-        ).length;
-
+      ).length;
+      
         setStats({
           totalAIHs: aihsData.length,
           processedToday,
@@ -159,14 +159,14 @@ const Dashboard = () => {
       {/* Header com informações do usuário */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white">
         <div className="flex items-center justify-between">
-          <div>
+        <div>
             <h1 className="text-2xl font-bold">
               Bem-vindo, {user.full_name || user.email?.split('@')[0]}!
             </h1>
             <p className="text-blue-100 mt-1">
               Dashboard do Sistema SIGTAP Sync
-            </p>
-          </div>
+          </p>
+        </div>
           <div className="text-right">
             <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
               {user.role.toUpperCase()}
@@ -180,7 +180,7 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
-
+      
       {/* Informações do Hospital */}
       {hospitalInfo && (
         <Card>
@@ -303,11 +303,11 @@ const Dashboard = () => {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">
                         {getActionLabel(log.action)}
-                      </p>
-                      <p className="text-xs text-gray-500">
+                  </p>
+                  <p className="text-xs text-gray-500">
                         {formatTime(log.created_at)} • {log.table_name}
-                      </p>
-                    </div>
+                  </p>
+                </div>
                     <Badge variant="outline" className="text-xs">
                       {log.operation_type}
                     </Badge>

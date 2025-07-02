@@ -141,7 +141,7 @@ export class SigtapService {
 
   static async getActiveProcedures(): Promise<SigtapProcedure[]> {
     try {
-      console.log('📊 CARREGANDO DADOS DA EXTRAÇÃO PDF - Tabela sigtap_procedures');
+      console.log('📊 CARREGAMENTO COMPLETO - Todos os procedimentos da versão ativa');
       
       // PASSO 1: Buscar a versão ativa
       const activeVersion = await this.getActiveVersion();
@@ -150,32 +150,63 @@ export class SigtapService {
         return [];
       }
       
-      console.log(`🔄 Carregando procedimentos da versão ativa: ${activeVersion.version_name}`);
+      console.log(`🔄 Carregando TODOS os procedimentos da versão: ${activeVersion.version_name}`);
       
-      // PASSO 2: Carregar dados da tabela onde o PDF foi salvo
-      const { data, error } = await supabase
-        .from('sigtap_procedures')  // ✅ TABELA CORRETA ONDE OS DADOS DO PDF SÃO SALVOS
-        .select('*')
-        .eq('version_id', activeVersion.id)
-        .order('code');
+      // PASSO 2: CARREGAMENTO PAGINADO PARA TODOS OS REGISTROS
+      const pageSize = 1000; // Manter 1000 por página para performance
+      let start = 0;
+      let allProcedures: any[] = [];
+      let hasMore = true;
       
-      if (error) {
-        console.error('❌ Erro ao carregar da tabela sigtap_procedures:', error);
-        throw error;
+      while (hasMore) {
+        console.log(`📄 Carregando página ${Math.floor(start/pageSize) + 1} (${start + 1}-${start + pageSize})...`);
+        
+        const { data: page, error } = await supabase
+          .from('sigtap_procedures')
+          .select('*')
+          .eq('version_id', activeVersion.id)
+          .range(start, start + pageSize - 1)
+          .order('code');
+        
+        if (error) {
+          console.error(`❌ Erro ao carregar página ${start}-${start + pageSize - 1}:`, error);
+          break;
+        }
+        
+        if (!page || page.length === 0) {
+          hasMore = false;
+          break;
+        }
+        
+        allProcedures = allProcedures.concat(page);
+        console.log(`✅ Página carregada: ${page.length} registros (Total: ${allProcedures.length})`);
+        
+        // Se retornou menos que pageSize, não há mais dados
+        if (page.length < pageSize) {
+          hasMore = false;
+        } else {
+          start += pageSize;
+        }
+        
+        // Limite de segurança aumentado para seus 4886 procedimentos
+        if (start > 20000) {
+          console.warn('⚠️ Limite de segurança atingido (20k registros)');
+          break;
+        }
       }
       
-      if (!data || data.length === 0) {
+      if (allProcedures.length === 0) {
         console.warn('⚠️ Nenhum procedimento encontrado na versão ativa');
         console.log('💡 DICA: Importe um arquivo PDF/Excel/ZIP primeiro');
         return [];
       }
       
-      console.log(`✅ ${data.length} procedimentos carregados da EXTRAÇÃO PDF`);
+      console.log(`✅ CARREGAMENTO COMPLETO: ${allProcedures.length} procedimentos da versão ativa`);
       
       // PASSO 3: Converter para formato do frontend
-      const procedures = data.map(proc => this.convertDbToFrontend(proc));
+      const procedures = allProcedures.map(proc => this.convertDbToFrontend(proc));
       
-      console.log(`✅ CONVERSÃO CONCLUÍDA: ${procedures.length} procedimentos prontos para exibição`);
+      console.log(`🎉 TODOS OS ${procedures.length} PROCEDIMENTOS CARREGADOS COM SUCESSO!`);
       return procedures;
       
     } catch (error) {

@@ -216,7 +216,7 @@ export const useSupabaseAIH = () => {
         if (!statsMap.has(hospitalId)) {
           statsMap.set(hospitalId, {
             hospital_id: hospitalId,
-            hospital_name: aih.hospitals?.name || 'Nome não disponível',
+            hospital_name: (aih.hospitals as any)?.name || 'Nome não disponível',
             total_aihs: 0,
             processing_count: 0,
             completed_count: 0,

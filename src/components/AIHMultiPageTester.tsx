@@ -27,6 +27,7 @@ import {
   DollarSign,
   Stethoscope,
   Database,
+  Settings,
   Save
 } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -37,7 +38,7 @@ import { ProcedureMatchingService } from '../services/procedureMatchingService';
 import { useSigtapContext } from '../contexts/SigtapContext';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
-import { AIHCompleteProcessingResult, AIHComplete, ProcedureAIH } from '../types';
+import { AIHCompleteProcessingResult, AIHComplete, ProcedureAIH, AIH } from '../types';
 
 // Declaração de tipo para jsPDF com autoTable
 declare module 'jspdf' {
@@ -982,7 +983,7 @@ const AIHMultiPageTester = () => {
   
   // MODO DESENVOLVIMENTO: valores padrão se não autenticado
   const safeUser = user || { id: 'dev-user', email: 'developer@test.com' };
-  const safeHospital = { id: 'dev-hospital', name: 'Hospital de Desenvolvimento' };
+  const safeHospital = { id: user?.hospital_id || '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b', name: 'Hospital de Desenvolvimento' };
 
   const processor = new AIHCompleteProcessor();
   const matchingService = new ProcedureMatchingService(sigtapProcedures);
@@ -1425,6 +1426,208 @@ const AIHMultiPageTester = () => {
     );
   };
 
+  // Função de diagnóstico do sistema
+  const runSystemDiagnostic = async () => {
+    try {
+      console.log('🔧 === INICIANDO DIAGNÓSTICO DO SISTEMA ===');
+      
+      // Usar hospital ID correto
+      const hospitalId = user?.hospital_id || '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b';
+      console.log('🏥 Hospital ID para diagnóstico:', hospitalId);
+      
+      // Teste da função de diagnóstico
+      await AIHPersistenceService.diagnoseSystem(hospitalId);
+      
+      toast({
+        title: "🔧 Diagnóstico Executado",
+        description: "Verifique o console para os resultados detalhados",
+        variant: "default",
+      });
+      
+    } catch (error) {
+      console.error('❌ Erro no diagnóstico:', error);
+      toast({
+        title: "❌ Erro no Diagnóstico",
+        description: `Erro: ${error instanceof Error ? error.message : 'Desconhecido'}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSaveToDatabase = async () => {
+    if (!aihCompleta) {
+      toast({
+        title: "Erro",
+        description: "Nenhuma AIH processada para salvar",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      console.log('💾 Salvando AIH no banco de dados...');
+
+      // Converter AIHComplete para formato AIH do serviço
+      const aihForService: AIH = {
+        numeroAIH: aihCompleta.numeroAIH,
+        nomePaciente: aihCompleta.nomePaciente,
+        cns: aihCompleta.cns,
+        nascimento: aihCompleta.nascimento,
+        sexo: aihCompleta.sexo,
+        prontuario: aihCompleta.prontuario,
+        endereco: aihCompleta.endereco,
+        municipio: aihCompleta.municipio,
+        uf: aihCompleta.uf,
+        cep: aihCompleta.cep,
+        telefone: aihCompleta.telefone,
+        nomeMae: aihCompleta.nomeMae,
+        nacionalidade: aihCompleta.nacionalidade,
+        racaCor: aihCompleta.racaCor,
+        tipoDocumento: aihCompleta.tipoDocumento,
+        documento: aihCompleta.documento,
+        nomeResponsavel: aihCompleta.nomeResponsavel,
+        bairro: aihCompleta.bairro,
+        numero: aihCompleta.numero,
+        complemento: aihCompleta.complemento,
+        dataInicio: aihCompleta.dataInicio,
+        dataFim: aihCompleta.dataFim,
+        dataAutorizacao: aihCompleta.dataAutorizacao,
+        situacao: aihCompleta.situacao,
+        tipo: aihCompleta.tipo,
+        apresentacao: aihCompleta.apresentacao,
+        cnsAutorizador: aihCompleta.cnsAutorizador,
+        cnsSolicitante: aihCompleta.cnsSolicitante,
+        cnsResponsavel: aihCompleta.cnsResponsavel,
+        procedimentoPrincipal: aihCompleta.procedimentoPrincipal,
+        procedimentoSolicitado: aihCompleta.procedimentoSolicitado,
+        mudancaProc: aihCompleta.mudancaProc,
+        cidPrincipal: aihCompleta.cidPrincipal,
+        especialidade: aihCompleta.especialidade,
+        modalidade: aihCompleta.modalidade,
+        caracterAtendimento: aihCompleta.caracterAtendimento,
+        motivoEncerramento: aihCompleta.motivoEncerramento,
+        procedimentoSequencial: aihCompleta.procedimentoSequencial,
+        procedimentoEspecial: aihCompleta.procedimentoEspecial,
+        utiDias: aihCompleta.utiDias,
+        atosMedicos: aihCompleta.atosMedicos,
+        permanenciaDias: aihCompleta.permanenciaDias,
+        complexidadeEspecifica: aihCompleta.complexidadeEspecifica,
+        valorDiaria: aihCompleta.valorDiaria,
+        observacoesFaturamento: aihCompleta.observacoesFaturamento,
+        // Procedimentos realizados (obrigatório)
+        procedimentosRealizados: aihCompleta.procedimentos?.map(proc => ({
+          linha: proc.sequencia,
+          codigo: proc.procedimento,
+          descricao: proc.descricao || '',
+          profissionais: [{
+            documento: proc.documentoProfissional,
+            cbo: proc.cbo,
+            participacao: proc.participacao,
+            cnes: proc.cnes
+          }],
+          quantidade: 1,
+          dataRealizacao: proc.data
+        })) || [],
+        // Adicionar campos que podem estar faltando
+        aihAnterior: '',
+        aihPosterior: ''
+      };
+
+      // Usar hospital ID do usuário autenticado ou fallback para UUID válido
+      const hospitalId = user?.hospital_id || '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b';
+      const sourceFile = selectedFile?.name || 'teste.pdf';
+
+      console.log('🔧 Dados preparados para persistência:', {
+        numeroAIH: aihForService.numeroAIH,
+        nomePaciente: aihForService.nomePaciente,
+        hospitalId: hospitalId,
+        usuario: user?.email
+      });
+
+      const result = await AIHPersistenceService.persistAIHFromPDF(
+        aihForService,
+        hospitalId,
+        sourceFile
+      );
+
+      if (result.success) {
+        toast({
+          title: "✅ Sucesso!",
+          description: result.message,
+          variant: "default",
+        });
+        console.log('✅ AIH salva com sucesso:', result);
+      } else {
+        toast({
+          title: "❌ Erro na persistência",
+          description: result.message,
+          variant: "destructive",
+        });
+        console.error('❌ Erro na persistência:', result);
+      }
+
+    } catch (error) {
+      console.error('❌ Erro ao salvar AIH:', error);
+      toast({
+        title: "❌ Erro",
+        description: `Erro ao salvar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSaveCompleteAIH = async () => {
+    if (!aihCompleta) {
+      toast({
+        title: "❌ Erro",
+        description: "Nenhuma AIH processada para salvar.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const hospitalId = user?.hospital_id || '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b';
+      
+      console.log('🚀 Iniciando persistência COMPLETA da AIH...');
+      console.log(`📋 AIH: ${aihCompleta.numeroAIH}`);
+      console.log(`🏥 Hospital: ${hospitalId}`);
+      console.log(`📊 Procedimentos: ${aihCompleta.procedimentos?.length || 0}`);
+
+      const result = await AIHPersistenceService.persistCompleteAIH(
+        aihCompleta,
+        hospitalId,
+        selectedFile?.name || 'upload_manual.pdf'
+      );
+
+      if (result.success) {
+        toast({
+          title: "🎉 AIH COMPLETA SALVA!",
+          description: result.message
+        });
+        
+        console.log('✅ Persistência completa finalizada!');
+        console.log(`📄 AIH ID: ${result.aihId}`);
+        console.log(`👤 Paciente ID: ${result.patientId}`);
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao salvar AIH completa:', error);
+      toast({
+        title: "❌ Erro na persistência completa",
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1535,6 +1738,39 @@ const AIHMultiPageTester = () => {
                 <Button onClick={exportDetailedReport} variant="outline">
                   <Download className="w-4 h-4 mr-2" />
                   Exportar Relatório
+                </Button>
+                
+                <Button onClick={runSystemDiagnostic} variant="outline" className="bg-blue-50 hover:bg-blue-100">
+                  <Settings className="w-4 h-4 mr-2" />
+                  🔧 Diagnóstico
+                </Button>
+                
+                <Button onClick={handleSaveToDatabase} disabled={isProcessing} variant="outline" className="bg-green-50 hover:bg-green-100">
+                  {isProcessing ? (
+                    <>
+                      <Database className="w-4 h-4 mr-2 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="w-4 h-4 mr-2" />
+                      💾 Salvar no Banco
+                    </>
+                  )}
+                </Button>
+                
+                <Button onClick={handleSaveCompleteAIH} disabled={isProcessing} variant="outline" className="bg-emerald-50 hover:bg-emerald-100 border-emerald-300">
+                  {isProcessing ? (
+                    <>
+                      <Database className="w-4 h-4 mr-2 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Database className="w-4 h-4 mr-2" />
+                      🚀 AIH Completa
+                    </>
+                  )}
                 </Button>
               </>
             )}

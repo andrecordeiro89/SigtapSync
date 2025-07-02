@@ -100,19 +100,19 @@ export class SigtapServiceRobust {
           start += pageSize;
         }
         
-        // Limite de segurança para evitar loops infinitos
-        if (start > 100000) {
-          console.warn('⚠️ Limite de segurança atingido (100k registros)');
+        // Limite de segurança aumentado para garantir carregamento completo
+        if (start > 50000) {
+          console.warn('⚠️ Limite de segurança atingido (50k registros)');
           break;
         }
         
       } catch (error) {
-        console.error(`❌ Erro durante paginação em ${tableName}:`, error);
+        console.error(`❌ Erro na página ${start}:`, error);
         break;
       }
     }
     
-    console.log(`✅ Total carregado de ${tableName}: ${allData.length} registros`);
+    console.log(`✅ CARREGAMENTO COMPLETO: ${allData.length} registros de ${tableName}`);
     return allData;
   }
   

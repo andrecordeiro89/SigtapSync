@@ -9,6 +9,7 @@ import { Search, Filter, Download, Eye, FileText, AlertCircle, ChevronDown, Chev
 import { formatCurrency } from '../utils/validation';
 import { SigtapProcedure } from '../types';
 import { useSigtapContext } from '../contexts/SigtapContext';
+import { useAuth } from '../contexts/AuthContext';
 
 // Função para corrigir problemas de encoding
 const fixEncoding = (text: string): string => {
@@ -67,6 +68,7 @@ const cleanText = (text: string): string => {
 
 const SigtapViewer = () => {
   const { procedures, totalProcedures, lastImportDate, error, clearData, forceReload, isLoading, importSigtapFile } = useSigtapContext();
+  const { hasFullAccess } = useAuth(); // Hook para verificar permissões
   const [searchTerm, setSearchTerm] = useState('');
   const [complexityFilter, setComplexityFilter] = useState('all');
   const [financingFilter, setFinancingFilter] = useState('all');
@@ -74,6 +76,9 @@ const SigtapViewer = () => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+
+  // Verificar se usuário tem acesso administrativo (diretoria)
+  const isAdminUser = hasFullAccess();
 
   const filteredProcedures = useMemo(() => {
     if (!procedures.length) return [];
@@ -200,29 +205,89 @@ const SigtapViewer = () => {
         </div>
 
         <Card>
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <AlertCircle className="w-16 h-16 text-gray-400 mx-auto" />
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Nenhuma tabela carregada</h3>
-                <p className="text-gray-600 mt-2">
-                  Importe um arquivo da tabela SIGTAP para começar a consultar os procedimentos.
-                </p>
+          <CardContent className="p-8 text-center space-y-6">
+            <AlertCircle className="h-16 w-16 text-yellow-500 mx-auto" />
+            
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Nenhum procedimento SIGTAP encontrado
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Os dados não estão carregados na tela. Vamos verificar e carregar seus {totalProcedures || '4886'} procedimentos.
+              </p>
+            </div>
+
+            {/* Status Loading */}
+            {isLoading && (
+              <div className="flex items-center justify-center space-x-2 text-blue-600">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                <span>Carregando dados do banco...</span>
               </div>
-              <div className="flex justify-center space-x-3">
+            )}
+
+            {/* Erro */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
+                <div className="flex">
+                  <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 mr-2" />
+                  <div>
+                    <h4 className="text-red-800 font-medium">Erro detectado:</h4>
+                    <p className="text-red-700 text-sm mt-1">{error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Botões de Ação */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button 
-                  onClick={forceReload} 
+                  onClick={handleForceReload}
+                  disabled={isLoading}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  Carregar Dados do Banco
+                </Button>
+                
+                <Button 
+                  onClick={handleClearCache}
                   variant="outline"
                   disabled={isLoading}
-                  className="flex items-center space-x-2"
                 >
-                  <Search className="w-4 h-4" />
-                  <span>{isLoading ? 'Carregando...' : 'Buscar Dados'}</span>
-                </Button>
-                <Button onClick={() => window.location.hash = '#sigtap'} variant="outline">
-                  Ir para Importação
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Limpar Cache e Recarregar
                 </Button>
               </div>
+
+              {/* Instruções */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+                <div className="flex">
+                  <FileText className="h-5 w-5 text-blue-400 mt-0.5 mr-2" />
+                  <div>
+                    <h4 className="text-blue-800 font-medium">Como resolver:</h4>
+                    <ul className="text-blue-700 text-sm mt-1 space-y-1">
+                      <li>1. Clique em "Carregar Dados do Banco" para buscar seus procedimentos</li>
+                      <li>2. Se não funcionar, clique em "Limpar Cache e Recarregar"</li>
+                      <li>3. Em último caso, vá para a aba "SIGTAP" e faça novo upload</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informações técnicas para debug */}
+              <details className="text-left">
+                <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
+                  Informações técnicas (para suporte)
+                </summary>
+                <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-3 rounded border font-mono">
+                  <div>Total Procedimentos Registrados: {totalProcedures || 'Não informado'}</div>
+                  <div>Última Importação: {lastImportDate || 'Nunca'}</div>
+                  <div>Supabase Habilitado: {isLoading ? 'Verificando...' : 'Sim'}</div>
+                  <div>Status Loading: {isLoading ? 'Sim' : 'Não'}</div>
+                  <div>Procedimentos Carregados: {procedures.length}</div>
+                </div>
+              </details>
             </div>
           </CardContent>
         </Card>
@@ -252,47 +317,63 @@ const SigtapViewer = () => {
             </div>
           </div>
         </div>
-        <div className="flex space-x-2">
-          <Button 
-            onClick={handleExportCSV} 
-            variant="outline" 
-            className="flex items-center space-x-2"
-            disabled={!filteredProcedures.length}
-          >
-            <Download className="w-4 h-4" />
-            <span>Exportar</span>
-          </Button>
-          <Button 
-            onClick={() => {
-              if (confirm('Limpar todos os dados? Você precisará importar novamente.')) {
-                clearData();
-              }
-            }}
-            variant="outline" 
-            className="flex items-center space-x-2 text-red-600 hover:text-red-700"
-          >
-            <AlertCircle className="w-4 h-4" />
-            <span>Limpar</span>
-          </Button>
-          <Button 
-            onClick={handleClearCache}
-            variant="outline" 
-            className="flex items-center space-x-2 bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100"
-            disabled={isLoading}
-            title="Limpar cache e recarregar dados"
-          >
-            {isLoading ? '⏳' : '🧹'} Cache
-          </Button>
-          <Button 
-            onClick={handleForceReload}
-            variant="outline" 
-            className="flex items-center space-x-2 bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
-            disabled={isLoading}
-            title="Recarregar dados do banco"
-          >
-            {isLoading ? '⏳' : '🔧'} Reload
-          </Button>
-        </div>
+        
+        {/* Botões Administrativos - Apenas para Diretoria */}
+        {isAdminUser && (
+          <div className="flex space-x-2">
+            <Button 
+              onClick={handleExportCSV} 
+              variant="outline" 
+              className="flex items-center space-x-2"
+              disabled={!filteredProcedures.length}
+              title="Exportar dados para CSV - Apenas Diretoria"
+            >
+              <Download className="w-4 h-4" />
+              <span>Exportar</span>
+            </Button>
+            <Button 
+              onClick={() => {
+                if (confirm('Limpar todos os dados? Você precisará importar novamente.')) {
+                  clearData();
+                }
+              }}
+              variant="outline" 
+              className="flex items-center space-x-2 text-red-600 hover:text-red-700"
+              title="Limpar dados - Apenas Diretoria"
+            >
+              <AlertCircle className="w-4 h-4" />
+              <span>Limpar</span>
+            </Button>
+            <Button 
+              onClick={handleClearCache}
+              variant="outline" 
+              className="flex items-center space-x-2 bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100"
+              disabled={isLoading}
+              title="Limpar cache e recarregar dados - Apenas Diretoria"
+            >
+              {isLoading ? '⏳' : '🧹'} Cache
+            </Button>
+            <Button 
+              onClick={handleForceReload}
+              variant="outline" 
+              className="flex items-center space-x-2 bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
+              disabled={isLoading}
+              title="Recarregar dados do banco - Apenas Diretoria"
+            >
+              {isLoading ? '⏳' : '🔧'} Reload
+            </Button>
+          </div>
+        )}
+
+        {/* Indicador para Operadores */}
+        {!isAdminUser && (
+          <div className="flex items-center space-x-2 text-gray-500">
+            <span className="text-sm">👤 Perfil Operador</span>
+            <Badge variant="outline" className="text-xs">
+              Interface Simplificada
+            </Badge>
+          </div>
+        )}
       </div>
 
       <Card>

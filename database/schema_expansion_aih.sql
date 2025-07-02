@@ -115,4 +115,74 @@ FROM aihs;
 SELECT 
   'Campos adicionados!' as status,
   COUNT(*) as total_patients  
-FROM patients; 
+FROM patients;
+
+-- ================================================
+-- EXPANSÃO SCHEMA - PROCEDIMENTOS COMPLETOS AIH
+-- ================================================
+
+-- Adicionar campos necessários para procedimentos completos das AIHs
+ALTER TABLE procedure_records 
+ADD COLUMN IF NOT EXISTS procedure_code VARCHAR(20),
+ADD COLUMN IF NOT EXISTS procedure_description TEXT,
+ADD COLUMN IF NOT EXISTS sequence INTEGER,
+ADD COLUMN IF NOT EXISTS professional_document VARCHAR(50),
+ADD COLUMN IF NOT EXISTS cbo VARCHAR(10),
+ADD COLUMN IF NOT EXISTS participation VARCHAR(50),
+ADD COLUMN IF NOT EXISTS cnes VARCHAR(20),
+ADD COLUMN IF NOT EXISTS accepted BOOLEAN DEFAULT TRUE,
+ADD COLUMN IF NOT EXISTS calculated_value INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS original_value INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS sus_percentage INTEGER DEFAULT 100,
+ADD COLUMN IF NOT EXISTS match_status VARCHAR(20) DEFAULT 'pending',
+ADD COLUMN IF NOT EXISTS match_confidence INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS approved BOOLEAN DEFAULT FALSE;
+
+-- Adicionar campos nas AIHs para estatísticas completas
+ALTER TABLE aihs 
+ADD COLUMN IF NOT EXISTS total_procedures INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS approved_procedures INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS rejected_procedures INTEGER DEFAULT 0,
+ADD COLUMN IF NOT EXISTS calculated_total_value INTEGER DEFAULT 0;
+
+-- Índices para performance
+CREATE INDEX IF NOT EXISTS idx_procedure_records_aih ON procedure_records(aih_id);
+CREATE INDEX IF NOT EXISTS idx_procedure_records_code ON procedure_records(procedure_code);
+CREATE INDEX IF NOT EXISTS idx_procedure_records_sequence ON procedure_records(sequence);
+CREATE INDEX IF NOT EXISTS idx_procedure_records_match_status ON procedure_records(match_status);
+
+-- Comentários para documentação
+COMMENT ON COLUMN procedure_records.procedure_code IS 'Código do procedimento extraído da AIH';
+COMMENT ON COLUMN procedure_records.procedure_description IS 'Descrição do procedimento';
+COMMENT ON COLUMN procedure_records.sequence IS 'Sequência do procedimento na AIH (1=principal)';
+COMMENT ON COLUMN procedure_records.professional_document IS 'Documento do profissional responsável';
+COMMENT ON COLUMN procedure_records.participation IS 'Tipo de participação do profissional';
+COMMENT ON COLUMN procedure_records.cnes IS 'CNES onde foi realizado o procedimento';
+COMMENT ON COLUMN procedure_records.calculated_value IS 'Valor calculado baseado no SIGTAP (centavos)';
+COMMENT ON COLUMN procedure_records.sus_percentage IS 'Porcentagem SUS aplicada (100% principal, 70% secundários)';
+COMMENT ON COLUMN procedure_records.match_status IS 'Status do matching: pending, matched, manual, rejected';
+COMMENT ON COLUMN procedure_records.approved IS 'Se o procedimento foi aprovado para faturamento';
+
+COMMENT ON COLUMN aihs.total_procedures IS 'Total de procedimentos extraídos da AIH';
+COMMENT ON COLUMN aihs.approved_procedures IS 'Procedimentos aprovados para faturamento';
+COMMENT ON COLUMN aihs.rejected_procedures IS 'Procedimentos rejeitados';
+COMMENT ON COLUMN aihs.calculated_total_value IS 'Valor total calculado (centavos)';
+
+-- View para visualizar procedimentos com detalhes completos
+CREATE OR REPLACE VIEW v_aih_procedures_complete AS
+SELECT 
+  pr.*,
+  a.aih_number,
+  a.admission_date,
+  p.name as patient_name,
+  p.cns as patient_cns,
+  sp.description as sigtap_description,
+  sp.value_hosp_total as sigtap_value_hosp_total,
+  am.overall_score as match_score,
+  am.status as match_approval_status
+FROM procedure_records pr
+LEFT JOIN aihs a ON pr.aih_id = a.id
+LEFT JOIN patients p ON pr.patient_id = p.id
+LEFT JOIN sigtap_procedures sp ON pr.procedure_id = sp.id
+LEFT JOIN aih_matches am ON (am.aih_id = pr.aih_id AND am.procedure_id = pr.procedure_id)
+ORDER BY a.admission_date DESC, pr.sequence ASC; 
