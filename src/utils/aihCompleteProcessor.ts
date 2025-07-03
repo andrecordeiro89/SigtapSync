@@ -1,6 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { AIH, ProcedureAIH, AIHComplete, AIHCompleteProcessingResult, ProcedureMatchingResult } from '../types';
 import { AIHPDFProcessor } from './aihPdfProcessor';
+import { isValidParticipationCode, formatParticipationCode, getParticipationInfo } from '../config/participationCodes';
 
 // Configurar worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
@@ -230,31 +231,45 @@ export class AIHCompleteProcessor {
   private extractProcedures(text: string, sequenciaInicial: number = 1): ProcedureAIH[] {
     try {
       console.log(`📋 Extraindo procedimentos (sequência inicial: ${sequenciaInicial})...`);
+      console.log(`🔍 DEBUGGING: Texto da página (primeiros 500 chars):`);
+      console.log(text.substring(0, 500));
       
       const procedimentos: ProcedureAIH[] = [];
       
-      // Patterns para extrair dados da tabela de procedimentos
+      // Patterns para extrair dados da tabela de procedimentos - REFINADOS
       const patterns = {
-        // Buscar linhas da tabela (baseado na imagem fornecida)
-        linhaTabela: /(\d+)\s+([0-9.]+)\s+([A-Z0-9-]+)\s+(\d+)\s+([A-Za-z]+)\s+(\d+)\s+(\d+)\s+(\d{2}\/\d{2}\/\d{4})\s+(.+?)(?=\d+\s+[0-9.]+|\s*$)/g,
+        // Pattern FLEXÍVEL para linhas da tabela
+        // Captura: Seq Código CRM CBO Participação CNES Aceita Data Descrição
+        linhaTabela: /(\d+)\s+([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9])\s+([A-Z0-9\-\/]+)\s+(\d{4,6})\s+([^0-9\s][^\s]*|[0-9]+[^\s]*|\d+)\s+(\d+)\s+([01])\s+(\d{2}\/\d{2}\/\d{4})\s+(.+?)(?=\n\d+\s+[0-9]{2}\.[0-9]{2}|\n\s*$|$)/gm,
+        
+        // Pattern para participação FLEXÍVEL - captura "1º", "1°", "1", etc.
+        participacaoFlexivel: /([0-9]+)[°º]?|([IVX]+)[°º]?|([A-Za-z]+)/g,
         
         // Patterns alternativos
         procedimentoCodigo: /([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9])/g,
-        cbo: /(\d{6})/g,
+        cbo: /(\d{4,6})/g,
         data: /(\d{2}\/\d{2}\/\d{4})/g
       };
 
-      // Tentar extrair usando pattern da tabela
+      // Tentar extrair usando pattern FLEXÍVEL da tabela
       let match;
       let sequenciaAtual = sequenciaInicial;
       
+      console.log(`🔍 TENTANDO EXTRAIR com pattern flexível...`);
+      
       while ((match = patterns.linhaTabela.exec(text)) !== null) {
+        console.log(`📋 MATCH ENCONTRADO:`, match);
+        
+        // Extrair e processar código de participação com lógica APRIMORADA
+        const rawParticipacao = match[5]?.trim() || '';
+        const participacaoValidada = this.parseParticipationField(rawParticipacao);
+        
         const procedimento: ProcedureAIH = {
           sequencia: parseInt(match[1]) || sequenciaAtual,
           procedimento: match[2]?.trim() || '',
           documentoProfissional: match[3]?.trim() || '',
           cbo: match[4]?.trim() || '',
-          participacao: match[5]?.trim() || '',
+          participacao: participacaoValidada,
           cnes: match[6]?.trim() || '',
           aceitar: match[7] === '1',
           data: match[8]?.trim() || '',
@@ -267,9 +282,17 @@ export class AIHCompleteProcessor {
         if (procedimento.procedimento) {
           procedimentos.push(procedimento);
           console.log(`✅ Procedimento ${sequenciaAtual}: ${procedimento.procedimento} - ${procedimento.descricao}`);
+          console.log(`   👨‍⚕️ Participação: "${rawParticipacao}" → "${participacaoValidada}" (${isValidParticipationCode(participacaoValidada) ? 'VÁLIDO' : 'INVÁLIDO'})`);
         }
         
         sequenciaAtual++;
+      }
+      
+      // Se pattern principal não funcionou, tentar EXTRAÇÃO LINHA POR LINHA
+      if (procedimentos.length === 0) {
+        console.warn('⚠️ Pattern principal falhou, tentando extração linha por linha...');
+        const extractedByLines = this.extractProceduresByLines(text, sequenciaInicial);
+        procedimentos.push(...extractedByLines);
       }
 
       // Se não encontrou procedimentos com o pattern principal, tentar método alternativo
@@ -362,5 +385,167 @@ export class AIHCompleteProcessor {
         tempoProcessamento: 0
       };
     }
+  }
+
+  /**
+   * Processa campo de participação com lógica APRIMORADA
+   * Aceita formatos: "1º", "1°", "2º", "1", "01", etc.
+   */
+  private parseParticipationField(rawValue: string): string {
+    if (!rawValue) return '';
+    
+    console.log(`🔍 PARSING Participação: "${rawValue}"`);
+    
+    // Limpar espaços
+    const cleaned = rawValue.trim();
+    
+    // Pattern para capturar números com possível º ou °
+    const numberMatch = cleaned.match(/^(\d+)[°º]?$/);
+    if (numberMatch) {
+      const number = parseInt(numberMatch[1]);
+      const formatted = number.toString().padStart(2, '0');
+      console.log(`   ✅ Número detectado: ${number} → ${formatted}`);
+      return formatted;
+    }
+    
+    // Pattern para ordinais escritos (1º, 2º, etc.)
+    const ordinalMatch = cleaned.match(/^(\d+)[°º]$/);
+    if (ordinalMatch) {
+      const number = parseInt(ordinalMatch[1]);
+      const formatted = number.toString().padStart(2, '0');
+      console.log(`   ✅ Ordinal detectado: ${cleaned} → ${formatted}`);
+      return formatted;
+    }
+    
+    // Pattern para números romanos
+    const romanNumerals: { [key: string]: string } = {
+      'I': '01', 'II': '02', 'III': '03', 'IV': '04', 'V': '05',
+      'VI': '06', 'VII': '07', 'VIII': '08', 'IX': '09', 'X': '10'
+    };
+    
+    const romanMatch = cleaned.toUpperCase().match(/^([IVX]+)[°º]?$/);
+    if (romanMatch && romanNumerals[romanMatch[1]]) {
+      const formatted = romanNumerals[romanMatch[1]];
+      console.log(`   ✅ Romano detectado: ${cleaned} → ${formatted}`);
+      return formatted;
+    }
+    
+    // Fallback: tentar extrair apenas dígitos
+    const digitOnly = cleaned.replace(/[^\d]/g, '');
+    if (digitOnly) {
+      const formatted = digitOnly.length === 1 ? '0' + digitOnly : digitOnly.substring(0, 2);
+      console.log(`   ⚠️ Fallback dígitos: "${cleaned}" → "${formatted}"`);
+      return formatted;
+    }
+    
+    console.log(`   ❌ Não foi possível processar: "${rawValue}"`);
+    return '';
+  }
+
+  /**
+   * Extração linha por linha quando pattern principal falha
+   */
+  private extractProceduresByLines(text: string, sequenciaInicial: number): ProcedureAIH[] {
+    console.log(`🔧 EXTRAÇÃO LINHA POR LINHA iniciada...`);
+    
+    const procedimentos: ProcedureAIH[] = [];
+    const lines = text.split('\n').filter(line => line.trim());
+    
+    let sequenciaAtual = sequenciaInicial;
+    
+    for (const line of lines) {
+      // Buscar linhas que começam com número (sequência)
+      const lineMatch = line.match(/^(\d+)\s+(.+)/);
+      if (!lineMatch) continue;
+      
+      console.log(`🔍 Analisando linha: "${line}"`);
+      
+      // Tentar extrair código de procedimento
+      const procedureMatch = line.match(/([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9])/);
+      if (!procedureMatch) continue;
+      
+      // Extrair componentes usando splits
+      const parts = line.trim().split(/\s+/);
+      console.log(`   📊 Partes da linha:`, parts);
+      
+      if (parts.length >= 8) {
+        // Tentar mapear campos baseado em posições
+        const participacaoIndex = this.findParticipationIndex(parts);
+        const rawParticipacao = participacaoIndex >= 0 ? parts[participacaoIndex] : '';
+        
+        const procedimento: ProcedureAIH = {
+          sequencia: parseInt(parts[0]) || sequenciaAtual,
+          procedimento: procedureMatch[1],
+          documentoProfissional: this.findDocumentField(parts) || '',
+          cbo: this.findCBOField(parts) || '',
+          participacao: this.parseParticipationField(rawParticipacao),
+          cnes: this.findCNESField(parts) || '',
+          aceitar: this.findAcceptField(parts),
+          data: this.findDateField(parts) || '',
+          descricao: this.findDescriptionField(parts, line) || '',
+          matchStatus: 'pending'
+        };
+        
+        procedimentos.push(procedimento);
+        console.log(`   ✅ Procedimento extraído: ${procedimento.procedimento}`);
+        console.log(`   👨‍⚕️ Participação: "${rawParticipacao}" → "${procedimento.participacao}"`);
+        
+        sequenciaAtual++;
+      }
+    }
+    
+    console.log(`📊 Extração linha por linha: ${procedimentos.length} procedimentos`);
+    return procedimentos;
+  }
+
+  /**
+   * Métodos auxiliares para extração linha por linha
+   */
+  private findParticipationIndex(parts: string[]): number {
+    // Procurar por padrões de participação
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (/^(\d+)[°º]?$/.test(part) || /^[IVX]+[°º]?$/.test(part)) {
+        console.log(`   🎯 Participação encontrada no índice ${i}: "${part}"`);
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  private findDocumentField(parts: string[]): string {
+    return parts.find(p => /^[A-Z0-9\-\/]{5,}$/.test(p)) || '';
+  }
+
+  private findCBOField(parts: string[]): string {
+    return parts.find(p => /^\d{4,6}$/.test(p)) || '';
+  }
+
+  private findCNESField(parts: string[]): string {
+    return parts.find(p => /^\d{7,}$/.test(p)) || '';
+  }
+
+  private findAcceptField(parts: string[]): boolean {
+    return parts.includes('1');
+  }
+
+  private findDateField(parts: string[]): string {
+    return parts.find(p => /^\d{2}\/\d{2}\/\d{4}$/.test(p)) || '';
+  }
+
+  private findDescriptionField(parts: string[], fullLine: string): string {
+    const dateIndex = parts.findIndex(p => /^\d{2}\/\d{2}\/\d{4}$/.test(p));
+    if (dateIndex >= 0 && dateIndex < parts.length - 1) {
+      return parts.slice(dateIndex + 1).join(' ');
+    }
+    // Fallback: pegar última parte que parece descrição
+    return fullLine.substring(fullLine.lastIndexOf(' ') + 1);
+  }
+
+  /**
+   * Valida e limpa código de participação extraído (método legado mantido para compatibilidade)
+   */
+  private validateAndCleanParticipationCode(rawCode: string): string {
+    return this.parseParticipationField(rawCode);
   }
 } 

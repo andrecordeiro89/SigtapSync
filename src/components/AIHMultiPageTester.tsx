@@ -47,6 +47,12 @@ import {
   logSpecialRules,
   debugSpecialRuleDetection 
 } from '../config/susCalculationRules';
+import { 
+  formatParticipationCode, 
+  getParticipationBadge, 
+  requiresPayment, 
+  isValidParticipationCode 
+} from '../config/participationCodes';
 
 // Declaração de tipo para jsPDF com autoTable
 declare module 'jspdf' {
@@ -56,6 +62,52 @@ declare module 'jspdf' {
     };
   }
 }
+
+// Componente para exibir participação profissional
+const ParticipationDisplay = ({ code }: { code: string }) => {
+  if (!code) {
+    return <span className="text-gray-400 text-sm">Não informado</span>;
+  }
+
+  const isValid = isValidParticipationCode(code);
+  const badge = getParticipationBadge(code);
+  const formatted = formatParticipationCode(code);
+  const needsPayment = requiresPayment(code);
+
+  if (!isValid) {
+    return (
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className="bg-red-50 border-red-200 text-red-700">
+          ❓ {code}
+        </Badge>
+        <span className="text-xs text-red-600">Código inválido</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Badge 
+        variant="outline" 
+        className={`
+          ${badge.color === 'blue' ? 'bg-blue-50 border-blue-200 text-blue-700' : ''}
+          ${badge.color === 'green' ? 'bg-green-50 border-green-200 text-green-700' : ''}
+          ${badge.color === 'purple' ? 'bg-purple-50 border-purple-200 text-purple-700' : ''}
+          ${badge.color === 'orange' ? 'bg-orange-50 border-orange-200 text-orange-700' : ''}
+          ${badge.color === 'gray' ? 'bg-gray-50 border-gray-200 text-gray-700' : ''}
+        `}
+      >
+        {badge.icon} {code}
+      </Badge>
+      <div className="flex flex-col">
+        <span className="text-sm font-medium">{formatted.split(' - ')[1]}</span>
+        <span className={`text-xs ${needsPayment ? 'text-green-600' : 'text-gray-500'}`}>
+          {needsPayment ? '💰 Requer pagamento' : '📋 Sem pagamento'}
+        </span>
+      </div>
+    </div>
+  );
+};
 
 // Componente organizado para visualizar AIH completa
 const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComplete; onUpdateAIH: (aih: AIHComplete) => void }) => {
@@ -67,7 +119,6 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     valorProf: number;
     porcentagem: number;
   }}>({});
-  const [defaultPercentage, setDefaultPercentage] = useState<number>(70); // Porcentagem padrão para procedimentos secundários
   const [expandedSections, setExpandedSections] = useState<{endereco: boolean}>({endereco: false}); // NOVO ESTADO
   const { toast } = useToast();
 
@@ -188,19 +239,19 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
         };
       } else {
         // APLICAR LÓGICA PADRÃO DO SISTEMA
-        const isPrincipal = index === 0;
-        const porcentagem = isPrincipal ? 100 : (proc.porcentagemSUS || defaultPercentage);
-        
-        const valorBase = proc.sigtapProcedure.valueHospTotal;
-        const valorCalculado = (valorBase * porcentagem) / 100;
+      const isPrincipal = index === 0;
+        const porcentagem = isPrincipal ? 100 : (proc.porcentagemSUS || 0); // ✅ REMOVIDO defaultPercentage - sem cálculo automático
+      
+      const valorBase = proc.sigtapProcedure.valueHospTotal;
+        const valorCalculado = isPrincipal ? valorBase : (proc.porcentagemSUS ? (valorBase * porcentagem) / 100 : 0); // ✅ Só calcula se tiver porcentagem definida
 
-        return {
-          ...proc,
-          porcentagemSUS: porcentagem,
-          valorCalculado,
+      return {
+        ...proc,
+        porcentagemSUS: porcentagem,
+        valorCalculado,
           valorOriginal: valorBase,
           isSpecialRule: false
-        };
+      };
       }
     });
 
@@ -217,7 +268,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     };
   };
 
-  // Iniciar edição de valores
+  // Iniciar edição de valores - INTEGRADO COM REGRAS ESPECIAIS
   const startEditingValues = (sequencia: number, procedure: ProcedureAIH) => {
     setEditingValues(prev => new Set([...prev, sequencia]));
     
@@ -228,28 +279,89 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       const valorSP = procedure.sigtapProcedure.valueProf;          // SP está correto
       const valorSH = valorTotalSigtap - valorSP;                   // SH = Total - SP
       
+      // 🎯 DETECTAR REGRA ESPECIAL
+      const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
+      const temRegraEspecial = hasSpecialRule(procedimentoPrincipal);
+      const regra = getSpecialRule(procedimentoPrincipal);
+      
+      let porcentagemParaAplicar = procedure.porcentagemSUS || (sequencia === 1 ? 100 : 0); // ✅ REMOVIDO defaultPercentage - sem valor padrão para secundários
+      
+      if (temRegraEspecial && regra) {
+        // Usar porcentagem da regra especial baseada na posição
+        const posicao = sequencia - 1;
+        porcentagemParaAplicar = regra.rule.hospitalPercentages[posicao] || 
+                                regra.rule.hospitalPercentages[regra.rule.hospitalPercentages.length - 1];
+      }
+      
       setTempValues(prev => ({
         ...prev,
         [sequencia]: {
           valorAmb: procedure.sigtapProcedure?.valueAmb || 0,
           valorHosp: valorSH, // 🔧 Usar o SH calculado correto
-          valorProf: valorSP, // 🔧 Usar o SP correto
-          porcentagem: procedure.porcentagemSUS || (sequencia === 1 ? 100 : defaultPercentage)
+          valorProf: valorSP, // 🔧 Usar o SP correto (sempre 100% nas regras especiais)
+          porcentagem: porcentagemParaAplicar,
+          isSpecialRule: temRegraEspecial,
+          specialRuleType: regra?.rule.type || null
         }
       }));
     }
   };
 
-  // Salvar edição de valores
+  // Salvar edição de valores - INTEGRADO COM REGRAS ESPECIAIS
   const saveEditedValues = (sequencia: number) => {
     const editedValues = tempValues[sequencia];
     if (!editedValues) return;
 
+    // 🎯 DETECTAR REGRA ESPECIAL
+    const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
+    const temRegraEspecial = hasSpecialRule(procedimentoPrincipal);
+    const regra = getSpecialRule(procedimentoPrincipal);
+
     const updatedProcedimentos = aihCompleta.procedimentos.map(proc => {
       if (proc.sequencia === sequencia && proc.sigtapProcedure) {
-        // 🔧 CORREÇÃO: Reinterpretar os valores editados corretamente
-        // O usuário editou: SA, SH e SP
-        // Precisamos salvar: valueAmb = SA, valueHosp = Total (SH + SP), valueProf = SP
+        
+        if (temRegraEspecial && regra) {
+          // 🏥 APLICAR REGRA ESPECIAL - PORCENTAGEM APENAS NO SH
+          const valorSA = editedValues.valorAmb;
+          const valorSH = editedValues.valorHosp;
+          const valorSP = editedValues.valorProf; // SP sempre mantém valor original nas regras especiais
+          
+          // Calcular porcentagem baseada na posição
+          const posicao = sequencia - 1;
+          const porcentagemSH = regra.rule.hospitalPercentages[posicao] || 
+                               regra.rule.hospitalPercentages[regra.rule.hospitalPercentages.length - 1];
+          
+          // Aplicar porcentagem APENAS ao SH
+          const valorSHCalculado = (valorSH * porcentagemSH) / 100;
+          const valorSPCalculado = valorSP; // SP sempre 100%
+          const valorSACalculado = valorSA; // SA sempre 100%
+          
+          const valorFinal = valorSHCalculado + valorSPCalculado + valorSACalculado;
+          
+          const updatedSigtapProcedure = {
+            ...proc.sigtapProcedure,
+            valueAmb: valorSA,
+            valueHosp: valorSH + valorSP, // Total original para referência
+            valueProf: valorSP,
+            valueHospTotal: valorSH + valorSP
+          };
+
+          return {
+            ...proc,
+            sigtapProcedure: updatedSigtapProcedure,
+            porcentagemSUS: porcentagemSH,
+            valorCalculado: valorFinal,
+            valorOriginal: valorSH + valorSP,
+            // Campos específicos para regras especiais
+            isSpecialRule: true,
+            specialRuleType: regra.rule.type,
+            regraEspecial: regra.procedureName,
+            valorCalculadoSH: valorSHCalculado,
+            valorCalculadoSP: valorSPCalculado,
+            valorCalculadoSA: valorSACalculado
+          };
+        } else {
+          // 📊 APLICAR LÓGICA PADRÃO DO SISTEMA
         const valorTotal = editedValues.valorHosp + editedValues.valorProf; // SH + SP = Total
         
         const updatedSigtapProcedure = {
@@ -260,7 +372,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           valueHospTotal: valorTotal              // Total hospitalar = SH + SP
         };
 
-        // Calcular valor com porcentagem
+          // Calcular valor com porcentagem aplicada ao total
         const valorCalculado = (updatedSigtapProcedure.valueHospTotal * editedValues.porcentagem) / 100;
 
         return {
@@ -268,8 +380,16 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           sigtapProcedure: updatedSigtapProcedure,
           porcentagemSUS: editedValues.porcentagem,
           valorCalculado,
-          valorOriginal: updatedSigtapProcedure.valueHospTotal
-        };
+            valorOriginal: updatedSigtapProcedure.valueHospTotal,
+            // Limpar campos de regras especiais
+            isSpecialRule: false,
+            specialRuleType: undefined,
+            regraEspecial: undefined,
+            valorCalculadoSH: undefined,
+            valorCalculadoSP: undefined,
+            valorCalculadoSA: undefined
+          };
+        }
       }
       return proc;
     });
@@ -290,10 +410,18 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       return newValues;
     });
 
+    // Toast específico para regra especial ou padrão
+    if (temRegraEspecial && regra) {
+      toast({
+        title: "⚡ Regra Especial Aplicada",
+        description: `${regra.procedureName} - SH: ${editedValues.porcentagem}%, SP: 100%`
+      });
+    } else {
     toast({
       title: "✅ Valores atualizados",
       description: `Procedimento ${sequencia} atualizado com ${editedValues.porcentagem}% de cobrança`
     });
+    }
   };
 
   // Cancelar edição
@@ -308,33 +436,6 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       const newValues = { ...prev };
       delete newValues[sequencia];
       return newValues;
-    });
-  };
-
-  // Atualizar porcentagem padrão para todos os procedimentos secundários
-  const updateDefaultPercentage = (newPercentage: number) => {
-    setDefaultPercentage(newPercentage);
-    
-    const updatedProcedimentos = aihCompleta.procedimentos.map((proc, index) => {
-      if (index > 0 && proc.sigtapProcedure) { // Não alterar o procedimento principal
-        const valorBase = proc.sigtapProcedure.valueHospTotal;
-        const valorCalculado = (valorBase * newPercentage) / 100;
-        
-        return {
-          ...proc,
-          porcentagemSUS: newPercentage,
-          valorCalculado
-        };
-      }
-      return proc;
-    });
-
-    const updatedAIH = calculateTotalsWithPercentage(updatedProcedimentos);
-    onUpdateAIH(updatedAIH);
-
-    toast({
-      title: "📊 Porcentagem atualizada",
-      description: `Todos os procedimentos secundários agora usam ${newPercentage}%`
     });
   };
 
@@ -572,13 +673,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                     )}
                     
                     {/* IDENTIFICAÇÃO DE REGRAS ESPECIAIS CIRURGIAS MÚLTIPLAS */}
-                    {(() => {
-                      // Debug para verificar detecção
-                      if (aihCompleta.procedimentoPrincipal) {
-                        debugSpecialRuleDetection(aihCompleta.procedimentoPrincipal);
-                      }
-                      return hasSpecialRule(aihCompleta.procedimentoPrincipal || '');
-                    })() && (
+                    {hasSpecialRule(aihCompleta.procedimentoPrincipal || '') && (
                       <Badge variant="outline" className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 border-purple-300 shadow-sm">
                         ⚡ Regra Especial SUS
                       </Badge>
@@ -713,21 +808,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
               <Badge variant="outline" className="bg-green-100 text-green-700">Premium</Badge>
             </div>
             
-            {/* CONTROLE DE PORCENTAGEM GLOBAL */}
-            <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-600">% Secundários:</label>
-              <div className="flex items-center space-x-1">
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={defaultPercentage}
-                  onChange={(e) => updateDefaultPercentage(Number(e.target.value))}
-                  className="w-16 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                />
-                <span className="text-sm text-gray-500">%</span>
-              </div>
-            </div>
+            {/* ❌ CAMPO DE PORCENTAGEM REMOVIDO - Agora usa apenas regras automáticas do SUS */}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -793,16 +874,16 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                 })()}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span>Procedimento Principal: <strong>100%</strong></span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <span>Procedimentos Secundários: <strong>{defaultPercentage}%</strong></span>
-                </div>
+              <div className="grid grid-cols-1 gap-4 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span>Procedimento Principal: <strong>100%</strong></span>
               </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span>Procedimentos Secundários: <strong>Editar Manualmente</strong></span>
+              </div>
+            </div>
             )}
           </div>
         </CardContent>
@@ -850,165 +931,27 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                         </div>
                       </TableCell>
                       <TableCell>
-                        {editingValues.has(procedure.sequencia) ? (
-                          // MODO EDIÇÃO PREMIUM
-                          <div className="bg-yellow-50 rounded border-2 border-yellow-200 p-3">
-                            <div className="text-xs font-medium text-gray-600 mb-2">Editando Valores:</div>
-                            <div className="grid grid-cols-3 gap-2 mb-2">
-                              <div className="text-center">
-                                <label className="text-xs font-medium text-gray-600">SA</label>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={tempValues[procedure.sequencia]?.valorAmb || 0}
-                                  onChange={(e) => setTempValues(prev => ({
-                                    ...prev,
-                                    [procedure.sequencia]: {
-                                      ...prev[procedure.sequencia],
-                                      valorAmb: Number(e.target.value)
-                                    }
-                                  }))}
-                                  className="w-full px-2 py-1 text-xs border rounded text-center"
-                                />
-                              </div>
-                              <div className="text-center">
-                                <label className="text-xs font-medium text-gray-600">SH</label>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={tempValues[procedure.sequencia]?.valorHosp || 0}
-                                  onChange={(e) => setTempValues(prev => ({
-                                    ...prev,
-                                    [procedure.sequencia]: {
-                                      ...prev[procedure.sequencia],
-                                      valorHosp: Number(e.target.value)
-                                    }
-                                  }))}
-                                  className="w-full px-2 py-1 text-xs border rounded text-center"
-                                />
-                              </div>
-                              <div className="text-center">
-                                <label className="text-xs font-medium text-gray-600">SP</label>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={tempValues[procedure.sequencia]?.valorProf || 0}
-                                  onChange={(e) => setTempValues(prev => ({
-                                    ...prev,
-                                    [procedure.sequencia]: {
-                                      ...prev[procedure.sequencia],
-                                      valorProf: Number(e.target.value)
-                                    }
-                                  }))}
-                                  className="w-full px-2 py-1 text-xs border rounded text-center"
-                                />
-                              </div>
+                        {/* NOVA COLUNA SIMPLIFICADA - APENAS TOTAL */}
+                        {procedure.valorCalculado && procedure.sigtapProcedure ? (
+                          <div className="text-center py-2">
+                            <div className="font-bold text-lg text-green-600 mb-1">
+                              {formatCurrency(procedure.valorCalculado)}
                             </div>
-                            <div className="flex items-center justify-center space-x-2 pt-2 border-t">
-                              <span className="text-xs font-medium">%:</span>
-                              <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={tempValues[procedure.sequencia]?.porcentagem || 100}
-                                onChange={(e) => setTempValues(prev => ({
-                                  ...prev,
-                                  [procedure.sequencia]: {
-                                    ...prev[procedure.sequencia],
-                                    porcentagem: Number(e.target.value)
-                                  }
-                                }))}
-                                className="w-16 px-2 py-1 text-xs border rounded text-center"
-                              />
-                              <span className="text-xs">%</span>
+                            <div className="flex justify-center">
+                              {procedure.isSpecialRule ? (
+                                <Badge variant="outline" className="text-xs px-2 bg-orange-100 text-orange-800 border-orange-300">
+                                  ⚡ Regra Especial
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs px-2">
+                                  {procedure.porcentagemSUS || (procedure.sequencia === 1 ? '100' : 'Manual')}% SUS
+                                </Badge>
+                              )}
                             </div>
-                            <div className="flex justify-center space-x-1 mt-3">
-                              <Button size="sm" onClick={() => saveEditedValues(procedure.sequencia)} className="h-7 px-3 text-xs">
-                                <Check className="w-3 h-3 mr-1" />
-                                Salvar
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => cancelEditingValues(procedure.sequencia)} className="h-7 px-3 text-xs">
-                                <X className="w-3 h-3 mr-1" />
-                                Cancelar
-                              </Button>
-                            </div>
-                          </div>
-                        ) : procedure.valorCalculado && procedure.sigtapProcedure ? (
-                          // MODO VISUALIZAÇÃO HORIZONTAL
-                          <div className="relative group">
-                            <div className="bg-gray-50 rounded-lg p-3 border">
-                              <div className="grid grid-cols-4 gap-3 text-xs">
-                                <div className="text-center">
-                                  <div className="text-gray-500 font-medium mb-1">SA</div>
-                                  <div className="font-semibold text-blue-600">
-                                    {formatCurrency(procedure.sigtapProcedure.valueAmb)}
-                                  </div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-gray-500 font-medium mb-1">SH</div>
-                                  <div className="font-semibold text-blue-600">
-                                    {(() => {
-                                      const valorTotalSigtap = procedure.sigtapProcedure.valueHosp;
-                                      const valorSP = procedure.sigtapProcedure.valueProf;
-                                      const valorSH = valorTotalSigtap - valorSP;
-                                      return formatCurrency(valorSH);
-                                    })()}
-                                  </div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-gray-500 font-medium mb-1">SP</div>
-                                  <div className="font-semibold text-blue-600">
-                                    {formatCurrency(procedure.sigtapProcedure.valueProf)}
-                                  </div>
-                                </div>
-                                <div className="text-center border-l pl-3">
-                                  <div className="text-gray-500 font-medium mb-1">Total</div>
-                                  <div className="font-bold text-green-600">
-                                    {formatCurrency(procedure.valorCalculado)}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-center mt-2 pt-2 border-t">
-                                {procedure.isSpecialRule ? (
-                                  <div className="flex flex-col items-center space-y-1">
-                                    <Badge variant="outline" className="text-xs px-2 bg-orange-100 text-orange-800 border-orange-300">
-                                      🏥 SH: {procedure.porcentagemSUS}%
-                                    </Badge>
-                                    <Badge variant="outline" className="text-xs px-2 bg-green-100 text-green-800 border-green-300">
-                                      SP: 100%
-                                    </Badge>
-                                  </div>
-                                ) : (
-                                  <Badge variant="outline" className="text-xs px-2">
-                                    {procedure.porcentagemSUS || (procedure.sequencia === 1 ? 100 : defaultPercentage)}% SUS
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            
-                            {/* Botão de edição (aparece no hover) */}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => startEditingValues(procedure.sequencia, procedure)}
-                              className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-yellow-100 hover:bg-yellow-200"
-                            >
-                              <Edit className="w-3 h-3" />
-                            </Button>
                           </div>
                         ) : (
                           <div className="text-center py-4">
                             <span className="text-gray-400 text-sm">Não calculado</span>
-                            {procedure.sigtapProcedure && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => startEditingValues(procedure.sequencia, procedure)}
-                                className="ml-2 h-6 w-6 p-0 bg-blue-100 hover:bg-blue-200"
-                              >
-                                <Edit className="w-3 h-3" />
-                              </Button>
-                            )}
                           </div>
                         )}
                       </TableCell>
@@ -1038,133 +981,314 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                       </TableCell>
                     </TableRow>
                     
-                    {/* DETALHES EXPANDIDOS */}
+                    {/* DETALHES EXPANDIDOS - NOVA VERSÃO COM EDIÇÃO DE VALORES */}
                     {expandedProcedures.has(procedure.sequencia) && (
                       <TableRow>
                         <TableCell colSpan={6} className="bg-gray-50 p-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            
+                            {/* COLUNA 1: INFORMAÇÕES TÉCNICAS */}
                             <div>
-                              <h5 className="font-medium text-sm text-gray-600 mb-2">Informações Técnicas</h5>
+                              <h5 className="font-medium text-sm text-gray-600 mb-2">📋 Informações Técnicas</h5>
                               <div className="bg-white p-3 rounded border text-sm space-y-1">
                                 <p><span className="font-medium">CBO:</span> {procedure.cbo}</p>
                                 <p><span className="font-medium">Data:</span> {procedure.data}</p>
-                                <p><span className="font-medium">Participação:</span> {procedure.participacao}</p>
+                                <div className="flex items-start gap-2">
+                          <span className="font-medium min-w-[80px]">Participação:</span>
+                          <ParticipationDisplay code={procedure.participacao} />
+                        </div>
                                 <p><span className="font-medium">CNES:</span> {procedure.cnes}</p>
                                 {procedure.matchConfidence && (
                                   <p><span className="font-medium">Confiança:</span> {(procedure.matchConfidence * 100).toFixed(1)}%</p>
                                 )}
                               </div>
-                            </div>
-                            
-                                                          {procedure.sigtapProcedure && (
-                                <div>
-                                  <h5 className="font-medium text-sm text-gray-600 mb-2">Match SIGTAP</h5>
+
+                              {/* SIGTAP INFO */}
+                              {procedure.sigtapProcedure && (
+                                <div className="mt-4">
+                                  <h5 className="font-medium text-sm text-gray-600 mb-2">🎯 Match SIGTAP</h5>
                                   <div className="bg-white p-3 rounded border text-sm space-y-1">
                                     <p><span className="font-medium">Código:</span> {procedure.sigtapProcedure.code}</p>
                                     <p><span className="font-medium">Descrição:</span> {procedure.sigtapProcedure.description}</p>
                                     <p><span className="font-medium">Complexidade:</span> {procedure.sigtapProcedure.complexity}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* COLUNA 2: EDIÇÃO DE VALORES */}
+                            {procedure.sigtapProcedure && (
+                              <div>
+                                <div className="flex items-center justify-between mb-3">
+                                  <h5 className="font-medium text-sm text-gray-600">💰 Editar Valores SUS</h5>
+                                  {/* INDICADOR DE REGRA ESPECIAL */}
+                                  {(() => {
+                                    const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
+                                    const temRegraEspecial = hasSpecialRule(procedimentoPrincipal);
+                                    const regra = getSpecialRule(procedimentoPrincipal);
                                     
-                                    <div className="pt-2 border-t">
+                                    return temRegraEspecial && regra ? (
+                                      <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
+                                        ⚡ {regra.procedureName}
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-xs">
+                                        📊 Padrão SUS
+                                      </Badge>
+                                    );
+                                  })()}
+                                </div>
+
+                        {editingValues.has(procedure.sequencia) ? (
+                                  // MODO EDIÇÃO
+                                  <div className="bg-yellow-50 rounded border-2 border-yellow-200 p-4">
+                                    <div className="text-sm font-medium text-gray-700 mb-3">✏️ Editando Valores:</div>
+                                    
+                                    {/* GRID DE VALORES */}
+                                    <div className="grid grid-cols-3 gap-3 mb-4">
+                              <div className="text-center">
+                                        <label className="text-xs font-medium text-gray-600 block mb-1">SA (Ambulatorial)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={tempValues[procedure.sequencia]?.valorAmb || 0}
+                                  onChange={(e) => setTempValues(prev => ({
+                                    ...prev,
+                                    [procedure.sequencia]: {
+                                      ...prev[procedure.sequencia],
+                                      valorAmb: Number(e.target.value)
+                                    }
+                                  }))}
+                                          className="w-full px-2 py-2 text-sm border rounded text-center"
+                                />
+                              </div>
+                              <div className="text-center">
+                                        <label className="text-xs font-medium text-gray-600 block mb-1">SH (Hospitalar)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={tempValues[procedure.sequencia]?.valorHosp || 0}
+                                  onChange={(e) => setTempValues(prev => ({
+                                    ...prev,
+                                    [procedure.sequencia]: {
+                                      ...prev[procedure.sequencia],
+                                      valorHosp: Number(e.target.value)
+                                    }
+                                  }))}
+                                          className="w-full px-2 py-2 text-sm border rounded text-center"
+                                />
+                              </div>
+                              <div className="text-center">
+                                        <label className="text-xs font-medium text-gray-600 block mb-1">SP (Profissional)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={tempValues[procedure.sequencia]?.valorProf || 0}
+                                  onChange={(e) => setTempValues(prev => ({
+                                    ...prev,
+                                    [procedure.sequencia]: {
+                                      ...prev[procedure.sequencia],
+                                      valorProf: Number(e.target.value)
+                                    }
+                                  }))}
+                                          className="w-full px-2 py-2 text-sm border rounded text-center"
+                                          disabled={(() => {
+                                            // SP sempre 100% nas regras especiais
+                                            const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
+                                            return hasSpecialRule(procedimentoPrincipal);
+                                          })()}
+                                />
+                              </div>
+                            </div>
+
+                                    {/* CONTROLE DE PORCENTAGEM - APENAS PARA SH */}
+                                    <div className="bg-white rounded p-3 border mb-4">
                                       <div className="flex items-center justify-between mb-2">
-                                        <p className="font-medium text-green-700">Valores SIGTAP:</p>
+                                        <span className="text-sm font-medium text-gray-700">Porcentagem aplicada ao SH:</span>
+                                        {(() => {
+                                          const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
+                                          const temRegraEspecial = hasSpecialRule(procedimentoPrincipal);
+                                          const regra = getSpecialRule(procedimentoPrincipal);
+                                          
+                                          if (temRegraEspecial && regra) {
+                                            // Calcular porcentagem da regra especial baseada na sequência
+                                            const posicao = procedure.sequencia - 1;
+                                            const porcentagemRegra = regra.rule.hospitalPercentages[posicao] || 
+                                                                   regra.rule.hospitalPercentages[regra.rule.hospitalPercentages.length - 1];
+                                            return (
+                                              <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800">
+                                                🔒 {porcentagemRegra}% (Automático)
+                                              </Badge>
+                                            );
+                                          }
+                                          return null;
+                                        })()}
+                                      </div>
+                                      
+                                      <div className="flex items-center space-x-3">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                          value={(() => {
+                                            const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
+                                            const temRegraEspecial = hasSpecialRule(procedimentoPrincipal);
+                                            const regra = getSpecialRule(procedimentoPrincipal);
+                                            
+                                            if (temRegraEspecial && regra) {
+                                              // Usar porcentagem da regra especial
+                                              const posicao = procedure.sequencia - 1;
+                                              return regra.rule.hospitalPercentages[posicao] || 
+                                                     regra.rule.hospitalPercentages[regra.rule.hospitalPercentages.length - 1];
+                                            }
+                                            
+                                            // Usar porcentagem editável
+                                            return tempValues[procedure.sequencia]?.porcentagem || 100;
+                                          })()}
+                                          onChange={(e) => {
+                                            // Só permitir edição se não for regra especial
+                                            const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
+                                            if (!hasSpecialRule(procedimentoPrincipal)) {
+                                              setTempValues(prev => ({
+                                  ...prev,
+                                  [procedure.sequencia]: {
+                                    ...prev[procedure.sequencia],
+                                    porcentagem: Number(e.target.value)
+                                  }
+                                              }));
+                                            }
+                                          }}
+                                          className="w-20 px-2 py-1 text-sm border rounded text-center"
+                                          disabled={(() => {
+                                            const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
+                                            return hasSpecialRule(procedimentoPrincipal);
+                                          })()}
+                                        />
+                                        <span className="text-sm text-gray-500">% (aplicado apenas ao SH)</span>
+                            </div>
+                            </div>
+
+                                    {/* REGRAS ESPECIAIS INFO */}
+                                    {(() => {
+                                      const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
+                                      const temRegraEspecial = hasSpecialRule(procedimentoPrincipal);
+                                      const regra = getSpecialRule(procedimentoPrincipal);
+                                      
+                                      return temRegraEspecial && regra ? (
+                                        <div className="bg-orange-50 border border-orange-200 rounded p-3 mb-4">
+                                          <div className="text-xs font-medium text-orange-800 mb-2">
+                                            ⚡ Regra Especial Ativa: {regra.procedureName}
+                                  </div>
+                                          <div className="grid grid-cols-2 gap-3 text-xs">
+                                            <div>
+                                              <span className="font-medium">SH (Hospitalar):</span>
+                                              <span className="ml-1">Porcentagem variável por posição</span>
+                                </div>
+                                            <div>
+                                              <span className="font-medium">SP (Profissional):</span>
+                                              <span className="ml-1 text-green-700">🔒 Sempre 100%</span>
+                                  </div>
+                                </div>
+                                  </div>
+                                      ) : null;
+                                    })()}
+
+                                    {/* BOTÕES */}
+                                    <div className="flex justify-center space-x-2">
+                                      <Button size="sm" onClick={() => saveEditedValues(procedure.sequencia)} className="h-8 px-4 text-sm">
+                                        <Check className="w-4 h-4 mr-1" />
+                                        Salvar Alterações
+                            </Button>
+                                      <Button size="sm" variant="outline" onClick={() => cancelEditingValues(procedure.sequencia)} className="h-8 px-4 text-sm">
+                                        <X className="w-4 h-4 mr-1" />
+                                        Cancelar
+                              </Button>
+                          </div>
+                              </div>
+                                ) : (
+                                  // MODO VISUALIZAÇÃO
+                                  <div className="bg-white rounded border p-4">
+                                    <div className="mb-3">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="font-medium text-gray-700">Valores Atuais:</span>
                                         <Button
                                           size="sm"
                                           variant="outline"
                                           onClick={() => startEditingValues(procedure.sequencia, procedure)}
-                                          className="h-6 px-2 text-xs bg-yellow-100 hover:bg-yellow-200"
+                                          className="h-7 px-3 text-xs bg-blue-50 hover:bg-blue-100"
                                         >
                                           <Edit className="w-3 h-3 mr-1" />
                                           Editar
                                         </Button>
                                       </div>
-                                      <div className="grid grid-cols-2 gap-2">
-                                        <div>
+                                      
+                                      {/* GRID DE VALORES ATUAIS */}
+                                      <div className="grid grid-cols-4 gap-3 text-center">
+                                        <div className="bg-blue-50 p-2 rounded">
+                                          <div className="text-xs text-gray-600 mb-1">SA</div>
+                                          <div className="font-semibold text-blue-600 text-sm">
+                                            {formatCurrency(procedure.sigtapProcedure.valueAmb)}
+                                          </div>
+                                        </div>
+                                        <div className="bg-green-50 p-2 rounded">
+                                          <div className="text-xs text-gray-600 mb-1">SH</div>
+                                          <div className="font-semibold text-green-600 text-sm">
                                           {(() => {
-                                            // 🔧 CORREÇÃO: O valueHosp extraído é na verdade o VALOR TOTAL SIGTAP
                                             const valorTotalSigtap = procedure.sigtapProcedure.valueHosp;
                                             const valorSP = procedure.sigtapProcedure.valueProf;
                                             const valorSH = valorTotalSigtap - valorSP;
-                                            
-                                            return (
-                                              <>
-                                                <p>• Ambulatorial: {formatCurrency(procedure.sigtapProcedure.valueAmb)}</p>
-                                                <p>• Hospitalar (SH): {formatCurrency(valorSH)}</p>
-                                                <p>• Profissional (SP): {formatCurrency(valorSP)}</p>
-                                                <p className="font-semibold border-t pt-1 text-blue-600">• Total SIGTAP: {formatCurrency(valorTotalSigtap)}</p>
-                                              </>
-                                            );
+                                              return formatCurrency(valorSH);
                                           })()}
                                         </div>
-                                        <div className={`p-2 rounded ${procedure.isSpecialRule ? 'bg-orange-50 border border-orange-200' : 'bg-green-50'}`}>
-                                          <div className="flex items-center justify-between mb-1">
-                                            <p className={`font-medium ${procedure.isSpecialRule ? 'text-orange-700' : 'text-green-700'}`}>
-                                              {procedure.isSpecialRule ? '🏥 Regra Especial:' : 'Lógica SUS:'}
-                                            </p>
-                                            {procedure.isSpecialRule && (
-                                              <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
-                                                Múltiplas
-                                              </Badge>
-                                            )}
                                           </div>
-                                          
-                                          {procedure.isSpecialRule ? (
-                                            // EXIBIÇÃO PARA REGRAS ESPECIAIS DE CIRURGIAS MÚLTIPLAS
-                                            <div className="space-y-2">
-                                              <div className="text-xs text-orange-600 font-medium">
-                                                {procedure.regraEspecial}
-                                              </div>
-                                              <div className="grid grid-cols-2 gap-2 text-xs">
-                                                <div className="space-y-1">
-                                                  <div className="flex justify-between">
-                                                    <span>SH ({procedure.porcentagemSUS}%):</span>
-                                                    <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSH || 0)}</span>
-                                                  </div>
-                                                  <div className="flex justify-between">
-                                                    <span>SP (100%):</span>
-                                                    <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSP || 0)}</span>
-                                                  </div>
-                                                  <div className="flex justify-between">
-                                                    <span>SA (100%):</span>
-                                                    <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSA || 0)}</span>
-                                                  </div>
-                                                </div>
-                                                <div className="border-l pl-2">
-                                                  <div className="text-center">
-                                                    <div className="text-orange-600 font-medium">Total Final</div>
-                                                    <div className="font-bold text-orange-700 text-sm">
-                                                      {formatCurrency(procedure.valorCalculado || 0)}
-                                                    </div>
-                                                    <div className="text-xs text-orange-500 mt-1">
-                                                      {procedure.sequencia}º Procedimento
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            // EXIBIÇÃO PADRÃO DO SISTEMA
-                                            <div>
-                                              <div className="flex items-center space-x-2">
-                                                <span className={`w-3 h-3 rounded-full ${procedure.sequencia === 1 ? 'bg-green-500' : 'bg-blue-500'}`}></span>
-                                                <span className="text-sm">
-                                                  {procedure.sequencia === 1 ? 'Principal' : 'Secundário'}: 
-                                                  <strong className="ml-1">
-                                                    {procedure.porcentagemSUS || (procedure.sequencia === 1 ? 100 : defaultPercentage)}%
-                                                  </strong>
-                                                </span>
-                                              </div>
-                                              <p className="text-sm mt-1">
-                                                <span className="font-medium">Valor Final:</span>
-                                                <span className="ml-1 font-semibold text-green-600">
-                                                  {formatCurrency(procedure.valorCalculado || 0)}
-                                                </span>
-                                              </p>
-                                            </div>
-                                          )}
+                                        <div className="bg-purple-50 p-2 rounded">
+                                          <div className="text-xs text-gray-600 mb-1">SP</div>
+                                          <div className="font-semibold text-purple-600 text-sm">
+                                            {formatCurrency(procedure.sigtapProcedure.valueProf)}
+                                          </div>
+                                        </div>
+                                        <div className="bg-emerald-50 p-2 rounded border-l-2 border-emerald-400">
+                                          <div className="text-xs text-gray-600 mb-1">Total Final</div>
+                                          <div className="font-bold text-emerald-600">
+                                              {formatCurrency(procedure.valorCalculado || 0)}
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
+
+                                    {/* LÓGICA APLICADA */}
+                                    <div className={`p-3 rounded ${procedure.isSpecialRule ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50'}`}>
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className={`font-medium text-sm ${procedure.isSpecialRule ? 'text-orange-700' : 'text-gray-700'}`}>
+                                          {procedure.isSpecialRule ? '⚡ Regra Especial Aplicada:' : '📊 Lógica SUS Padrão:'}
+                                            </span>
+                                        </div>
+                                      
+                                      {procedure.isSpecialRule ? (
+                                        <div className="text-xs space-y-1">
+                                          <div className="flex justify-between">
+                                            <span>SH ({procedure.porcentagemSUS}%):</span>
+                                            <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSH || 0)}</span>
+                                      </div>
+                                          <div className="flex justify-between">
+                                            <span>SP (100%):</span>
+                                            <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSP || 0)}</span>
+                                    </div>
+                                          <div className="flex justify-between">
+                                            <span>SA (100%):</span>
+                                            <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSA || 0)}</span>
                                   </div>
+                                        </div>
+                                      ) : (
+                                        <div className="text-sm">
+                                          <span>Aplicada porcentagem de </span>
+                                          <strong>{procedure.porcentagemSUS || (procedure.sequencia === 1 ? 100 : 'Manual')}%</strong>
+                                          <span> sobre o valor total SIGTAP</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
                                 </div>
                               )}
                           </div>

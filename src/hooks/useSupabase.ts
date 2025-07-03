@@ -12,7 +12,7 @@ export interface AIHProcessingResult {
 
 export interface AIHData {
   aih_number: string;
-  patient_name?: string;
+  patients?: { name: string };
   procedure_code?: string;
   admission_date?: string;
   hospital_id: string;
@@ -137,13 +137,13 @@ export const useSupabaseAIH = () => {
         .select(`
           id,
           aih_number,
-          patient_name,
           procedure_code,
           admission_date,
           processing_status,
           hospital_id,
           created_at,
           processed_by,
+          patients!aihs_patient_id_fkey(name),
           hospitals!aihs_hospital_id_fkey(name, cnpj, city, state)
         `)
         .order('created_at', { ascending: false })
