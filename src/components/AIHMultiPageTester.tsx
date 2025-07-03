@@ -39,6 +39,14 @@ import { useSigtapContext } from '../contexts/SigtapContext';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
 import { AIHCompleteProcessingResult, AIHComplete, ProcedureAIH, AIH } from '../types';
+import { 
+  hasSpecialRule, 
+  getSpecialRule, 
+  applySpecialCalculation, 
+  hasSpecialProceduresInList,
+  logSpecialRules,
+  debugSpecialRuleDetection 
+} from '../config/susCalculationRules';
 
 // Declaração de tipo para jsPDF com autoTable
 declare module 'jspdf' {
@@ -131,22 +139,69 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
 
   // Função para calcular totais aplicando lógica de porcentagem SUS
   const calculateTotalsWithPercentage = (procedimentos: ProcedureAIH[]): AIHComplete => {
+    // Verificar se existem procedimentos com regras especiais na lista
+    const specialCheck = hasSpecialProceduresInList(
+      procedimentos.map(p => ({ procedureCode: p.procedimento }))
+    );
+
+    if (specialCheck.hasSpecial) {
+      console.log('🏥 APLICANDO REGRAS ESPECIAIS DE CIRURGIAS MÚLTIPLAS:', specialCheck.specialCodes);
+      logSpecialRules();
+    }
+
     const procedimentosComPercentagem = procedimentos.map((proc, index) => {
       if (!proc.sigtapProcedure) return proc;
 
-      // Procedimento principal (primeiro) = 100%, demais = porcentagem definida
-      const isPrincipal = index === 0;
-      const porcentagem = isPrincipal ? 100 : (proc.porcentagemSUS || defaultPercentage);
+      // Verificar se este procedimento tem regra especial
+      const hasSpecialCalc = hasSpecialRule(proc.procedimento);
       
-      const valorBase = proc.sigtapProcedure.valueHospTotal;
-      const valorCalculado = (valorBase * porcentagem) / 100;
+      if (hasSpecialCalc) {
+        // APLICAR REGRAS ESPECIAIS DE CIRURGIAS MÚLTIPLAS
+        const valorTotalSigtap = proc.sigtapProcedure.valueHosp; // Total extraído
+        const valorSP = proc.sigtapProcedure.valueProf;          // SP
+        const valorSH = valorTotalSigtap - valorSP;              // SH = Total - SP
+        const valorSA = proc.sigtapProcedure.valueAmb;           // SA
+        
+        const specialCalc = applySpecialCalculation([{
+          procedureCode: proc.procedimento,
+          valueHosp: valorSH,
+          valueProf: valorSP,
+          valueAmb: valorSA,
+          sequenceOrder: proc.sequencia
+        }]);
 
-      return {
-        ...proc,
-        porcentagemSUS: porcentagem,
-        valorCalculado,
-        valorOriginal: valorBase
-      };
+        const result = specialCalc[0];
+        
+        console.log(`📋 ${proc.procedimento} (${proc.sequencia}º): SH=${result.appliedHospPercentage}%, SP=100%`);
+        
+        return {
+          ...proc,
+          porcentagemSUS: result.appliedHospPercentage, // Para compatibilidade com interface
+          valorCalculado: result.calculatedTotal,
+          valorOriginal: valorSH + valorSP + valorSA,
+          // Campos adicionais para cirurgias especiais
+          valorCalculadoSH: result.calculatedValueHosp,
+          valorCalculadoSP: result.calculatedValueProf,
+          valorCalculadoSA: result.calculatedValueAmb,
+          regraEspecial: result.ruleApplied,
+          isSpecialRule: true
+        };
+      } else {
+        // APLICAR LÓGICA PADRÃO DO SISTEMA
+        const isPrincipal = index === 0;
+        const porcentagem = isPrincipal ? 100 : (proc.porcentagemSUS || defaultPercentage);
+        
+        const valorBase = proc.sigtapProcedure.valueHospTotal;
+        const valorCalculado = (valorBase * porcentagem) / 100;
+
+        return {
+          ...proc,
+          porcentagemSUS: porcentagem,
+          valorCalculado,
+          valorOriginal: valorBase,
+          isSpecialRule: false
+        };
+      }
     });
 
     const valorTotalCalculado = procedimentosComPercentagem
@@ -515,7 +570,77 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                     {aihCompleta.procedimentoEspecial && (
                       <Badge variant="secondary" className="bg-red-100 text-red-700">Especial</Badge>
                     )}
+                    
+                    {/* IDENTIFICAÇÃO DE REGRAS ESPECIAIS CIRURGIAS MÚLTIPLAS */}
+                    {(() => {
+                      // Debug para verificar detecção
+                      if (aihCompleta.procedimentoPrincipal) {
+                        debugSpecialRuleDetection(aihCompleta.procedimentoPrincipal);
+                      }
+                      return hasSpecialRule(aihCompleta.procedimentoPrincipal || '');
+                    })() && (
+                      <Badge variant="outline" className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 border-purple-300 shadow-sm">
+                        ⚡ Regra Especial SUS
+                      </Badge>
+                    )}
                   </div>
+                  
+                  {/* EXPLICAÇÃO DETALHADA DAS REGRAS ESPECIAIS */}
+                  {hasSpecialRule(aihCompleta.procedimentoPrincipal || '') && (
+                    <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                        <h5 className="text-sm font-semibold text-purple-800">🎯 Regra de Cirurgia Múltipla Ativa</h5>
+                      </div>
+                      
+                      {(() => {
+                        const rule = getSpecialRule(aihCompleta.procedimentoPrincipal || '');
+                        return rule ? (
+                          <div className="space-y-2">
+                            <p className="text-xs text-purple-700 font-medium">
+                              📋 <strong>{rule.procedureName}</strong>
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {rule.description}
+                            </p>
+                            
+                            <div className="grid grid-cols-2 gap-3 mt-2">
+                              <div className="bg-white p-2 rounded border">
+                                <p className="text-xs font-medium text-gray-600 mb-1">🏥 Serviços Hospitalares (SH):</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {rule.rule.hospitalPercentages.map((percentage, index) => (
+                                    <span 
+                                      key={index}
+                                      className={`text-xs px-1.5 py-0.5 rounded ${
+                                        index === 0 
+                                          ? 'bg-green-100 text-green-700 font-semibold' 
+                                          : 'bg-blue-100 text-blue-700'
+                                      }`}
+                                    >
+                                      {index + 1}º: {percentage}%
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              <div className="bg-white p-2 rounded border">
+                                <p className="text-xs font-medium text-gray-600 mb-1">👨‍⚕️ Serviços Profissionais (SP):</p>
+                                <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded font-semibold">
+                                  🟢 Sempre 100%
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                              <p className="text-xs text-yellow-800">
+                                <strong>⚠️ Atenção:</strong> Esta regra será aplicada automaticamente a todos os procedimentos desta AIH.
+                              </p>
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
                 </div>
                 
                 <div>
@@ -642,16 +767,43 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           {/* RESUMO DE PORCENTAGENS */}
           <div className="mt-4 p-3 bg-white rounded-lg border">
             <h4 className="text-sm font-medium text-gray-600 mb-2">Lógica de Cobrança SUS:</h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span>Procedimento Principal: <strong>100%</strong></span>
+            
+            {/* VERIFICAÇÃO DE REGRAS ESPECIAIS ATIVAS */}
+            {hasSpecialRule(aihCompleta.procedimentoPrincipal || '') ? (
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2 p-2 bg-purple-50 border border-purple-200 rounded">
+                  <div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-semibold text-purple-800">⚡ Regra Especial de Cirurgia Múltipla Ativa</span>
+                </div>
+                
+                {(() => {
+                  const rule = getSpecialRule(aihCompleta.procedimentoPrincipal || '');
+                  return rule ? (
+                    <div className="grid grid-cols-1 gap-2 text-sm">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        <span>🏥 <strong>SH:</strong> {rule.rule.hospitalPercentages.join('%, ')}%</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span>👨‍⚕️ <strong>SP:</strong> Sempre 100%</span>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                <span>Procedimentos Secundários: <strong>{defaultPercentage}%</strong></span>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span>Procedimento Principal: <strong>100%</strong></span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span>Procedimentos Secundários: <strong>{defaultPercentage}%</strong></span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -817,9 +969,20 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                 </div>
                               </div>
                               <div className="flex items-center justify-center mt-2 pt-2 border-t">
-                                <Badge variant="outline" className="text-xs px-2">
-                                  {procedure.porcentagemSUS || (procedure.sequencia === 1 ? 100 : defaultPercentage)}% SUS
-                                </Badge>
+                                {procedure.isSpecialRule ? (
+                                  <div className="flex flex-col items-center space-y-1">
+                                    <Badge variant="outline" className="text-xs px-2 bg-orange-100 text-orange-800 border-orange-300">
+                                      🏥 SH: {procedure.porcentagemSUS}%
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs px-2 bg-green-100 text-green-800 border-green-300">
+                                      SP: 100%
+                                    </Badge>
+                                  </div>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs px-2">
+                                    {procedure.porcentagemSUS || (procedure.sequencia === 1 ? 100 : defaultPercentage)}% SUS
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                             
@@ -932,23 +1095,72 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                             );
                                           })()}
                                         </div>
-                                        <div className="bg-green-50 p-2 rounded">
-                                          <p className="font-medium text-green-700 mb-1">Lógica SUS:</p>
-                                          <div className="flex items-center space-x-2">
-                                            <span className={`w-3 h-3 rounded-full ${procedure.sequencia === 1 ? 'bg-green-500' : 'bg-blue-500'}`}></span>
-                                            <span className="text-sm">
-                                              {procedure.sequencia === 1 ? 'Principal' : 'Secundário'}: 
-                                              <strong className="ml-1">
-                                                {procedure.porcentagemSUS || (procedure.sequencia === 1 ? 100 : defaultPercentage)}%
-                                              </strong>
-                                            </span>
+                                        <div className={`p-2 rounded ${procedure.isSpecialRule ? 'bg-orange-50 border border-orange-200' : 'bg-green-50'}`}>
+                                          <div className="flex items-center justify-between mb-1">
+                                            <p className={`font-medium ${procedure.isSpecialRule ? 'text-orange-700' : 'text-green-700'}`}>
+                                              {procedure.isSpecialRule ? '🏥 Regra Especial:' : 'Lógica SUS:'}
+                                            </p>
+                                            {procedure.isSpecialRule && (
+                                              <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
+                                                Múltiplas
+                                              </Badge>
+                                            )}
                                           </div>
-                                          <p className="text-sm mt-1">
-                                            <span className="font-medium">Valor Final:</span>
-                                            <span className="ml-1 font-semibold text-green-600">
-                                              {formatCurrency(procedure.valorCalculado || 0)}
-                                            </span>
-                                          </p>
+                                          
+                                          {procedure.isSpecialRule ? (
+                                            // EXIBIÇÃO PARA REGRAS ESPECIAIS DE CIRURGIAS MÚLTIPLAS
+                                            <div className="space-y-2">
+                                              <div className="text-xs text-orange-600 font-medium">
+                                                {procedure.regraEspecial}
+                                              </div>
+                                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div className="space-y-1">
+                                                  <div className="flex justify-between">
+                                                    <span>SH ({procedure.porcentagemSUS}%):</span>
+                                                    <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSH || 0)}</span>
+                                                  </div>
+                                                  <div className="flex justify-between">
+                                                    <span>SP (100%):</span>
+                                                    <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSP || 0)}</span>
+                                                  </div>
+                                                  <div className="flex justify-between">
+                                                    <span>SA (100%):</span>
+                                                    <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSA || 0)}</span>
+                                                  </div>
+                                                </div>
+                                                <div className="border-l pl-2">
+                                                  <div className="text-center">
+                                                    <div className="text-orange-600 font-medium">Total Final</div>
+                                                    <div className="font-bold text-orange-700 text-sm">
+                                                      {formatCurrency(procedure.valorCalculado || 0)}
+                                                    </div>
+                                                    <div className="text-xs text-orange-500 mt-1">
+                                                      {procedure.sequencia}º Procedimento
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            // EXIBIÇÃO PADRÃO DO SISTEMA
+                                            <div>
+                                              <div className="flex items-center space-x-2">
+                                                <span className={`w-3 h-3 rounded-full ${procedure.sequencia === 1 ? 'bg-green-500' : 'bg-blue-500'}`}></span>
+                                                <span className="text-sm">
+                                                  {procedure.sequencia === 1 ? 'Principal' : 'Secundário'}: 
+                                                  <strong className="ml-1">
+                                                    {procedure.porcentagemSUS || (procedure.sequencia === 1 ? 100 : defaultPercentage)}%
+                                                  </strong>
+                                                </span>
+                                              </div>
+                                              <p className="text-sm mt-1">
+                                                <span className="font-medium">Valor Final:</span>
+                                                <span className="ml-1 font-semibold text-green-600">
+                                                  {formatCurrency(procedure.valorCalculado || 0)}
+                                                </span>
+                                              </p>
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
                                     </div>

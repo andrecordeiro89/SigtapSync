@@ -365,6 +365,13 @@ export interface ProcedureAIH {
   // Lógica de porcentagem SUS
   porcentagemSUS?: number; // Porcentagem a ser aplicada no valor (padrão: 100% para principal, 70% para secundários)
   
+  // Campos para regras especiais de cirurgias múltiplas e sequenciais
+  isSpecialRule?: boolean;           // Se aplica regra especial
+  regraEspecial?: string;            // Nome da regra aplicada
+  valorCalculadoSH?: number;         // Valor SH calculado com percentual especial
+  valorCalculadoSP?: number;         // Valor SP (sempre 100%)
+  valorCalculadoSA?: number;         // Valor SA (sempre 100%)
+  
   // Auditoria
   revisadoPor?: string;
   dataRevisao?: string;
