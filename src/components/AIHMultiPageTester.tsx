@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import DoctorDisplay from './ui/doctor-display';
 import { 
   Upload, 
   FileText, 
@@ -121,6 +122,10 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
   }}>({});
   const [expandedSections, setExpandedSections] = useState<{endereco: boolean}>({endereco: false}); // NOVO ESTADO
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  // Definir hospital atual para busca de médicos
+  const currentHospital = { id: user?.hospital_id || '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b', name: 'Hospital de Desenvolvimento' };
 
   // Aplicar lógica de porcentagem SUS quando AIH é carregada
   useEffect(() => {
@@ -531,34 +536,33 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                 </div>
               </div>
               
-              {/* Linha 3: CNS dos Médicos - Seção Destacada */}
+              {/* Linha 3: CNS dos Médicos - Seção Destacada com Nomes */}
               <div className="bg-gray-50 p-3 rounded border mt-3">
                 <div className="flex items-center space-x-2 mb-2">
                   <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                   <h5 className="text-xs font-semibold text-gray-700">👨‍⚕️ Médicos Responsáveis</h5>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                    ✨ Com nomes dos médicos
+                  </Badge>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-gray-600">CNS Autorizador</label>
-                    <p className="text-gray-900 text-sm font-mono bg-green-50 px-2 py-1 rounded">
-                      {aihCompleta.cnsAutorizador || 'N/A'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Médico que autorizou</p>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600">CNS Solicitante</label>
-                    <p className="text-gray-900 text-sm font-mono bg-blue-50 px-2 py-1 rounded">
-                      {aihCompleta.cnsSolicitante || 'N/A'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Médico solicitante</p>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-600">CNS Responsável</label>
-                    <p className="text-gray-900 text-sm font-mono bg-purple-50 px-2 py-1 rounded">
-                      {aihCompleta.cnsResponsavel || 'N/A'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">Médico responsável</p>
-                  </div>
+                  <DoctorDisplay 
+                    cns={aihCompleta.cnsAutorizador || ''} 
+                    type="autorizador" 
+                    hospitalId={currentHospital?.id}
+                  />
+                  <DoctorDisplay 
+                    cns={aihCompleta.cnsSolicitante || ''} 
+                    type="solicitante" 
+                    hospitalId={currentHospital?.id}
+                    showFullInfo={true}
+                  />
+                  <DoctorDisplay 
+                    cns={aihCompleta.cnsResponsavel || ''} 
+                    type="responsavel" 
+                    hospitalId={currentHospital?.id}
+                    showFullInfo={true}
+                  />
                 </div>
               </div>
             </div>
@@ -1331,6 +1335,8 @@ const AIHMultiPageTester = () => {
       setSelectedFile(file);
       setResult(null);
       setAihCompleta(null);
+      // ✅ RESETAR STATUS DE SALVAMENTO QUANDO NOVO ARQUIVO É SELECIONADO
+      setAihSaved(false);
       console.log('📄 Arquivo selecionado:', file.name, `(${file.size} bytes)`);
     }
   };
@@ -1346,6 +1352,8 @@ const AIHMultiPageTester = () => {
     }
 
     setIsProcessing(true);
+    // ✅ RESETAR STATUS DE SALVAMENTO PARA NOVA AIH
+    setAihSaved(false);
     const startTime = Date.now();
 
     try {
@@ -1380,41 +1388,12 @@ const AIHMultiPageTester = () => {
 
       toast({
         title: "✅ Processamento concluído",
-        description: `AIH processada em ${totalTime}ms`
+        description: `AIH processada em ${totalTime}ms. Use o botão "🚀 Salvar AIH Completa" para salvar no banco.`
       });
 
-      // Persistir AIH processada no banco de dados
-      if (processingResult.aihCompleta && user && safeHospital) {
-        try {
-          console.log('💾 Salvando AIH no banco de dados...');
-          const persistenceResult = await AIHPersistenceService.persistAIHFromPDF(
-            processingResult.aihCompleta,
-            safeHospital.id,
-            selectedFile.name
-          );
-          
-          if (persistenceResult.success) {
-            toast({
-              title: "✅ AIH salva com sucesso",
-              description: persistenceResult.message
-            });
-            setAihSaved(true);
-          } else {
-            toast({
-              title: "⚠️ Erro ao salvar AIH",
-              description: persistenceResult.message,
-              variant: "destructive"
-            });
-          }
-        } catch (error) {
-          console.error('❌ Erro na persistência:', error);
-          toast({
-            title: "❌ Erro na persistência",
-            description: "Falha ao salvar no banco de dados",
-            variant: "destructive"
-          });
-        }
-      }
+      // ✅ NOVA LÓGICA: Dados só são salvos quando usuário clicar em "Salvar AIH Completa"
+      console.log('📋 AIH processada e pronta para edição.');
+      console.log('💡 Para salvar 100% dos dados no banco: use o botão "🚀 Salvar AIH Completa"');
 
     } catch (error) {
       console.error('❌ Erro no processamento:', error);
@@ -1933,6 +1912,13 @@ const AIHMultiPageTester = () => {
       console.log(`📋 AIH: ${aihCompleta.numeroAIH}`);
       console.log(`🏥 Hospital: ${hospitalId}`);
       console.log(`📊 Procedimentos: ${aihCompleta.procedimentos?.length || 0}`);
+      
+      // ✅ VERIFICAÇÃO DE DUPLICATAS ANTES DE SALVAR
+      console.log('🔍 Verificando se AIH já existe no banco...');
+      toast({
+        title: "🔍 Verificando duplicatas",
+        description: "Conferindo se esta AIH já foi salva anteriormente..."
+      });
 
       const result = await AIHPersistenceService.persistCompleteAIH(
         aihCompleta,
@@ -1942,23 +1928,48 @@ const AIHMultiPageTester = () => {
 
       if (result.success) {
         toast({
-          title: "🎉 AIH COMPLETA SALVA!",
-          description: result.message
+          title: "🎉 AIH COMPLETA SALVA COM SUCESSO!",
+          description: `✅ ${result.message}\n📊 Todos os dados foram preservados no banco.`,
+          duration: 5000
         });
         
         console.log('✅ Persistência completa finalizada!');
         console.log(`📄 AIH ID: ${result.aihId}`);
         console.log(`👤 Paciente ID: ${result.patientId}`);
+        
+        // ✅ MARCAR COMO SALVA PARA EVITAR MÚLTIPLOS SALVAMENTOS
+        setAihSaved(true);
+        
+        // ✅ FEEDBACK VISUAL DE SUCESSO
+        toast({
+          title: "💾 Sistema atualizado",
+          description: "Dados disponíveis para consulta e relatórios!",
+          duration: 3000
+        });
+        
       } else {
         throw new Error(result.message);
       }
     } catch (error) {
       console.error('❌ Erro ao salvar AIH completa:', error);
-      toast({
-        title: "❌ Erro na persistência completa",
-        description: error instanceof Error ? error.message : 'Erro desconhecido',
-        variant: "destructive"
-      });
+      
+      // ✅ TRATAMENTO ESPECÍFICO PARA DUPLICATAS
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      
+      if (errorMessage.includes('já existe') || errorMessage.includes('duplicada')) {
+        toast({
+          title: "⚠️ AIH já existe no sistema",
+          description: "Esta AIH já foi salva anteriormente. Para atualizar, use a função de edição.",
+          variant: "destructive",
+          duration: 5000
+        });
+      } else {
+        toast({
+          title: "❌ Erro na persistência completa",
+          description: `Falha ao salvar: ${errorMessage}`,
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -2081,34 +2092,53 @@ const AIHMultiPageTester = () => {
                   🔧 Diagnóstico
                 </Button>
                 
-                <Button onClick={handleSaveToDatabase} disabled={isProcessing} variant="outline" className="bg-green-50 hover:bg-green-100">
+                {/* ✅ BOTÃO PRINCIPAL PARA SALVAR TODOS OS DADOS */}
+                <Button 
+                  onClick={handleSaveCompleteAIH} 
+                  disabled={isProcessing || aihSaved} 
+                  className={aihSaved ? "bg-gray-100 border-gray-300" : "bg-emerald-50 hover:bg-emerald-100 border-emerald-300"}
+                  variant="outline"
+                >
                   {isProcessing ? (
                     <>
                       <Database className="w-4 h-4 mr-2 animate-spin" />
-                      Salvando...
+                      Salvando 100% dos dados...
+                    </>
+                  ) : aihSaved ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+                      ✅ AIH Salva
                     </>
                   ) : (
                     <>
-                      <Database className="w-4 h-4 mr-2" />
-                      💾 Salvar no Banco
-                    </>
-                  )}
-                </Button>
-                
-                <Button onClick={handleSaveCompleteAIH} disabled={isProcessing} variant="outline" className="bg-emerald-50 hover:bg-emerald-100 border-emerald-300">
-                  {isProcessing ? (
-                    <>
-                      <Database className="w-4 h-4 mr-2 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    <>
-                      <Database className="w-4 h-4 mr-2" />
-                      🚀 AIH Completa
+                      <Save className="w-4 h-4 mr-2" />
+                      🚀 Salvar AIH Completa
                     </>
                   )}
                 </Button>
               </>
+            )}
+
+            {/* ⚠️ AVISO QUANDO AIH NÃO FOI SALVA */}
+            {aihCompleta && !aihSaved && (
+              <Alert className="border-orange-500 bg-orange-50 mt-2">
+                <Info className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-orange-800">
+                  💡 <strong>AIH processada mas não salva no banco.</strong> 
+                  Revise os dados e clique em "🚀 Salvar AIH Completa" para persistir 100% das informações.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* ✅ CONFIRMAÇÃO QUANDO AIH FOI SALVA */}
+            {aihCompleta && aihSaved && (
+              <Alert className="border-green-500 bg-green-50 mt-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-800">
+                  ✅ <strong>AIH salva com sucesso!</strong> 
+                  Todos os dados estão disponíveis no sistema para consultas e relatórios.
+                </AlertDescription>
+              </Alert>
             )}
           </div>
         </CardContent>

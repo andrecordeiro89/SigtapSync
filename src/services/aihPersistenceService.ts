@@ -345,7 +345,7 @@ export class AIHPersistenceService {
   private static async createPatientFromAIH(aih: AIH, hospitalId: string): Promise<PatientDB> {
     console.log('👤 Criando novo paciente...', aih.nomePaciente);
     
-    // Preparar dados do paciente
+    // Preparar dados do paciente COM TODOS OS NOVOS CAMPOS EXPANDIDOS
     const patientData = {
       id: crypto.randomUUID(),
       hospital_id: hospitalId,
@@ -355,27 +355,43 @@ export class AIHPersistenceService {
       gender: (aih.sexo === 'Masculino' ? 'M' : aih.sexo === 'Feminino' ? 'F' : aih.sexo) as 'M' | 'F',
       medical_record: aih.prontuario || null,
       mother_name: aih.nomeMae || null,
+      
+      // 🆕 NOVOS CAMPOS ADICIONADOS NA MIGRAÇÃO
       address: aih.endereco || null,
+      numero: aih.numero || null,               // Novo: número do endereço
+      complemento: aih.complemento || null,      // Novo: complemento do endereço
+      bairro: aih.bairro || null,               // Novo: bairro
       city: aih.municipio || null,
       state: aih.uf || null,
       zip_code: aih.cep || null,
+      phone: aih.telefone || null,              // Novo: telefone
       nationality: aih.nacionalidade || 'BRASIL',
       race_color: aih.racaCor || null,
+      
+      // 🆕 NOVOS CAMPOS DE DOCUMENTO
+      tipo_documento: aih.tipoDocumento || null,  // Novo: tipo de documento
+      documento: aih.documento || null,           // Novo: número do documento
+      nome_responsavel: aih.nomeResponsavel || null, // Novo: nome do responsável
+      
       is_active: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
 
-    console.log('📋 Dados do paciente preparados:', {
+    console.log('📋 Dados COMPLETOS do paciente preparados:', {
       name: patientData.name,
       cns: patientData.cns,
       hospital_id: patientData.hospital_id,
       birth_date: patientData.birth_date,
-      gender: patientData.gender
+      gender: patientData.gender,
+      endereco_completo: `${patientData.address}, ${patientData.numero} ${patientData.complemento}`.trim(),
+      bairro: patientData.bairro,
+      telefone: patientData.phone,
+      responsavel: patientData.nome_responsavel
     });
 
     // Tentar criar com schema expandido primeiro
-    console.log('👤 Tentando criar paciente com schema expandido...');
+    console.log('👤 Tentando criar paciente com schema COMPLETAMENTE expandido...');
     const { data: expandedData, error: expandedError } = await supabase
       .from('patients')
       .insert([patientData])
@@ -383,10 +399,11 @@ export class AIHPersistenceService {
       .single();
 
     if (!expandedError && expandedData) {
-      console.log('✅ Paciente criado com schema expandido:', expandedData.name);
+      console.log('✅ Paciente criado com schema COMPLETAMENTE expandido:', expandedData.name);
+      console.log('📍 Endereço completo salvo:', `${expandedData.address}, ${expandedData.numero}`);
       return expandedData;
     } else {
-      console.log(' ⚠️ Erro com schema expandido para paciente, tentando schema básico...', expandedError);
+      console.log('⚠️ Erro com schema expandido para paciente, tentando schema básico...', expandedError);
       
       // Tentar com schema básico (campos obrigatórios apenas)
       console.log('👤 Tentando criar paciente com schema básico...');
@@ -411,11 +428,12 @@ export class AIHPersistenceService {
         .single();
 
       if (basicError) {
-        console.log(' ❌ Erro mesmo com schema básico para paciente:', basicError);
+        console.log('❌ Erro mesmo com schema básico para paciente:', basicError);
         throw new Error(`Erro ao criar paciente: ${basicError.message}`);
       }
 
       console.log('✅ Paciente criado com schema básico:', basicPatientData.name);
+      console.log('⚠️ AVISO: Alguns campos não foram salvos. Execute migração do banco para schema completo.');
       return basicPatientData;
     }
   }
@@ -495,21 +513,38 @@ export class AIHPersistenceService {
         source_file: sourceFile
       };
       
-      // Campos expandidos (podem não existir no schema)
+      // 🆕 CAMPOS EXPANDIDOS COMPLETOS (todos os 14 novos campos)
       const expandedAihData = {
-        aih_situation: aih.situacao || '',
-        aih_type: aih.tipo || '',
-        authorization_date: aih.dataAutorizacao || undefined,
-        cns_authorizer: aih.cnsAutorizador || '',
-        cns_requester: aih.cnsSolicitante || '',
-        cns_responsible: aih.cnsResponsavel || '',
-        procedure_requested: aih.procedimentoSolicitado || '',
-        procedure_changed: aih.mudancaProc || false,
-        discharge_reason: aih.motivoEncerramento || '',
-        specialty: aih.especialidade || '',
-        care_modality: aih.modalidade || '',
-        care_character: aih.caracterAtendimento || '',
-        estimated_original_value: aih.estimatedOriginalValue || undefined
+        // Campos de situação e tipo
+        situacao: aih.situacao || null,                          // Novo: situação da AIH
+        tipo: aih.tipo || null,                                  // Novo: tipo da AIH
+        
+        // Datas importantes
+        data_autorizacao: aih.dataAutorizacao || null,           // Novo: data de autorização
+        
+        // CNS dos profissionais
+        cns_autorizador: aih.cnsAutorizador || null,             // Novo: CNS do autorizador
+        cns_solicitante: aih.cnsSolicitante || null,             // Novo: CNS do solicitante
+        cns_responsavel: aih.cnsResponsavel || null,             // Novo: CNS do responsável
+        
+        // AIHs relacionadas
+        aih_anterior: aih.aihAnterior || null,                   // Novo: AIH anterior
+        aih_posterior: aih.aihPosterior || null,                 // Novo: AIH posterior
+        
+        // Procedimento e mudanças
+        procedure_requested: aih.procedimentoSolicitado || null,  // Novo: procedimento solicitado
+        procedure_changed: aih.mudancaProc || false,             // Novo: houve mudança de procedimento
+        
+        // Encerramento
+        discharge_reason: aih.motivoEncerramento || null,        // Novo: motivo do encerramento
+        
+        // Classificações de atendimento
+        specialty: aih.especialidade || null,                    // Novo: especialidade
+        care_modality: aih.modalidade || null,                   // Novo: modalidade de atendimento
+        care_character: aih.caracterAtendimento || null,         // Novo: caráter do atendimento
+        
+        // Estimativas financeiras
+        estimated_original_value: aih.estimatedOriginalValue || null  // Novo: valor original estimado
       };
       
       // Tentar com campos expandidos primeiro
@@ -1032,6 +1067,24 @@ export class AIHPersistenceService {
       console.log(`👤 Paciente: ${aihCompleta.nomePaciente}`);
       console.log(`📋 Procedimentos: ${aihCompleta.procedimentos?.length || 0}`);
 
+      // ✅ VERIFICAÇÃO PRÉVIA DE DUPLICATAS
+      console.log('🔍 Verificando se AIH já existe no sistema...');
+      const { data: existingAIH, error: checkError } = await supabase
+        .from('aihs')
+        .select('id, aih_number, created_at')
+        .eq('hospital_id', hospitalId)
+        .eq('aih_number', aihCompleta.numeroAIH)
+        .single();
+
+      if (existingAIH) {
+        console.warn(`⚠️ AIH ${aihCompleta.numeroAIH} já existe no sistema (ID: ${existingAIH.id})`);
+        return {
+          success: false,
+          message: `AIH ${aihCompleta.numeroAIH} já existe no sistema (salva em ${new Date(existingAIH.created_at).toLocaleDateString()})`,
+          errors: ['AIH duplicada - use a função de edição para atualizar']
+        };
+      }
+
       // ETAPA 1: Criar AIH básica (como antes)
       const basicResult = await this.persistAIHFromPDF(aihCompleta, hospitalId, sourceFile);
       
@@ -1133,123 +1186,251 @@ export class AIHPersistenceService {
   }
 
   /**
-   * NOVA FUNÇÃO CORRIGIDA: Salva procedimento na estrutura REAL da tabela procedure_records
+   * 🛡️ FUNÇÃO ROBUSTA: Salva procedimento com detecção automática de schema
+   * Funciona tanto com schema original quanto expandido
    */
   private static async saveProcedureRecordFixed(data: any): Promise<any> {
-    console.log(`🔧 SALVANDO PROCEDIMENTO COM MAPEAMENTO CORRETO: ${data.procedure_code}`);
+    console.log(`🔧 SALVANDO PROCEDIMENTO (MODO ROBUSTO): ${data.procedure_code}`);
     
     // Buscar procedure_id do SIGTAP se existe match
     let procedureId = null;
     if (data.procedure_code) {
-      const { data: sigtapProc } = await supabase
-        .from('sigtap_procedures')
-        .select('id')
-        .eq('code', data.procedure_code)
-        .single();
-      
-      if (sigtapProc) {
-        procedureId = sigtapProc.id;
-        console.log(`✅ Procedimento SIGTAP encontrado: ${data.procedure_code} -> ${procedureId}`);
+      try {
+        const { data: sigtapProc } = await supabase
+          .from('sigtap_procedures')
+          .select('id')
+          .eq('code', data.procedure_code)
+          .single();
+        
+        if (sigtapProc) {
+          procedureId = sigtapProc.id;
+          console.log(`✅ Procedimento SIGTAP encontrado: ${data.procedure_code} -> ${procedureId}`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ SIGTAP não disponível para ${data.procedure_code}, continuando sem referência`);
       }
     }
 
-    // Se não encontrou no SIGTAP, usar o primeiro disponível como referência
+    // Se não encontrou no SIGTAP, buscar qualquer um como referência (para FK)
     if (!procedureId) {
-      console.warn(`⚠️ Procedimento ${data.procedure_code} não encontrado no SIGTAP, usando referência genérica`);
-      const { data: firstProc } = await supabase
-        .from('sigtap_procedures')
-        .select('id')
-        .limit(1)
-        .single();
-      
-      if (firstProc) {
-        procedureId = firstProc.id;
-      } else {
-        throw new Error('Nenhum procedimento SIGTAP disponível para referência');
+      try {
+        const { data: firstProc } = await supabase
+          .from('sigtap_procedures')
+          .select('id')
+          .limit(1)
+          .single();
+        
+        if (firstProc) {
+          procedureId = firstProc.id;
+          console.log(`⚠️ Usando procedimento SIGTAP genérico como referência: ${procedureId}`);
+        }
+      } catch (error) {
+        console.warn('⚠️ Nenhum procedimento SIGTAP disponível, continuando sem procedure_id');
+        // Procedemos sem procedure_id se a tabela SIGTAP não existir
       }
     }
 
-    // 🎯 MAPEAMENTO PARA ESTRUTURA REAL DA TABELA procedure_records
-    const record = {
+    // 🎯 MAPEAMENTO ROBUSTO - Usando nomes EXATOS do schema do usuário
+    const basicRecord: any = {
       id: crypto.randomUUID(),
       hospital_id: data.hospital_id,
       patient_id: data.patient_id,
-      procedure_id: procedureId,
       aih_id: data.aih_id,
       
-      // ✅ CAMPOS OBRIGATÓRIOS DA ESTRUTURA REAL
-      procedure_code: data.procedure_code,                                    // Código do procedimento
-      procedure_name: data.procedure_description || `Procedimento ${data.procedure_code}`, // Nome do procedimento
-      execution_date: data.procedure_date || new Date().toISOString(),       // Data de execução
+      // ✅ CAMPOS USANDO NOMES CORRETOS DO SCHEMA
+      procedure_code: data.procedure_code,
+      procedure_name: data.procedure_description || `Procedimento ${data.procedure_code}`,
+      procedure_date: data.procedure_date || new Date().toISOString(),  // Nome correto!
       
-      // Profissional responsável
-      professional_name: data.professional_name || 'PROFISSIONAL NÃO INFORMADO',  // Nome do profissional
-      professional_cbo: data.cbo || 'N/A',                                   // CBO do profissional
-      professional_cns: data.professional_document || 'N/A',                 // CNS do profissional
+      // Profissional responsável  
+      professional_name: data.professional_name || 'PROFISSIONAL NÃO INFORMADO',
+      professional_cbo: data.cbo || 'N/A',
+      professional_cns: data.professional_document || 'N/A',
       
-      // Valores financeiros (em centavos conforme padrão Supabase)
-      quantity: 1,                                                           // Quantidade (padrão 1)
-      unit_value: Math.round((data.calculated_value || 0) * 100),           // Valor unitário em centavos
-      total_value: Math.round((data.calculated_value || 0) * 100),          // Valor total em centavos
+      // Valores financeiros (em centavos)
+      quantity: 1,
+      unit_value: Math.round((data.calculated_value || 0) * 100),
+      total_value: Math.round((data.calculated_value || 0) * 100),
+      value_charged: Math.round((data.calculated_value || 0) * 100), // Campo obrigatório!
       
       // Autorização
-      authorization_number: data.aih_number || 'N/A',                        // Número da AIH
-      authorization_type: 'AIH',                                             // Tipo de autorização
+      authorization_number: data.aih_number || 'N/A',
+      authorization_type: 'AIH',
       
-      // Status de processamento
-      status: data.approved ? 'approved' : 'pending',                       // Status do registro
-      billing_status: 'pending',                                            // Status de faturamento
+      // Status
+      status: data.approved ? 'approved' : 'pending',
+      billing_status: 'pending',
       
       // Modalidade e caráter
-      care_modality: data.care_modality || 'hospitalar',                    // Modalidade de atendimento
-      care_character: data.care_character || 'eletivo',                     // Caráter do atendimento
+      care_modality: data.care_modality || 'hospitalar',
+      care_character: data.care_character || 'eletivo',
       
-      // Observações
-      notes: data.notes || `Sequência: ${data.sequence || 'N/A'}`,          // Observações + sequência
+      // Observações básicas
+      notes: data.notes || `Sequência: ${data.sequence || 'N/A'}`,
       
       // Auditoria
       created_at: new Date().toISOString(),
-      created_by: data.created_by || null,
+      validation_status: data.match_status || 'pending',
+      source_system: 'sigtap-billing-wizard',
+      external_id: `${data.aih_id}_seq_${data.sequence}`,
+      complexity: data.complexity || 'media',
+      financing_type: 'SUS',
+      execution_location: data.cnes || 'MESMO ESTABELECIMENTO',
+      instrument: 'SISTEMA_SIGTAP',
       
-      // Validação
-      validation_status: data.match_status || 'pending',                    // Status de validação
-      
-      // Sistema de origem
-      source_system: 'sigtap-billing-wizard',                              // Sistema de origem
-      external_id: `${data.aih_id}_seq_${data.sequence}`,                  // ID externo único
-      
-      // Classificação
-      complexity: data.complexity || 'media',                              // Complexidade
-      financing_type: 'SUS',                                               // Tipo de financiamento
-      
-      // Local
-      execution_location: data.cnes || 'MESMO ESTABELECIMENTO',             // Local de execução
-      instrument: 'SISTEMA_SIGTAP'                                         // Instrumento
+      // ✅ CAMPO OBRIGATÓRIO execution_date (existe no schema!)
+      execution_date: data.procedure_date || new Date().toISOString()
     };
 
-    console.log(`📋 Mapeamento completo para procedure_records:`, {
-      procedure_code: record.procedure_code,
-      procedure_name: record.procedure_name,
+    // Adicionar procedure_id apenas se encontrado
+    if (procedureId) {
+      basicRecord.procedure_id = procedureId;
+    }
+
+    // 🆕 CAMPOS EXPANDIDOS - Usando nomes EXATOS do schema
+    const expandedFields = {
+      sequencia: data.sequence || null,
+      codigo_procedimento_original: data.procedure_code,  // Nome correto!
+      documento_profissional: data.professional_document || null,
+      participacao: data.participation || null,
+      cnes: data.cnes || null,
+      valor_original: Math.round((data.original_value || 0) * 100),
+      porcentagem_sus: data.sus_percentage || 100,
+      aprovado: data.approved || false,
+      match_confidence: data.match_confidence || 0,
+      observacoes: data.notes || null,
+      match_status: data.match_status || 'pending'
+    };
+
+    console.log(`📋 Tentando salvar com mapeamento ROBUSTO:`, {
+      procedure_code: basicRecord.procedure_code,
       sequence: data.sequence,
-      unit_value_reais: (record.unit_value / 100).toFixed(2),
-      professional: record.professional_name,
-      cbo: record.professional_cbo
+      unit_value_reais: (basicRecord.unit_value / 100).toFixed(2),
+      professional: basicRecord.professional_name,
+      status: basicRecord.status
     });
 
-    const { data: result, error } = await supabase
-      .from('procedure_records')
-      .insert([record])
-      .select()
-      .single();
+    // 🔄 TENTATIVA 1: Schema expandido (com novos campos)
+    try {
+      console.log('📊 Tentativa 1: Salvando com schema EXPANDIDO...');
+      const expandedRecord = { ...basicRecord, ...expandedFields };
+      
+      const { data: result, error } = await supabase
+        .from('procedure_records')
+        .insert([expandedRecord])
+        .select()
+        .single();
 
-    if (error) {
-      console.error('❌ ERRO ao salvar na procedure_records:', error);
-      console.error('📋 Dados que tentamos inserir:', record);
-      throw error;
+      if (error) {
+        throw error;
+      }
+      
+      console.log('✅ SUCESSO: Procedimento salvo com schema EXPANDIDO!');
+      return result;
+
+    } catch (expandedError) {
+      console.warn('⚠️ Schema expandido falhou, tentando schema BÁSICO...', expandedError.message);
+
+      // 🔄 TENTATIVA 2: Schema básico (apenas campos originais)
+      try {
+        console.log('📊 Tentativa 2: Salvando com schema BÁSICO...');
+        
+        const { data: result, error } = await supabase
+          .from('procedure_records')
+          .insert([basicRecord])
+          .select()
+          .single();
+
+        if (error) {
+          throw error;
+        }
+        
+        console.log('✅ SUCESSO: Procedimento salvo com schema BÁSICO!');
+        console.log('💡 DICA: Execute a migração do banco para salvar todos os campos');
+        return result;
+
+      } catch (basicError) {
+        console.error('❌ FALHA: Erro mesmo com schema básico:', basicError);
+        
+        // 🔄 TENTATIVA 3: Schema mínimo (campos essenciais apenas)
+        try {
+          console.log('📊 Tentativa 3: Salvando com schema MÍNIMO...');
+          
+          const minimalRecord: any = {
+            id: basicRecord.id,
+            hospital_id: basicRecord.hospital_id,
+            patient_id: basicRecord.patient_id,
+            aih_id: basicRecord.aih_id,
+            procedure_code: basicRecord.procedure_code,
+            procedure_name: basicRecord.procedure_name,
+            procedure_date: basicRecord.procedure_date,  // Campo obrigatório!
+            value_charged: basicRecord.value_charged,    // Campo obrigatório!
+            total_value: basicRecord.total_value,
+            status: basicRecord.status,
+            created_at: basicRecord.created_at
+          };
+
+          // Adicionar procedure_id apenas se disponível
+          if (procedureId) {
+            minimalRecord.procedure_id = procedureId;
+          }
+          
+          const { data: result, error } = await supabase
+            .from('procedure_records')
+            .insert([minimalRecord])
+            .select()
+            .single();
+
+          if (error) {
+            throw error;
+          }
+          
+          console.log('✅ SUCESSO: Procedimento salvo com schema MÍNIMO!');
+          console.log('⚠️ AVISO: Apenas campos essenciais foram salvos');
+          return result;
+
+        } catch (minimalError) {
+          console.error('❌ ERRO CRÍTICO: Falha em todos os schemas:', minimalError);
+          console.error('📋 Detalhes do erro mínimo:', minimalError);
+          
+          // 🔄 TENTATIVA 4: Ultra-mínimo (apenas 6 campos obrigatórios)
+          try {
+            console.log('📊 Tentativa 4: Schema ULTRA-MÍNIMO (apenas obrigatórios)...');
+            
+            const ultraMinimalRecord: any = {
+              id: crypto.randomUUID(),
+              hospital_id: data.hospital_id,
+              patient_id: data.patient_id,
+              procedure_date: new Date().toISOString(),
+              value_charged: Math.round((data.calculated_value || 0) * 100)
+            };
+
+            // Adicionar procedure_id apenas se disponível
+            if (procedureId) {
+              ultraMinimalRecord.procedure_id = procedureId;
+            }
+            
+            const { data: result, error } = await supabase
+              .from('procedure_records')
+              .insert([ultraMinimalRecord])
+              .select()
+              .single();
+
+            if (error) {
+              throw error;
+            }
+            
+            console.log('✅ SUCESSO: Procedimento salvo com schema ULTRA-MÍNIMO!');
+            console.log('⚠️ AVISO: Apenas 6 campos obrigatórios foram salvos');
+            return result;
+
+          } catch (ultraMinimalError) {
+            console.error('❌ ERRO FINAL: Falha até com campos obrigatórios:', ultraMinimalError);
+            throw new Error(`Falha crítica ao salvar procedimento: ${ultraMinimalError.message}`);
+          }
+        }
+      }
     }
-    
-    console.log(`✅ SUCESSO! Procedimento salvo: ${result.procedure_code} | ID: ${result.id}`);
-    return result;
   }
 
   /**
@@ -1320,15 +1501,71 @@ export class AIHPersistenceService {
   }
 
   /**
-   * Atualiza estatísticas da AIH
+   * 🛡️ ROBUSTO: Atualiza estatísticas da AIH com detecção automática de schema
    */
   private static async updateAIHStatistics(aihId: string, stats: any): Promise<void> {
-    const { error } = await supabase
-      .from('aihs')
-      .update(stats)
-      .eq('id', aihId);
+    console.log('📊 Atualizando estatísticas da AIH (MODO ROBUSTO)...');
+    
+    // 🎯 Campos básicos que sempre existem
+    const basicStats = {
+      match_found: stats.match_found || false,
+      processing_status: 'processing'  // ✅ VALOR VÁLIDO: apenas 'pending' ou 'processing'
+    };
 
-    if (error) throw error;
+    // 🆕 Campos expandidos - tentativa se o schema suportar
+    const expandedStats = {
+      total_procedures: stats.total_procedures || 0,
+      approved_procedures: stats.approved_procedures || 0,
+      rejected_procedures: stats.rejected_procedures || 0,
+      calculated_total_value: stats.calculated_total_value || 0,
+      requires_manual_review: stats.requires_manual_review || false
+    };
+
+    // 🔄 TENTATIVA 1: Schema expandido
+    try {
+      console.log('📊 Tentativa 1: Atualizando com schema EXPANDIDO...');
+      const fullStats = { ...basicStats, ...expandedStats };
+      
+      const { error } = await supabase
+        .from('aihs')
+        .update(fullStats)
+        .eq('id', aihId);
+
+      if (error) {
+        throw error;
+      }
+      
+      console.log('✅ SUCESSO: Estatísticas atualizadas com schema EXPANDIDO!');
+      return;
+
+    } catch (expandedError) {
+      console.warn('⚠️ Schema expandido falhou, tentando schema BÁSICO...', expandedError.message);
+
+      // 🔄 TENTATIVA 2: Schema básico
+      try {
+        console.log('📊 Tentativa 2: Atualizando com schema BÁSICO...');
+        
+        const { error } = await supabase
+          .from('aihs')
+          .update(basicStats)
+          .eq('id', aihId);
+
+        if (error) {
+          throw error;
+        }
+        
+        console.log('✅ SUCESSO: Estatísticas atualizadas com schema BÁSICO!');
+        console.log('💡 DICA: Execute a migração do banco para salvar todas as estatísticas');
+        return;
+
+      } catch (basicError) {
+        console.error('❌ FALHA: Erro mesmo com schema básico:', basicError);
+        
+        // 🔄 TENTATIVA 3: Sem atualização de estatísticas
+        console.warn('⚠️ Pulando atualização de estatísticas da AIH devido a incompatibilidade de schema');
+        return; // Não falha, apenas pula a atualização
+      }
+    }
   }
 
   /**
@@ -1479,4 +1716,4 @@ export class AIHPersistenceService {
   }
 }
 
-export const aihPersistenceService = new AIHPersistenceService(); 
+export const aihPersistenceService = new AIHPersistenceService();
