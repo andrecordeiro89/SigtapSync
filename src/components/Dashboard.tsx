@@ -42,7 +42,8 @@ const Dashboard = () => {
   useEffect(() => {
     const loadHospitalInfo = async () => {
       const currentHospital = getCurrentHospital();
-    if (!currentHospital) return;
+      // Não carregar se não há hospital ou se é 'ALL' (acesso total)
+      if (!currentHospital || currentHospital === 'ALL') return;
     
       try {
         const { data, error } = await supabase

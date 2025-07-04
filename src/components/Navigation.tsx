@@ -12,7 +12,7 @@ interface NavigationProps {
 }
 
 const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
-  const { user, signOut, isDeveloper, isAdmin, isDirector, isCoordinator, isAuditor, isTI, hasFullAccess, canAccessAllHospitals, getCurrentHospital } = useAuth();
+  const { user, signOut, isDeveloper, isAdmin, isDirector, isCoordinator, isAuditor, isTI, hasFullAccess, canAccessAllHospitals, getCurrentHospital, hasPermission } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Define todas as tabs disponíveis com ordem específica para cada role
@@ -58,12 +58,22 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       order: 5
     },
     {
-      id: 'reports',
-      label: 'Relatórios',
+      id: 'executive-dashboard',
+      label: 'Dashboard Executivo',
       icon: BarChart4,
-      description: 'Central de relatórios executivos',
+      description: 'Central de inteligência e relatórios para diretoria',
       requiresAdmin: true,
+      requiresExecutive: true, // Novo flag para acesso executivo
       order: 6
+    },
+    {
+      id: 'medical-staff',
+      label: 'Corpo Médico',
+      icon: Users, // Temporariamente Users, depois trocar para Stethoscope
+      description: 'Gestão e análise do corpo clínico médico',
+      requiresAdmin: true,
+      requiresExecutive: true, // Mesmo nível de acesso do dashboard executivo
+      order: 7
     },
     {
       id: 'aih-upload',
@@ -72,13 +82,14 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       description: 'Teste de rastreabilidade - Apenas desenvolvimento',
       requiresAdmin: true,
       requiresDeveloper: true, // Novo flag para desenvolvimento
-      order: 7
+      order: 8
     }
   ];
 
   const getVisibleTabs = () => {
-    const isAdmin = canAccessAllHospitals();
+    const hasAdminAccess = canAccessAllHospitals();
     const isDeveloper = user?.role === 'developer' || user?.role === 'ti';
+    const hasExecutiveAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('generate_reports');
     
     return allTabs
       .filter(tab => {
@@ -90,8 +101,13 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
           return isDeveloper;
         }
         
+        // Se requer acesso executivo, verificar permissões específicas
+        if (tab.requiresExecutive) {
+          return hasExecutiveAccess;
+        }
+        
         // Se requer admin, só admin/diretoria podem ver
-        return isAdmin;
+        return hasAdminAccess;
       })
       .sort((a, b) => a.order - b.order);
   };

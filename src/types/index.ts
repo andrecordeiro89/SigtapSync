@@ -411,3 +411,157 @@ export interface AIHCompleteProcessingResult extends AIHProcessingResult {
   aihCompleta?: AIHComplete;
   procedureMatchingResult?: ProcedureMatchingResult;
 }
+
+// === INTERFACES MÉDICAS ===
+
+export interface MedicalDoctor {
+  id: string;
+  cns: string;
+  crm: string;
+  name: string;
+  speciality: string;
+  hospitalId: string;
+  hospitalName: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MedicalSpecialty {
+  id: string;
+  name: string;
+  code: string;
+  description?: string;
+  doctorCount: number;
+  averageRevenue: number;
+  totalProcedures: number;
+}
+
+export interface DoctorStats {
+  id: string;
+  name: string;
+  crm: string;
+  cns: string;
+  speciality: string;
+  hospitalId: string;
+  hospitalName: string;
+  aihCount: number;
+  procedureCount: number;
+  revenue: number;
+  avgConfidenceScore: number;
+  avgProcessingTime: number;
+  approvalRate: number;
+  lastActivity: string;
+  isActive: boolean;
+}
+
+export interface HospitalMedicalStats {
+  hospitalId: string;
+  hospitalName: string;
+  totalDoctors: number;
+  specialties: string[];
+  totalRevenue: number;
+  totalProcedures: number;
+  avgApprovalRate: number;
+  avgProcessingTime: number;
+  doctorDistribution: {
+    specialty: string;
+    count: number;
+    percentage: number;
+  }[];
+}
+
+export interface MedicalKPIData {
+  totalDoctors: number;
+  totalSpecialties: number;
+  totalHospitals: number;
+  avgRevenuePerDoctor: number;
+  totalRevenue: number;
+  avgApprovalRate: number;
+  monthlyGrowth: number;
+  topSpecialty: string;
+}
+
+export interface DateRange {
+  startDate: Date;
+  endDate: Date;
+}
+
+export interface MedicalAnalytics {
+  period: DateRange;
+  totalDoctors: number;
+  specialtyDistribution: {
+    specialty: string;
+    count: number;
+    percentage: number;
+    revenue: number;
+  }[];
+  hospitalDistribution: {
+    hospitalId: string;
+    hospitalName: string;
+    doctorCount: number;
+    revenue: number;
+    procedures: number;
+  }[];
+  performanceMetrics: {
+    topPerformers: DoctorStats[];
+    avgRevenuePerDoctor: number;
+    avgProceduresPerDoctor: number;
+    avgApprovalRate: number;
+  };
+  trends: {
+    monthlyRevenue: { month: string; revenue: number }[];
+    monthlyProcedures: { month: string; procedures: number }[];
+    specialtyGrowth: { specialty: string; growth: number }[];
+  };
+}
+
+export interface MedicalFilters {
+  hospitalIds?: string[];
+  specialties?: string[];
+  dateRange?: DateRange;
+  isActive?: boolean;
+  minApprovalRate?: number;
+  minRevenue?: number;
+  searchTerm?: string;
+}
+
+export interface DoctorPerformanceMetrics {
+  doctorId: string;
+  period: DateRange;
+  totalProcedures: number;
+  totalRevenue: number;
+  avgProcedureValue: number;
+  approvalRate: number;
+  rejectionRate: number;
+  avgProcessingTime: number;
+  specialtyRanking: number;
+  hospitalRanking: number;
+  trendData: {
+    month: string;
+    procedures: number;
+    revenue: number;
+    approvalRate: number;
+  }[];
+}
+
+export interface MedicalDashboardData {
+  kpis: MedicalKPIData;
+  analytics: MedicalAnalytics;
+  recentActivities: {
+    doctorId: string;
+    doctorName: string;
+    action: string;
+    description: string;
+    timestamp: string;
+  }[];
+  alerts: {
+    id: string;
+    type: 'warning' | 'error' | 'info';
+    title: string;
+    message: string;
+    doctorId?: string;
+    hospitalId?: string;
+    timestamp: string;
+  }[];
+}

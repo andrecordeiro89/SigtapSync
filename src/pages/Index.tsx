@@ -5,8 +5,9 @@ import SigtapImport from '../components/SigtapImport';
 import SigtapViewer from '../components/SigtapViewer';
 import AIHMultiPageTester from '../components/AIHMultiPageTester';
 import PatientManagement from '../components/PatientManagement';
-import ReportsSimple from '../components/ReportsSimple';
 import AIHUpload from '../components/AIHUpload';
+import ExecutiveDashboard from '../components/ExecutiveDashboard';
+import MedicalStaffDashboard from '../components/MedicalStaffDashboard';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -25,8 +26,10 @@ const Index = () => {
         return <SigtapViewer />;
       case 'patients':
         return <PatientManagement />;
-      case 'reports':
-        return <ReportsSimple />;
+      case 'executive-dashboard':
+        return <ExecutiveDashboard />;
+      case 'medical-staff':
+        return <MedicalStaffDashboard />;
       default:
         return <Dashboard />;
     }

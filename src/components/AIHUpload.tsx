@@ -42,7 +42,7 @@ const AIHUpload = () => {
     const aihData: AIHData = {
       ...formData,
       hospital_id: user.hospital_id,
-      processed_by: user.id,
+      created_by: user.id,
       processing_timestamp: new Date().toISOString()
     };
 

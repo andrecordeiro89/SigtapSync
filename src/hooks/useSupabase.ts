@@ -66,7 +66,7 @@ export const useSupabaseAIH = () => {
           admission_date: aihData.admission_date,
           processing_status: 'processing',
           source_data: aihData,
-          processed_by: user.id,
+          created_by: user.id,
           created_at: new Date().toISOString()
         })
         .select()
@@ -142,7 +142,8 @@ export const useSupabaseAIH = () => {
           processing_status,
           hospital_id,
           created_at,
-          processed_by,
+          processed_at,
+          created_by,
           patients!aihs_patient_id_fkey(name),
           hospitals!aihs_hospital_id_fkey(name, cnpj, city, state)
         `)
