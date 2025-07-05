@@ -565,3 +565,148 @@ export interface MedicalDashboardData {
     timestamp: string;
   }[];
 }
+
+// === INTERFACES PARA VIEWS SUPABASE - PROFISSIONAIS ===
+
+// View principal: doctor_hospital_info
+export interface DoctorHospitalInfo {
+  // Dados do Médico
+  doctor_id: string;
+  doctor_name: string;
+  doctor_cns: string;
+  doctor_crm: string;
+  doctor_crm_state: string;
+  doctor_specialty: string;
+  doctor_secondary_specialties: string[];
+  doctor_cbo_codes: string[];
+  doctor_email?: string;
+  doctor_phone?: string;
+  doctor_mobile_phone?: string;
+  doctor_is_active: boolean;
+  doctor_is_sus_enabled: boolean;
+  doctor_professional_status: string;
+  
+  // Dados do Hospital
+  hospital_id: string;
+  hospital_name: string;
+  hospital_address?: string;
+  hospital_city?: string;
+  hospital_state?: string;
+  hospital_zip_code?: string;
+  hospital_phone?: string;
+  hospital_email?: string;
+  hospital_is_active: boolean;
+  
+  // Dados da Relação
+  link_id: string;
+  link_role?: string;
+  link_department?: string;
+  link_is_active: boolean;
+  link_is_primary_hospital: boolean;
+  link_start_date?: string;
+  link_end_date?: string;
+}
+
+// View otimizada: frontend_doctor_hospital_speciality
+export interface FrontendDoctorHospitalSpecialty {
+  // Médico
+  doctor_id: string;
+  doctor_name: string;
+  primary_specialty: string;
+  secondary_specialties: string[];
+  doctor_active: boolean;
+  
+  // Hospital
+  hospital_id: string;
+  hospital_name: string;
+  hospital_address?: string;
+  hospital_active: boolean;
+  
+  // Relação
+  role?: string;
+  department?: string;
+  is_primary_hospital: boolean;
+  link_active: boolean;
+}
+
+// View agregada: frontend_doctors_by_speciality
+export interface FrontendDoctorsBySpecialty {
+  specialty: string;
+  doctor_count: number;
+  doctor_names: string[];
+}
+
+// View agregada: frontend_hospitals_with_specialties
+export interface FrontendHospitalsWithSpecialties {
+  hospital_id: string;
+  hospital_name: string;
+  hospital_address?: string;
+  specialties: string[];
+  doctor_count: number;
+}
+
+// Interfaces para filtros da lista de profissionais
+export interface ProfessionalsFilters {
+  searchTerm?: string;
+  hospitalId?: string;
+  specialty?: string;
+  status?: 'all' | 'active' | 'inactive' | 'sus_enabled';
+  role?: string;
+  department?: string;
+  isPrimaryHospital?: boolean;
+  sortBy?: 'name' | 'specialty' | 'hospital' | 'status';
+  sortOrder?: 'asc' | 'desc';
+}
+
+// Interface para dados agregados da lista de profissionais
+export interface ProfessionalsListData {
+  doctors: DoctorHospitalInfo[];
+  totalCount: number;
+  filteredCount: number;
+  specialties: string[];
+  hospitals: { id: string; name: string }[];
+  roles: string[];
+  departments: string[];
+}
+
+// Interface para resultado da consulta de profissionais
+export interface ProfessionalsQueryResult {
+  success: boolean;
+  data: ProfessionalsListData;
+  error?: string;
+}
+
+// Interface para estatísticas de profissionais
+export interface ProfessionalsStats {
+  totalDoctors: number;
+  activeDoctors: number;
+  inactiveDoctors: number;
+  susEnabledDoctors: number;
+  totalHospitals: number;
+  activeHospitals: number;
+  totalSpecialties: number;
+  doctorsBySpecialty: { specialty: string; count: number }[];
+  doctorsByHospital: { hospitalId: string; hospitalName: string; count: number }[];
+}
+
+// Interface para detalhes expandidos de um profissional
+export interface ProfessionalDetails extends DoctorHospitalInfo {
+  // Estatísticas adicionais (se disponíveis)
+  totalAIHs?: number;
+  approvalRate?: number;
+  revenue?: number;
+  lastActivity?: string;
+  performanceScore?: number;
+  
+  // Relacionamentos múltiplos
+  allHospitals?: Array<{
+    hospitalId: string;
+    hospitalName: string;
+    role?: string;
+    department?: string;
+    isPrimary: boolean;
+    isActive: boolean;
+    startDate?: string;
+    endDate?: string;
+  }>;
+}

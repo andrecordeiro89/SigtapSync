@@ -38,6 +38,7 @@ import ExecutiveDateFilters from './ExecutiveDateFilters';
 import DoctorsAnalyticsService from '../services/doctorsAnalyticsService';
 import { DoctorsCrudService } from '../services/doctorsCrudService';
 import DoctorEditModal from './DoctorEditModal';
+import ProfessionalsTable from './ProfessionalsTable';
 import { 
   MedicalKPIData, 
   MedicalAnalytics, 
@@ -290,9 +291,9 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             <div className="text-3xl font-bold flex items-center gap-2">
               {isLoading ? '...' : kpis.totalDoctors}
               {useRealData ? (
-                <Database className="h-6 w-6 text-green-300" title="Dados Reais" />
-              ) : (
-                <FileText className="h-6 w-6 text-yellow-300" title="Dados Mock" />
+                              <Database className="h-6 w-6 text-green-300" />
+            ) : (
+              <FileText className="h-6 w-6 text-yellow-300" />
               )}
             </div>
             <div className="text-blue-100">Médicos Ativos</div>
@@ -508,7 +509,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
 
       {/* TABS PRINCIPAIS */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview" className="flex items-center space-x-2">
             <BarChart3 className="h-4 w-4" />
             <span>Visão Geral</span>
@@ -520,6 +521,10 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
           <TabsTrigger value="specialties" className="flex items-center space-x-2">
             <Stethoscope className="h-4 w-4" />
             <span>Especialidades</span>
+          </TabsTrigger>
+          <TabsTrigger value="professionals" className="flex items-center space-x-2">
+            <Users className="h-4 w-4" />
+            <span>Lista de Profissionais</span>
           </TabsTrigger>
           <TabsTrigger value="performance" className="flex items-center space-x-2">
             <TrendingUp className="h-4 w-4" />
@@ -682,6 +687,11 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* TAB: LISTA DE PROFISSIONAIS */}
+        <TabsContent value="professionals" className="space-y-4">
+          <ProfessionalsTable />
         </TabsContent>
 
         {/* TAB: PERFORMANCE */}
