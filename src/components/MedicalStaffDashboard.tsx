@@ -17,6 +17,7 @@ import {
   CheckCircle,
   AlertTriangle,
   UserCheck,
+  UserX,
   FileText,
   BarChart3,
   PieChart,
@@ -67,12 +68,13 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
   const [selectedHospital, setSelectedHospital] = useState<string>('all');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
   
-  // Estados para persistência real
-  const [realDoctors, setRealDoctors] = useState<MedicalDoctor[]>([]);
-  const [realSpecialties, setRealSpecialties] = useState<MedicalSpecialty[]>([]);
-  const [realHospitalStats, setRealHospitalStats] = useState<HospitalMedicalStats[]>([]);
-  const [realDoctorStats, setRealDoctorStats] = useState<DoctorStats[]>([]);
-  const [useRealData, setUseRealData] = useState(true);
+        // Estados para persistência real
+      const [realDoctors, setRealDoctors] = useState<MedicalDoctor[]>([]);
+      const [realDoctorsAll, setRealDoctorsAll] = useState<MedicalDoctor[]>([]);
+      const [realSpecialties, setRealSpecialties] = useState<MedicalSpecialty[]>([]);
+      const [realHospitalStats, setRealHospitalStats] = useState<HospitalMedicalStats[]>([]);
+      const [realDoctorStats, setRealDoctorStats] = useState<DoctorStats[]>([]);
+      const [useRealData, setUseRealData] = useState(true);
   
   // Estados para edição
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -108,11 +110,12 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
         hospitalIds: selectedHospital === 'all' ? undefined : [selectedHospital],
         specialties: selectedSpecialty === 'all' ? undefined : [selectedSpecialty],
         searchTerm: searchTerm || undefined,
-        isActive: true
+        isActive: true // Filtrar apenas médicos ativos
       };
 
-      const [doctorsResult, specialtiesResult, hospitalStatsResult, doctorStatsResult] = await Promise.all([
+      const [doctorsResult, doctorsAllResult, specialtiesResult, hospitalStatsResult, doctorStatsResult] = await Promise.all([
         DoctorsCrudService.getAllDoctors(filters),
+        DoctorsCrudService.getAllDoctors({ ...filters, isActive: undefined }), // Todos os médicos
         DoctorsCrudService.getMedicalSpecialties(),
         DoctorsCrudService.getHospitalMedicalStats(),
         DoctorsCrudService.getDoctorStats(filters)
@@ -120,7 +123,12 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
 
       if (doctorsResult.success) {
         setRealDoctors(doctorsResult.data || []);
-        console.log('✅ Médicos carregados:', doctorsResult.data?.length);
+        console.log('✅ Médicos ativos carregados:', doctorsResult.data?.length);
+      }
+
+      if (doctorsAllResult.success) {
+        setRealDoctorsAll(doctorsAllResult.data || []);
+        console.log('✅ Todos os médicos carregados:', doctorsAllResult.data?.length);
       }
 
       if (specialtiesResult.success) {
@@ -289,7 +297,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
           </div>
           <div className="text-right">
             <div className="text-3xl font-bold flex items-center gap-2">
-              {isLoading ? '...' : kpis.totalDoctors}
+              {isLoading ? '...' : useRealData ? realDoctors.length : kpis.totalDoctors}
               {useRealData ? (
                               <Database className="h-6 w-6 text-green-300" />
             ) : (
@@ -444,10 +452,10 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               <div>
                 <p className="text-sm font-medium text-blue-600">Total Médicos</p>
                 <p className="text-2xl font-bold text-blue-800">
-                  {isLoading ? '...' : kpis.totalDoctors}
+                  {isLoading ? '...' : useRealData ? realDoctorsAll.length : kpis.totalDoctors}
                 </p>
                 <p className="text-xs text-blue-500">
-                  +{Math.round(kpis.monthlyGrowth)}% este mês
+                  {useRealData ? realDoctors.length : kpis.totalDoctors} ativos
                 </p>
               </div>
               <Users className="h-8 w-8 text-blue-600" />

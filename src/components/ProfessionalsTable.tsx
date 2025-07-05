@@ -25,7 +25,10 @@ import {
   RefreshCw,
   Download,
   SortAsc,
-  SortDesc
+  SortDesc,
+  UserCheck,
+  UserX,
+  AlertCircle
 } from 'lucide-react';
 import { useProfessionalViews } from '../hooks/useProfessionalViews';
 import { 
@@ -33,6 +36,8 @@ import {
   ProfessionalsFilters, 
   ProfessionalDetails 
 } from '../types';
+import { DoctorsCrudService } from '../services/doctorsCrudService';
+import { toast } from './ui/use-toast';
 
 /**
  * 🩺 COMPONENTE TABELA DE PROFISSIONAIS
@@ -145,6 +150,56 @@ const ProfessionalsTable: React.FC<ProfessionalsTableProps> = ({ className = '' 
   const handleRefresh = () => {
     resetData();
     handleApplyFilters();
+  };
+
+  /**
+   * 🔄 ALTERNAR STATUS DO MÉDICO
+   * Ativa ou inativa um médico
+   */
+  const [isToggling, setIsToggling] = useState<string | null>(null);
+
+  const handleToggleDoctorStatus = async (professional: DoctorHospitalInfo) => {
+    const newStatus = !professional.doctor_is_active;
+    const actionText = newStatus ? 'ativar' : 'inativar';
+    
+    setIsToggling(professional.doctor_id);
+    
+    try {
+      console.log(`🔄 Tentando ${actionText} médico:`, professional.doctor_name);
+      
+      const result = await DoctorsCrudService.updateDoctor(
+        professional.doctor_id,
+        { is_active: newStatus }
+      );
+      
+      if (result.success) {
+        toast({
+          title: "✅ Status Atualizado",
+          description: `Dr(a). ${professional.doctor_name} foi ${newStatus ? 'ativado(a)' : 'inativado(a)'} com sucesso.`,
+          variant: "default",
+          duration: 3000,
+        });
+        
+        // Atualizar dados
+        handleRefresh();
+        
+        console.log(`✅ Médico ${newStatus ? 'ativado' : 'inativado'} com sucesso`);
+      } else {
+        throw new Error(result.error || `Erro ao ${actionText} médico`);
+      }
+      
+    } catch (error) {
+      console.error(`❌ Erro ao ${actionText} médico:`, error);
+      
+      toast({
+        title: "❌ Erro",
+        description: `Não foi possível ${actionText} o médico. Tente novamente.`,
+        variant: "destructive",
+        duration: 5000,
+      });
+    } finally {
+      setIsToggling(null);
+    }
   };
 
   /**
@@ -464,8 +519,8 @@ const ProfessionalsTable: React.FC<ProfessionalsTableProps> = ({ className = '' 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {professionals.map((professional) => (
-                  <TableRow key={professional.doctor_id} className="hover:bg-gray-50">
+                {professionals.map((professional, index) => (
+                  <TableRow key={`${professional.doctor_id}-${professional.hospital_id}-${index}`} className="hover:bg-gray-50">
                     <TableCell>
                       <div>
                         <div className="font-medium">{professional.doctor_name}</div>
@@ -521,13 +576,33 @@ const ProfessionalsTable: React.FC<ProfessionalsTableProps> = ({ className = '' 
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewDetails(professional)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewDetails(professional)}
+                          title="Ver detalhes"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleDoctorStatus(professional)}
+                          disabled={isToggling === professional.doctor_id}
+                          title={professional.doctor_is_active ? 'Inativar médico' : 'Ativar médico'}
+                          className={professional.doctor_is_active ? 'text-red-600 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
+                        >
+                          {isToggling === professional.doctor_id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : professional.doctor_is_active ? (
+                            <UserX className="h-4 w-4" />
+                          ) : (
+                            <UserCheck className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
