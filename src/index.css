@@ -1,6 +1,15 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+}
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
 
@@ -108,5 +117,110 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+}
+
+/* 🎨 HEADER OTIMIZADO - ESTILOS CUSTOMIZADOS */
+
+/* Esconder scrollbar horizontal mas manter funcionalidade */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
+}
+
+/* Animações suaves para tabs */
+.nav-tab {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-tab:hover {
+  transform: translateY(-1px);
+}
+
+.nav-tab.active {
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Efeito de gradiente para indicar mais conteúdo nas tabs mobile */
+.nav-tabs-container {
+  position: relative;
+}
+
+.nav-tabs-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 20px;
+  height: 100%;
+  background: linear-gradient(to left, rgba(249, 250, 251, 1), rgba(249, 250, 251, 0));
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Avatar do usuário com animação */
+.user-avatar {
+  transition: all 0.3s ease;
+  box-shadow: 0 0 0 2px transparent;
+}
+
+.user-avatar:hover {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+  transform: scale(1.05);
+}
+
+/* Logo com efeito de hover sutil */
+.logo-container:hover .logo-icon {
+  transform: rotate(5deg) scale(1.1);
+}
+
+.logo-icon {
+  transition: transform 0.3s ease;
+}
+
+/* Melhoria na responsividade */
+@media (max-width: 640px) {
+  .nav-tabs-mobile {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Badge administrativo com pulse */
+.admin-badge {
+  animation: pulse-admin 2s infinite;
+}
+
+@keyframes pulse-admin {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Melhoria na acessibilidade - foco */
+.nav-tab:focus-visible,
+.user-avatar:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Indicador de admin no avatar */
+.admin-indicator {
+  animation: bounce-subtle 2s infinite;
+}
+
+@keyframes bounce-subtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
   }
 }

@@ -8,6 +8,7 @@ import PatientManagement from '../components/PatientManagement';
 import AIHUpload from '../components/AIHUpload';
 import ExecutiveDashboard from '../components/ExecutiveDashboard';
 import MedicalStaffDashboard from '../components/MedicalStaffDashboard';
+import AuditDashboard from './AuditDashboard';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -30,6 +31,8 @@ const Index = () => {
         return <ExecutiveDashboard />;
       case 'medical-staff':
         return <MedicalStaffDashboard />;
+      case 'audit-dashboard':
+        return <AuditDashboard />;
       default:
         return <Dashboard />;
     }

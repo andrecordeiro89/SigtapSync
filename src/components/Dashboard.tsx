@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSupabaseAIH } from '../hooks/useSupabase';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
+import { AIHAuditService } from '../services/aihAuditService';
 
 interface HospitalInfo {
   id: string;
@@ -22,10 +23,12 @@ interface DashboardStats {
   processedToday: number;
   pendingReview: number;
   auditLogsCount: number;
+  avgProcessingTime?: number;
+  successRate?: number;
 }
 
 const Dashboard = () => {
-  const { user, getCurrentHospital } = useAuth();
+  const { user, getCurrentHospital, canAccessAllHospitals } = useAuth();
   const { getUserAuditLogs, getHospitalAIHs } = useSupabaseAIH();
   
   const [hospitalInfo, setHospitalInfo] = useState<HospitalInfo | null>(null);
@@ -36,6 +39,7 @@ const Dashboard = () => {
     auditLogsCount: 0
   });
   const [recentAuditLogs, setRecentAuditLogs] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Carregar informações do hospital atual
@@ -70,38 +74,50 @@ const Dashboard = () => {
   // Carregar estatísticas e logs
   useEffect(() => {
     const loadDashboardData = async () => {
-      if (!user?.hospital_id) return;
+      if (!user) return;
 
-      setLoading(true);
-      
       try {
-        // Carregar AIHs do hospital
-        const { data: aihsData } = await getHospitalAIHs(100);
-        
-        // Carregar logs de auditoria
-        const { data: auditData } = await getUserAuditLogs(10);
-      
-      // Calcular estatísticas
-        const today = new Date().toISOString().split('T')[0];
-        const processedToday = aihsData.filter(aih => 
-          aih.created_at?.startsWith(today)
-        ).length;
-        
-        const pendingReview = aihsData.filter(aih => 
-          aih.processing_status === 'pending_review'
-      ).length;
-      
-        setStats({
-          totalAIHs: aihsData.length,
-          processedToday,
-          pendingReview,
-          auditLogsCount: auditData.length
-        });
+        setLoading(true);
+        console.log('🔄 Carregando dados do dashboard...');
 
-        setRecentAuditLogs(auditData.slice(0, 5));
-        
+        const hospitalId = canAccessAllHospitals ? undefined : user.hospital_id;
+
+        // Carregar dados em paralelo usando o novo serviço
+        const [statsResult, activityResult] = await Promise.all([
+          AIHAuditService.getAIHStats(hospitalId),
+          AIHAuditService.getRecentActivity(10, user.id, hospitalId)
+        ]);
+
+        // Processar estatísticas
+        if (statsResult.success) {
+          setStats(statsResult.data);
+          console.log('✅ Estatísticas carregadas:', statsResult.data);
+        } else {
+          console.error('❌ Erro ao carregar estatísticas:', statsResult.error);
+          toast.error('Erro ao carregar estatísticas');
+          
+          // Usar dados de fallback
+          setStats({
+            totalAIHs: 0,
+            processedToday: 0,
+            pendingReview: 0,
+            auditLogsCount: 0
+          });
+        }
+
+        // Processar atividade recente
+        if (activityResult.success) {
+          setRecentActivity(activityResult.data);
+          setRecentAuditLogs(activityResult.data); // Manter compatibilidade
+          console.log('✅ Atividade recente carregada:', activityResult.data.length, 'itens');
+        } else {
+          console.error('❌ Erro ao carregar atividade:', activityResult.error);
+          setRecentActivity([]);
+          setRecentAuditLogs([]);
+        }
+
       } catch (error) {
-        console.error('Erro ao carregar dados do dashboard:', error);
+        console.error('❌ Erro geral ao carregar dashboard:', error);
         toast.error('Erro ao carregar dados do dashboard');
       } finally {
         setLoading(false);
@@ -109,7 +125,7 @@ const Dashboard = () => {
     };
 
     loadDashboardData();
-  }, [user, getHospitalAIHs, getUserAuditLogs]);
+  }, [user, canAccessAllHospitals]);
 
   const getActionIcon = (action: string) => {
     if (action.includes('LOGIN')) return <ShieldCheck className="h-4 w-4 text-green-600" />;
@@ -296,22 +312,34 @@ const Dashboard = () => {
                   <div key={i} className="animate-pulse bg-gray-200 h-16 rounded"></div>
                 ))}
               </div>
-            ) : recentAuditLogs.length > 0 ? (
+            ) : recentActivity.length > 0 ? (
               <div className="space-y-3">
-                {recentAuditLogs.map((log) => (
+                {recentActivity.map((log) => (
                   <div key={log.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                     {getActionIcon(log.action)}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">
                         {getActionLabel(log.action)}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                        {formatTime(log.created_at)} • {log.table_name}
-                  </p>
-                </div>
-                    <Badge variant="outline" className="text-xs">
-                      {log.operation_type}
-                    </Badge>
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {formatTime(log.created_at)} • {log.user_name || log.user_email}
+                      </p>
+                      {log.aih_number && (
+                        <p className="text-xs text-blue-600 font-mono">
+                          AIH: {log.aih_number}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="outline" className="text-xs">
+                        {log.operation_type}
+                      </Badge>
+                      {log.hospital_name && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          {log.hospital_name}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

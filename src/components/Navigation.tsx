@@ -76,13 +76,22 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       order: 7
     },
     {
+      id: 'audit-dashboard',
+      label: 'Auditoria AIH',
+      icon: Shield,
+      description: 'Auditoria e rastreamento de AIH por analista',
+      requiresAdmin: false,
+      requiresAuditor: true, // Novo flag para auditoria
+      order: 8
+    },
+    {
       id: 'aih-upload',
       label: 'Upload AIH (Teste)',
       icon: FileUp,
       description: 'Teste de rastreabilidade - Apenas desenvolvimento',
       requiresAdmin: true,
       requiresDeveloper: true, // Novo flag para desenvolvimento
-      order: 8
+      order: 9
     }
   ];
 
@@ -90,15 +99,21 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
     const hasAdminAccess = canAccessAllHospitals();
     const isDeveloper = user?.role === 'developer' || user?.role === 'ti';
     const hasExecutiveAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('generate_reports');
+    const hasAuditAccess = isAuditor() || isAdmin() || isDirector() || isTI() || hasPermission('audit_access');
     
     return allTabs
       .filter(tab => {
         // Se não requer admin, todos podem ver
-        if (!tab.requiresAdmin) return true;
+        if (!tab.requiresAdmin && !tab.requiresAuditor && !tab.requiresDeveloper && !tab.requiresExecutive) return true;
         
         // Se requer developer, só developer/ti podem ver
         if (tab.requiresDeveloper) {
           return isDeveloper;
+        }
+        
+        // Se requer acesso de auditoria
+        if (tab.requiresAuditor) {
+          return hasAuditAccess;
         }
         
         // Se requer acesso executivo, verificar permissões específicas
@@ -107,7 +122,11 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
         }
         
         // Se requer admin, só admin/diretoria podem ver
-        return hasAdminAccess;
+        if (tab.requiresAdmin) {
+          return hasAdminAccess;
+        }
+        
+        return true;
       })
       .sort((a, b) => a.order - b.order);
   };
@@ -229,25 +248,30 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
 
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          {/* Logo e Menu Principal */}
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <Building2 className="h-8 w-8 text-blue-600" />
-              <div className="ml-2">
-                <div className="text-xl font-bold text-gray-900">SIGTAP Sync</div>
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo e Nome - Otimizado para Largura Total */}
+          <div className="logo-container flex items-center flex-shrink-0">
+            <Building2 className="logo-icon h-8 w-8 text-blue-600" />
+            <div className="ml-2">
+              <div className="text-base font-bold text-gray-900 leading-tight">
+                SIGTAP
               </div>
-              {canAccessAllHospitals() && (
-                <Badge variant="outline" className="ml-2 bg-purple-50 text-purple-700 border-purple-200 text-xs px-2 py-1">
-                  <Globe className="h-3 w-3 mr-1" />
-                  ADMIN
-                </Badge>
-              )}
+              <div className="text-sm font-medium text-blue-600 leading-tight">
+                Sync
+              </div>
             </div>
-            
-            {/* Tabs de Navegação - Agora filtradas por permissão */}
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
+            {canAccessAllHospitals() && (
+              <Badge variant="outline" className="admin-badge ml-2 bg-purple-50 text-purple-700 border-purple-200 text-xs px-2 py-1">
+                <Globe className="h-3 w-3 mr-1" />
+                ADMIN
+              </Badge>
+            )}
+          </div>
+
+          {/* Tabs de Navegação - Centralizadas e Responsivas */}
+          <div className="flex-1 flex justify-center">
+            <div className="flex space-x-1 overflow-x-auto max-w-none">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isDeveloper = user?.role === 'developer' || user?.role === 'ti';
@@ -256,15 +280,15 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                   <button
                     key={tab.id}
                     onClick={() => onTabChange(tab.id)}
-                    className={`${
+                    className={`nav-tab ${
                       activeTab === tab.id
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm transition-colors inline-flex items-center gap-2 relative`}
+                        ? 'border-blue-500 text-blue-600 bg-blue-50 active'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                    } whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm inline-flex items-center gap-2 relative rounded-t-md`}
                     title={tab.description}
                   >
-                    <Icon className="h-4 w-4" />
-                    {tab.label}
+                    <Icon className="h-4 w-4 flex-shrink-0" />
+                    <span className="hidden sm:inline">{tab.label}</span>
                     
                     {/* Badge especial para sistema oficial - apenas para developers/ti */}
                     {tab.id === 'aih-multipage-tester' && isDeveloper && (
@@ -278,28 +302,26 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
             </div>
           </div>
 
-          {/* Informações do Usuário */}
-          <div className="flex items-center space-x-4">
-            
-            {/* Informações do Usuário Logado - Simplificado */}
-            <div className="hidden sm:flex items-center space-x-3">
-              {/* Email do Usuário */}
+          {/* Menu do Usuário - Otimizado */}
+          <div className="flex items-center space-x-3 flex-shrink-0">
+            {/* Informações do Usuário - Compactas */}
+            <div className="hidden md:flex items-center space-x-3">
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900 leading-none">
+                <p className="text-sm font-medium text-gray-900 leading-tight">
                   {user.full_name || user.email?.split('@')[0]}
                 </p>
-                <p className="text-xs text-gray-500 leading-none mt-0.5">
-                  {user.email}
+                <p className="text-xs text-gray-500 leading-tight">
+                  {roleConfig?.label || 'Usuário'}
                 </p>
               </div>
             </div>
 
-            {/* Menu do Usuário */}
+            {/* Avatar e Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className={`text-xs font-medium ${
+                <Button variant="ghost" className="user-avatar relative h-9 w-9 rounded-full ring-2 ring-transparent hover:ring-blue-200">
+                  <Avatar className="h-9 w-9">
+                    <AvatarFallback className={`text-sm font-medium ${
                       canAccessAllHospitals() 
                         ? 'bg-purple-100 text-purple-700' 
                         : 'bg-blue-100 text-blue-700'
@@ -307,6 +329,11 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                       {getInitials(user.full_name, user.email)}
                     </AvatarFallback>
                   </Avatar>
+                  {canAccessAllHospitals() && (
+                    <div className="admin-indicator absolute -top-1 -right-1 w-4 h-4 bg-purple-600 rounded-full flex items-center justify-center">
+                      <Crown className="h-2 w-2 text-white" />
+                    </div>
+                  )}
                 </Button>
               </DropdownMenuTrigger>
               
@@ -453,37 +480,33 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
         </div>
       </div>
 
-      {/* Menu Mobile - Também filtrado */}
-      <div className="sm:hidden">
-        <div className="pt-2 pb-3 space-y-1 border-t border-gray-200">
+      {/* Navegação Mobile - Tabs Horizontais Compactas */}
+      <div className="nav-tabs-mobile sm:hidden border-t border-gray-200 bg-gray-50">
+        <div className="nav-tabs-container flex overflow-x-auto px-3 py-2 space-x-2 scrollbar-hide">
           {tabs.map((tab) => {
             const Icon = tab.icon;
+            const isDeveloper = user?.role === 'developer' || user?.role === 'ti';
+            
             return (
               <button
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
                 className={`${
                   activeTab === tab.id
-                    ? 'bg-blue-50 border-blue-500 text-blue-700'
-                    : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'
-                } block pl-3 pr-4 py-2 border-l-4 text-base font-medium w-full text-left transition-colors`}
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                } flex-shrink-0 px-3 py-2 rounded-lg font-medium text-sm transition-all duration-200 inline-flex items-center gap-2`}
+                title={tab.description}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Icon className="h-5 w-5 mr-3" />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        {tab.label}
-                        {tab.id === 'aih-multipage-tester' && (
-                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                            OFICIAL
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500">{tab.description}</div>
-                    </div>
-                  </div>
-                </div>
+                <Icon className="h-4 w-4" />
+                <span className="whitespace-nowrap text-xs">{tab.label}</span>
+                
+                {/* Badge especial para sistema oficial - apenas para developers/ti */}
+                {tab.id === 'aih-multipage-tester' && isDeveloper && (
+                  <Badge variant="outline" className="ml-1 text-xs bg-green-50 text-green-700 border-green-200">
+                    OFICIAL
+                  </Badge>
+                )}
               </button>
             );
           })}
