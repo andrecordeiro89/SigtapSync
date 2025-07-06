@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Search, Filter, FileText, User, Calendar, DollarSign, AlertCircle, CheckCircle, Clock, Eye, RefreshCw, Trash2, ChevronDown, ChevronRight, Download, Edit } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
-import { formatCurrency } from '../utils/validation';
+import { formatCurrency as baseCurrency } from '../utils/validation';
+
+// 🔧 CORREÇÃO: Função para formatar valores que vêm em centavos
+const formatCurrency = (value: number | undefined | null): string => {
+  if (!value) return 'R$ 0,00';
+  // Dividir por 100 se valor parece estar em centavos (>= 1000)
+  const realValue = value >= 1000 ? value / 100 : value;
+  return baseCurrency(realValue);
+};
 import { useToast } from '@/components/ui/use-toast';
 
-// Criar instância do serviço
-const persistenceService = new AIHPersistenceService();
-
+// Tipos de dados
 interface Patient {
   id: string;
   name: string;
@@ -54,6 +58,10 @@ interface AIH {
   aih_situation?: string;
   care_character?: string;
   specialty?: string;
+  processed_at?: string;
+  processed_by_name?: string;
+  created_at?: string;
+  updated_at?: string;
   patients?: {
     name: string;
     cns: string;
@@ -77,39 +85,48 @@ interface HospitalStats {
   average_value: number;
 }
 
+// Interface para dados unificados
+interface UnifiedAIHData extends AIH {
+  patient: Patient | null;
+  matches: AIH['aih_matches'];
+  processed_at_formatted?: string;
+  created_by_profile?: {
+    full_name?: string;
+    email?: string;
+  };
+}
+
 const PatientManagement = () => {
-  const { user } = useAuth();
+  const { user, hasFullAccess } = useAuth();
+  const currentHospitalId = user?.hospital_id;
   const { toast } = useToast();
-  
-  // MODO DESENVOLVIMENTO: hospital_id com fallback
-  const currentHospitalId = user?.hospital_id || '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b';
-  
+  const persistenceService = new AIHPersistenceService();
+  const isDirector = hasFullAccess();
+
+  // Estados principais
   const [patients, setPatients] = useState<Patient[]>([]);
   const [aihs, setAIHs] = useState<AIH[]>([]);
   const [stats, setStats] = useState<HospitalStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('patients');
   
-  // Estados de expansão
-  const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set());
-  const [expandedAIHs, setExpandedAIHs] = useState<Set<string>>(new Set());
+  // Estados de expansão unificados
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   
-  // Filtros
-  const [patientSearch, setPatientSearch] = useState('');
-  const [aihSearch, setAihSearch] = useState('');
+  // Filtros unificados
+  const [globalSearch, setGlobalSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('');
+  const [matchFilter, setMatchFilter] = useState('all');
+  const [processedByFilter, setProcessedByFilter] = useState('');
 
   // Paginação
-  const [patientsPage, setPatientsPage] = useState(0);
-  const [aihsPage, setAihsPage] = useState(0);
-  const itemsPerPage = 20;
+  const [currentPage, setCurrentPage] = useState(0);
+  const [itemsPerPage] = useState(10);
 
-  // Estados para exclusão
+  // Estados para deleção
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<{type: 'patient' | 'aih'; id: string; name: string} | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{type: 'patient' | 'aih', id: string, name: string} | null>(null);
 
-  // Carregar dados iniciais
   useEffect(() => {
     if (currentHospitalId) {
       loadAllData();
@@ -124,14 +141,6 @@ const PatientManagement = () => {
         loadAIHs(),
         loadStats()
       ]);
-      console.log('✅ Dados de pacientes carregados com sucesso');
-    } catch (error) {
-      console.error('❌ Erro ao carregar dados:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao carregar dados do sistema",
-        variant: "destructive"
-      });
     } finally {
       setIsLoading(false);
     }
@@ -141,26 +150,15 @@ const PatientManagement = () => {
     try {
       console.log('🔍 Carregando pacientes para hospital:', currentHospitalId);
       const data = await persistenceService.getPatients(currentHospitalId, {
-        name: patientSearch || undefined,
+        name: globalSearch || undefined,
         limit: 100
       });
-      
-      // Buscar AIHs e associar aos pacientes por nome
-      const allAIHs = await persistenceService.getAIHs(currentHospitalId, { limit: 200 });
-      
-      const patientsWithAIHs = data.map((patient: Patient) => {
-        const patientAIHs = allAIHs.filter((aih: any) => 
-          aih.patients?.name === patient.name || aih.patients?.cns === patient.cns
-        );
-        return { ...patient, aihs: patientAIHs };
-      });
-      
-      setPatients(patientsWithAIHs);
-      console.log('📊 Pacientes carregados:', patientsWithAIHs.length);
+      setPatients(data);
+      console.log('👥 Pacientes carregados:', data.length);
     } catch (error) {
       console.error('❌ Erro ao carregar pacientes:', error);
       toast({
-        title: "Erro",
+        title: "Erro", 
         description: "Falha ao carregar lista de pacientes",
         variant: "destructive"
       });
@@ -172,8 +170,9 @@ const PatientManagement = () => {
       console.log('🔍 Carregando AIHs para hospital:', currentHospitalId);
       const data = await persistenceService.getAIHs(currentHospitalId, {
         status: statusFilter !== 'all' ? statusFilter : undefined,
-        aihNumber: aihSearch || undefined,
+        aihNumber: globalSearch || undefined,
         dateFrom: dateFilter || undefined,
+        processedBy: processedByFilter || undefined,
         limit: 100
       });
       setAIHs(data);
@@ -197,28 +196,17 @@ const PatientManagement = () => {
     }
   };
 
-  // Funções de expansão
-  const togglePatientExpansion = (patientId: string) => {
-    const newExpanded = new Set(expandedPatients);
-    if (newExpanded.has(patientId)) {
-      newExpanded.delete(patientId);
+  // Função de expansão unificada
+  const toggleItemExpansion = (itemId: string) => {
+    const newExpanded = new Set(expandedItems);
+    if (newExpanded.has(itemId)) {
+      newExpanded.delete(itemId);
     } else {
-      newExpanded.add(patientId);
+      newExpanded.add(itemId);
     }
-    setExpandedPatients(newExpanded);
+    setExpandedItems(newExpanded);
   };
 
-  const toggleAIHExpansion = (aihId: string) => {
-    const newExpanded = new Set(expandedAIHs);
-    if (newExpanded.has(aihId)) {
-      newExpanded.delete(aihId);
-    } else {
-      newExpanded.add(aihId);
-    }
-    setExpandedAIHs(newExpanded);
-  };
-
-  // Funções de exclusão
   const handleDeleteRequest = (type: 'patient' | 'aih', id: string, name: string) => {
     setItemToDelete({ type, id, name });
     setDeleteDialogOpen(true);
@@ -228,65 +216,63 @@ const PatientManagement = () => {
     if (!itemToDelete) return;
     
     try {
-      setIsLoading(true);
-      
       if (itemToDelete.type === 'patient') {
-        // Excluir paciente (e suas AIHs em cascata)
         await persistenceService.deletePatient(itemToDelete.id);
-        toast({
-          title: "✅ Paciente excluído",
-          description: `${itemToDelete.name} foi removido do sistema`,
-        });
+        setPatients(patients.filter(p => p.id !== itemToDelete.id));
       } else {
-        // Excluir AIH específica
         await persistenceService.deleteAIH(itemToDelete.id);
-        toast({
-          title: "✅ AIH excluída", 
-          description: `AIH ${itemToDelete.name} foi removida do sistema`,
-        });
+        setAIHs(aihs.filter(a => a.id !== itemToDelete.id));
       }
       
-      // Recarregar dados
-      await loadAllData();
+      toast({
+        title: "Sucesso",
+        description: `${itemToDelete.type === 'patient' ? 'Paciente' : 'AIH'} removido com sucesso`,
+      });
       
+      await loadStats();
     } catch (error) {
-      console.error('❌ Erro ao excluir:', error);
+      console.error('❌ Erro ao deletar:', error);
       toast({
         title: "Erro",
-        description: `Falha ao excluir ${itemToDelete.type === 'patient' ? 'paciente' : 'AIH'}`,
+        description: "Falha ao remover item",
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
       setDeleteDialogOpen(false);
       setItemToDelete(null);
     }
   };
 
-  // Filtros aplicados
-  const filteredPatients = patients.filter(patient => 
-    patient.name.toLowerCase().includes(patientSearch.toLowerCase()) ||
-    patient.cns.includes(patientSearch)
-  );
-
-  const filteredAIHs = aihs.filter(aih => {
-    const matchesSearch = aih.aih_number.includes(aihSearch) || 
-                         aih.patients?.name.toLowerCase().includes(aihSearch.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || aih.processing_status === statusFilter;
-    const matchesDate = !dateFilter || aih.admission_date >= dateFilter;
-    
-    return matchesSearch && matchesStatus && matchesDate;
+  // Dados unificados: AIHs com informações dos pacientes
+  const unifiedData: UnifiedAIHData[] = aihs.map(aih => {
+    const patient = patients.find(p => p.cns === aih.patients?.cns);
+    return {
+      ...aih,
+      patient: patient || null,
+      matches: aih.aih_matches || []
+    };
   });
 
-  // Paginação
-  const paginatedPatients = filteredPatients.slice(
-    patientsPage * itemsPerPage,
-    (patientsPage + 1) * itemsPerPage
-  );
+  // Filtros aplicados
+  const filteredData = unifiedData.filter(item => {
+    const matchesSearch = 
+      item.aih_number.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      (item.patients?.name && item.patients.name.toLowerCase().includes(globalSearch.toLowerCase())) ||
+      (item.patient?.cns && item.patient.cns.includes(globalSearch));
+    
+    const matchesStatus = statusFilter === 'all' || item.processing_status === statusFilter;
+    const matchesDate = !dateFilter || item.admission_date >= dateFilter;
+    const matchesMatches = matchFilter === 'all' || 
+      (matchFilter === 'with_matches' && item.matches.length > 0) ||
+      (matchFilter === 'without_matches' && item.matches.length === 0);
+    
+    return matchesSearch && matchesStatus && matchesDate && matchesMatches;
+  });
 
-  const paginatedAIHs = filteredAIHs.slice(
-    aihsPage * itemsPerPage,
-    (aihsPage + 1) * itemsPerPage
+  // Paginação unificada
+  const paginatedData = filteredData.slice(
+    currentPage * itemsPerPage,
+    (currentPage + 1) * itemsPerPage
   );
 
   const getStatusBadge = (status: string) => {
@@ -321,25 +307,46 @@ const PatientManagement = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Gestão de Pacientes</h1>
-          <p className="text-gray-600">Visualize e gerencie pacientes e AIHs processadas</p>
+          <h1 className="text-2xl font-bold text-gray-900">Gestão de AIHs e Pacientes</h1>
+          <p className="text-gray-600">Visualize e gerencie AIHs processadas e dados dos pacientes</p>
         </div>
-        <div className="flex space-x-2">
-          <Button 
-            onClick={loadAllData} 
-            disabled={isLoading}
-            variant="outline"
-            size="sm"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Atualizar
-          </Button>
+        <div className="flex items-center space-x-4">
+          {/* Informações do Usuário */}
+          <div className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-lg">
+            <User className="w-4 h-4 text-gray-500" />
+            <div className="text-right">
+              <p className="text-sm font-medium text-gray-900">
+                {user?.full_name || user?.email || 'Usuário'}
+              </p>
+              <p className="text-xs text-gray-500">
+                {user?.role === 'director' ? 'Diretor' : 
+                 user?.role === 'admin' ? 'Administrador' :
+                 user?.role === 'coordinator' ? 'Coordenador' :
+                 user?.role === 'auditor' ? 'Auditor' :
+                 user?.role === 'developer' ? 'Desenvolvedor' :
+                 'Operador'}
+              </p>
+            </div>
+          </div>
+
+          {/* Botões de Ação */}
+          <div className="flex space-x-2">
+            <Button 
+              onClick={loadAllData} 
+              disabled={isLoading}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Estatísticas */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className={`grid grid-cols-1 md:grid-cols-2 ${isDirector ? 'lg:grid-cols-6' : 'lg:grid-cols-4'} gap-4`}>
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
@@ -388,245 +395,50 @@ const PatientManagement = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <DollarSign className="w-4 h-4 text-green-600" />
-                <div>
-                  <p className="text-xs text-gray-600">Valor Total</p>
-                  <p className="text-lg font-semibold">{formatCurrency(stats.total_value)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Cards financeiros - Apenas para diretores */}
+          {isDirector && (
+            <>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-4 h-4 text-green-600" />
+                    <div>
+                      <p className="text-xs text-gray-600">Valor Total</p>
+                      <p className="text-lg font-semibold">{formatCurrency(stats.total_value)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Calendar className="w-4 h-4 text-purple-500" />
-                <div>
-                  <p className="text-xs text-gray-600">Valor Médio</p>
-                  <p className="text-lg font-semibold">{formatCurrency(stats.average_value)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="w-4 h-4 text-purple-500" />
+                    <div>
+                      <p className="text-xs text-gray-600">Valor Médio</p>
+                      <p className="text-lg font-semibold">{formatCurrency(stats.average_value)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       )}
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="patients">👥 Pacientes ({filteredPatients.length})</TabsTrigger>
-          <TabsTrigger value="aihs">📄 AIHs ({filteredAIHs.length})</TabsTrigger>
-        </TabsList>
-
-        {/* TAB PACIENTES */}
-        <TabsContent value="patients" className="space-y-4">
-          {/* Filtros Pacientes */}
+            {/* Filtros Unificados */}
           <Card>
             <CardContent className="p-4">
-              <div className="flex space-x-4">
-                <div className="flex-1">
-                  <Input
-                    placeholder="Buscar por nome ou CNS..."
-                    value={patientSearch}
-                    onChange={(e) => setPatientSearch(e.target.value)}
-                  />
-                </div>
-                <Button onClick={loadPatients} disabled={isLoading} variant="outline">
-                  <Search className="w-4 h-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Lista Pacientes */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <User className="w-5 h-5" />
-                <span>Pacientes Cadastrados</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                  <span className="ml-2">Carregando pacientes...</span>
-                </div>
-              ) : paginatedPatients.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <User className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Nenhum paciente encontrado</p>
-                  <p className="text-sm">Processe algumas AIHs para ver pacientes aqui</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {paginatedPatients.map((patient) => (
-                    <div key={patient.id} className="border rounded-lg">
-                      {/* Linha Principal do Paciente */}
-                      <div className="p-4 flex items-center justify-between hover:bg-gray-50">
-                        <div className="flex items-center space-x-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => togglePatientExpansion(patient.id)}
-                            className="p-1"
-                          >
-                            {expandedPatients.has(patient.id) ? 
-                              <ChevronDown className="w-4 h-4" /> : 
-                              <ChevronRight className="w-4 h-4" />
-                            }
-                          </Button>
-                          
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3">
-                              <h3 className="font-medium text-gray-900">{patient.name}</h3>
-                              <Badge variant="outline" className="text-xs">
-                                {patient.gender === 'M' ? '👨' : '👩'} CNS: {patient.cns}
-                              </Badge>
-                              {patient.medical_record && (
-                                <Badge variant="secondary" className="text-xs">
-                                  📋 {patient.medical_record}
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-600">
-                              🎂 Nascimento: {formatDate(patient.birth_date)} • 
-                              📄 AIHs: {patient.aihs?.length || 0} • 
-                              📅 Cadastrado: {formatDate(patient.created_at)}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="outline" className="text-xs">
-                            {patient.aihs?.length || 0} AIH{(patient.aihs?.length || 0) !== 1 ? 's' : ''}
-                          </Badge>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteRequest('patient', patient.id, patient.name)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Detalhes Expandidos do Paciente */}
-                      {expandedPatients.has(patient.id) && (
-                        <div className="border-t bg-gray-50 p-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            {/* Informações Pessoais */}
-                            <div>
-                              <h4 className="font-medium text-sm text-gray-700 mb-2">👤 Informações Pessoais</h4>
-                              <div className="bg-white p-3 rounded border space-y-1 text-sm">
-                                <p><span className="font-medium">Nome:</span> {patient.name}</p>
-                                <p><span className="font-medium">CNS:</span> {patient.cns}</p>
-                                <p><span className="font-medium">Nascimento:</span> {formatDate(patient.birth_date)}</p>
-                                <p><span className="font-medium">Gênero:</span> {patient.gender === 'M' ? 'Masculino' : 'Feminino'}</p>
-                                {patient.mother_name && <p><span className="font-medium">Mãe:</span> {patient.mother_name}</p>}
-                                {patient.nationality && <p><span className="font-medium">Nacionalidade:</span> {patient.nationality}</p>}
-                                {patient.race_color && <p><span className="font-medium">Cor/Raça:</span> {patient.race_color}</p>}
-                              </div>
-                            </div>
-
-                            {/* Informações de Contato */}
-                            <div>
-                              <h4 className="font-medium text-sm text-gray-700 mb-2">📧 Contato e Endereço</h4>
-                              <div className="bg-white p-3 rounded border space-y-1 text-sm">
-                                {patient.phone && <p><span className="font-medium">Telefone:</span> {patient.phone}</p>}
-                                {patient.address && <p><span className="font-medium">Endereço:</span> {patient.address}</p>}
-                                {patient.city && <p><span className="font-medium">Cidade:</span> {patient.city}</p>}
-                                {patient.state && <p><span className="font-medium">Estado:</span> {patient.state}</p>}
-                                {patient.medical_record && <p><span className="font-medium">Prontuário:</span> {patient.medical_record}</p>}
-                                <p><span className="font-medium">Cadastrado:</span> {formatDate(patient.created_at)}</p>
-                                <p><span className="font-medium">Atualizado:</span> {formatDate(patient.updated_at)}</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* AIHs do Paciente */}
-                          {patient.aihs && patient.aihs.length > 0 && (
-                            <div>
-                              <h4 className="font-medium text-sm text-gray-700 mb-2">📄 AIHs do Paciente ({patient.aihs.length})</h4>
-                              <div className="space-y-2">
-                                {patient.aihs.map((aih) => (
-                                  <div key={aih.id} className="bg-white border rounded p-3">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex-1">
-                                        <div className="flex items-center space-x-3 mb-1">
-                                          <span className="font-medium text-blue-600">🏥 AIH {aih.aih_number}</span>
-                                          {getStatusBadge(aih.processing_status)}
-                                          {aih.requires_manual_review && (
-                                            <Badge variant="destructive" className="text-xs">⚠️ Revisão</Badge>
-                                          )}
-                                        </div>
-                                        <p className="text-sm text-gray-600">
-                                          🩺 Procedimento: {aih.procedure_code} • 
-                                          📅 Internação: {formatDate(aih.admission_date)} • 
-                                          🔬 CID: {aih.main_cid}
-                                        </p>
-                                        {aih.calculated_total_value && (
-                                          <p className="text-sm font-medium text-green-600">
-                                            💰 Valor: {formatCurrency(aih.calculated_total_value)}
-                                          </p>
-                                        )}
-                                      </div>
-                                      <Button
-                                        variant="destructive"
-                                        size="sm"
-                                        onClick={() => handleDeleteRequest('aih', aih.id, aih.aih_number)}
-                                        className="h-8 w-8 p-0"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </Button>
-                                    </div>
-
-                                    {/* Matches da AIH */}
-                                    {aih.aih_matches && aih.aih_matches.length > 0 && (
-                                      <div className="mt-2 pt-2 border-t">
-                                        <p className="text-xs text-gray-600 mb-1">🎯 Matches SIGTAP ({aih.aih_matches.length}):</p>
-                                        <div className="flex flex-wrap gap-2">
-                                          {aih.aih_matches.map((match, idx) => (
-                                            <div key={idx} className="flex items-center space-x-2">
-                                              {getScoreBadge(match.overall_score)}
-                                              <span className="text-xs text-gray-600">
-                                                {formatCurrency(match.calculated_total)}
-                                              </span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* TAB AIHS */}
-        <TabsContent value="aihs" className="space-y-4">
-          {/* Filtros AIHs */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
                 <Input
-                  placeholder="Buscar AIH ou paciente..."
-                  value={aihSearch}
-                  onChange={(e) => setAihSearch(e.target.value)}
-                />
+                placeholder="Buscar AIH, paciente ou CNS..."
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger>
                     <SelectValue placeholder="Status" />
@@ -639,233 +451,214 @@ const PatientManagement = () => {
                     <SelectItem value="error">Erro</SelectItem>
                   </SelectContent>
                 </Select>
+            </div>
+            <div>
+              <Select value={matchFilter} onValueChange={setMatchFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Matches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="with_matches">Com Matches</SelectItem>
+                  <SelectItem value="without_matches">Sem Matches</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
                 <Input
                   type="date"
-                  placeholder="Data de internação"
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
                 />
-                <Button onClick={loadAIHs} disabled={isLoading} variant="outline">
-                  <Search className="w-4 h-4" />
-                </Button>
+            </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Lista AIHs */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <FileText className="w-5 h-5" />
-                <span>AIHs Processadas</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                  <span className="ml-2">Carregando AIHs...</span>
-                </div>
-              ) : paginatedAIHs.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Nenhuma AIH encontrada</p>
-                  <p className="text-sm">Processe alguns PDFs para ver AIHs aqui</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {paginatedAIHs.map((aih) => (
-                    <div key={aih.id} className="border rounded-lg">
-                      {/* Linha Principal da AIH */}
-                      <div className="p-4 flex items-center justify-between hover:bg-gray-50">
-                        <div className="flex items-center space-x-4">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleAIHExpansion(aih.id)}
-                            className="p-1"
-                          >
-                            {expandedAIHs.has(aih.id) ? 
-                              <ChevronDown className="w-4 h-4" /> : 
-                              <ChevronRight className="w-4 h-4" />
-                            }
-                          </Button>
-                          
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3">
-                              <h3 className="font-medium text-blue-600">🏥 AIH {aih.aih_number}</h3>
-                              {getStatusBadge(aih.processing_status)}
-                              {aih.match_found && <Badge variant="default" className="text-xs bg-green-500">✅ Match</Badge>}
-                              {aih.requires_manual_review && <Badge variant="destructive" className="text-xs">⚠️ Revisão</Badge>}
-                            </div>
-                            <p className="text-sm text-gray-600">
-                              👤 Paciente: {aih.patients?.name} • 
-                              📅 Internação: {formatDate(aih.admission_date)} • 
-                              🩺 Procedimento: {aih.procedure_code}
-                            </p>
-                            {aih.calculated_total_value && (
-                              <p className="text-sm font-medium text-green-600">
-                                💰 Valor Calculado: {formatCurrency(aih.calculated_total_value)}
-                              </p>
+      {/* Lista Unificada de AIHs */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <FileText className="w-5 h-5" />
+            <span>AIHs Processadas ({filteredData.length})</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+          ) : paginatedData.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p>Nenhuma AIH encontrada</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {paginatedData.map((item) => (
+                <div key={item.id} className="border rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleItemExpansion(item.id)}
+                        >
+                          {expandedItems.has(item.id) ? 
+                            <ChevronUp className="w-4 h-4" /> : 
+                            <ChevronDown className="w-4 h-4" />
+                          }
+                        </Button>
+                        <div>
+                          <h3 className="font-semibold">📄 {item.aih_number}</h3>
+                          <p className="text-sm text-gray-600">
+                            👤 {item.patients?.name || 'Paciente não identificado'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="default" className="bg-green-500 text-xs">
+                          ✅ Processada
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col items-end space-y-2">
+                      {/* Badge do Operador */}
+                      <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100">
+                        <User className="w-3 h-3 mr-1" />
+                        {item.processed_by_name || 'Sistema'}
+                      </Badge>
+                      
+                      {/* Badge da Data/Hora */}
+                      <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {item.processed_at_formatted}
+                      </Badge>
+                      
+                      {/* Badge do Valor */}
+                      {item.calculated_total_value && (
+                        <Badge variant="outline" className="bg-green-50 border-green-200 text-green-800 hover:bg-green-100 font-semibold">
+                          <DollarSign className="w-3 h-3 mr-1" />
+                          {formatCurrency(item.calculated_total_value)}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  {expandedItems.has(item.id) && (
+                    <div className="mt-4 pt-4 border-t space-y-3">
+                      {/* Informações do Paciente */}
+                      {item.patient && (
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                          <h4 className="font-semibold text-blue-900 mb-2">👤 Informações do Paciente</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <p><span className="font-medium">Nome:</span> {item.patient.name}</p>
+                            <p><span className="font-medium">CNS:</span> {item.patient.cns}</p>
+                            <p><span className="font-medium">Data Nascimento:</span> {formatDate(item.patient.birth_date)}</p>
+                            <p><span className="font-medium">Gênero:</span> {item.patient.gender === 'M' ? 'Masculino' : 'Feminino'}</p>
+                            {item.patient.medical_record && (
+                              <p><span className="font-medium">Prontuário:</span> {item.patient.medical_record}</p>
                             )}
                           </div>
                         </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          {aih.aih_matches && (
-                            <Badge variant="outline" className="text-xs">
-                              🎯 {aih.aih_matches.length} Match{aih.aih_matches.length !== 1 ? 'es' : ''}
-                            </Badge>
+                      )}
+
+                      {/* Informações da AIH */}
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <h4 className="font-semibold text-gray-900 mb-2">📋 Detalhes da AIH</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                          <p><span className="font-medium">Código Proc:</span> {item.procedure_code}</p>
+                          <p><span className="font-medium">CID Principal:</span> {item.main_cid}</p>
+                          <p><span className="font-medium">Admissão:</span> {formatDate(item.admission_date)}</p>
+                          {item.discharge_date && (
+                            <p><span className="font-medium">Alta:</span> {formatDate(item.discharge_date)}</p>
                           )}
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDeleteRequest('aih', aih.id, aih.aih_number)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <p><span className="font-medium">Situação:</span> {item.aih_situation || 'N/A'}</p>
+                          <p><span className="font-medium">Caráter:</span> {item.care_character || 'N/A'}</p>
+                          {item.specialty && (
+                            <p><span className="font-medium">Especialidade:</span> {item.specialty}</p>
+                          )}
                         </div>
                       </div>
 
-                      {/* Detalhes Expandidos da AIH */}
-                      {expandedAIHs.has(aih.id) && (
-                        <div className="border-t bg-gray-50 p-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Informações da AIH */}
-                            <div>
-                              <h4 className="font-medium text-sm text-gray-700 mb-2">📋 Dados da AIH</h4>
-                              <div className="bg-white p-3 rounded border space-y-1 text-sm">
-                                <p><span className="font-medium">Número:</span> {aih.aih_number}</p>
-                                <p><span className="font-medium">Paciente:</span> {aih.patients?.name}</p>
-                                <p><span className="font-medium">CNS:</span> {aih.patients?.cns}</p>
-                                <p><span className="font-medium">Procedimento:</span> {aih.procedure_code}</p>
-                                <p><span className="font-medium">CID Principal:</span> {aih.main_cid}</p>
-                                <p><span className="font-medium">Internação:</span> {formatDate(aih.admission_date)}</p>
-                                {aih.discharge_date && <p><span className="font-medium">Alta:</span> {formatDate(aih.discharge_date)}</p>}
-                                {aih.source_file && <p><span className="font-medium">Arquivo:</span> {aih.source_file}</p>}
+                      {/* Matches Encontrados */}
+                      {item.matches.length > 0 && (
+                        <div className="bg-green-50 p-3 rounded-lg">
+                          <h4 className="font-semibold text-green-900 mb-2">🎯 Matches Encontrados ({item.matches.length})</h4>
+                          <div className="space-y-2">
+                            {item.matches.map((match, index) => (
+                              <div key={match.id} className="flex items-center justify-between p-2 bg-white rounded border">
+                                <div className="flex items-center space-x-2">
+                                  {getScoreBadge(match.overall_score)}
+                                  <span className="text-sm">Match #{index + 1}</span>
+                                </div>
+                                <div className="flex items-center space-x-2 text-sm">
+                                  <span>Confiança: {match.match_confidence}%</span>
+                                  {isDirector && (
+                                    <span>💰 {formatCurrency(match.calculated_total)}</span>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-
-                            {/* Resumo de Procedimentos */}
-                            <div>
-                              <h4 className="font-medium text-sm text-gray-700 mb-2">📊 Resumo de Procedimentos</h4>
-                              <div className="bg-white p-3 rounded border space-y-1 text-sm">
-                                {aih.total_procedures && <p><span className="font-medium">Total:</span> {aih.total_procedures}</p>}
-                                {aih.approved_procedures !== undefined && <p><span className="font-medium">Aprovados:</span> {aih.approved_procedures}</p>}
-                                {aih.rejected_procedures !== undefined && <p><span className="font-medium">Rejeitados:</span> {aih.rejected_procedures}</p>}
-                                {aih.calculated_total_value && (
-                                  <p className="text-green-600 font-medium">
-                                    <span className="font-medium">Valor Total:</span> {formatCurrency(aih.calculated_total_value)}
-                                  </p>
-                                )}
-                                <p><span className="font-medium">Match Encontrado:</span> {aih.match_found ? '✅ Sim' : '❌ Não'}</p>
-                                <p><span className="font-medium">Revisão Manual:</span> {aih.requires_manual_review ? '⚠️ Necessária' : '✅ Não necessária'}</p>
-                              </div>
-                            </div>
+                            ))}
                           </div>
-
-                          {/* Matches Detalhados */}
-                          {aih.aih_matches && aih.aih_matches.length > 0 && (
-                            <div className="mt-4">
-                              <h4 className="font-medium text-sm text-gray-700 mb-2">🎯 Matches SIGTAP Detalhados ({aih.aih_matches.length})</h4>
-                              <div className="space-y-2">
-                                {aih.aih_matches.map((match, idx) => (
-                                  <div key={idx} className="bg-white border rounded p-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div className="flex items-center space-x-3">
-                                        {getScoreBadge(match.overall_score)}
-                                        <Badge variant="outline" className="text-xs">
-                                          🎯 Confiança: {(match.match_confidence * 100).toFixed(1)}%
-                                        </Badge>
-                                        <Badge variant={match.status === 'approved' ? 'default' : 'secondary'} className="text-xs">
-                                          {match.status === 'approved' ? '✅ Aprovado' : 
-                                           match.status === 'rejected' ? '❌ Rejeitado' : 
-                                           match.status === 'under_review' ? '🔍 Em revisão' : '⏳ Pendente'}
-                                        </Badge>
-                                      </div>
-                                      <span className="font-medium text-green-600">
-                                        💰 {formatCurrency(match.calculated_total)}
-                                      </span>
-                                    </div>
-                                    
-                                    {match.validation_details && (
-                                      <div className="text-xs text-gray-600">
-                                        <p><span className="font-medium">🔍 Validações:</span></p>
-                                        <div className="grid grid-cols-2 gap-2 mt-1">
-                                          {Object.entries(match.validation_details).map(([key, value]) => (
-                                            <span key={key} className="flex items-center space-x-1">
-                                              <span>{value ? '✅' : '❌'}</span>
-                                              <span>{key}</span>
-                                            </span>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              ))}
+            </div>
+          )}
 
-      {/* Dialog de Confirmação de Exclusão */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <AlertCircle className="w-5 h-5 text-red-500" />
-              <span>Confirmar Exclusão</span>
-            </DialogTitle>
-            <DialogDescription>
-              {itemToDelete?.type === 'patient' ? (
-                <>
-                  Tem certeza que deseja excluir o paciente <strong>{itemToDelete.name}</strong>?
-                  <br />
-                  <span className="text-red-600 font-medium">
-                    ⚠️ Todas as AIHs deste paciente também serão excluídas.
-                  </span>
-                </>
-              ) : (
-                <>
-                  Tem certeza que deseja excluir a AIH <strong>{itemToDelete?.name}</strong>?
-                  <br />
-                  <span className="text-gray-600">
-                    O paciente será mantido no sistema.
-                  </span>
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Excluindo...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Excluir {itemToDelete?.type === 'patient' ? 'Paciente' : 'AIH'}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {/* Paginação */}
+          {filteredData.length > itemsPerPage && (
+            <div className="flex justify-between items-center mt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                disabled={currentPage === 0}
+              >
+                Anterior
+              </Button>
+              <span className="text-sm text-gray-600">
+                Página {currentPage + 1} de {Math.ceil(filteredData.length / itemsPerPage)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.min(Math.ceil(filteredData.length / itemsPerPage) - 1, currentPage + 1))}
+                disabled={currentPage >= Math.ceil(filteredData.length / itemsPerPage) - 1}
+              >
+                Próximo
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dialog de Confirmação de Deleção */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Deleção</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja deletar {itemToDelete?.type === 'patient' ? 'o paciente' : 'a AIH'} "{itemToDelete?.name}"?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-red-600 hover:bg-red-700">
+              Deletar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

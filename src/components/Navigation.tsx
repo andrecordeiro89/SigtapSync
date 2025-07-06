@@ -5,6 +5,7 @@ import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Home, Upload, Search, FileUp, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe } from 'lucide-react';
+import ProfileEditModal from './ProfileEditModal';
 
 interface NavigationProps {
   activeTab: string;
@@ -14,6 +15,7 @@ interface NavigationProps {
 const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
   const { user, signOut, isDeveloper, isAdmin, isDirector, isCoordinator, isAuditor, isTI, hasFullAccess, canAccessAllHospitals, getCurrentHospital, hasPermission } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Define todas as tabs disponíveis com ordem específica para cada role
   const allTabs = [
@@ -459,7 +461,10 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                 )}
 
                 {/* Menu Items */}
-                <DropdownMenuItem className="cursor-pointer">
+                <DropdownMenuItem 
+                  className="cursor-pointer" 
+                  onClick={() => setShowProfileModal(true)}
+                >
                   <Settings className="h-4 w-4 mr-2" />
                   <span>Configurações</span>
                 </DropdownMenuItem>
@@ -512,6 +517,12 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
           })}
         </div>
       </div>
+
+      {/* Modal de Configurações */}
+      <ProfileEditModal 
+        isOpen={showProfileModal} 
+        onClose={() => setShowProfileModal(false)} 
+      />
     </nav>
   );
 };

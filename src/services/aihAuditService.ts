@@ -158,11 +158,7 @@ export class AIHAuditService {
           hospital_id,
           created_at,
           action,
-          new_values,
-          user_profiles!audit_logs_user_id_fkey (
-            full_name,
-            email
-          )
+          new_values
         `)
         .eq('action', 'AIH_PROCESSING_SUCCESS')
         .eq('table_name', 'aihs')
@@ -186,13 +182,12 @@ export class AIHAuditService {
 
       (logs || []).forEach(log => {
         const userId = log.user_id;
-        const userProfile = (log.user_profiles as any);
         
         if (!analystMap.has(userId)) {
           analystMap.set(userId, {
             user_id: userId,
-            user_email: userProfile?.email || 'Email não disponível',
-            user_name: userProfile?.full_name || 'Nome não disponível',
+            user_email: 'Email não disponível',
+            user_name: 'Operador do Sistema',
             total_aihs: 0,
             aihs_today: 0,
             aihs_this_week: 0,
@@ -272,14 +267,7 @@ export class AIHAuditService {
           hospital_id,
           created_at,
           ip_address,
-          new_values,
-          user_profiles!audit_logs_user_id_fkey (
-            full_name,
-            email
-          ),
-          hospitals!audit_logs_hospital_id_fkey (
-            name
-          )
+          new_values
         `)
         .eq('table_name', 'aihs')
         .in('action', [
@@ -313,10 +301,10 @@ export class AIHAuditService {
         table_name: log.table_name,
         operation_type: log.operation_type,
         user_id: log.user_id,
-        user_email: (log.user_profiles as any)?.email,
-        user_name: (log.user_profiles as any)?.full_name,
+        user_email: 'Email não disponível',
+        user_name: 'Operador do Sistema',
         hospital_id: log.hospital_id,
-        hospital_name: (log.hospitals as any)?.name,
+        hospital_name: 'Hospital não disponível',
         aih_number: log.new_values?.aih_number,
         created_at: log.created_at,
         ip_address: log.ip_address,

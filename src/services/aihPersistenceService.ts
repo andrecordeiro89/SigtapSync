@@ -893,6 +893,7 @@ export class AIHPersistenceService {
     dateTo?: string;
     patientName?: string;
     aihNumber?: string;
+    processedBy?: string;
     limit?: number;
     offset?: number;
   }) {
@@ -951,7 +952,39 @@ export class AIHPersistenceService {
 
       if (error) throw error;
 
-      return data || [];
+      // Buscar informações do usuário atual (temporário até corrigir foreign keys)
+      const currentUser = JSON.parse(sessionStorage.getItem('current_user') || '{}');
+      const userName = currentUser.full_name || currentUser.email || 'Operador do Sistema';
+
+      // Processar dados para incluir informações do operador
+      const processedData = (data || []).map(aih => ({
+        ...aih,
+        processed_by_name: userName, // Nome real do usuário logado
+        processed_at_formatted: aih.processed_at ? 
+          new Date(aih.processed_at).toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit', 
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }) : 
+          new Date(aih.created_at).toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit', 
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+      }));
+
+      // Filtrar por operador se fornecido (temporariamente desabilitado)
+      // if (filters?.processedBy) {
+      //   return processedData.filter(aih => 
+      //     aih.processed_by_name?.toLowerCase().includes(filters.processedBy!.toLowerCase())
+      //   );
+      // }
+
+      return processedData;
     } catch (error) {
       console.error('❌ Erro ao buscar AIHs:', error);
       throw error;
