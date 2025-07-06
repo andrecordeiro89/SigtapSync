@@ -25,6 +25,25 @@ export default defineConfig(({ mode }) => ({
   build: {
     commonjsOptions: {
       include: [/pdfjs-dist/, /node_modules/]
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          supabase: ['@supabase/supabase-js'],
+          pdf: ['pdfjs-dist'],
+          ui: ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu']
+        }
+      }
+    },
+    target: 'esnext',
+    sourcemap: false,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
     }
   },
   worker: {

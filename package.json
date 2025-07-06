@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:check": "npm run copy-pdf-worker && vite build --mode production",
     "lint": "eslint .",
     "preview": "vite preview",
-    "copy-pdf-worker": "copy node_modules\\pdfjs-dist\\build\\pdf.worker.min.mjs public\\pdf.worker.min.mjs",
+    "verify-build": "npm run build:check && npm run preview",
+    "copy-pdf-worker": "copyfiles -u 3 node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/",
     "postinstall": "npm run copy-pdf-worker"
   },
   "dependencies": {
@@ -84,6 +86,7 @@
     "@types/xlsx": "^0.0.35",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.20",
+    "copyfiles": "^2.4.1",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
@@ -91,6 +94,7 @@
     "lovable-tagger": "^1.1.7",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
+    "terser": "^5.43.1",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
     "vite": "^5.4.1"
