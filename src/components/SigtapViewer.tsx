@@ -72,7 +72,7 @@ const SigtapViewer = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [complexityFilter, setComplexityFilter] = useState('all');
   const [financingFilter, setFinancingFilter] = useState('all');
-  const [origemFilter, setOrigemFilter] = useState('all');
+  const [modalityFilter, setModalityFilter] = useState('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -89,11 +89,11 @@ const SigtapViewer = () => {
       
       const matchesComplexity = complexityFilter === 'all' || procedure.complexity === complexityFilter;
       const matchesFinancing = financingFilter === 'all' || procedure.financing === financingFilter;
-      const matchesOrigem = origemFilter === 'all' || procedure.origem === origemFilter;
+      const matchesModality = modalityFilter === 'all' || procedure.modality === modalityFilter;
       
-      return matchesSearch && matchesComplexity && matchesFinancing && matchesOrigem;
+      return matchesSearch && matchesComplexity && matchesFinancing && matchesModality;
     });
-  }, [procedures, searchTerm, complexityFilter, financingFilter, origemFilter]);
+      }, [procedures, searchTerm, complexityFilter, financingFilter, modalityFilter]);
 
   const paginatedProcedures = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -110,8 +110,8 @@ const SigtapViewer = () => {
     return [...new Set(procedures.map(p => p.financing).filter(Boolean))];
   }, [procedures]);
 
-  const origemTypes = useMemo(() => {
-    return [...new Set(procedures.map(p => p.origem).filter(Boolean))];
+  const modalityTypes = useMemo(() => {
+    return [...new Set(procedures.map(p => p.modality).filter(Boolean))];
   }, [procedures]);
 
   const toggleRowExpansion = (procedureCode: string) => {
@@ -365,15 +365,7 @@ const SigtapViewer = () => {
           </div>
         )}
 
-        {/* Indicador para Operadores */}
-        {!isAdminUser && (
-          <div className="flex items-center space-x-2 text-gray-500">
-            <span className="text-sm">👤 Perfil Operador</span>
-            <Badge variant="outline" className="text-xs">
-              Interface Simplificada
-            </Badge>
-          </div>
-        )}
+
       </div>
 
       <Card>
@@ -444,9 +436,9 @@ const SigtapViewer = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Origem</label>
-              <Select value={origemFilter} onValueChange={(value) => {
-                setOrigemFilter(value);
+              <label className="text-sm font-medium">Modalidade</label>
+              <Select value={modalityFilter} onValueChange={(value) => {
+                setModalityFilter(value);
                 setCurrentPage(1);
               }}>
                 <SelectTrigger>
@@ -454,9 +446,9 @@ const SigtapViewer = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  {origemTypes.filter(o => o && o.trim()).map((origem) => (
-                    <SelectItem key={origem} value={origem}>
-                      {origem}
+                  {modalityTypes.filter(m => m && m.trim()).map((modality) => (
+                    <SelectItem key={modality} value={modality}>
+                      {modality}
                     </SelectItem>
                   ))}
                 </SelectContent>

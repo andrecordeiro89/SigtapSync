@@ -816,7 +816,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
               <p className="text-sm text-gray-600">Total Procedimentos</p>
               <p className="text-2xl font-bold text-blue-700">{aihCompleta.totalProcedimentos}</p>
@@ -824,19 +824,6 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
             <div className="text-center p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
               <p className="text-sm text-gray-600">Aprovados</p>
               <p className="text-2xl font-bold text-green-700">{aihCompleta.procedimentosAprovados}</p>
-            </div>
-            <div className="text-center p-4 bg-red-50 rounded-lg border-l-4 border-red-500">
-              <p className="text-sm text-gray-600">Rejeitados</p>
-              <p className="text-2xl font-bold text-red-700">{aihCompleta.procedimentosRejeitados}</p>
-            </div>
-            <div className="text-center p-4 bg-amber-50 rounded-lg border-l-4 border-amber-500">
-              <p className="text-sm text-gray-600">Valor Original</p>
-              <p className="text-xl font-bold text-amber-700">
-                {formatCurrency(aihCompleta.procedimentos
-                  .filter(p => p.aprovado)
-                  .reduce((sum, p) => sum + (p.valorOriginal || 0), 0)
-                )}
-              </p>
             </div>
             <div className="text-center p-4 bg-green-100 rounded-lg border-l-4 border-green-600 relative">
               <p className="text-sm text-gray-600">Valor Final</p>
@@ -903,12 +890,12 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50">
-                  <TableHead className="w-12">Seq</TableHead>
+                  <TableHead className="w-12 text-center">Seq</TableHead>
                   <TableHead className="w-28">Código</TableHead>
                   <TableHead>Procedimento</TableHead>
-                  <TableHead className="w-80">Valores</TableHead>
-                  <TableHead className="w-12">+</TableHead>
-                  <TableHead className="w-8"></TableHead>
+                  <TableHead className="w-80 text-center">Valores</TableHead>
+                  <TableHead className="w-12 text-center">+</TableHead>
+                  <TableHead className="w-8 text-center"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1981,7 +1968,7 @@ const AIHMultiPageTester = () => {
       <div className="text-center">
         <h2 className="text-3xl font-bold text-gray-900 flex items-center justify-center space-x-2">
           <Layers className="w-8 h-8 text-blue-600" />
-          <span>Teste AIH Multi-Página</span>
+          <span>AIH Avançado</span>
         </h2>
         <p className="text-gray-600 mt-2">
           Processamento completo de PDFs AIH com múltiplas páginas de procedimentos
@@ -1993,7 +1980,7 @@ const AIHMultiPageTester = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Upload className="w-5 h-5 text-blue-600" />
-            <span>Upload PDF AIH Multi-Página</span>
+            <span>Upload PDF AIH</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -2047,7 +2034,7 @@ const AIHMultiPageTester = () => {
               {isProcessing ? (
                 <>
                   <Zap className="w-4 h-4 mr-2 animate-spin" />
-                  Processando Multi-Página...
+                  Processando AIH...
                 </>
               ) : (
                 <>
@@ -2076,69 +2063,7 @@ const AIHMultiPageTester = () => {
                     </>
                   )}
                 </Button>
-                
-                <Button onClick={handleGenerateExecutiveReport} variant="outline">
-                  <FileText className="w-4 h-4 mr-2" />
-                  📊 Relatório Diretores
-                </Button>
-                
-                <Button onClick={exportDetailedReport} variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Exportar Relatório
-                </Button>
-                
-                <Button onClick={runSystemDiagnostic} variant="outline" className="bg-blue-50 hover:bg-blue-100">
-                  <Settings className="w-4 h-4 mr-2" />
-                  🔧 Diagnóstico
-                </Button>
-                
-                {/* ✅ BOTÃO PRINCIPAL PARA SALVAR TODOS OS DADOS */}
-                <Button 
-                  onClick={handleSaveCompleteAIH} 
-                  disabled={isProcessing || aihSaved} 
-                  className={aihSaved ? "bg-gray-100 border-gray-300" : "bg-emerald-50 hover:bg-emerald-100 border-emerald-300"}
-                  variant="outline"
-                >
-                  {isProcessing ? (
-                    <>
-                      <Database className="w-4 h-4 mr-2 animate-spin" />
-                      Salvando 100% dos dados...
-                    </>
-                  ) : aihSaved ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
-                      ✅ AIH Salva
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      🚀 Salvar AIH Completa
-                    </>
-                  )}
-                </Button>
               </>
-            )}
-
-            {/* ⚠️ AVISO QUANDO AIH NÃO FOI SALVA */}
-            {aihCompleta && !aihSaved && (
-              <Alert className="border-orange-500 bg-orange-50 mt-2">
-                <Info className="h-4 w-4 text-orange-600" />
-                <AlertDescription className="text-orange-800">
-                  💡 <strong>AIH processada mas não salva no banco.</strong> 
-                  Revise os dados e clique em "🚀 Salvar AIH Completa" para persistir 100% das informações.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* ✅ CONFIRMAÇÃO QUANDO AIH FOI SALVA */}
-            {aihCompleta && aihSaved && (
-              <Alert className="border-green-500 bg-green-50 mt-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-green-800">
-                  ✅ <strong>AIH salva com sucesso!</strong> 
-                  Todos os dados estão disponíveis no sistema para consultas e relatórios.
-                </AlertDescription>
-              </Alert>
             )}
           </div>
         </CardContent>
@@ -2223,6 +2148,61 @@ const AIHMultiPageTester = () => {
             />
           )}
         </div>
+      )}
+
+      {/* SEÇÃO DE SALVAMENTO FINAL */}
+      {aihCompleta && (
+        <Card className="border-2 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
+          <CardHeader className="text-center">
+            <CardTitle className="flex items-center justify-center space-x-2">
+              <Save className="w-6 h-6 text-green-600" />
+              <span>💾 Finalizar Processamento</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-gray-600">
+              ✅ Conferência concluída? Salve a AIH no banco de dados para disponibilizar nos relatórios.
+            </p>
+            
+            <Button 
+              onClick={handleSaveCompleteAIH} 
+              disabled={isProcessing || aihSaved} 
+              className={`
+                px-8 py-3 text-lg font-medium
+                ${aihSaved 
+                  ? "bg-gray-100 border-gray-300 cursor-not-allowed" 
+                  : "bg-green-600 hover:bg-green-700 text-white"
+                }
+              `}
+              size="lg"
+            >
+              {isProcessing ? (
+                <>
+                  <Save className="w-5 h-5 mr-2 animate-spin" />
+                  Salvando AIH...
+                </>
+              ) : aihSaved ? (
+                <>
+                  <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
+                  ✅ AIH Salva
+                </>
+              ) : (
+                <>
+                  <Save className="w-5 h-5 mr-2" />
+                  💾 Salvar AIH
+                </>
+              )}
+            </Button>
+            
+            {aihSaved && (
+              <div className="mt-4 p-3 bg-green-100 rounded-lg">
+                <p className="text-green-800 text-sm">
+                  ✅ <strong>AIH salva com sucesso!</strong> Dados disponíveis para consulta em "Pacientes".
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );
