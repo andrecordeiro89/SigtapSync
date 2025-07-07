@@ -225,25 +225,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     });
   };
   
-  // Função para mostrar detalhes do procedimento
-  const handleShowProcedureDetails = (procedure: ProcedureAIH) => {
-    const details = [
-      `Sequência: ${procedure.sequencia}`,
-      `Código: ${procedure.procedimento}`,
-      `Descrição: ${procedure.descricao || 'N/A'}`,
-      `Data: ${procedure.data}`,
-      `CBO: ${procedure.cbo}`,
-      `Profissional: ${procedure.documentoProfissional}`,
-      `Participação: ${procedure.participacao}`,
-      `CNES: ${procedure.cnes}`,
-      `Status: ${procedure.matchStatus}`,
-      `Aprovado: ${procedure.aprovado ? 'Sim' : 'Não'}`,
-      `Valor Calculado: R$ ${(procedure.valorCalculado || 0).toFixed(2)}`,
-      `Confiança: ${procedure.matchConfidence ? (procedure.matchConfidence * 100).toFixed(1) + '%' : 'N/A'}`
-    ].join('\n');
-    
-    alert(`DETALHES DO PROCEDIMENTO:\n\n${details}`);
-  };
+
 
   // ✅ FUNÇÃO ATUALIZADA: Calcular totais aplicando lógica SUS (incluindo Instrumento 04)
   const calculateTotalsWithPercentage = (procedimentos: ProcedureAIH[]): AIHComplete => {
@@ -1156,19 +1138,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                         </Button>
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className="flex items-center justify-center space-x-1">
-                          {/* Botão Remover (amarelo) */}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRemoveProcedure(procedure.sequencia)}
-                            className="h-7 px-2 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 border-yellow-200"
-                            title="Remover temporariamente"
-                          >
-                            <AlertTriangle className="w-3 h-3" />
-                          </Button>
-                          
-                          {/* Botão Excluir (vermelho) */}
+                        <div className="flex items-center justify-center">
+                          {/* Botão Excluir (vermelho) - ÚNICO BOTÃO MANTIDO */}
                           <Button
                             variant="outline"
                             size="sm"
@@ -1177,17 +1148,6 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                             title="Excluir permanentemente"
                           >
                             <Trash2 className="w-3 h-3" />
-                          </Button>
-                          
-                          {/* Botão Info */}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleShowProcedureDetails(procedure)}
-                            className="h-7 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-                            title="Ver detalhes"
-                          >
-                            <Info className="w-3 h-3" />
                           </Button>
                         </div>
                       </TableCell>
