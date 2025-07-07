@@ -226,13 +226,304 @@ export class AIHCompleteProcessor {
   }
 
   /**
-   * Extrai lista de procedimentos de uma página
+   * 🎯 FILTRO INTELIGENTE E ESPECÍFICO: Remove apenas linhas de procedimentos de anestesia
+   * Preserva cabeçalhos, estrutura do documento e outras informações
+   */
+  private preFilterAnesthesiaLines(text: string): { filteredText: string; removedLines: string[] } {
+    console.log(`🚫 PRÉ-FILTRO: Aplicando filtro inteligente de anestesia...`);
+    
+    // 🔧 QUEBRA INTELIGENTE: PDF pode vir como bloco contínuo, quebrar por padrões de procedimento
+    const smartLines = this.smartSplitProcedureText(text);
+    
+    const filteredLines: string[] = [];
+    const removedLines: string[] = [];
+    
+    for (const line of smartLines) {
+      const trimmedLine = line.trim();
+      
+      // 🎯 SKIP: Linhas vazias ou muito curtas (preservar estrutura)
+      if (trimmedLine.length < 10) {
+        filteredLines.push(line);
+        console.log(`⏭️ LINHA CURTA PRESERVADA (${trimmedLine.length} chars): ${trimmedLine}`);
+        continue;
+      }
+      
+      // 🎯 SKIP: Cabeçalhos e informações do hospital (preservar)
+      if (this.isHeaderOrSystemLine(trimmedLine)) {
+        filteredLines.push(line);
+        console.log(`📋 CABEÇALHO PRESERVADO: ${trimmedLine.substring(0, 60)}...`);
+        continue;
+      }
+      
+      // 🎯 VERIFICAR: Apenas linhas que parecem ser procedimentos
+      if (this.isProcedureLine(trimmedLine)) {
+        const lowerLine = trimmedLine.toLowerCase();
+        
+        // 🚫 FILTRO ESPECÍFICO: CBO 225151 ou texto "anestesista" em linhas de procedimento
+        const hasAnesthesiaCBO = trimmedLine.includes('225151');
+        const hasAnesthesiaText = lowerLine.includes('anestesista') || 
+                                 lowerLine.includes('anestesiologista') ||
+                                 lowerLine.includes('anestesiol');
+        
+        if (hasAnesthesiaCBO || hasAnesthesiaText) {
+          console.log(`🚫 PROCEDIMENTO FILTRADO: ${trimmedLine.substring(0, 80)}...`);
+          console.log(`   📋 Motivo: ${hasAnesthesiaCBO ? 'CBO 225151' : 'Texto de anestesia'}`);
+          removedLines.push(line);
+          // NÃO adicionar à lista filtrada
+        } else {
+          console.log(`✅ PROCEDIMENTO MANTIDO: ${trimmedLine.substring(0, 60)}...`);
+          filteredLines.push(line);
+        }
+      } else {
+        // Não é linha de procedimento - preservar sempre
+        console.log(`📄 LINHA NÃO-PROCEDIMENTO PRESERVADA: ${trimmedLine.substring(0, 60)}...`);
+        filteredLines.push(line);
+      }
+    }
+    
+    const filteredText = filteredLines.join('\n');
+    
+    console.log(`✅ PRÉ-FILTRO INTELIGENTE CONCLUÍDO:`);
+    console.log(`   📄 Segmentos originais: ${smartLines.length}`);
+    console.log(`   ✅ Segmentos mantidos: ${filteredLines.length}`);
+    console.log(`   🚫 Procedimentos filtrados: ${removedLines.length}`);
+    
+    if (removedLines.length > 0) {
+      console.log(`   🎯 ECONOMIA: ${removedLines.length} procedimentos de anestesia removidos`);
+      removedLines.forEach((line, index) => {
+        console.log(`   🚫 ${index + 1}. ${line.substring(0, 80)}...`);
+      });
+    }
+    
+    return { filteredText, removedLines };
+  }
+
+  /**
+   * 🔧 QUEBRA INTELIGENTE: Divide texto de PDF em segmentos lógicos
+   * PDFs podem vir como bloco contínuo - quebrar por padrões que indicam novos procedimentos
+   */
+  private smartSplitProcedureText(text: string): string[] {
+    // Primeiro tentar quebra natural por \n
+    let lines = text.split('\n');
+    
+    console.log(`🔧 QUEBRA INICIAL: ${lines.length} linhas naturais`);
+    console.log(`📏 Tamanho do texto: ${text.length} caracteres`);
+    
+    // Se tem poucas linhas mas texto longo, fazer quebra inteligente
+    if (lines.length <= 3 && text.length > 500) {
+      console.log(`🔧 TEXTO LONGO EM POUCAS LINHAS - Aplicando quebra inteligente...`);
+      console.log(`📄 Texto original (primeiros 200 chars): ${text.substring(0, 200)}...`);
+      
+      // Quebrar onde há códigos de procedimento seguidos por data
+      // Padrão: XX.XX.XX.XXX-X ... DD/MM/AAAA (próximo código)
+      const procedurePattern = /(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/g;
+      
+      let smartLines: string[] = [];
+      let currentSegment = '';
+      
+      // Quebrar por códigos de procedimento
+      const segments = text.split(procedurePattern);
+      
+      console.log(`🔧 SEGMENTOS ENCONTRADOS: ${segments.length}`);
+      
+      for (let i = 0; i < segments.length; i++) {
+        if (segments[i].match(/^\d{2}\.\d{2}\.\d{2}\.\d{3}-\d$/)) {
+          // É um código de procedimento
+          if (currentSegment.trim()) {
+            smartLines.push(currentSegment.trim());
+            console.log(`📋 Segmento ${smartLines.length}: ${currentSegment.trim().substring(0, 60)}...`);
+          }
+          currentSegment = segments[i]; // Iniciar novo segmento com o código
+        } else {
+          // É o conteúdo após o código
+          currentSegment += segments[i];
+        }
+      }
+      
+      // Adicionar último segmento
+      if (currentSegment.trim()) {
+        smartLines.push(currentSegment.trim());
+        console.log(`📋 Segmento ${smartLines.length} (último): ${currentSegment.trim().substring(0, 60)}...`);
+      }
+      
+      console.log(`🔧 QUEBRA REALIZADA: ${lines.length} linhas → ${smartLines.length} segmentos`);
+      
+      // 🔍 DEBUG: Verificar se há anestesia nos segmentos
+      smartLines.forEach((segment, index) => {
+        if (segment.includes('225151') || segment.toLowerCase().includes('anestesista')) {
+          console.log(`⚠️ ANESTESIA DETECTADA no segmento ${index + 1}: ${segment.substring(0, 80)}...`);
+        }
+      });
+      
+      return smartLines;
+    }
+    
+    // 🔍 DEBUG: Verificar se há anestesia nas linhas normais
+    lines.forEach((line, index) => {
+      if (line.includes('225151') || line.toLowerCase().includes('anestesista')) {
+        console.log(`⚠️ ANESTESIA DETECTADA na linha ${index + 1}: ${line.substring(0, 80)}...`);
+      }
+    });
+    
+    return lines;
+  }
+
+  /**
+   * Identifica se uma linha é cabeçalho/sistema (deve ser preservada)
+   */
+  private isHeaderOrSystemLine(line: string): boolean {
+    const lowerLine = line.toLowerCase();
+    
+    // Padrões de cabeçalho/sistema
+    const headerPatterns = [
+      'centro integrado', 'hospital', 'maternidade', 'apresentação da aih',
+      'número da aih', 'situação', 'tipo', 'data autorização', 'telefone',
+      'linha procedimento', 'documento profissional', 'descrição', 'participação',
+      'apurar valor', 'qtde', 'procedimentos realizados', 'cnes', 'data realização',
+      'gsus-v', 'página', 'gerado por', 'dados complementare', 'nota fiscal'
+    ];
+    
+    return headerPatterns.some(pattern => lowerLine.includes(pattern));
+  }
+
+  /**
+   * Identifica se uma linha contém um procedimento (candidata à filtragem)
+   */
+  private isProcedureLine(line: string): boolean {
+    // Padrão: deve conter código de procedimento SUS (XX.XX.XX.XXX-X)
+    const hasProcedureCode = /\d{2}\.\d{2}\.\d{2}\.\d{3}-\d/.test(line);
+    
+    // E deve ter estrutura de dados (CBO, datas, etc.) - MAIS FLEXÍVEL
+    const hasStructuredData = /\d{4,6}/.test(line) || // CBO (4-6 dígitos)
+                              /\d{2}\/\d{2}\/\d{4}/.test(line) || // Data
+                              /\d{3}\.\d{3}\.\d{3}-\d{2}/.test(line); // CPF/CNPJ
+    
+    const isProcedure = hasProcedureCode && hasStructuredData;
+    
+    // 🔍 DEBUG: Log detalhado para linhas suspeitas
+    if (line.includes('225151') || line.toLowerCase().includes('anestesista')) {
+      console.log(`🔍 DEBUG LINHA ANESTESIA:`);
+      console.log(`   📝 Linha: ${line.substring(0, 80)}...`);
+      console.log(`   🏥 Tem código procedimento: ${hasProcedureCode}`);
+      console.log(`   📊 Tem dados estruturados: ${hasStructuredData}`);
+      console.log(`   ✅ É linha de procedimento: ${isProcedure}`);
+    }
+    
+    return isProcedure;
+  }
+
+  /**
+   * Verifica se um procedimento é de anestesista e deve ser filtrado
+   * PRIORIDADE 1: CBO 225151 (anestesiologista oficial)
+   * PRIORIDADE 2: Palavras na coluna "Participação" (backup)
+   */
+  private isAnesthesiaProcedure(procedimento: ProcedureAIH): boolean {
+    // 🎯 PRIORIDADE 1: CBO 225151 - CRITÉRIO OFICIAL CONFIRMADO PELO HOSPITAL
+    const cbo = (procedimento.cbo || '').trim();
+    if (cbo === '225151') {
+      return true; // Anestesiologista confirmado por CBO oficial
+    }
+    
+    // 🎯 PRIORIDADE 2: Detecção por texto na participação (backup para casos edge)
+    const participacao = (procedimento.participacao || '').toLowerCase().trim();
+    
+    // Se não há participação definida, não é anestesista (já foi filtrado por CBO)
+    if (!participacao) {
+      return false;
+    }
+    
+    // 📋 TERMOS DE ANESTESIA EM PORTUGUÊS - como backup
+    const anesthesiaTerms = [
+      // Termos principais
+      'anestesista',        // Termo exato da tabela
+      'anestesiologista',   // Variação comum
+      'anestesiol',         // Abreviação comum
+      'anestes',            // Variação
+      'anes',               // Abreviação curta
+      'anest',              // Abreviação
+      
+      // Variações e erros de digitação
+      'anestsista',         // Erro comum
+      'anestesita',         // Erro comum
+      'anestesis',          // Variação
+      'anastesista',        // Erro comum
+      'anastesiologista',   // Erro comum
+      
+      // Termos em inglês (caso apareçam)
+      'anesthesi',          // Inglês
+      'anesthesiol',        // Inglês abreviado
+      
+      // Termos relacionados
+      'anest.',             // Abreviação com ponto
+      'anes.',              // Abreviação com ponto
+    ];
+    
+    // Verificar se algum termo de anestesia está presente na participação
+    const isAnesthesia = anesthesiaTerms.some(term => 
+      participacao.includes(term)
+    );
+    
+    return isAnesthesia;
+  }
+
+  /**
+   * Retorna detalhes sobre por que um procedimento foi filtrado (para debug)
+   */
+  private getFilterReason(procedimento: ProcedureAIH): string {
+    // 🎯 PRIORIDADE 1: Verificar se foi filtrado por CBO 225151
+    const cbo = (procedimento.cbo || '').trim();
+    if (cbo === '225151') {
+      return `CBO 225151 (Anestesiologista oficial) - Critério principal confirmado pelo hospital`;
+    }
+    
+    // 🎯 PRIORIDADE 2: Verificar se foi filtrado por texto na participação
+    const participacao = (procedimento.participacao || '').toLowerCase().trim();
+    
+    if (!participacao) {
+      return 'Erro: Procedimento filtrado sem CBO 225151 nem participação - revisar lógica';
+    }
+    
+    const anesthesiaTerms = [
+      // Termos principais  
+      'anestesista', 'anestesiologista', 'anestesiologia',
+      // Abreviações
+      'anestesiol', 'anestes', 'anes', 'anest',
+      // Variações e erros
+      'anestsista', 'anestesita', 'anestesis', 'anastesista', 'anastesiologista',
+      // Inglês
+      'anesthesi', 'anesthesiol',
+      // Com pontos
+      'anest.', 'anes.'
+    ];
+    
+    const foundTerm = anesthesiaTerms.find(term => 
+      participacao.includes(term)
+    );
+    
+    if (foundTerm) {
+      return `Termo de anestesia '${foundTerm}' encontrado na Participação: "${procedimento.participacao}" (filtro backup)`;
+    }
+    
+    return `Erro: Procedimento filtrado sem critério válido - CBO: "${cbo}", Participação: "${procedimento.participacao}"`;
+  }
+
+  /**
+   * Extrai procedimentos da página e aplica filtros SUS
    */
   private extractProcedures(text: string, sequenciaInicial: number = 1): ProcedureAIH[] {
     try {
       console.log(`📋 Extraindo procedimentos (sequência inicial: ${sequenciaInicial})...`);
       console.log(`🔍 DEBUGGING: Texto da página (primeiros 500 chars):`);
       console.log(text.substring(0, 500));
+      
+      // 🚫 ETAPA 1: PRÉ-FILTRO DE ANESTESIA (ANTES DA EXTRAÇÃO COMPLEXA)
+      const { filteredText, removedLines } = this.preFilterAnesthesiaLines(text);
+      
+      // Se todas as linhas foram filtradas, retornar vazio
+      if (filteredText.trim().length === 0) {
+        console.log(`🚫 TODAS AS LINHAS FILTRADAS - Nenhum procedimento válido encontrado`);
+        return [];
+      }
       
       const procedimentos: ProcedureAIH[] = [];
       
@@ -251,13 +542,14 @@ export class AIHCompleteProcessor {
         data: /(\d{2}\/\d{2}\/\d{4})/g
       };
 
+      // 📄 PROCESSAR TEXTO FILTRADO (sem linhas de anestesia)
       // Tentar extrair usando pattern FLEXÍVEL da tabela
       let match;
       let sequenciaAtual = sequenciaInicial;
       
-      console.log(`🔍 TENTANDO EXTRAIR com pattern flexível...`);
+      console.log(`🔍 TENTANDO EXTRAIR com pattern flexível no texto filtrado...`);
       
-      while ((match = patterns.linhaTabela.exec(text)) !== null) {
+      while ((match = patterns.linhaTabela.exec(filteredText)) !== null) {
         console.log(`📋 MATCH ENCONTRADO:`, match);
         
         // Extrair e processar código de participação com lógica APRIMORADA
@@ -281,6 +573,7 @@ export class AIHCompleteProcessor {
         };
 
         if (procedimento.procedimento) {
+          // ✅ PROCEDIMENTO JÁ FILTRADO pelo pré-filtro - adicionar diretamente
           procedimentos.push(procedimento);
           console.log(`✅ Procedimento ${sequenciaAtual}: ${procedimento.procedimento} - ${procedimento.descricao}`);
           console.log(`   👨‍⚕️ Participação: "${rawParticipacao}" → "${participacaoValidada}" (${isValidParticipationCode(participacaoValidada) ? 'VÁLIDO' : 'INVÁLIDO'})`);
@@ -291,18 +584,18 @@ export class AIHCompleteProcessor {
       
       // Se pattern principal não funcionou, tentar EXTRAÇÃO LINHA POR LINHA
       if (procedimentos.length === 0) {
-        console.warn('⚠️ Pattern principal falhou, tentando extração linha por linha...');
-        const extractedByLines = this.extractProceduresByLines(text, sequenciaInicial);
+        console.warn('⚠️ Pattern principal falhou, tentando extração linha por linha no texto filtrado...');
+        const extractedByLines = this.extractProceduresByLines(filteredText, sequenciaInicial);
         procedimentos.push(...extractedByLines);
       }
 
       // Se não encontrou procedimentos com o pattern principal, tentar método alternativo
       if (procedimentos.length === 0) {
-        console.warn('⚠️ Nenhum procedimento encontrado com pattern principal, tentando extração alternativa...');
+        console.warn('⚠️ Nenhum procedimento encontrado com pattern principal, tentando extração alternativa no texto filtrado...');
         
         // Buscar códigos de procedimento e tentar montar estrutura básica
-        const codigosMatch = text.match(patterns.procedimentoCodigo);
-        const datasMatch = text.match(patterns.data);
+        const codigosMatch = filteredText.match(patterns.procedimentoCodigo);
+        const datasMatch = filteredText.match(patterns.data);
         
         if (codigosMatch) {
           codigosMatch.forEach((codigo, index) => {
@@ -320,6 +613,7 @@ export class AIHCompleteProcessor {
               aprovado: true
             };
             
+            // ✅ PROCEDIMENTO JÁ FILTRADO pelo pré-filtro - adicionar diretamente
             procedimentos.push(procedimento);
             console.log(`✅ Procedimento alternativo ${sequenciaInicial + index}: ${codigo}`);
           });
@@ -327,6 +621,20 @@ export class AIHCompleteProcessor {
       }
 
       console.log(`📊 Total de procedimentos extraídos: ${procedimentos.length}`);
+      
+      // 📊 ESTATÍSTICAS DO PRÉ-FILTRO SUS
+      if (removedLines.length > 0) {
+        console.log(`🚫 PRÉ-FILTRO SUS APLICADO:`);
+        console.log(`   ✅ Procedimentos extraídos: ${procedimentos.length}`);
+        console.log(`   🚫 Linhas de anestesia filtradas: ${removedLines.length}`);
+        console.log(`   🎯 ECONOMIA: ${removedLines.length} linhas removidas antes da extração`);
+        console.log(`   💾 BANCO: Apenas ${procedimentos.length} procedimentos válidos serão salvos`);
+        console.log(`   🔬 CRITÉRIO: Filtro por CBO 225151 e/ou texto "anestesista" aplicado no texto bruto`);
+      } else {
+        console.log(`✅ NENHUMA LINHA DE ANESTESIA DETECTADA - Todos os ${procedimentos.length} procedimentos são válidos`);
+        console.log(`   🔍 VERIFICAÇÃO: Nenhum CBO 225151 ou termo de anestesia encontrado no texto bruto`);
+      }
+      
       return procedimentos;
 
     } catch (error) {
@@ -390,8 +698,9 @@ export class AIHCompleteProcessor {
   }
 
   /**
-   * Processa campo de participação com lógica APRIMORADA
-   * Aceita formatos: "1º", "1°", "2º", "1", "01", etc.
+   * Processa campo de participação PRESERVANDO TEXTO ORIGINAL
+   * Conforme nova lógica: manter "Anestesista", "1º cirurgião" etc. como texto
+   * Só converter códigos numéricos puros para formato padronizado
    */
   private parseParticipationField(rawValue: string): string {
     if (!rawValue) return '';
@@ -401,21 +710,20 @@ export class AIHCompleteProcessor {
     // Limpar espaços
     const cleaned = rawValue.trim();
     
+    // 🎯 NOVA LÓGICA: Se contém letras (texto), preservar como está
+    if (/[a-zA-ZáéíóúâêîôûàèìòùçãõüÁÉÍÓÚÂÊÎÔÛÀÈÌÒÙÇÃÕÜ]/.test(cleaned)) {
+      console.log(`   ✅ Texto preservado: "${cleaned}"`);
+      return cleaned; // Preservar "Anestesista", "1º cirurgião", etc.
+    }
+    
+    // Se for só números/símbolos, aplicar conversão para códigos
+    
     // Pattern para capturar números com possível º ou °
     const numberMatch = cleaned.match(/^(\d+)[°º]?$/);
     if (numberMatch) {
       const number = parseInt(numberMatch[1]);
       const formatted = number.toString().padStart(2, '0');
       console.log(`   ✅ Número detectado: ${number} → ${formatted}`);
-      return formatted;
-    }
-    
-    // Pattern para ordinais escritos (1º, 2º, etc.)
-    const ordinalMatch = cleaned.match(/^(\d+)[°º]$/);
-    if (ordinalMatch) {
-      const number = parseInt(ordinalMatch[1]);
-      const formatted = number.toString().padStart(2, '0');
-      console.log(`   ✅ Ordinal detectado: ${cleaned} → ${formatted}`);
       return formatted;
     }
     
@@ -432,16 +740,9 @@ export class AIHCompleteProcessor {
       return formatted;
     }
     
-    // Fallback: tentar extrair apenas dígitos
-    const digitOnly = cleaned.replace(/[^\d]/g, '');
-    if (digitOnly) {
-      const formatted = digitOnly.length === 1 ? '0' + digitOnly : digitOnly.substring(0, 2);
-      console.log(`   ⚠️ Fallback dígitos: "${cleaned}" → "${formatted}"`);
-      return formatted;
-    }
-    
-    console.log(`   ❌ Não foi possível processar: "${rawValue}"`);
-    return '';
+    // Fallback: retornar o valor original limpo
+    console.log(`   ⚠️ Valor preservado como texto: "${cleaned}"`);
+    return cleaned;
   }
 
   /**
@@ -489,6 +790,7 @@ export class AIHCompleteProcessor {
           aprovado: true
         };
         
+        // ✅ PROCEDIMENTO JÁ FILTRADO pelo pré-filtro - adicionar diretamente
         procedimentos.push(procedimento);
         console.log(`   ✅ Procedimento extraído: ${procedimento.procedimento}`);
         console.log(`   👨‍⚕️ Participação: "${rawParticipacao}" → "${procedimento.participacao}"`);

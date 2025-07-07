@@ -2225,11 +2225,11 @@ export class AIHPersistenceService {
   async getAIHProcedures(aihId: string): Promise<any[]> {
     try {
       console.log('Buscando procedimentos para AIH:', aihId);
-      
+
       // Strategy 1: Optimized query with known schema fields INCLUDING DESCRIPTION AND SEQUENCIA
       try {
         const { data: procedures, error } = await supabase
-          .from('procedure_records')
+        .from('procedure_records')
           .select(`
             id,
             aih_id,
@@ -2252,8 +2252,8 @@ export class AIHPersistenceService {
             created_at,
             updated_at
           `)
-          .eq('aih_id', aihId)
-          .order('sequencia', { ascending: true });
+        .eq('aih_id', aihId)
+        .order('sequencia', { ascending: true });
 
         if (error) throw error;
 
@@ -2340,9 +2340,9 @@ export class AIHPersistenceService {
         // Buscar descrições no SIGTAP
         const { data: sigtapData } = await supabase
           .from('sigtap_procedures')
-          .select(`
-            code,
-            description,
+            .select(`
+                code,
+                description,
             sigtap_versions!inner(is_active)
           `)
           .in('code', codesNeedingDescription)
@@ -2597,7 +2597,7 @@ export class AIHPersistenceService {
         .limit(maxAIHs);
 
       if (!aihsWithoutProcedures?.length) {
-        return {
+                return {
           processed: 0,
           synchronized: 0,
           errors: [],
