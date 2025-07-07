@@ -23,7 +23,7 @@ interface ProcedureData {
   procedure_description?: string;
   displayName?: string;
   fullDescription?: string;
-  match_status: 'pending' | 'approved' | 'rejected' | 'removed';
+  match_status: 'pending' | 'matched' | 'manual' | 'rejected';
   match_confidence?: number;
   value_charged?: number;
   professional?: string;
@@ -84,26 +84,26 @@ const ProcedureInlineCard = ({
         textColor: 'text-yellow-800',
         badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-300'
       },
-      approved: { 
+      matched: { 
         icon: CheckCircle, 
         text: 'Aprovado', 
         bgColor: 'bg-green-50 border-green-200',
         textColor: 'text-green-800',
         badgeColor: 'bg-green-100 text-green-800 border-green-300'
       },
+      manual: { 
+        icon: CheckCircle, 
+        text: 'Manual', 
+        bgColor: 'bg-blue-50 border-blue-200',
+        textColor: 'text-blue-800',
+        badgeColor: 'bg-blue-100 text-blue-800 border-blue-300'
+      },
       rejected: { 
         icon: XCircle, 
         text: 'Rejeitado', 
-        bgColor: 'bg-red-50 border-red-200',
-        textColor: 'text-red-800',
-        badgeColor: 'bg-red-100 text-red-800 border-red-300'
-      },
-      removed: { 
-        icon: AlertTriangle, 
-        text: 'Removido', 
-        bgColor: 'bg-gray-50 border-gray-200',
-        textColor: 'text-gray-600',
-        badgeColor: 'bg-gray-100 text-gray-600 border-gray-300'
+        bgColor: 'bg-slate-50 border-slate-300',
+        textColor: 'text-slate-600',
+        badgeColor: 'bg-slate-100 text-slate-600 border-slate-300'
       }
     };
     
@@ -120,7 +120,7 @@ const ProcedureInlineCard = ({
 
   const config = getStatusConfig();
   const StatusIcon = config.icon;
-  const isRemoved = procedure.match_status === 'removed';
+  const isRejected = procedure.match_status === 'rejected';
 
   // Obter descrição do procedimento
   const procedureDescription = procedure.procedure_description || 
@@ -129,7 +129,7 @@ const ProcedureInlineCard = ({
     'Descrição não disponível';
 
   return (
-    <Card className={`transition-all duration-300 hover:shadow-md ${config.bgColor} ${isRemoved ? 'opacity-75' : ''}`}>
+    <Card className={`transition-all duration-300 hover:shadow-md ${config.bgColor} ${isRejected ? 'opacity-75' : ''}`}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           {/* Informações Principais */}
@@ -193,54 +193,56 @@ const ProcedureInlineCard = ({
           {/* Ações */}
           {!isReadOnly && (
             <div className="flex items-center space-x-1 ml-4">
-              {isRemoved ? (
-                // Ações para procedimento removido
+              {isRejected ? (
+                // Ações para procedimento rejeitado
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => onRestore && handleAction(() => onRestore(procedure), 'Restaurar')}
+                  onClick={() => onRestore && handleAction(() => onRestore(procedure), 'Reativar')}
                   disabled={isLoading}
-                  className="h-8 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
-                  title="Restaurar procedimento"
+                  className="h-8 px-2 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                  title="Reativar procedimento"
                 >
                   <RotateCcw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
                 </Button>
               ) : (
                 // Ações para procedimento ativo
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onRemove && handleAction(() => onRemove(procedure), 'Remover')}
-                  disabled={isLoading}
-                  className="h-8 px-2 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 border-yellow-200"
-                  title="Remover temporariamente"
-                >
-                  <AlertTriangle className={`w-3 h-3 ${isLoading ? 'animate-pulse' : ''}`} />
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onRemove && handleAction(() => onRemove(procedure), 'Inativar')}
+                    disabled={isLoading}
+                    className="h-8 px-2 text-slate-600 hover:text-slate-700 hover:bg-slate-50 border-slate-200"
+                    title="Inativar procedimento"
+                  >
+                    <XCircle className={`w-3 h-3 ${isLoading ? 'animate-pulse' : ''}`} />
+                  </Button>
+                  
+                  {/* Exclusão permanente - sempre disponível */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onDelete && handleAction(() => onDelete(procedure), 'Excluir')}
+                    disabled={isLoading}
+                    className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                    title="Excluir permanentemente"
+                  >
+                    <Trash2 className={`w-3 h-3 ${isLoading ? 'animate-pulse' : ''}`} />
+                  </Button>
+                  
+                  {/* Detalhes */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onShowDetails?.(procedure)}
+                    className="h-8 px-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 border-gray-200"
+                    title="Ver detalhes"
+                  >
+                    <Info className="w-3 h-3" />
+                  </Button>
+                </>
               )}
-              
-              {/* Exclusão permanente - sempre disponível */}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onDelete && handleAction(() => onDelete(procedure), 'Excluir')}
-                disabled={isLoading}
-                className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                title="Excluir permanentemente"
-              >
-                <Trash2 className={`w-3 h-3 ${isLoading ? 'animate-pulse' : ''}`} />
-              </Button>
-              
-              {/* Detalhes */}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onShowDetails?.(procedure)}
-                className="h-8 px-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 border-gray-200"
-                title="Ver detalhes"
-              >
-                <Info className="w-3 h-3" />
-              </Button>
             </div>
           )}
         </div>

@@ -131,12 +131,12 @@ const PatientManagement = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{type: 'patient' | 'aih', id: string, name: string} | null>(null);
 
-  // Estados para gerenciamento de procedimentos
-
-
   // Estados para gerenciamento inline de procedimentos
   const [proceduresData, setProceduresData] = useState<{[aihId: string]: any[]}>({});
   const [loadingProcedures, setLoadingProcedures] = useState<{[aihId: string]: boolean}>({});
+  
+  // 🎯 NOVO: Estado para valores totais recalculados dinamicamente
+  const [aihTotalValues, setAihTotalValues] = useState<{[aihId: string]: number}>({});
 
   // Estados para exclusão completa
   const [completeDeleteDialogOpen, setCompleteDeleteDialogOpen] = useState(false);
@@ -148,6 +148,28 @@ const PatientManagement = () => {
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResults, setSyncResults] = useState<any>(null);
+
+  // 🎯 NOVA FUNÇÃO: Recalcular valor total da AIH baseado nos procedimentos ativos
+  const recalculateAIHTotal = (aihId: string, procedures: any[]) => {
+    // 🎯 CALCULAR APENAS PROCEDIMENTOS ATIVOS/APROVADOS
+    const activeProcedures = procedures.filter(proc => 
+      proc.match_status === 'matched' || proc.match_status === 'manual' // ✅ VALORES CORRETOS DA CONSTRAINT
+    );
+    
+    const totalValue = activeProcedures.reduce((sum, proc) => {
+      return sum + (proc.value_charged || 0);
+    }, 0);
+    
+    // Atualizar estado do valor total recalculado
+    setAihTotalValues(prev => ({
+      ...prev,
+      [aihId]: totalValue
+    }));
+    
+    console.log(`💰 AIH ${aihId}: ${activeProcedures.length} procedimentos ativos = R$ ${(totalValue/100).toFixed(2)}`);
+    
+    return totalValue;
+  };
 
   useEffect(() => {
     if (currentHospitalId) {
@@ -276,6 +298,10 @@ const PatientManagement = () => {
     try {
       const procedures = await persistenceService.getAIHProcedures(aihId);
       setProceduresData(prev => ({ ...prev, [aihId]: procedures }));
+      
+      // 🎯 RECALCULAR VALOR TOTAL INICIAL
+      recalculateAIHTotal(aihId, procedures);
+      
     } catch (error) {
       console.error('❌ Erro ao carregar procedimentos:', error);
       toast({
@@ -291,17 +317,28 @@ const PatientManagement = () => {
   // Ações inline para procedimentos
   const handleRemoveProcedure = async (aihId: string, procedure: any) => {
     try {
-      await persistenceService.removeProcedureFromAIH(aihId, procedure.procedure_sequence, user?.id || 'system');
-      await loadAIHProcedures(aihId); // Recarregar procedimentos
+      // 🎯 NOVA LÓGICA: Marcar como REJEITADO (valor permitido na constraint)
+      const updatedProcedures = proceduresData[aihId].map(proc => 
+        proc.procedure_sequence === procedure.procedure_sequence
+          ? { ...proc, match_status: 'rejected' } // ✅ VALOR PERMITIDO
+          : proc
+      );
+      
+      // Atualizar estado local
+      setProceduresData(prev => ({ ...prev, [aihId]: updatedProcedures }));
+      
+      // 🎯 RECALCULAR VALOR TOTAL DA AIH
+      const newTotal = recalculateAIHTotal(aihId, updatedProcedures);
+      
       toast({
-        title: "Sucesso",
-        description: "Procedimento removido temporariamente",
+        title: "✅ Procedimento Inativado",
+        description: `Procedimento inativado. Novo valor da AIH: R$ ${(newTotal/100).toFixed(2)}`,
       });
     } catch (error) {
-      console.error('❌ Erro ao remover procedimento:', error);
+      console.error('❌ Erro ao inativar procedimento:', error);
       toast({
         title: "Erro",
-        description: "Falha ao remover procedimento",
+        description: "Falha ao inativar procedimento",
         variant: "destructive"
       });
     }
@@ -309,11 +346,21 @@ const PatientManagement = () => {
 
   const handleDeleteProcedure = async (aihId: string, procedure: any) => {
     try {
-      await persistenceService.deleteProcedureFromAIH(aihId, procedure.procedure_sequence, user?.id || 'system');
-      await loadAIHProcedures(aihId); // Recarregar procedimentos
+      // 🎯 NOVA LÓGICA: Remover COMPLETAMENTE da tela
+      const updatedProcedures = proceduresData[aihId].filter(proc => 
+        proc.procedure_sequence !== procedure.procedure_sequence
+      );
+      
+      // Atualizar estado local (remove da visualização)
+      setProceduresData(prev => ({ ...prev, [aihId]: updatedProcedures }));
+      
+      // 🎯 RECALCULAR VALOR TOTAL DA AIH
+      const newTotal = recalculateAIHTotal(aihId, updatedProcedures);
+      
       toast({
-        title: "Sucesso",
-        description: "Procedimento excluído permanentemente",
+        title: "🗑️ Procedimento Excluído",
+        description: `Procedimento removido. Novo valor da AIH: R$ ${(newTotal/100).toFixed(2)}`,
+        variant: "destructive"
       });
     } catch (error) {
       console.error('❌ Erro ao excluir procedimento:', error);
@@ -327,17 +374,28 @@ const PatientManagement = () => {
 
   const handleRestoreProcedure = async (aihId: string, procedure: any) => {
     try {
-      await persistenceService.restoreProcedureInAIH(aihId, procedure.procedure_sequence, user?.id || 'system');
-      await loadAIHProcedures(aihId); // Recarregar procedimentos
+      // 🎯 NOVA LÓGICA: Reativar procedimento
+      const updatedProcedures = proceduresData[aihId].map(proc => 
+        proc.procedure_sequence === procedure.procedure_sequence
+          ? { ...proc, match_status: 'matched' } // ✅ VALOR PERMITIDO PARA ATIVO
+          : proc
+      );
+      
+      // Atualizar estado local
+      setProceduresData(prev => ({ ...prev, [aihId]: updatedProcedures }));
+      
+      // 🎯 RECALCULAR VALOR TOTAL DA AIH  
+      const newTotal = recalculateAIHTotal(aihId, updatedProcedures);
+      
       toast({
-        title: "Sucesso",
-        description: "Procedimento restaurado",
+        title: "♻️ Procedimento Reativado",
+        description: `Procedimento reativado. Novo valor da AIH: R$ ${(newTotal/100).toFixed(2)}`,
       });
     } catch (error) {
-      console.error('❌ Erro ao restaurar procedimento:', error);
+      console.error('❌ Erro ao reativar procedimento:', error);
       toast({
         title: "Erro",
-        description: "Falha ao restaurar procedimento",
+        description: "Falha ao reativar procedimento",
         variant: "destructive"
       });
     }
@@ -763,10 +821,13 @@ const PatientManagement = () => {
                       </Badge>
                       
                       {/* Badge do Valor */}
-                      {item.calculated_total_value && (
+                      {(aihTotalValues[item.id] !== undefined || item.calculated_total_value) && (
                         <Badge variant="outline" className="bg-green-50 border-green-200 text-green-800 hover:bg-green-100 font-semibold">
                           <DollarSign className="w-3 h-3 mr-1" />
-                          {formatCurrency(item.calculated_total_value)}
+                          {formatCurrency(aihTotalValues[item.id] !== undefined ? aihTotalValues[item.id] : item.calculated_total_value)}
+                          {aihTotalValues[item.id] !== undefined && (
+                            <span className="ml-1 text-xs text-green-600">●</span>
+                          )}
                         </Badge>
                       )}
                       
@@ -800,8 +861,8 @@ const PatientManagement = () => {
                           patient_cpf: item.patient?.cns || '', // Usando CNS como CPF
                           admission_date: item.admission_date,
                           discharge_date: item.discharge_date,
-                          total_procedures: item.total_procedures,
-                          total_value: item.calculated_total_value,
+                          total_procedures: proceduresData[item.id]?.length || item.total_procedures,
+                          total_value: aihTotalValues[item.id] !== undefined ? aihTotalValues[item.id] : item.calculated_total_value,
                           status: item.processing_status || 'pending',
                           aih_procedures: proceduresData[item.id] || []
                         }}
@@ -877,6 +938,51 @@ const PatientManagement = () => {
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
                             )}
                           </div>
+                          
+                          {/* 🎯 NOVO: Resumo de Valores por Status */}
+                          {aihTotalValues[item.id] !== undefined && (
+                            <div className="mb-4 p-3 bg-white rounded-lg border border-slate-200">
+                              <h5 className="font-medium text-slate-800 mb-2 flex items-center">
+                                <DollarSign className="w-4 h-4 mr-1" />
+                                Resumo Financeiro da AIH
+                              </h5>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                {(() => {
+                                  const approved = proceduresData[item.id].filter(p => p.match_status === 'matched' || p.match_status === 'manual');
+                                  const inactive = proceduresData[item.id].filter(p => p.match_status === 'rejected');
+                                  const pending = proceduresData[item.id].filter(p => p.match_status === 'pending');
+                                  
+                                  const approvedValue = approved.reduce((sum, p) => sum + (p.value_charged || p.sigtap_procedures?.value_hosp_total || 0), 0);
+                                  const inactiveValue = inactive.reduce((sum, p) => sum + (p.value_charged || p.sigtap_procedures?.value_hosp_total || 0), 0);
+                                  
+                                  return (
+                                    <>
+                                      <div className="text-center p-2 bg-green-50 rounded border border-green-200">
+                                        <p className="font-medium text-green-800">{approved.length}</p>
+                                        <p className="text-xs text-green-600">Aprovados</p>
+                                        <p className="text-xs font-semibold text-green-700">{formatCurrency(approvedValue)}</p>
+                                      </div>
+                                      <div className="text-center p-2 bg-slate-50 rounded border border-slate-200">
+                                        <p className="font-medium text-slate-800">{inactive.length}</p>
+                                        <p className="text-xs text-slate-600">Inativos</p>
+                                        <p className="text-xs font-semibold text-slate-700">{formatCurrency(inactiveValue)}</p>
+                                      </div>
+                                      <div className="text-center p-2 bg-red-50 rounded border border-red-200">
+                                        <p className="font-medium text-red-800">{pending.length}</p>
+                                        <p className="text-xs text-red-600">Pendentes</p>
+                                        <p className="text-xs font-semibold text-red-700">R$ 0,00</p>
+                                      </div>
+                                      <div className="text-center p-2 bg-blue-50 rounded border border-blue-200">
+                                        <p className="font-semibold text-blue-800">{formatCurrency(aihTotalValues[item.id])}</p>
+                                        <p className="text-xs text-blue-600">TOTAL FATURÁVEL</p>
+                                        <p className="text-xs text-blue-500">({approved.length} proc.)</p>
+                                      </div>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          )}
                           
                           <div className="space-y-3">
                             {proceduresData[item.id].map((procedure) => (
