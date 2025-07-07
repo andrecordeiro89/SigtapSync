@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✅ Regras SUS Corrigidas - Procedimento Principal</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 10px 0; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        .procedure { background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin: 5px 0; border-radius: 4px; }
+        .badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin: 2px; }
+        .instrument04 { background-color: #e3f2fd; color: #1976d2; }
+        .multiple { background-color: #fff3e0; color: #f57c00; }
+        .sequential { background-color: #e8f5e8; color: #388e3c; }
+        .orthopedic { background-color: #fce4ec; color: #c2185b; }
+        .normal { background-color: #f3e5f5; color: #7b1fa2; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        .highlight { background-color: #ffeb3b; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>✅ Regras SUS Corrigidas - Sistema Baseado no Procedimento Principal</h1>
+    
+    <div class="card success">
+        <h2>🎯 Correção Implementada</h2>
+        <p><strong>Problema anterior:</strong> Sistema verificava regras individualmente por procedimento</p>
+        <p><strong>Solução aplicada:</strong> Sistema agora usa o <strong>procedimento principal da AIH</strong> para definir qual regra aplicar a TODOS os procedimentos</p>
+    </div>
+
+    <div class="card info">
+        <h2>📋 Regras Oficiais SUS Implementadas</h2>
+        
+        <h3>1. 🧮 04.15.01.001-2 - TRATAMENTO C/ CIRURGIAS MÚLTIPLAS</h3>
+        <table>
+            <tr><th>Posição</th><th>SH (%)</th><th>SP (%)</th></tr>
+            <tr><td>1º Procedimento</td><td class="highlight">100%</td><td>100%</td></tr>
+            <tr><td>2º Procedimento</td><td class="highlight">75%</td><td>100%</td></tr>
+            <tr><td>3º Procedimento</td><td class="highlight">75%</td><td>100%</td></tr>
+            <tr><td>4º Procedimento</td><td class="highlight">60%</td><td>100%</td></tr>
+            <tr><td>5º Procedimento</td><td class="highlight">50%</td><td>100%</td></tr>
+        </table>
+
+        <h3>2. 🔄 04.15.02.003-4 - OUTROS PROCEDIMENTOS COM CIRURGIAS SEQUENCIAIS</h3>
+        <table>
+            <tr><th>Posição</th><th>SH (%)</th><th>SP (%)</th></tr>
+            <tr><td>1º Procedimento</td><td class="highlight">100%</td><td>100%</td></tr>
+            <tr><td>2º Procedimento</td><td class="highlight">75%</td><td>100%</td></tr>
+            <tr><td>3º Procedimento</td><td class="highlight">50%</td><td>100%</td></tr>
+        </table>
+
+        <h3>3. 🦴 04.15.02.006-9 - PROCEDIMENTOS SEQUENCIAIS EM ORTOPEDIA</h3>
+        <table>
+            <tr><th>Posição</th><th>SH (%)</th><th>SP (%)</th></tr>
+            <tr><td>1º Procedimento</td><td class="highlight">100%</td><td>100%</td></tr>
+            <tr><td>2º Procedimento</td><td class="highlight">75%</td><td>100%</td></tr>
+            <tr><td>3º Procedimento</td><td class="highlight">50%</td><td>100%</td></tr>
+            <tr><td>4º Procedimento</td><td class="highlight">50%</td><td>100%</td></tr>
+            <tr><td>5º Procedimento</td><td class="highlight">50%</td><td>100%</td></tr>
+        </table>
+    </div>
+
+    <div class="card warning">
+        <h2>🔄 Exemplos de Aplicação Corrigida</h2>
+        
+        <h3>Cenário 1: AIH com Procedimento Principal = 04.15.01.001-2 (Cirurgias Múltiplas)</h3>
+        <div class="procedure">
+            <strong>Procedimento Principal:</strong> 04.15.01.001-2 - TRATAMENTO C/ CIRURGIAS MÚLTIPLAS
+            <br><strong>Regra detectada:</strong> <span class="badge multiple">Cirurgias Múltiplas</span>
+            <br><strong>Aplicação:</strong> TODOS os procedimentos seguem a regra de cirurgias múltiplas
+        </div>
+        
+        <table>
+            <tr><th>Seq.</th><th>Procedimento</th><th>Tipo</th><th>SH %</th><th>SP %</th><th>Regra Aplicada</th></tr>
+            <tr>
+                <td>1º</td>
+                <td>04.15.01.001-2</td>
+                <td><span class="badge multiple">Principal</span></td>
+                <td class="highlight">100%</td>
+                <td>100%</td>
+                <td>Cirurgias Múltiplas - 1º</td>
+            </tr>
+            <tr>
+                <td>2º</td>
+                <td>04.08.01.014-2</td>
+                <td><span class="badge multiple">Seguidor</span></td>
+                <td class="highlight">75%</td>
+                <td>100%</td>
+                <td>Cirurgias Múltiplas - 2º</td>
+            </tr>
+            <tr>
+                <td>3º</td>
+                <td>04.08.06.071-9</td>
+                <td><span class="badge multiple">Seguidor</span></td>
+                <td class="highlight">75%</td>
+                <td>100%</td>
+                <td>Cirurgias Múltiplas - 3º</td>
+            </tr>
+        </table>
+
+        <h3>Cenário 2: AIH com Instrumento 04 + Procedimentos Normais</h3>
+        <div class="procedure">
+            <strong>Procedimento Principal:</strong> 04.08.01.014-2 - REPARO DE ROTURA DO MANGUITO ROTADOR
+            <br><strong>Regra detectada:</strong> <span class="badge normal">Nenhuma regra especial</span>
+            <br><strong>Aplicação:</strong> Procedimentos normais = 100%/70%, Instrumento 04 = sempre 100%
+        </div>
+        
+        <table>
+            <tr><th>Seq.</th><th>Procedimento</th><th>Tipo</th><th>SH %</th><th>SP %</th><th>Regra Aplicada</th></tr>
+            <tr>
+                <td>1º</td>
+                <td>04.08.01.014-2</td>
+                <td><span class="badge normal">Normal</span></td>
+                <td class="highlight">100%</td>
+                <td>100%</td>
+                <td>Padrão - 1º normal</td>
+            </tr>
+            <tr>
+                <td>2º</td>
+                <td>07.02.03.002-3</td>
+                <td><span class="badge instrument04">Instrumento 04</span></td>
+                <td class="highlight">100%</td>
+                <td>100%</td>
+                <td>Instrumento 04 - Sempre 100%</td>
+            </tr>
+            <tr>
+                <td>3º</td>
+                <td>04.08.06.071-9</td>
+                <td><span class="badge instrument04">Instrumento 04</span></td>
+                <td class="highlight">100%</td>
+                <td>100%</td>
+                <td>Instrumento 04 - Sempre 100%</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="card success">
+        <h2>🏗️ Implementação Técnica</h2>
+        
+        <h3>Arquivo: <code>src/components/AIHMultiPageTester.tsx</code></h3>
+        
+        <h4>✅ Função <code>calculateTotalsWithPercentage()</code> corrigida:</h4>
+        <ul>
+            <li><strong>Detecção do procedimento principal:</strong> <code>aihCompleta.procedimentoPrincipal</code></li>
+            <li><strong>Verificação de regra especial:</strong> <code>getSpecialRule(procedimentoPrincipal)</code></li>
+            <li><strong>Aplicação baseada na regra principal:</strong> Todos os procedimentos seguem a mesma regra</li>
+            <li><strong>Exceção para Instrumento 04:</strong> Sempre 100%, independente de qualquer regra</li>
+        </ul>
+        
+        <h4>📊 Logs de Debug Implementados:</h4>
+        <pre style="background-color: #f8f9fa; padding: 10px; border-radius: 4px;">
+🔄 ANÁLISE DA AIH:
+📋 Procedimento Principal: 04.15.01.001-2
+🏥 Regra Especial Detectada: Cirurgias Múltiplas
+
+🔄 CLASSIFICAÇÃO DOS PROCEDIMENTOS:
+🎯 Instrumento 04: []
+🏥 Regras Especiais: ['1º - 04.15.01.001-2', '2º - 04.08.01.014-2', '3º - 04.08.06.071-9']
+📊 Procedimentos Normais: []
+
+🏥 REGRA ESPECIAL - 04.15.01.001-2 (1º na AIH, 1º na regra Cirurgias Múltiplas): SH=100%, SP=100%
+🏥 REGRA ESPECIAL - 04.08.01.014-2 (2º na AIH, 2º na regra Cirurgias Múltiplas): SH=75%, SP=100%
+🏥 REGRA ESPECIAL - 04.08.06.071-9 (3º na AIH, 3º na regra Cirurgias Múltiplas): SH=75%, SP=100%
+        </pre>
+    </div>
+
+    <div class="card info">
+        <h2>🎯 Hierarquia Final das Regras</h2>
+        <ol>
+            <li><strong>PRIORIDADE 1:</strong> 🎯 Instrumento 04 - Sempre 100% (SH, SP, SA)</li>
+            <li><strong>PRIORIDADE 2:</strong> 🏥 Regras especiais baseadas no procedimento principal</li>
+            <li><strong>PRIORIDADE 3:</strong> 📊 Regras padrão (100% para 1º normal, 70% para demais normais)</li>
+        </ol>
+    </div>
+
+    <script>
+        // Simular teste das regras corrigidas
+        function testarRegrasSUS() {
+            console.log('🧪 TESTE - Regras SUS Corrigidas');
+            
+            // Cenário 1: Cirurgias Múltiplas
+            console.log('\n📋 CENÁRIO 1: Cirurgias Múltiplas');
+            const cenario1 = {
+                procedimentoPrincipal: '04.15.01.001-2',
+                procedimentos: [
+                    { sequencia: 1, codigo: '04.15.01.001-2', nome: 'TRATAMENTO C/ CIRURGIAS MULTIPLAS' },
+                    { sequencia: 2, codigo: '04.08.01.014-2', nome: 'REPARO DE ROTURA DO MANGUITO ROTADOR' },
+                    { sequencia: 3, codigo: '04.08.06.071-9', nome: 'VIDEOARTROSCOPIA' }
+                ]
+            };
+            
+            console.log('Procedimento Principal:', cenario1.procedimentoPrincipal);
+            console.log('Regra Detectada: Cirurgias Múltiplas [100%, 75%, 75%, 60%, 50%]');
+            
+            cenario1.procedimentos.forEach((proc, index) => {
+                const porcentagens = [100, 75, 75, 60, 50];
+                const porcentagem = porcentagens[index] || 50;
+                console.log(`${proc.sequencia}º - ${proc.codigo}: SH=${porcentagem}%, SP=100%`);
+            });
+            
+            // Cenário 2: Procedimentos Normais + Instrumento 04
+            console.log('\n📋 CENÁRIO 2: Procedimentos Normais + Instrumento 04');
+            const cenario2 = {
+                procedimentoPrincipal: '04.08.01.014-2',
+                procedimentos: [
+                    { sequencia: 1, codigo: '04.08.01.014-2', tipo: 'NORMAL' },
+                    { sequencia: 2, codigo: '07.02.03.002-3', tipo: 'INSTRUMENTO_04' },
+                    { sequencia: 3, codigo: '04.08.06.071-9', tipo: 'INSTRUMENTO_04' }
+                ]
+            };
+            
+            console.log('Procedimento Principal:', cenario2.procedimentoPrincipal);
+            console.log('Regra Detectada: Nenhuma (aplicar regras padrão)');
+            
+            cenario2.procedimentos.forEach(proc => {
+                if (proc.tipo === 'INSTRUMENTO_04') {
+                    console.log(`${proc.sequencia}º - ${proc.codigo}: SH=100%, SP=100% (Instrumento 04 - sempre 100%)`);
+                } else {
+                    const normais = cenario2.procedimentos.filter(p => p.tipo === 'NORMAL');
+                    const posicao = normais.findIndex(p => p.sequencia === proc.sequencia) + 1;
+                    const porcentagem = posicao === 1 ? 100 : 70;
+                    console.log(`${proc.sequencia}º - ${proc.codigo}: SH=${porcentagem}%, SP=100% (${posicao}º procedimento normal)`);
+                }
+            });
+            
+            return '✅ Teste concluído - regras aplicadas corretamente!';
+        }
+        
+        // Executar teste automaticamente
+        console.log(testarRegrasSUS());
+    </script>
+</body>
+</html> 

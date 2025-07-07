@@ -47,7 +47,10 @@ import {
   applySpecialCalculation, 
   hasSpecialProceduresInList,
   logSpecialRules,
-  debugSpecialRuleDetection 
+  debugSpecialRuleDetection,
+  isInstrument04Procedure,     // ✅ NOVA função para Instrumento 04
+  debugInstrument04Detection,  // ✅ NOVA função de debug
+  classifyProcedures          // ✅ NOVA função de classificação
 } from '../config/susCalculationRules';
 import { 
   formatParticipationCode, 
@@ -242,71 +245,147 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     alert(`DETALHES DO PROCEDIMENTO:\n\n${details}`);
   };
 
-  // Função para calcular totais aplicando lógica de porcentagem SUS
+  // ✅ FUNÇÃO ATUALIZADA: Calcular totais aplicando lógica SUS (incluindo Instrumento 04)
   const calculateTotalsWithPercentage = (procedimentos: ProcedureAIH[]): AIHComplete => {
-    // Verificar se existem procedimentos com regras especiais na lista
-    const specialCheck = hasSpecialProceduresInList(
-      procedimentos.map(p => ({ procedureCode: p.procedimento }))
-    );
+    // 🎯 DETECTAR PROCEDIMENTO PRINCIPAL E SUA REGRA (se houver)
+    const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
+    const regraEspecialPrincipal = getSpecialRule(procedimentoPrincipal);
+    const temRegraEspecialGeral = Boolean(regraEspecialPrincipal);
+    
+    console.log('🔄 ANÁLISE DA AIH:');
+    console.log('📋 Procedimento Principal:', procedimentoPrincipal);
+    console.log('🏥 Regra Especial Detectada:', regraEspecialPrincipal ? regraEspecialPrincipal.procedureName : 'Nenhuma');
+    
+    // ✅ SEPARAR PROCEDIMENTOS POR TIPO
+    const procedimentosInstrumento04: ProcedureAIH[] = [];
+    const procedimentosNormais: ProcedureAIH[] = [];
+    const procedimentosComRegrasEspeciais: ProcedureAIH[] = [];
 
-    if (specialCheck.hasSpecial) {
-      console.log('🏥 APLICANDO REGRAS ESPECIAIS DE CIRURGIAS MÚLTIPLAS:', specialCheck.specialCodes);
-      logSpecialRules();
-    }
+    procedimentos.forEach(proc => {
+      if (proc.sigtapProcedure) {
+        // 🎯 VERIFICAR INSTRUMENTO 04 - PRIORIDADE MÁXIMA
+        if (isInstrument04Procedure(proc.sigtapProcedure.registrationInstrument)) {
+          procedimentosInstrumento04.push(proc);
+        }
+        // 🏥 VERIFICAR SE APLICA REGRA ESPECIAL (baseado no procedimento principal)
+        else if (temRegraEspecialGeral) {
+          procedimentosComRegrasEspeciais.push(proc);
+        }
+        // 📊 PROCEDIMENTOS NORMAIS
+        else {
+          procedimentosNormais.push(proc);
+        }
+      } else {
+        // Sem SIGTAP match, tratado como normal (ou regra especial se aplicável)
+        if (temRegraEspecialGeral) {
+          procedimentosComRegrasEspeciais.push(proc);
+        } else {
+          procedimentosNormais.push(proc);
+        }
+      }
+    });
 
+    console.log('🔄 CLASSIFICAÇÃO DOS PROCEDIMENTOS:');
+    console.log('🎯 Instrumento 04:', procedimentosInstrumento04.map(p => `${p.sequencia}º - ${p.procedimento}`));
+    console.log('🏥 Regras Especiais:', procedimentosComRegrasEspeciais.map(p => `${p.sequencia}º - ${p.procedimento}`));
+    console.log('📊 Procedimentos Normais:', procedimentosNormais.map(p => `${p.sequencia}º - ${p.procedimento}`));
+
+    // ✅ PROCESSAR CADA TIPO DE PROCEDIMENTO
     const procedimentosComPercentagem = procedimentos.map((proc, index) => {
       if (!proc.sigtapProcedure) return proc;
 
-      // Verificar se este procedimento tem regra especial
-      const hasSpecialCalc = hasSpecialRule(proc.procedimento);
-      
-      if (hasSpecialCalc) {
-        // APLICAR REGRAS ESPECIAIS DE CIRURGIAS MÚLTIPLAS
+      // 🎯 INSTRUMENTO 04 - SEMPRE 100%
+      if (isInstrument04Procedure(proc.sigtapProcedure.registrationInstrument)) {
+        debugInstrument04Detection(proc.sigtapProcedure.registrationInstrument);
+        
         const valorTotalSigtap = proc.sigtapProcedure.valueHosp; // Total extraído
         const valorSP = proc.sigtapProcedure.valueProf;          // SP
         const valorSH = valorTotalSigtap - valorSP;              // SH = Total - SP
         const valorSA = proc.sigtapProcedure.valueAmb;           // SA
         
-        const specialCalc = applySpecialCalculation([{
-          procedureCode: proc.procedimento,
-          valueHosp: valorSH,
-          valueProf: valorSP,
-          valueAmb: valorSA,
-          sequenceOrder: proc.sequencia
-        }]);
-
-        const result = specialCalc[0];
-        
-        console.log(`📋 ${proc.procedimento} (${proc.sequencia}º): SH=${result.appliedHospPercentage}%, SP=100%`);
+        console.log(`🎯 INSTRUMENTO 04 - ${proc.procedimento} (${proc.sequencia}º): SEMPRE 100%`);
         
         return {
           ...proc,
-          porcentagemSUS: result.appliedHospPercentage, // Para compatibilidade com interface
-          valorCalculado: result.calculatedTotal,
+          porcentagemSUS: 100, // Sempre 100% para Instrumento 04
+          valorCalculado: valorSH + valorSP + valorSA, // Valor total sem desconto
+          valorOriginal: valorSH + valorSP + valorSA,
+          // Campos específicos para Instrumento 04
+          isInstrument04: true,
+          instrument04Rule: 'Instrumento 04 - AIH (Proc. Especial) - Sempre 100%',
+          valorCalculadoSH: valorSH,
+          valorCalculadoSP: valorSP,
+          valorCalculadoSA: valorSA,
+          isSpecialRule: true, // Marcar como regra especial para interface
+          regraEspecial: 'Instrumento 04 - AIH (Proc. Especial)'
+        };
+      }
+
+      // 🏥 REGRAS ESPECIAIS BASEADAS NO PROCEDIMENTO PRINCIPAL
+      if (temRegraEspecialGeral && regraEspecialPrincipal) {
+        const valorTotalSigtap = proc.sigtapProcedure.valueHosp; // Total extraído
+        const valorSP = proc.sigtapProcedure.valueProf;          // SP
+        const valorSH = valorTotalSigtap - valorSP;              // SH = Total - SP
+        const valorSA = proc.sigtapProcedure.valueAmb;           // SA
+        
+        // ✅ CALCULAR POSIÇÃO SEQUENCIAL ENTRE TODOS OS PROCEDIMENTOS COM REGRA ESPECIAL
+        const procedimentosOrdenados = procedimentosComRegrasEspeciais
+          .sort((a, b) => a.sequencia - b.sequencia);
+        
+        const posicaoNaRegra = procedimentosOrdenados.findIndex(p => p.sequencia === proc.sequencia) + 1;
+        
+        // ✅ APLICAR A REGRA DO PROCEDIMENTO PRINCIPAL
+        const hospPercentageIndex = posicaoNaRegra - 1; // Array é 0-based
+        const hospPercentage = regraEspecialPrincipal.rule.hospitalPercentages[hospPercentageIndex] || 
+                              regraEspecialPrincipal.rule.hospitalPercentages[regraEspecialPrincipal.rule.hospitalPercentages.length - 1];
+
+        const valorSHCalculado = (valorSH * hospPercentage) / 100;
+        const valorSPCalculado = valorSP; // SP sempre 100%
+        const valorSACalculado = valorSA; // SA sempre 100%
+        const valorTotalCalculado = valorSHCalculado + valorSPCalculado + valorSACalculado;
+        
+        console.log(`🏥 REGRA ESPECIAL - ${proc.procedimento} (${proc.sequencia}º na AIH, ${posicaoNaRegra}º na regra ${regraEspecialPrincipal.procedureName}): SH=${hospPercentage}%, SP=100%`);
+        
+        return {
+          ...proc,
+          porcentagemSUS: hospPercentage, // Para compatibilidade com interface
+          valorCalculado: valorTotalCalculado,
           valorOriginal: valorSH + valorSP + valorSA,
           // Campos adicionais para cirurgias especiais
-          valorCalculadoSH: result.calculatedValueHosp,
-          valorCalculadoSP: result.calculatedValueProf,
-          valorCalculadoSA: result.calculatedValueAmb,
-          regraEspecial: result.ruleApplied,
-          isSpecialRule: true
+          valorCalculadoSH: valorSHCalculado,
+          valorCalculadoSP: valorSPCalculado,
+          valorCalculadoSA: valorSACalculado,
+          regraEspecial: `${regraEspecialPrincipal.rule.type} - ${regraEspecialPrincipal.procedureName}`,
+          isSpecialRule: true,
+          isInstrument04: false // Não é Instrumento 04
         };
-      } else {
-        // APLICAR LÓGICA PADRÃO DO SISTEMA
-      const isPrincipal = index === 0;
-        const porcentagem = isPrincipal ? 100 : (proc.porcentagemSUS || 0); // ✅ REMOVIDO defaultPercentage - sem cálculo automático
+      }
+
+      // 📊 PROCEDIMENTOS NORMAIS - REGRA PADRÃO DO SISTEMA
+      // ✅ CALCULAR POSIÇÃO SEQUENCIAL APENAS ENTRE PROCEDIMENTOS NORMAIS
+      const procedimentosNormaisOrdenados = procedimentosNormais
+        .sort((a, b) => a.sequencia - b.sequencia);
+      
+      const posicaoEntreNormais = procedimentosNormaisOrdenados.findIndex(p => p.sequencia === proc.sequencia) + 1;
+      const isPrincipalEntreNormais = posicaoEntreNormais === 1;
+      
+      // Regra padrão: 100% para primeiro procedimento normal, 70% para os demais
+      const porcentagem = isPrincipalEntreNormais ? 100 : 70;
       
       const valorBase = proc.sigtapProcedure.valueHospTotal;
-        const valorCalculado = isPrincipal ? valorBase : (proc.porcentagemSUS ? (valorBase * porcentagem) / 100 : 0); // ✅ Só calcula se tiver porcentagem definida
+      const valorCalculado = (valorBase * porcentagem) / 100;
+
+      console.log(`📊 PROCEDIMENTO NORMAL - ${proc.procedimento} (${proc.sequencia}º na AIH, ${posicaoEntreNormais}º entre normais): ${porcentagem}%`);
 
       return {
         ...proc,
         porcentagemSUS: porcentagem,
         valorCalculado,
-          valorOriginal: valorBase,
-          isSpecialRule: false
+        valorOriginal: valorBase,
+        isSpecialRule: false,
+        isInstrument04: false,
+        regraEspecial: `Regra padrão: ${porcentagem}% (${posicaoEntreNormais}º procedimento normal)`
       };
-      }
     });
 
     const valorTotalCalculado = procedimentosComPercentagem
@@ -322,7 +401,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     };
   };
 
-  // Iniciar edição de valores - INTEGRADO COM REGRAS ESPECIAIS
+  // Iniciar edição de valores - INTEGRADO COM REGRAS ESPECIAIS CORRIGIDAS
   const startEditingValues = (sequencia: number, procedure: ProcedureAIH) => {
     setEditingValues(prev => new Set([...prev, sequencia]));
     
@@ -333,18 +412,39 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       const valorSP = procedure.sigtapProcedure.valueProf;          // SP está correto
       const valorSH = valorTotalSigtap - valorSP;                   // SH = Total - SP
       
-      // 🎯 DETECTAR REGRA ESPECIAL
+      // 🎯 DETECTAR INSTRUMENTO 04
+      const isInstrument04 = isInstrument04Procedure(procedure.sigtapProcedure.registrationInstrument);
+      
+      // 🏥 DETECTAR REGRA ESPECIAL BASEADA NO PROCEDIMENTO PRINCIPAL
       const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
-      const temRegraEspecial = hasSpecialRule(procedimentoPrincipal);
-      const regra = getSpecialRule(procedimentoPrincipal);
+      const regraEspecialPrincipal = getSpecialRule(procedimentoPrincipal);
+      const temRegraEspecialGeral = Boolean(regraEspecialPrincipal);
       
-      let porcentagemParaAplicar = procedure.porcentagemSUS || (sequencia === 1 ? 100 : 0); // ✅ REMOVIDO defaultPercentage - sem valor padrão para secundários
+      let porcentagemParaAplicar = procedure.porcentagemSUS || 100;
       
-      if (temRegraEspecial && regra) {
-        // Usar porcentagem da regra especial baseada na posição
-        const posicao = sequencia - 1;
-        porcentagemParaAplicar = regra.rule.hospitalPercentages[posicao] || 
-                                regra.rule.hospitalPercentages[regra.rule.hospitalPercentages.length - 1];
+      if (isInstrument04) {
+        // Instrumento 04 sempre 100%
+        porcentagemParaAplicar = 100;
+      } else if (temRegraEspecialGeral && regraEspecialPrincipal) {
+        // ✅ CALCULAR POSIÇÃO ENTRE TODOS OS PROCEDIMENTOS (exceto Instrumento 04)
+        const procedimentosParaRegra = aihCompleta.procedimentos
+          .filter(p => p.sigtapProcedure && 
+                      !isInstrument04Procedure(p.sigtapProcedure.registrationInstrument))
+          .sort((a, b) => a.sequencia - b.sequencia);
+        
+        const posicaoNaRegra = procedimentosParaRegra.findIndex(p => p.sequencia === sequencia);
+        porcentagemParaAplicar = regraEspecialPrincipal.rule.hospitalPercentages[posicaoNaRegra] || 
+                                regraEspecialPrincipal.rule.hospitalPercentages[regraEspecialPrincipal.rule.hospitalPercentages.length - 1];
+      } else {
+        // ✅ PROCEDIMENTO NORMAL - CALCULAR POSIÇÃO ENTRE PROCEDIMENTOS NORMAIS
+        const procedimentosNormais = aihCompleta.procedimentos
+          .filter(p => p.sigtapProcedure && 
+                      !isInstrument04Procedure(p.sigtapProcedure.registrationInstrument) &&
+                      !hasSpecialRule(p.procedimento))
+          .sort((a, b) => a.sequencia - b.sequencia);
+        
+        const posicaoEntreNormais = procedimentosNormais.findIndex(p => p.sequencia === sequencia) + 1;
+        porcentagemParaAplicar = posicaoEntreNormais === 1 ? 100 : 70;
       }
       
       setTempValues(prev => ({
@@ -354,8 +454,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           valorHosp: valorSH, // 🔧 Usar o SH calculado correto
           valorProf: valorSP, // 🔧 Usar o SP correto (sempre 100% nas regras especiais)
           porcentagem: porcentagemParaAplicar,
-          isSpecialRule: temRegraEspecial,
-          specialRuleType: regra?.rule.type || null
+          isSpecialRule: temRegraEspecialGeral || isInstrument04,
+          specialRuleType: isInstrument04 ? 'instrument04' : regraEspecialPrincipal?.rule.type || null
         }
       }));
     }
@@ -366,24 +466,67 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     const editedValues = tempValues[sequencia];
     if (!editedValues) return;
 
-    // 🎯 DETECTAR REGRA ESPECIAL
+    // 🎯 DETECTAR INSTRUMENTO 04 OU REGRA ESPECIAL
+    const procedureToEdit = aihCompleta.procedimentos.find(p => p.sequencia === sequencia);
+    const isInstrument04 = procedureToEdit && isInstrument04Procedure(procedureToEdit.sigtapProcedure?.registrationInstrument);
     const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
-    const temRegraEspecial = hasSpecialRule(procedimentoPrincipal);
-    const regra = getSpecialRule(procedimentoPrincipal);
+    const regraEspecialPrincipal = getSpecialRule(procedimentoPrincipal);
+    const temRegraEspecialGeral = Boolean(regraEspecialPrincipal);
 
     const updatedProcedimentos = aihCompleta.procedimentos.map(proc => {
       if (proc.sequencia === sequencia && proc.sigtapProcedure) {
         
-        if (temRegraEspecial && regra) {
+        if (isInstrument04) {
+          // 🎯 APLICAR REGRA INSTRUMENTO 04 - SEMPRE 100%
+          const valorSA = editedValues.valorAmb;
+          const valorSH = editedValues.valorHosp;
+          const valorSP = editedValues.valorProf;
+          
+          // Aplicar 100% para todos os componentes
+          const valorSHCalculado = valorSH; // 100%
+          const valorSPCalculado = valorSP; // 100%
+          const valorSACalculado = valorSA; // 100%
+          
+          const valorFinal = valorSHCalculado + valorSPCalculado + valorSACalculado;
+          
+          const updatedSigtapProcedure = {
+            ...proc.sigtapProcedure,
+            valueAmb: valorSA,
+            valueHosp: valorSH + valorSP, // Total original para referência
+            valueProf: valorSP,
+            valueHospTotal: valorSH + valorSP
+          };
+
+          return {
+            ...proc,
+            sigtapProcedure: updatedSigtapProcedure,
+            porcentagemSUS: 100, // Sempre 100%
+            valorCalculado: valorFinal,
+            valorOriginal: valorSH + valorSP + valorSA,
+            // Campos específicos para Instrumento 04
+            isInstrument04: true,
+            instrument04Rule: 'Instrumento 04 - AIH (Proc. Especial) - Sempre 100%',
+            isSpecialRule: true, // Para compatibilidade com interface
+            regraEspecial: 'Instrumento 04 - AIH (Proc. Especial)',
+            valorCalculadoSH: valorSHCalculado,
+            valorCalculadoSP: valorSPCalculado,
+            valorCalculadoSA: valorSACalculado
+          };
+        } else if (temRegraEspecialGeral && regraEspecialPrincipal) {
           // 🏥 APLICAR REGRA ESPECIAL - PORCENTAGEM APENAS NO SH
           const valorSA = editedValues.valorAmb;
           const valorSH = editedValues.valorHosp;
           const valorSP = editedValues.valorProf; // SP sempre mantém valor original nas regras especiais
           
-          // Calcular porcentagem baseada na posição
-          const posicao = sequencia - 1;
-          const porcentagemSH = regra.rule.hospitalPercentages[posicao] || 
-                               regra.rule.hospitalPercentages[regra.rule.hospitalPercentages.length - 1];
+          // Calcular porcentagem baseada na posição sequencial
+          const procedimentosParaRegra = aihCompleta.procedimentos
+            .filter(p => p.sigtapProcedure && 
+                        !isInstrument04Procedure(p.sigtapProcedure.registrationInstrument))
+            .sort((a, b) => a.sequencia - b.sequencia);
+          
+          const posicaoNaRegra = procedimentosParaRegra.findIndex(p => p.sequencia === sequencia);
+          const porcentagemSH = regraEspecialPrincipal.rule.hospitalPercentages[posicaoNaRegra] || 
+                               regraEspecialPrincipal.rule.hospitalPercentages[regraEspecialPrincipal.rule.hospitalPercentages.length - 1];
           
           // Aplicar porcentagem APENAS ao SH
           const valorSHCalculado = (valorSH * porcentagemSH) / 100;
@@ -408,8 +551,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
             valorOriginal: valorSH + valorSP,
             // Campos específicos para regras especiais
             isSpecialRule: true,
-            specialRuleType: regra.rule.type,
-            regraEspecial: regra.procedureName,
+            specialRuleType: regraEspecialPrincipal.rule.type,
+            regraEspecial: regraEspecialPrincipal.procedureName,
             valorCalculadoSH: valorSHCalculado,
             valorCalculadoSP: valorSPCalculado,
             valorCalculadoSA: valorSACalculado
@@ -465,10 +608,10 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     });
 
     // Toast específico para regra especial ou padrão
-    if (temRegraEspecial && regra) {
+    if (temRegraEspecialGeral && regraEspecialPrincipal) {
       toast({
         title: "⚡ Regra Especial Aplicada",
-        description: `${regra.procedureName} - SH: ${editedValues.porcentagem}%, SP: 100%`
+        description: `${regraEspecialPrincipal.procedureName} - SH: ${editedValues.porcentagem}%, SP: 100%`
       });
     } else {
     toast({
@@ -978,7 +1121,11 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                               {formatCurrency(procedure.valorCalculado)}
                             </div>
                             <div className="flex justify-center">
-                              {procedure.isSpecialRule ? (
+                              {procedure.isInstrument04 ? (
+                                <Badge variant="outline" className="text-xs px-2 bg-blue-100 text-blue-800 border-blue-300">
+                                  🎯 Instrumento 04
+                                </Badge>
+                              ) : procedure.isSpecialRule ? (
                                 <Badge variant="outline" className="text-xs px-2 bg-orange-100 text-orange-800 border-orange-300">
                                   ⚡ Regra Especial
                                 </Badge>
@@ -1086,8 +1233,18 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                               <div>
                                 <div className="flex items-center justify-between mb-3">
                                   <h5 className="font-medium text-sm text-gray-600">💰 Editar Valores SUS</h5>
-                                  {/* INDICADOR DE REGRA ESPECIAL */}
+                                  {/* INDICADOR DE REGRA ESPECIAL OU INSTRUMENTO 04 */}
                                   {(() => {
+                                    // Verificar Instrumento 04 primeiro
+                                    if (procedure.isInstrument04) {
+                                      return (
+                                        <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-300">
+                                          🎯 Instrumento 04 - Sempre 100%
+                                        </Badge>
+                                      );
+                                    }
+                                    
+                                    // Verificar regras especiais de cirurgias múltiplas
                                     const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
                                     const temRegraEspecial = hasSpecialRule(procedimentoPrincipal);
                                     const regra = getSpecialRule(procedimentoPrincipal);
@@ -1322,27 +1479,55 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                     </div>
 
                                     {/* LÓGICA APLICADA */}
-                                    <div className={`p-3 rounded ${procedure.isSpecialRule ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50'}`}>
+                                    <div className={`p-3 rounded ${
+                                      procedure.isInstrument04 ? 'bg-blue-50 border border-blue-200' : 
+                                      procedure.isSpecialRule ? 'bg-orange-50 border border-orange-200' : 
+                                      'bg-gray-50'
+                                    }`}>
                                       <div className="flex items-center justify-between mb-2">
-                                        <span className={`font-medium text-sm ${procedure.isSpecialRule ? 'text-orange-700' : 'text-gray-700'}`}>
-                                          {procedure.isSpecialRule ? '⚡ Regra Especial Aplicada:' : '📊 Lógica SUS Padrão:'}
-                                            </span>
-                                        </div>
+                                        <span className={`font-medium text-sm ${
+                                          procedure.isInstrument04 ? 'text-blue-700' : 
+                                          procedure.isSpecialRule ? 'text-orange-700' : 
+                                          'text-gray-700'
+                                        }`}>
+                                          {procedure.isInstrument04 ? '🎯 Instrumento 04 - AIH (Proc. Especial):' : 
+                                           procedure.isSpecialRule ? '⚡ Regra Especial Aplicada:' : 
+                                           '📊 Lógica SUS Padrão:'}
+                                        </span>
+                                      </div>
                                       
-                                      {procedure.isSpecialRule ? (
+                                      {procedure.isInstrument04 ? (
+                                        <div className="text-xs space-y-1">
+                                          <div className="text-blue-700 font-medium mb-1">
+                                            ✅ Procedimento sempre cobrado a 100% (SH, SP e SA)
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span>SH (100%):</span>
+                                            <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSH || 0)}</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span>SP (100%):</span>
+                                            <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSP || 0)}</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span>SA (100%):</span>
+                                            <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSA || 0)}</span>
+                                          </div>
+                                        </div>
+                                      ) : procedure.isSpecialRule ? (
                                         <div className="text-xs space-y-1">
                                           <div className="flex justify-between">
                                             <span>SH ({procedure.porcentagemSUS}%):</span>
                                             <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSH || 0)}</span>
-                                      </div>
+                                          </div>
                                           <div className="flex justify-between">
                                             <span>SP (100%):</span>
                                             <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSP || 0)}</span>
-                                    </div>
+                                          </div>
                                           <div className="flex justify-between">
                                             <span>SA (100%):</span>
                                             <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSA || 0)}</span>
-                                  </div>
+                                          </div>
                                         </div>
                                       ) : (
                                         <div className="text-sm">

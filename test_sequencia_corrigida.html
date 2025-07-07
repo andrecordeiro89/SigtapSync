@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Correção Lógica Sequencial SUS</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 10px 0; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        .procedure { background-color: #f8f9fa; border: 1px solid #dee2e6; padding: 10px; margin: 5px 0; border-radius: 4px; }
+        .badge { padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+        .instrument04 { background-color: #e3f2fd; color: #1976d2; }
+        .normal { background-color: #f3e5f5; color: #7b1fa2; }
+        .special { background-color: #fff3e0; color: #f57c00; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste - Correção da Lógica Sequencial SUS</h1>
+    
+    <div class="card info">
+        <h2>📋 Cenário de Teste</h2>
+        <p><strong>AIH com 3 procedimentos:</strong></p>
+        <ol>
+            <li><strong>04.08.01.014-2</strong> - REPARO DE ROTURA DO MANGUITO ROTADOR (Procedimento Normal)</li>
+            <li><strong>07.02.03.002-3</strong> - ANCORA (Instrumento 04)</li>
+            <li><strong>04.08.06.071-9</strong> - VIDEOARTROSCOPIA (Instrumento 04)</li>
+        </ol>
+    </div>
+
+    <div class="card error">
+        <h2>❌ Lógica ANTERIOR (Incorreta)</h2>
+        <div class="procedure">
+            <strong>1º - 04.08.01.014-2</strong><br>
+            Porcentagem: <strong>100%</strong> (primeira posição sequencial geral)<br>
+            <span class="badge normal">Procedimento Normal</span>
+        </div>
+        <div class="procedure">
+            <strong>2º - 07.02.03.002-3</strong><br>
+            Porcentagem: <strong>75%</strong> ❌ (segunda posição sequencial geral - ERRO!)<br>
+            <span class="badge instrument04">Instrumento 04</span>
+        </div>
+        <div class="procedure">
+            <strong>3º - 04.08.06.071-9</strong><br>
+            Porcentagem: <strong>50%</strong> ❌ (terceira posição sequencial geral - ERRO!)<br>
+            <span class="badge instrument04">Instrumento 04</span>
+        </div>
+        <p><strong>Problema:</strong> Instrumento 04 não deveria seguir sequência - sempre deve ser 100%!</p>
+    </div>
+
+    <div class="card success">
+        <h2>✅ Lógica CORRIGIDA (Atual)</h2>
+        
+        <h3>🔄 Classificação dos Procedimentos:</h3>
+        <ul>
+            <li><strong>🎯 Instrumento 04:</strong> [2º - 07.02.03.002-3, 3º - 04.08.06.071-9]</li>
+            <li><strong>🏥 Regras Especiais:</strong> []</li>
+            <li><strong>📊 Procedimentos Normais:</strong> [1º - 04.08.01.014-2]</li>
+        </ul>
+
+        <h3>📊 Aplicação das Regras:</h3>
+        <div class="procedure">
+            <strong>1º - 04.08.01.014-2</strong><br>
+            Porcentagem: <strong>100%</strong> ✅ (1º procedimento entre normais)<br>
+            <span class="badge normal">Procedimento Normal</span><br>
+            <em>Regra: 1º procedimento normal = 100%</em>
+        </div>
+        <div class="procedure">
+            <strong>2º - 07.02.03.002-3</strong><br>
+            Porcentagem: <strong>100%</strong> ✅ (Instrumento 04 - sempre 100%)<br>
+            <span class="badge instrument04">Instrumento 04</span><br>
+            <em>Regra: Instrumento 04 - AIH (Proc. Especial) - Sempre 100%</em>
+        </div>
+        <div class="procedure">
+            <strong>3º - 04.08.06.071-9</strong><br>
+            Porcentagem: <strong>100%</strong> ✅ (Instrumento 04 - sempre 100%)<br>
+            <span class="badge instrument04">Instrumento 04</span><br>
+            <em>Regra: Instrumento 04 - AIH (Proc. Especial) - Sempre 100%</em>
+        </div>
+    </div>
+
+    <div class="card info">
+        <h2>🎯 Hierarquia das Regras Implementada</h2>
+        <ol>
+            <li><strong>PRIORIDADE 1:</strong> Instrumento 04 - Sempre 100% (SH, SP, SA)</li>
+            <li><strong>PRIORIDADE 2:</strong> Regras especiais de cirurgias múltiplas/sequenciais</li>
+            <li><strong>PRIORIDADE 3:</strong> Regras padrão (100% para 1º normal, 70% para demais normais)</li>
+        </ol>
+    </div>
+
+    <div class="card">
+        <h2>🏗️ Implementação Técnica</h2>
+        <h3>Arquivo: <code>src/components/AIHMultiPageTester.tsx</code></h3>
+        <h4>Função <code>calculateTotalsWithPercentage()</code>:</h4>
+        <ul>
+            <li>✅ Classificação inteligente por tipo de procedimento</li>
+            <li>✅ Cálculo de posição sequencial independente por categoria</li>
+            <li>✅ Logs detalhados para debug</li>
+        </ul>
+        
+        <h4>Console Output Esperado:</h4>
+        <pre style="background-color: #f8f9fa; padding: 10px; border-radius: 4px;">
+🔄 CLASSIFICAÇÃO DOS PROCEDIMENTOS:
+🎯 Instrumento 04: ['2º - 07.02.03.002-3', '3º - 04.08.06.071-9']
+🏥 Regras Especiais: []
+📊 Procedimentos Normais: ['1º - 04.08.01.014-2']
+
+🎯 INSTRUMENTO 04 - 07.02.03.002-3 (2º): SEMPRE 100%
+🎯 INSTRUMENTO 04 - 04.08.06.071-9 (3º): SEMPRE 100%
+📊 PROCEDIMENTO NORMAL - 04.08.01.014-2 (1º na AIH, 1º entre normais): 100%
+        </pre>
+    </div>
+
+    <script>
+        // Simular função de teste
+        function testarLogicaSequencial() {
+            console.log('🧪 TESTE - Lógica Sequencial Corrigida');
+            
+            const procedimentos = [
+                {
+                    sequencia: 1,
+                    codigo: '04.08.01.014-2',
+                    nome: 'REPARO DE ROTURA DO MANGUITO ROTADOR',
+                    tipo: 'NORMAL',
+                    instrumentoSigtap: 'Não informado'
+                },
+                {
+                    sequencia: 2,
+                    codigo: '07.02.03.002-3',
+                    nome: 'ANCORA',
+                    tipo: 'INSTRUMENTO_04',
+                    instrumentoSigtap: '04 - AIH (Proc. Especial)'
+                },
+                {
+                    sequencia: 3,
+                    codigo: '04.08.06.071-9',
+                    nome: 'VIDEOARTROSCOPIA',
+                    tipo: 'INSTRUMENTO_04',
+                    instrumentoSigtap: '04 - AIH (Proc. Especial)'
+                }
+            ];
+            
+            console.log('📋 Procedimentos:', procedimentos);
+            
+            // Simular classificação
+            const instrumento04 = procedimentos.filter(p => p.tipo === 'INSTRUMENTO_04');
+            const normais = procedimentos.filter(p => p.tipo === 'NORMAL');
+            
+            console.log('🎯 Instrumento 04:', instrumento04.map(p => `${p.sequencia}º - ${p.codigo}`));
+            console.log('📊 Procedimentos Normais:', normais.map(p => `${p.sequencia}º - ${p.codigo}`));
+            
+            // Simular aplicação das regras
+            procedimentos.forEach(proc => {
+                if (proc.tipo === 'INSTRUMENTO_04') {
+                    console.log(`🎯 ${proc.codigo} (${proc.sequencia}º): 100% - Instrumento 04`);
+                } else {
+                    const posicaoEntreNormais = normais.findIndex(n => n.sequencia === proc.sequencia) + 1;
+                    const porcentagem = posicaoEntreNormais === 1 ? 100 : 70;
+                    console.log(`📊 ${proc.codigo} (${proc.sequencia}º): ${porcentagem}% - ${posicaoEntreNormais}º entre normais`);
+                }
+            });
+            
+            return '✅ Teste concluído - verifique o console!';
+        }
+        
+        // Executar teste automaticamente
+        console.log(testarLogicaSequencial());
+    </script>
+</body>
+</html> 

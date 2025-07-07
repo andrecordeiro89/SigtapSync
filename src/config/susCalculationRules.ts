@@ -6,6 +6,8 @@
  * 
  * REGRA UNIVERSAL: Serviços Profissionais (SP) sempre 100%
  * VARIAÇÃO: Serviços Hospitalares (SH) com percentuais decrescentes
+ * 
+ * NOVA REGRA: Instrumento 04 - AIH (Proc. Especial) sempre 100%
  */
 
 // Interface para definir regras especiais de cálculo
@@ -21,6 +23,16 @@ export interface SpecialCalculationRule {
   };
   notes: string;
   lastUpdated: string;
+}
+
+// Interface para procedimentos com informações do SIGTAP
+export interface ProcedureWithSigtap {
+  procedureCode: string;
+  sequenceOrder: number;
+  valueHosp: number;
+  valueProf: number;
+  valueAmb: number;
+  registrationInstrument?: string; // Campo do SIGTAP para detectar procedimentos especiais
 }
 
 // PROCEDIMENTOS ESPECIAIS COM REGRAS DE MÚLTIPLOS PROCEDIMENTOS
@@ -66,6 +78,55 @@ export const SPECIAL_CALCULATION_RULES: SpecialCalculationRule[] = [
   }
 ];
 
+// ✅ NOVA FUNÇÃO: Verifica se é procedimento do Instrumento 04 - AIH (Proc. Especial)
+export function isInstrument04Procedure(registrationInstrument?: string): boolean {
+  if (!registrationInstrument) return false;
+  
+  const instrument = registrationInstrument.toLowerCase().trim();
+  
+  // Padrões que indicam Instrumento 04 - AIH (Proc. Especial)
+  const instrument04Patterns = [
+    '04 - aih (proc. especial)',
+    '04 - aih',
+    'aih (proc. especial)',
+    'aih proc especial',
+    'aih procedimento especial',
+    'instrumento 04',
+    '04-aih',
+    '04_aih'
+  ];
+  
+  return instrument04Patterns.some(pattern => instrument.includes(pattern));
+}
+
+// ✅ NOVA FUNÇÃO: Classifica procedimentos por tipo (especial vs normal)
+export function classifyProcedures(procedures: ProcedureWithSigtap[]): {
+  instrument04Procedures: ProcedureWithSigtap[];
+  normalProcedures: ProcedureWithSigtap[];
+  specialRuleProcedures: ProcedureWithSigtap[];
+} {
+  const instrument04Procedures: ProcedureWithSigtap[] = [];
+  const normalProcedures: ProcedureWithSigtap[] = [];
+  const specialRuleProcedures: ProcedureWithSigtap[] = [];
+  
+  procedures.forEach(proc => {
+    // 🎯 PRIORIDADE 1: Instrumento 04 - AIH (Proc. Especial)
+    if (isInstrument04Procedure(proc.registrationInstrument)) {
+      instrument04Procedures.push(proc);
+    }
+    // 🎯 PRIORIDADE 2: Regras especiais de cirurgias múltiplas
+    else if (hasSpecialRule(proc.procedureCode)) {
+      specialRuleProcedures.push(proc);
+    }
+    // 🎯 PRIORIDADE 3: Procedimentos normais
+    else {
+      normalProcedures.push(proc);
+    }
+  });
+  
+  return { instrument04Procedures, normalProcedures, specialRuleProcedures };
+}
+
 // Função para verificar se um procedimento tem regra especial
 export function hasSpecialRule(procedureCodeOrFull: string): boolean {
   // Extrair apenas o código se vier com descrição
@@ -80,7 +141,7 @@ export function getSpecialRule(procedureCodeOrFull: string): SpecialCalculationR
   return SPECIAL_CALCULATION_RULES.find(rule => rule.procedureCode === procedureCode) || null;
 }
 
-// Função para aplicar cálculo especial com separação SH/SP
+// ✅ FUNÇÃO ATUALIZADA: Aplicar cálculo especial considerando Instrumento 04
 export function applySpecialCalculation(
   procedures: Array<{
     procedureCode: string;
@@ -88,6 +149,7 @@ export function applySpecialCalculation(
     valueProf: number;      // Valor SP (Serviço Profissional)
     valueAmb: number;       // Valor SA (Ambulatorial)
     sequenceOrder: number;  // Posição na sequência (1, 2, 3...)
+    registrationInstrument?: string; // Instrumento do SIGTAP
   }>
 ): Array<{
   procedureCode: string;
@@ -99,11 +161,33 @@ export function applySpecialCalculation(
   appliedProfPercentage: number;  // Sempre 100% para SP
   ruleApplied: string;
   specialRule: boolean;
+  isInstrument04?: boolean;       // Se é procedimento do Instrumento 04
 }> {
   
   return procedures.map((proc) => {
-    const specialRule = getSpecialRule(proc.procedureCode);
+    // 🎯 VERIFICAR INSTRUMENTO 04 - SEMPRE 100%
+    if (isInstrument04Procedure(proc.registrationInstrument)) {
+      const calculatedValueHosp = proc.valueHosp; // 100%
+      const calculatedValueProf = proc.valueProf; // 100%
+      const calculatedValueAmb = proc.valueAmb;   // 100%
+      const calculatedTotal = calculatedValueHosp + calculatedValueProf + calculatedValueAmb;
+      
+      return {
+        procedureCode: proc.procedureCode,
+        calculatedValueHosp,
+        calculatedValueProf,
+        calculatedValueAmb,
+        calculatedTotal,
+        appliedHospPercentage: 100,
+        appliedProfPercentage: 100,
+        ruleApplied: 'Instrumento 04 - AIH (Proc. Especial) - Sempre 100%',
+        specialRule: true,
+        isInstrument04: true
+      };
+    }
     
+    // 🎯 VERIFICAR REGRAS ESPECIAIS DE CIRURGIAS MÚLTIPLAS
+    const specialRule = getSpecialRule(proc.procedureCode);
     if (specialRule && proc.sequenceOrder <= specialRule.rule.maxProcedures!) {
       // APLICAR REGRA ESPECIAL
       const hospPercentageIndex = proc.sequenceOrder - 1; // Array é 0-based
@@ -124,7 +208,8 @@ export function applySpecialCalculation(
         appliedHospPercentage: hospPercentage,
         appliedProfPercentage: 100,
         ruleApplied: `${specialRule.rule.type} - ${specialRule.procedureName}`,
-        specialRule: true
+        specialRule: true,
+        isInstrument04: false
       };
     }
     
@@ -144,21 +229,34 @@ export function applySpecialCalculation(
       appliedHospPercentage: defaultHospPercentage,
       appliedProfPercentage: 100,
       ruleApplied: 'Regra padrão do sistema',
-      specialRule: false
+      specialRule: false,
+      isInstrument04: false
     };
   });
 }
 
-// Função para verificar se uma lista de procedimentos contém códigos especiais
-export function hasSpecialProceduresInList(procedures: Array<{ procedureCode: string }>): {
+// ✅ FUNÇÃO ATUALIZADA: Verifica se uma lista contém procedimentos especiais (incluindo Instrumento 04)
+export function hasSpecialProceduresInList(procedures: Array<{ 
+  procedureCode: string; 
+  registrationInstrument?: string 
+}>): {
   hasSpecial: boolean;
   specialCodes: string[];
   rules: SpecialCalculationRule[];
+  hasInstrument04: boolean;
+  instrument04Codes: string[];
 } {
   const specialCodes: string[] = [];
   const rules: SpecialCalculationRule[] = [];
+  const instrument04Codes: string[] = [];
   
   procedures.forEach(proc => {
+    // Verificar Instrumento 04
+    if (isInstrument04Procedure(proc.registrationInstrument)) {
+      instrument04Codes.push(proc.procedureCode);
+    }
+    
+    // Verificar regras especiais de cirurgias múltiplas
     if (hasSpecialRule(proc.procedureCode)) {
       specialCodes.push(proc.procedureCode);
       const rule = getSpecialRule(proc.procedureCode);
@@ -167,15 +265,24 @@ export function hasSpecialProceduresInList(procedures: Array<{ procedureCode: st
   });
   
   return {
-    hasSpecial: specialCodes.length > 0,
+    hasSpecial: specialCodes.length > 0 || instrument04Codes.length > 0,
     specialCodes,
-    rules
+    rules,
+    hasInstrument04: instrument04Codes.length > 0,
+    instrument04Codes
   };
 }
 
-// Log das regras para debug
+// ✅ FUNÇÃO ATUALIZADA: Log das regras incluindo Instrumento 04
 export function logSpecialRules(): void {
-  console.log('📋 REGRAS ESPECIAIS DE CÁLCULO SUS - CIRURGIAS MÚLTIPLAS:');
+  console.log('📋 REGRAS ESPECIAIS DE CÁLCULO SUS:');
+  
+  console.log('\n🏥 INSTRUMENTO 04 - AIH (PROC. ESPECIAL):');
+  console.log('   Tipo: Sempre 100% (SH, SP e SA)');
+  console.log('   Detectado por: Campo "registrationInstrument" do SIGTAP');
+  console.log('   Prioridade: MÁXIMA (aplicada antes de qualquer outra regra)');
+  
+  console.log('\n🏥 CIRURGIAS MÚLTIPLAS E SEQUENCIAIS:');
   SPECIAL_CALCULATION_RULES.forEach(rule => {
     console.log(`\n🏥 ${rule.procedureCode}: ${rule.procedureName}`);
     console.log(`   Tipo: ${rule.rule.type}`);
@@ -202,6 +309,21 @@ export function debugSpecialRuleDetection(procedureCodeOrFull: string): void {
     console.log(`   Tipo: ${rule.rule.type}`);
   } else {
     console.log(`   ❌ Nenhuma regra encontrada`);
+  }
+}
+
+// ✅ NOVA FUNÇÃO: Debug específico para Instrumento 04
+export function debugInstrument04Detection(registrationInstrument?: string): void {
+  console.log('🔍 DEBUG - Detecção Instrumento 04:');
+  console.log(`   Input: "${registrationInstrument || 'undefined'}"`);
+  
+  const isInstrument04 = isInstrument04Procedure(registrationInstrument);
+  console.log(`   É Instrumento 04: ${isInstrument04}`);
+  
+  if (isInstrument04) {
+    console.log(`   ✅ Detectado como AIH (Proc. Especial) - Cobrança 100%`);
+  } else {
+    console.log(`   ❌ Não é Instrumento 04 - Aplicar regras normais`);
   }
 }
 

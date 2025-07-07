@@ -372,6 +372,10 @@ export interface ProcedureAIH {
   valorCalculadoSP?: number;         // Valor SP (sempre 100%)
   valorCalculadoSA?: number;         // Valor SA (sempre 100%)
   
+  // ✅ NOVO: Campos para Instrumento 04 - AIH (Proc. Especial)
+  isInstrument04?: boolean;          // Se é procedimento do Instrumento 04 - AIH (Proc. Especial)
+  instrument04Rule?: string;         // Descrição da regra do Instrumento 04
+  
   // Auditoria
   revisadoPor?: string;
   dataRevisao?: string;

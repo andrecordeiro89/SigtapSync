@@ -707,6 +707,48 @@ const PatientManagement = () => {
         </div>
       )}
 
+      {/* Painel de Ações Rápidas - Logo após os badges */}
+      {canManageProcedures && (
+        <Card className="border-l-4 border-l-red-500">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Gerenciamento de AIHs</h3>
+                    <p className="text-xs text-gray-600">Ações administrativas para AIHs processadas</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Badge variant="outline" className="text-xs">
+                  📊 {filteredData.length} AIHs disponíveis
+                </Badge>
+                
+                {filteredData.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+                    onClick={() => {
+                      toast({
+                        title: "Exclusão de AIHs",
+                        description: "Use os botões 🗑️ ao lado de cada AIH para excluir individualmente",
+                      });
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Excluir AIHs
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
             {/* Filtros Unificados */}
           <Card>
             <CardContent className="p-4">
