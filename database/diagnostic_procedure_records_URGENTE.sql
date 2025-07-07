@@ -216,4 +216,228 @@ INSERT INTO procedure_records (
 
 SELECT 
     'DIAGNÓSTICO COMPLETO REALIZADO' as status,
-    'Verifique os resultados acima para identificar o problema' as instrucoes; 
+    'Verifique os resultados acima para identificar o problema' as instrucoes;
+
+-- ================================================
+-- DIAGNÓSTICO E CORREÇÃO DE PROCEDIMENTOS - URGENTE
+-- Sistema SIGTAP Billing Wizard
+-- ================================================
+
+-- 1. DIAGNÓSTICO COMPLETO
+-- ================================================
+
+-- Verificar total de AIHs e procedimentos
+SELECT 
+  'AIHs Totais' as tipo,
+  COUNT(*) as quantidade,
+  MAX(created_at) as ultima_criacao
+FROM aihs
+WHERE hospital_id = (SELECT id FROM hospitals LIMIT 1)
+
+UNION ALL
+
+SELECT 
+  'Procedimentos Totais' as tipo,
+  COUNT(*) as quantidade,
+  MAX(created_at) as ultima_criacao
+FROM procedure_records
+WHERE hospital_id = (SELECT id FROM hospitals LIMIT 1)
+
+UNION ALL
+
+SELECT 
+  'AIHs com Procedimentos' as tipo,
+  COUNT(DISTINCT pr.aih_id) as quantidade,
+  MAX(pr.created_at) as ultima_criacao
+FROM procedure_records pr
+WHERE pr.hospital_id = (SELECT id FROM hospitals LIMIT 1);
+
+-- 2. IDENTIFICAR AIHs SEM PROCEDIMENTOS
+-- ================================================
+
+SELECT 
+  a.aih_number as "Número AIH",
+  a.procedure_code as "Código Procedimento Principal",
+  a.total_procedures as "Total Reportado",
+  COUNT(pr.id) as "Procedimentos Reais",
+  a.created_at as "Criada em"
+FROM aihs a
+LEFT JOIN procedure_records pr ON a.id = pr.aih_id
+WHERE a.hospital_id = (SELECT id FROM hospitals LIMIT 1)
+GROUP BY a.id, a.aih_number, a.procedure_code, a.total_procedures, a.created_at
+HAVING COUNT(pr.id) = 0
+ORDER BY a.created_at DESC
+LIMIT 20;
+
+-- 3. VERIFICAR INCONSISTÊNCIAS NAS ESTATÍSTICAS
+-- ================================================
+
+SELECT 
+  a.aih_number as "Número AIH",
+  a.total_procedures as "Total Reportado",
+  COUNT(pr.id) as "Procedimentos Reais",
+  COUNT(CASE WHEN pr.match_status = 'approved' THEN 1 END) as "Aprovados Reais",
+  a.approved_procedures as "Aprovados Reportados"
+FROM aihs a
+LEFT JOIN procedure_records pr ON a.id = pr.aih_id
+WHERE a.hospital_id = (SELECT id FROM hospitals LIMIT 1)
+GROUP BY a.id, a.aih_number, a.total_procedures, a.approved_procedures
+HAVING 
+  a.total_procedures != COUNT(pr.id) OR
+  a.approved_procedures != COUNT(CASE WHEN pr.match_status = 'approved' THEN 1 END)
+ORDER BY a.created_at DESC
+LIMIT 10;
+
+-- 4. ESTATÍSTICAS DE PROCEDIMENTOS POR STATUS
+-- ================================================
+
+SELECT 
+  COALESCE(pr.match_status, 'NULL') as "Status",
+  COUNT(*) as "Quantidade",
+  ROUND(AVG(pr.value_charged / 100.0), 2) as "Valor Médio (R$)",
+  SUM(pr.value_charged / 100.0) as "Valor Total (R$)"
+FROM procedure_records pr
+WHERE pr.hospital_id = (SELECT id FROM hospitals LIMIT 1)
+GROUP BY pr.match_status
+ORDER BY COUNT(*) DESC;
+
+-- 5. CORREÇÃO AUTOMÁTICA - CRIAR PROCEDIMENTOS FALTANTES
+-- ================================================
+-- ATENÇÃO: Execute apenas após análise dos dados acima!
+
+-- Criar procedimentos principais para AIHs sem procedimentos
+INSERT INTO procedure_records (
+  id,
+  hospital_id,
+  patient_id,
+  aih_id,
+  procedure_code,
+  procedure_name,
+  procedure_date,
+  value_charged,
+  total_value,
+  professional_name,
+  professional_cbo,
+  quantity,
+  status,
+  billing_status,
+  sequencia,
+  codigo_procedimento_original,
+  match_status,
+  created_at
+)
+SELECT 
+  gen_random_uuid() as id,
+  a.hospital_id,
+  a.patient_id,
+  a.id as aih_id,
+  a.procedure_code,
+  'Procedimento Principal: ' || a.procedure_code as procedure_name,
+  a.admission_date as procedure_date,
+  COALESCE(a.calculated_total_value, 0) as value_charged,
+  COALESCE(a.calculated_total_value, 0) as total_value,
+  COALESCE(a.requesting_physician, 'PROFISSIONAL RESPONSÁVEL') as professional_name,
+  COALESCE(a.professional_cbo, '225125') as professional_cbo,
+  1 as quantity,
+  'pending' as status,
+  'pending' as billing_status,
+  1 as sequencia,
+  a.procedure_code as codigo_procedimento_original,
+  'pending' as match_status,
+  NOW() as created_at
+FROM aihs a
+LEFT JOIN procedure_records pr ON a.id = pr.aih_id
+WHERE a.hospital_id = (SELECT id FROM hospitals LIMIT 1)
+  AND pr.id IS NULL  -- Apenas AIHs sem procedimentos
+  AND a.procedure_code IS NOT NULL
+GROUP BY a.id, a.hospital_id, a.patient_id, a.procedure_code, 
+         a.admission_date, a.calculated_total_value, a.requesting_physician, 
+         a.professional_cbo;
+
+-- 6. ATUALIZAR ESTATÍSTICAS DAS AIHs
+-- ================================================
+
+UPDATE aihs 
+SET 
+  total_procedures = subquery.real_count,
+  approved_procedures = subquery.approved_count,
+  rejected_procedures = subquery.rejected_count,
+  calculated_total_value = subquery.total_value,
+  updated_at = NOW()
+FROM (
+  SELECT 
+    pr.aih_id,
+    COUNT(*) as real_count,
+    COUNT(CASE WHEN pr.match_status = 'approved' THEN 1 END) as approved_count,
+    COUNT(CASE WHEN pr.match_status = 'rejected' THEN 1 END) as rejected_count,
+    SUM(CASE WHEN pr.match_status = 'approved' THEN pr.value_charged ELSE 0 END) as total_value
+  FROM procedure_records pr
+  WHERE pr.hospital_id = (SELECT id FROM hospitals LIMIT 1)
+  GROUP BY pr.aih_id
+) subquery
+WHERE aihs.id = subquery.aih_id
+  AND aihs.hospital_id = (SELECT id FROM hospitals LIMIT 1);
+
+-- 7. VERIFICAÇÃO FINAL
+-- ================================================
+
+SELECT 
+  'RESULTADO FINAL' as status,
+  COUNT(DISTINCT a.id) as "AIHs Totais",
+  COUNT(pr.id) as "Procedimentos Totais",
+  COUNT(DISTINCT pr.aih_id) as "AIHs com Procedimentos",
+  COUNT(DISTINCT a.id) - COUNT(DISTINCT pr.aih_id) as "AIHs sem Procedimentos"
+FROM aihs a
+LEFT JOIN procedure_records pr ON a.id = pr.aih_id
+WHERE a.hospital_id = (SELECT id FROM hospitals LIMIT 1);
+
+-- 8. LOGS DE AUDITORIA
+-- ================================================
+
+INSERT INTO audit_logs (
+  id,
+  action,
+  table_name,
+  record_id,
+  details,
+  user_id,
+  created_at
+)
+SELECT 
+  gen_random_uuid(),
+  'PROCEDURE_SYNC',
+  'procedure_records',
+  pr.id::text,
+  jsonb_build_object(
+    'action', 'auto_created_principal_procedure',
+    'aih_number', a.aih_number,
+    'procedure_code', pr.procedure_code,
+    'sync_date', NOW()
+  ),
+  (SELECT id FROM auth.users LIMIT 1),
+  NOW()
+FROM procedure_records pr
+JOIN aihs a ON pr.aih_id = a.id
+WHERE pr.created_at > NOW() - INTERVAL '1 hour'
+  AND pr.sequencia = 1
+  AND pr.hospital_id = (SELECT id FROM hospitals LIMIT 1);
+
+-- ================================================
+-- COMANDOS UTILITÁRIOS ADICIONAIS
+-- ================================================
+
+-- Comando para verificar schema da tabela procedure_records
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns 
+WHERE table_name = 'procedure_records' 
+ORDER BY ordinal_position;
+
+-- Comando para verificar índices
+SELECT indexname, indexdef 
+FROM pg_indexes 
+WHERE tablename = 'procedure_records';
+
+-- Comando para verificar constraints
+SELECT constraint_name, constraint_type 
+FROM information_schema.table_constraints 
+WHERE table_name = 'procedure_records'; 

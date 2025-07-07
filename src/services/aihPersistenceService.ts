@@ -2220,92 +2220,550 @@ export class AIHPersistenceService {
   }
 
   /**
-   * NOVO: Busca procedimentos de uma AIH específica com detalhes
+   * OTIMIZADO: Busca procedimentos de uma AIH específica com performance melhorada
    */
   async getAIHProcedures(aihId: string): Promise<any[]> {
     try {
-      console.log(`🔍 Buscando procedimentos para AIH: ${aihId}`);
+      console.log('Buscando procedimentos para AIH:', aihId);
+      
+      // Strategy 1: Optimized query with known schema fields INCLUDING DESCRIPTION
+      try {
+        const { data: procedures, error } = await supabase
+          .from('procedure_records')
+          .select(`
+            id,
+            aih_id,
+            procedure_code,
+            procedure_description,
+            quantity,
+            professional_code,
+            professional_name,
+            amount,
+            status,
+            confidence,
+            created_at,
+            updated_at
+          `)
+          .eq('aih_id', aihId)
+          .order('created_at', { ascending: false });
 
-      // STEP 1: Primeiro tentar busca simples para diagnóstico
-      const { data: simpleData, error: simpleError } = await supabase
-        .from('procedure_records')
-        .select('*')
-        .eq('aih_id', aihId)
-        .order('sequencia', { ascending: true });
+        if (error) throw error;
 
-      if (simpleError) {
-        console.error('❌ Erro na busca simples de procedimentos:', simpleError);
-        throw simpleError;
+        if (procedures && procedures.length > 0) {
+          console.log(`Strategy 1: Found ${procedures.length} procedures with descriptions`);
+          
+          // Enriquecer com dados SIGTAP se necessário
+          const enrichedProcedures = await this.enrichProceduresWithSigtap(procedures);
+          return enrichedProcedures;
+        }
+      } catch (error) {
+        console.warn('Strategy 1 failed, trying fallback:', error);
       }
 
-      console.log(`📊 Busca simples encontrou ${simpleData?.length || 0} procedimentos`);
+      // Strategy 2: Basic fallback query
+      try {
+        const { data: procedures, error } = await supabase
+          .from('procedure_records')
+          .select('*')
+          .eq('aih_id', aihId);
 
-      if (!simpleData || simpleData.length === 0) {
-        console.log('⚠️ Nenhum procedimento encontrado na busca simples');
+        if (error) throw error;
+
+        if (procedures && procedures.length > 0) {
+          console.log(`Strategy 2: Found ${procedures.length} procedures (basic query)`);
+          
+          // Enriquecer com descrições se não existirem
+          const enrichedProcedures = await this.enrichProceduresWithSigtap(procedures);
+          return enrichedProcedures;
+        }
+      } catch (error) {
+        console.warn('Strategy 2 failed:', error);
+      }
+
+      // Strategy 3: Verification if AIH exists
+      const { data: aihExists } = await supabase
+        .from('aihs')
+        .select('id')
+        .eq('id', aihId)
+        .single();
+
+      if (!aihExists) {
+        console.warn('AIH not found:', aihId);
         return [];
       }
 
-              // STEP 2: Tentar busca com joins se existem dados
-        try {
-          const { data: fullData, error: fullError } = await supabase
-            .from('procedure_records')
-            .select(`
-              *,
-              sigtap_procedures(
-                code,
-                description,
-                value_hosp_total,
-                complexity
-              )
-            `)
-            .eq('aih_id', aihId)
-            .order('sequencia', { ascending: true });
-
-        if (fullError) {
-          console.warn('⚠️ Erro na busca com joins, usando dados simples:', fullError);
-          return simpleData;
-        }
-
-        console.log(`✅ ${fullData?.length || 0} procedimentos com SIGTAP encontrados`);
-
-                  // STEP 3: Tentar adicionar matches (opcional)
-          try {
-            const { data: matchData, error: matchError } = await supabase
-              .from('aih_matches')
-              .select('"overall score", match_confidence, status, aih_id, procedure_id')
-              .eq('aih_id', aihId);
-
-            if (!matchError && matchData) {
-              // Combinar dados manualmente por procedure_id
-              const enrichedData = fullData?.map(proc => {
-                const matches = matchData.filter(m => 
-                  m.aih_id === proc.aih_id && 
-                  m.procedure_id === proc.procedure_id
-                );
-                
-                return {
-                  ...proc,
-                  aih_matches: matches.length > 0 ? matches : []
-                };
-              });
-
-            console.log(`🎯 Dados enriquecidos com ${matchData.length} matches`);
-            return enrichedData || fullData;
-          }
-        } catch (matchErr) {
-          console.warn('⚠️ Erro ao buscar matches, ignorando:', matchErr);
-        }
-
-        return fullData || simpleData;
-
-      } catch (joinError) {
-        console.warn('⚠️ Erro na busca com joins, usando dados simples:', joinError);
-        return simpleData;
-      }
+      console.log('No procedures found for existing AIH:', aihId);
+      return [];
 
     } catch (error) {
-      console.error('❌ Erro geral na busca de procedimentos:', error);
+      console.error('Error getting AIH procedures:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Enriquecer procedimentos com descrições SIGTAP
+   */
+  async enrichProceduresWithSigtap(procedures: any[]): Promise<any[]> {
+    try {
+      // Buscar códigos únicos que precisam de descrição
+      const codesNeedingDescription = procedures
+        .filter(p => p.procedure_code && !p.procedure_description)
+        .map(p => p.procedure_code);
+
+      if (codesNeedingDescription.length > 0) {
+        console.log(`Enriching ${codesNeedingDescription.length} procedures with SIGTAP descriptions`);
+        
+        // Buscar descrições no SIGTAP
+        const { data: sigtapData } = await supabase
+          .from('sigtap_procedures')
+          .select(`
+            code,
+            description,
+            sigtap_versions!inner(is_active)
+          `)
+          .in('code', codesNeedingDescription)
+          .eq('sigtap_versions.is_active', true);
+
+        if (sigtapData) {
+          // Criar mapa código -> descrição
+          const descriptionMap = sigtapData.reduce((map, item) => {
+            map[item.code] = item.description;
+            return map;
+          }, {} as Record<string, string>);
+
+          // Enriquecer procedimentos
+          return procedures.map(procedure => ({
+            ...procedure,
+            procedure_description: procedure.procedure_description || 
+              descriptionMap[procedure.procedure_code] || 
+              `Procedimento: ${procedure.procedure_code}`,
+            // Garantir compatibilidade com interface existente
+            displayName: procedure.procedure_description || 
+              descriptionMap[procedure.procedure_code] || 
+              `Procedimento: ${procedure.procedure_code}`,
+            fullDescription: `${procedure.procedure_code} - ${
+              procedure.procedure_description || 
+              descriptionMap[procedure.procedure_code] || 
+              'Descrição não disponível'
+            }`
+          }));
+        }
+      }
+
+      // Se não precisar enriquecer ou falhar, retornar com campos compatíveis
+      return procedures.map(procedure => ({
+        ...procedure,
+        procedure_description: procedure.procedure_description || `Procedimento: ${procedure.procedure_code}`,
+        displayName: procedure.procedure_description || `Procedimento: ${procedure.procedure_code}`,
+        fullDescription: `${procedure.procedure_code} - ${
+          procedure.procedure_description || 'Descrição não disponível'
+        }`
+      }));
+
+    } catch (error) {
+      console.error('Error enriching procedures with SIGTAP:', error);
+      
+      // Fallback: retornar com descrições básicas
+      return procedures.map(procedure => ({
+        ...procedure,
+        procedure_description: procedure.procedure_description || `Procedimento: ${procedure.procedure_code}`,
+        displayName: procedure.procedure_description || `Procedimento: ${procedure.procedure_code}`,
+        fullDescription: `${procedure.procedure_code} - ${
+          procedure.procedure_description || 'Descrição não disponível'
+        }`
+      }));
+    }
+  }
+
+  /**
+   * NOVO: Normaliza dados de procedimentos para interface consistente
+   */
+  private normalizeProceduresData(procedures: any[]): any[] {
+    return procedures.map((proc, index) => ({
+      // Campos principais (interface)
+      id: proc.id,
+      aih_id: proc.aih_id,
+      procedure_sequence: proc.sequencia || index + 1,
+      procedure_code: proc.procedure_code || proc.codigo_procedimento_original,
+      procedure_description: proc.procedure_name || `Procedimento ${proc.procedure_code}`,
+      procedure_date: proc.procedure_date,
+      
+      // Valores financeiros
+      value_charged: proc.value_charged || 0,
+      total_value: proc.total_value || proc.value_charged || 0,
+      original_value: proc.valor_original || 0,
+      
+      // Profissional
+      professional_name: proc.professional_name || 'PROFISSIONAL RESPONSÁVEL',
+      professional_cbo: proc.professional_cbo || proc.cbo,
+      professional_document: proc.documento_profissional,
+      
+      // Status e matching
+      match_status: proc.match_status || proc.status || 'pending',
+      match_confidence: proc.match_confidence || 0,
+      approved: proc.aprovado || false,
+      
+      // Dados específicos da AIH
+      participacao: proc.participacao,
+      cnes: proc.cnes,
+      porcentagem_sus: proc.porcentagem_sus || 100,
+      quantity: proc.quantity || 1,
+      
+      // Metadados
+      notes: proc.notes || proc.observacoes,
+      created_at: proc.created_at,
+      
+      // Dados enriquecidos (se disponíveis)
+      sigtap_procedures: proc.sigtap_procedures,
+      aih_matches: proc.aih_matches || []
+    }));
+  }
+
+  /**
+   * NOVO: Diagnóstico completo dos procedimentos no sistema
+   */
+  async diagnoseProceduresData(hospitalId: string): Promise<{
+    aihs: {
+      total: number;
+      withProcedures: number;
+      withoutProcedures: number;
+      inconsistent: number;
+    };
+    procedures: {
+      total: number;
+      pending: number;
+      approved: number;
+      rejected: number;
+      removed: number;
+    };
+    issues: string[];
+    recommendations: string[];
+  }> {
+    try {
+      console.log('🔍 === DIAGNÓSTICO DE PROCEDIMENTOS ===');
+      
+      const issues: string[] = [];
+      const recommendations: string[] = [];
+
+      // 1. Contar AIHs totais
+      const { data: allAIHs, error: aihError } = await supabase
+        .from('aihs')
+        .select('id, aih_number, total_procedures, approved_procedures')
+        .eq('hospital_id', hospitalId);
+
+      if (aihError) {
+        throw aihError;
+      }
+
+      const totalAIHs = allAIHs?.length || 0;
+      console.log(`📊 AIHs encontradas: ${totalAIHs}`);
+
+      // 2. Contar AIHs com procedimentos
+      const { data: proceduresCount } = await supabase
+        .from('procedure_records')
+        .select('aih_id')
+        .eq('hospital_id', hospitalId);
+
+      const aihsWithProcedures = new Set(proceduresCount?.map(p => p.aih_id)).size;
+      const aihsWithoutProcedures = totalAIHs - aihsWithProcedures;
+
+      console.log(`✅ AIHs com procedimentos: ${aihsWithProcedures}`);
+      console.log(`❌ AIHs sem procedimentos: ${aihsWithoutProcedures}`);
+
+      // 3. Contar procedimentos por status
+      const { data: allProcedures } = await supabase
+        .from('procedure_records')
+        .select('match_status')
+        .eq('hospital_id', hospitalId);
+
+      const proceduresStats = {
+        total: allProcedures?.length || 0,
+        pending: allProcedures?.filter(p => p.match_status === 'pending').length || 0,
+        approved: allProcedures?.filter(p => p.match_status === 'approved').length || 0,
+        rejected: allProcedures?.filter(p => p.match_status === 'rejected').length || 0,
+        removed: allProcedures?.filter(p => p.match_status === 'removed').length || 0
+      };
+
+      console.log(`📋 Procedimentos: Total=${proceduresStats.total}, Aprovados=${proceduresStats.approved}`);
+
+      // 4. Verificar inconsistências
+      let inconsistentAIHs = 0;
+      for (const aih of allAIHs || []) {
+        const { data: aihProcedures } = await supabase
+          .from('procedure_records')
+          .select('id')
+          .eq('aih_id', aih.id);
+
+        const actualCount = aihProcedures?.length || 0;
+        const reportedCount = aih.total_procedures || 0;
+
+        if (actualCount !== reportedCount) {
+          inconsistentAIHs++;
+          if (actualCount === 0) {
+            issues.push(`AIH ${aih.aih_number}: Sem procedimentos cadastrados`);
+          } else if (actualCount !== reportedCount) {
+            issues.push(`AIH ${aih.aih_number}: ${actualCount} procedimentos reais vs ${reportedCount} reportados`);
+          }
+        }
+      }
+
+      // 5. Gerar recomendações
+      if (aihsWithoutProcedures > 0) {
+        recommendations.push(`Executar migração para ${aihsWithoutProcedures} AIHs sem procedimentos`);
+      }
+
+      if (inconsistentAIHs > 0) {
+        recommendations.push(`Recalcular estatísticas para ${inconsistentAIHs} AIHs inconsistentes`);
+      }
+
+      if (proceduresStats.pending > proceduresStats.approved) {
+        recommendations.push('Priorizar revisão de procedimentos pendentes');
+      }
+
+      const result = {
+        aihs: {
+          total: totalAIHs,
+          withProcedures: aihsWithProcedures,
+          withoutProcedures: aihsWithoutProcedures,
+          inconsistent: inconsistentAIHs
+        },
+        procedures: proceduresStats,
+        issues,
+        recommendations
+      };
+
+      console.log('✅ Diagnóstico concluído:', result);
+      return result;
+
+    } catch (error) {
+      console.error('❌ Erro no diagnóstico:', error);
       throw error;
+    }
+  }
+
+  /**
+   * NOVO: Sincroniza procedimentos faltantes para AIHs antigas
+   */
+  async syncMissingProcedures(hospitalId: string, options?: {
+    dryRun?: boolean;
+    maxAIHs?: number;
+  }): Promise<{
+    processed: number;
+    synchronized: number;
+    errors: string[];
+    details: Array<{
+      aihId: string;
+      aihNumber: string;
+      proceduresAdded: number;
+      status: 'success' | 'error';
+      message: string;
+    }>;
+  }> {
+    try {
+      const dryRun = options?.dryRun ?? false;
+      const maxAIHs = options?.maxAIHs ?? 50;
+      
+      console.log(`🔄 === SINCRONIZAÇÃO DE PROCEDIMENTOS ${dryRun ? '(DRY RUN)' : ''} ===`);
+
+      // 1. Buscar AIHs sem procedimentos
+      const { data: aihsWithoutProcedures } = await supabase
+        .from('aihs')
+        .select('id, aih_number, procedure_code')
+        .eq('hospital_id', hospitalId)
+        .limit(maxAIHs);
+
+      if (!aihsWithoutProcedures?.length) {
+        return {
+          processed: 0,
+          synchronized: 0,
+          errors: [],
+          details: []
+        };
+      }
+
+      const result = {
+        processed: 0,
+        synchronized: 0,
+        errors: [] as string[],
+        details: [] as any[]
+      };
+
+      for (const aih of aihsWithoutProcedures) {
+        try {
+          result.processed++;
+
+          // Verificar se já tem procedimentos
+          const { data: existingProcedures } = await supabase
+            .from('procedure_records')
+            .select('id')
+            .eq('aih_id', aih.id);
+
+          if (existingProcedures?.length) {
+            result.details.push({
+              aihId: aih.id,
+              aihNumber: aih.aih_number,
+              proceduresAdded: 0,
+              status: 'success',
+              message: `AIH já possui ${existingProcedures.length} procedimentos`
+            });
+            continue;
+          }
+
+          if (!dryRun) {
+            // Criar pelo menos o procedimento principal
+            const { data: patient } = await supabase
+              .from('patients')
+              .select('id')
+              .eq('hospital_id', hospitalId)
+              .single();
+
+            if (patient && aih.procedure_code) {
+              const procedureData = {
+                hospital_id: hospitalId,
+                patient_id: patient.id,
+                aih_id: aih.id,
+                procedure_code: aih.procedure_code,
+                procedure_description: `Procedimento principal: ${aih.procedure_code}`,
+                sequence: 1,
+                professional_name: 'PROFISSIONAL RESPONSÁVEL',
+                cbo: '225125', // Médico genérico
+                procedure_date: new Date().toISOString(),
+                calculated_value: 0,
+                match_status: 'pending'
+              };
+
+              await this.saveProcedureRecordFixed(procedureData);
+              
+              // Atualizar estatísticas da AIH
+              await supabase
+                .from('aihs')
+                .update({
+                  total_procedures: 1,
+                  approved_procedures: 0,
+                  rejected_procedures: 0,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', aih.id);
+
+              result.synchronized++;
+              result.details.push({
+                aihId: aih.id,
+                aihNumber: aih.aih_number,
+                proceduresAdded: 1,
+                status: 'success',
+                message: 'Procedimento principal sincronizado'
+              });
+
+              console.log(`✅ AIH ${aih.aih_number}: Procedimento principal sincronizado`);
+            }
+          } else {
+            result.details.push({
+              aihId: aih.id,
+              aihNumber: aih.aih_number,
+              proceduresAdded: 1,
+              status: 'success',
+              message: '[DRY RUN] Procedimento principal seria criado'
+            });
+          }
+
+        } catch (error) {
+          const errorMsg = `Erro na AIH ${aih.aih_number}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
+          result.errors.push(errorMsg);
+          result.details.push({
+            aihId: aih.id,
+            aihNumber: aih.aih_number,
+            proceduresAdded: 0,
+            status: 'error',
+            message: errorMsg
+          });
+          console.error(`❌ ${errorMsg}`);
+        }
+      }
+
+      console.log(`✅ Sincronização concluída: ${result.synchronized}/${result.processed} AIHs`);
+      return result;
+
+    } catch (error) {
+      console.error('❌ Erro na sincronização:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Salvar registro de procedimento com descrição automática
+   */
+  async saveProcedureRecordFixed(procedureData: any): Promise<boolean> {
+    try {
+      console.log('Saving procedure record with auto-description:', procedureData);
+
+             // Buscar descrição SIGTAP se não fornecida
+       if (!procedureData.procedure_description && procedureData.procedure_code) {
+         try {
+           const { data: sigtapData } = await supabase
+             .from('sigtap_procedures')
+             .select(`
+               description,
+               sigtap_versions!inner(is_active)
+             `)
+             .eq('code', procedureData.procedure_code)
+             .eq('sigtap_versions.is_active', true)
+             .limit(1)
+             .single();
+
+           if (sigtapData) {
+             procedureData.procedure_description = sigtapData.description;
+           }
+         } catch (error) {
+           console.warn('Could not fetch SIGTAP description:', error);
+         }
+       }
+
+       // Se ainda não tem descrição, usar padrão
+       if (!procedureData.procedure_description && procedureData.procedure_code) {
+         procedureData.procedure_description = `Procedimento: ${procedureData.procedure_code}`;
+       }
+
+       // Estratégia 1: Tentar com campos conhecidos
+       try {
+         const { error } = await supabase
+           .from('procedure_records')
+           .insert({
+             aih_id: procedureData.aih_id,
+             procedure_code: procedureData.procedure_code,
+             procedure_description: procedureData.procedure_description,
+             quantity: procedureData.quantity || 1,
+             professional_code: procedureData.professional_code,
+             professional_name: procedureData.professional_name,
+             amount: procedureData.amount,
+             status: procedureData.status || 'extracted',
+             confidence: procedureData.confidence || 0.8,
+             extraction_method: procedureData.extraction_method || 'hybrid'
+           });
+
+         if (!error) {
+           console.log('Procedure record saved successfully with description');
+           return true;
+         }
+       } catch (error) {
+         console.warn('Strategy 1 failed, trying fallback:', error);
+       }
+
+       // Estratégia 2: Fallback básico
+       const { error } = await supabase
+         .from('procedure_records')
+         .insert(procedureData);
+
+      if (error) {
+        console.error('Failed to save procedure record:', error);
+        return false;
+      }
+
+      return true;
+
+    } catch (error) {
+      console.error('Error in saveProcedureRecordFixed:', error);
+      return false;
     }
   }
 }

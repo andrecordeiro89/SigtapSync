@@ -21,6 +21,8 @@ interface ProcedureData {
   procedure_sequence: number;
   procedure_code: string;
   procedure_description?: string;
+  displayName?: string;
+  fullDescription?: string;
   match_status: 'pending' | 'approved' | 'rejected' | 'removed';
   match_confidence?: number;
   value_charged?: number;
@@ -113,12 +115,18 @@ const ProcedureInlineCard = ({
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
-    }).format(value / 100); // Assumindo valor em centavos
+    }).format(value / 100);
   };
 
   const config = getStatusConfig();
   const StatusIcon = config.icon;
   const isRemoved = procedure.match_status === 'removed';
+
+  // Obter descrição do procedimento
+  const procedureDescription = procedure.procedure_description || 
+    procedure.displayName || 
+    procedure.sigtap_procedures?.description || 
+    'Descrição não disponível';
 
   return (
     <Card className={`transition-all duration-300 hover:shadow-md ${config.bgColor} ${isRemoved ? 'opacity-75' : ''}`}>
@@ -126,16 +134,11 @@ const ProcedureInlineCard = ({
         <div className="flex items-center justify-between">
           {/* Informações Principais */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center space-x-3 mb-2">
-              {/* Código e Sequência */}
-              <div className="flex items-center space-x-2">
-                <Badge variant="outline" className="font-mono text-xs">
-                  #{procedure.procedure_sequence}
-                </Badge>
-                <span className="font-mono text-sm font-semibold text-gray-900">
-                  {procedure.procedure_code}
-                </span>
-              </div>
+            <div className="flex items-center space-x-3 mb-3">
+              {/* Sequência */}
+              <Badge variant="outline" className="font-mono text-xs">
+                #{procedure.procedure_sequence}
+              </Badge>
               
               {/* Status Badge */}
               <Badge className={`flex items-center space-x-1 ${config.badgeColor}`}>
@@ -152,24 +155,29 @@ const ProcedureInlineCard = ({
               )}
             </div>
 
-            {/* Descrição */}
-            <div className="mb-2">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {procedure.procedure_description || 
-                 procedure.sigtap_procedures?.description || 
-                 `Procedimento ${procedure.procedure_code}`}
-              </p>
-              
-              {/* Profissional */}
-              {procedure.professional && (
-                <div className="flex items-center space-x-1 mt-1">
-                  <User className="w-3 h-3 text-gray-400" />
-                  <span className="text-xs text-gray-600">
-                    {procedure.professional} ({procedure.professional_cbo})
-                  </span>
+            {/* 🎯 CÓDIGO E DESCRIÇÃO - FORMATO MELHORADO */}
+            <div className="mb-3">
+              <div className="flex items-start space-x-3">
+                <span className="font-mono text-sm font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-md border border-blue-200 shrink-0">
+                  {procedure.procedure_code}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 leading-relaxed">
+                    {procedureDescription}
+                  </p>
                 </div>
-              )}
+              </div>
             </div>
+              
+            {/* Profissional */}
+            {procedure.professional && (
+              <div className="flex items-center space-x-1 mb-2">
+                <User className="w-3 h-3 text-gray-400" />
+                <span className="text-xs text-gray-600">
+                  {procedure.professional} {procedure.professional_cbo && `(${procedure.professional_cbo})`}
+                </span>
+              </div>
+            )}
 
             {/* Valor */}
             {procedure.value_charged && (
@@ -199,18 +207,16 @@ const ProcedureInlineCard = ({
                 </Button>
               ) : (
                 // Ações para procedimento ativo
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onRemove && handleAction(() => onRemove(procedure), 'Remover')}
-                    disabled={isLoading}
-                    className="h-8 px-2 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 border-yellow-200"
-                    title="Remover temporariamente"
-                  >
-                    <AlertTriangle className={`w-3 h-3 ${isLoading ? 'animate-pulse' : ''}`} />
-                  </Button>
-                </>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onRemove && handleAction(() => onRemove(procedure), 'Remover')}
+                  disabled={isLoading}
+                  className="h-8 px-2 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 border-yellow-200"
+                  title="Remover temporariamente"
+                >
+                  <AlertTriangle className={`w-3 h-3 ${isLoading ? 'animate-pulse' : ''}`} />
+                </Button>
               )}
               
               {/* Exclusão permanente - sempre disponível */}
@@ -241,7 +247,7 @@ const ProcedureInlineCard = ({
 
         {/* Complexidade SIGTAP (se disponível) */}
         {procedure.sigtap_procedures?.complexity && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
+          <div className="mt-3 pt-2 border-t border-gray-100">
             <span className="text-xs text-gray-500">
               Complexidade: <span className="font-medium">{procedure.sigtap_procedures.complexity}</span>
             </span>

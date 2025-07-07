@@ -6,13 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Stethoscope, Settings, AlertTriangle, RotateCcw, Info } from 'lucide-react';
+import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Stethoscope, Settings, AlertTriangle, RotateCcw, Info, Activity } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
 import AIHProcedureManager from './AIHProcedureManager';
 import AIHExecutiveSummary from './AIHExecutiveSummary';
 import ProcedureInlineCard from './ProcedureInlineCard';
 import { formatCurrency as baseCurrency } from '../utils/validation';
+import { useToast } from '@/hooks/use-toast';
 
 // 🔧 CORREÇÃO: Função para formatar valores que vêm em centavos
 const formatCurrency = (value: number | undefined | null): string => {
@@ -21,7 +22,6 @@ const formatCurrency = (value: number | undefined | null): string => {
   const realValue = value >= 1000 ? value / 100 : value;
   return baseCurrency(realValue);
 };
-import { useToast } from '@/components/ui/use-toast';
 
 // Tipos de dados
 interface Patient {
@@ -142,6 +142,13 @@ const PatientManagement = () => {
   // Estados para exclusão completa
   const [completeDeleteDialogOpen, setCompleteDeleteDialogOpen] = useState(false);
   const [aihToCompleteDelete, setAihToCompleteDelete] = useState<{id: string, name: string, patientName: string} | null>(null);
+
+  // NOVOS ESTADOS: Diagnóstico e Sincronização
+  const [diagnosticModalOpen, setDiagnosticModalOpen] = useState(false);
+  const [diagnosticData, setDiagnosticData] = useState<any>(null);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResults, setSyncResults] = useState<any>(null);
 
   useEffect(() => {
     if (currentHospitalId) {
@@ -450,6 +457,67 @@ const PatientManagement = () => {
     return new Date(date).toLocaleDateString('pt-BR');
   };
 
+  // NOVA FUNÇÃO: Executar diagnóstico
+  const handleRunDiagnostic = async () => {
+    if (!currentHospitalId) return;
+    
+    setIsDiagnosing(true);
+    try {
+      console.log('🔍 Executando diagnóstico de procedimentos...');
+      const diagnostic = await persistenceService.diagnoseProceduresData(currentHospitalId);
+      setDiagnosticData(diagnostic);
+      
+      toast({
+        title: "Diagnóstico Concluído",
+        description: `${diagnostic.aihs.total} AIHs analisadas, ${diagnostic.procedures.total} procedimentos encontrados`,
+      });
+    } catch (error) {
+      console.error('❌ Erro no diagnóstico:', error);
+      toast({
+        title: "Erro no Diagnóstico",
+        description: "Falha ao executar diagnóstico do sistema",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDiagnosing(false);
+    }
+  };
+
+  // NOVA FUNÇÃO: Executar sincronização
+  const handleRunSync = async (dryRun: boolean = false) => {
+    if (!currentHospitalId) return;
+    
+    setIsSyncing(true);
+    try {
+      console.log(`🔄 Executando sincronização ${dryRun ? '(simulação)' : ''}...`);
+      const syncResult = await persistenceService.syncMissingProcedures(currentHospitalId, {
+        dryRun,
+        maxAIHs: 50
+      });
+      
+      setSyncResults(syncResult);
+      
+      if (!dryRun) {
+        // Recarregar dados após sincronização real
+        await loadAllData();
+      }
+      
+      toast({
+        title: dryRun ? "Simulação Concluída" : "Sincronização Concluída",
+        description: `${syncResult.synchronized}/${syncResult.processed} AIHs ${dryRun ? 'seriam sincronizadas' : 'sincronizadas'}`,
+      });
+    } catch (error) {
+      console.error('❌ Erro na sincronização:', error);
+      toast({
+        title: "Erro na Sincronização",
+        description: "Falha ao executar sincronização de procedimentos",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -488,6 +556,19 @@ const PatientManagement = () => {
               <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Atualizar
             </Button>
+            
+            {/* NOVO: Botão de Diagnóstico */}
+            {(user?.role === 'admin' || user?.role === 'developer') && (
+              <Button 
+                onClick={() => setDiagnosticModalOpen(true)}
+                variant="outline"
+                size="sm"
+                className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              >
+                <Activity className="w-4 h-4 mr-2" />
+                Diagnóstico
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -994,6 +1075,194 @@ const PatientManagement = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* NOVO: Modal de Diagnóstico e Sincronização */}
+      <Dialog open={diagnosticModalOpen} onOpenChange={setDiagnosticModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Activity className="w-5 h-5 text-blue-600" />
+              <span>Diagnóstico e Sincronização de Procedimentos</span>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="overflow-y-auto max-h-[calc(80vh-120px)] space-y-6">
+            {/* Seção de Diagnóstico */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-gray-900">Diagnóstico do Sistema</h3>
+                  <Button 
+                    onClick={handleRunDiagnostic}
+                    disabled={isDiagnosing}
+                    size="sm"
+                  >
+                    {isDiagnosing ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                    ) : (
+                      <Search className="w-4 h-4 mr-2" />
+                    )}
+                    {isDiagnosing ? 'Analisando...' : 'Executar Diagnóstico'}
+                  </Button>
+                </div>
+
+                {diagnosticData && (
+                  <div className="space-y-4">
+                    {/* Estatísticas de AIHs */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="bg-blue-50 p-3 rounded-lg">
+                        <p className="text-xs text-blue-600">Total AIHs</p>
+                        <p className="text-lg font-bold text-blue-800">{diagnosticData.aihs.total}</p>
+                      </div>
+                      <div className="bg-green-50 p-3 rounded-lg">
+                        <p className="text-xs text-green-600">Com Procedimentos</p>
+                        <p className="text-lg font-bold text-green-800">{diagnosticData.aihs.withProcedures}</p>
+                      </div>
+                      <div className="bg-red-50 p-3 rounded-lg">
+                        <p className="text-xs text-red-600">Sem Procedimentos</p>
+                        <p className="text-lg font-bold text-red-800">{diagnosticData.aihs.withoutProcedures}</p>
+                      </div>
+                      <div className="bg-yellow-50 p-3 rounded-lg">
+                        <p className="text-xs text-yellow-600">Inconsistentes</p>
+                        <p className="text-lg font-bold text-yellow-800">{diagnosticData.aihs.inconsistent}</p>
+                      </div>
+                    </div>
+
+                    {/* Estatísticas de Procedimentos */}
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <h4 className="font-medium text-gray-900 mb-2">Procedimentos</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+                        <span>Total: <strong>{diagnosticData.procedures.total}</strong></span>
+                        <span>Pendentes: <strong>{diagnosticData.procedures.pending}</strong></span>
+                        <span>Aprovados: <strong>{diagnosticData.procedures.approved}</strong></span>
+                        <span>Rejeitados: <strong>{diagnosticData.procedures.rejected}</strong></span>
+                        <span>Removidos: <strong>{diagnosticData.procedures.removed}</strong></span>
+                      </div>
+                    </div>
+
+                    {/* Problemas e Recomendações */}
+                    {(diagnosticData.issues.length > 0 || diagnosticData.recommendations.length > 0) && (
+                      <div className="space-y-3">
+                        {diagnosticData.issues.length > 0 && (
+                          <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
+                            <h4 className="font-medium text-red-900 mb-2 flex items-center">
+                              <AlertTriangle className="w-4 h-4 mr-2" />
+                              Problemas Identificados ({diagnosticData.issues.length})
+                            </h4>
+                            <ul className="text-sm text-red-700 space-y-1">
+                              {diagnosticData.issues.slice(0, 5).map((issue: string, index: number) => (
+                                <li key={index}>• {issue}</li>
+                              ))}
+                              {diagnosticData.issues.length > 5 && (
+                                <li className="italic">... e mais {diagnosticData.issues.length - 5} problemas</li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+
+                        {diagnosticData.recommendations.length > 0 && (
+                          <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                            <h4 className="font-medium text-blue-900 mb-2 flex items-center">
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Recomendações ({diagnosticData.recommendations.length})
+                            </h4>
+                            <ul className="text-sm text-blue-700 space-y-1">
+                              {diagnosticData.recommendations.map((rec: string, index: number) => (
+                                <li key={index}>• {rec}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Seção de Sincronização */}
+            {diagnosticData && diagnosticData.aihs.withoutProcedures > 0 && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-gray-900">Sincronização de Procedimentos</h3>
+                    <div className="flex space-x-2">
+                      <Button 
+                        onClick={() => handleRunSync(true)}
+                        disabled={isSyncing}
+                        variant="outline"
+                        size="sm"
+                      >
+                        {isSyncing ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+                        ) : (
+                          <Eye className="w-4 h-4 mr-2" />
+                        )}
+                        Simular
+                      </Button>
+                      <Button 
+                        onClick={() => handleRunSync(false)}
+                        disabled={isSyncing}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {isSyncing ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        ) : (
+                          <Download className="w-4 h-4 mr-2" />
+                        )}
+                        Executar Sincronização
+                      </Button>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-gray-600 mb-4">
+                    Esta operação criará procedimentos principais para AIHs que não possuem procedimentos cadastrados.
+                  </p>
+
+                  {syncResults && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-blue-50 p-3 rounded-lg text-center">
+                          <p className="text-xs text-blue-600">Processadas</p>
+                          <p className="text-lg font-bold text-blue-800">{syncResults.processed}</p>
+                        </div>
+                        <div className="bg-green-50 p-3 rounded-lg text-center">
+                          <p className="text-xs text-green-600">Sincronizadas</p>
+                          <p className="text-lg font-bold text-green-800">{syncResults.synchronized}</p>
+                        </div>
+                        <div className="bg-red-50 p-3 rounded-lg text-center">
+                          <p className="text-xs text-red-600">Erros</p>
+                          <p className="text-lg font-bold text-red-800">{syncResults.errors.length}</p>
+                        </div>
+                      </div>
+
+                      {syncResults.details.length > 0 && (
+                        <div className="bg-gray-50 p-3 rounded-lg max-h-48 overflow-y-auto">
+                          <h4 className="font-medium text-gray-900 mb-2">Detalhes da Sincronização</h4>
+                          <div className="space-y-1 text-sm">
+                            {syncResults.details.slice(0, 10).map((detail: any, index: number) => (
+                              <div key={index} className={`flex justify-between ${
+                                detail.status === 'success' ? 'text-green-700' : 'text-red-700'
+                              }`}>
+                                <span>AIH {detail.aihNumber}</span>
+                                <span>{detail.message}</span>
+                              </div>
+                            ))}
+                            {syncResults.details.length > 10 && (
+                              <p className="italic text-gray-500">... e mais {syncResults.details.length - 10} registros</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

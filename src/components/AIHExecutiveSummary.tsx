@@ -158,29 +158,19 @@ const AIHExecutiveSummary = ({ aih, onRefresh, className = "" }: AIHExecutiveSum
         )}
       </div>
 
-      {/* Grid de Estatísticas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      {/* Grid de Estatísticas - SIMPLIFICADO PARA 3 CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Total de Procedimentos */}
         <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="p-3">
-            <div className="flex items-center space-x-2">
-              <FileText className="w-4 h-4 text-blue-600" />
-              <div>
-                <p className="text-xs text-blue-600 font-medium">Total</p>
-                <p className="text-lg font-bold text-blue-800">{stats.total}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Pendentes */}
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="p-3">
-            <div className="flex items-center space-x-2">
-              <Clock className={`w-4 h-4 text-yellow-600 ${stats.pending > 0 ? 'animate-pulse' : ''}`} />
-              <div>
-                <p className="text-xs text-yellow-600 font-medium">Pendentes</p>
-                <p className="text-lg font-bold text-yellow-800">{stats.pending}</p>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <FileText className="w-5 h-5 text-blue-600" />
+              <div className="flex-1">
+                <p className="text-sm text-blue-600 font-medium">Total Procedimentos</p>
+                <p className="text-2xl font-bold text-blue-800">{stats.total}</p>
+                <p className="text-xs text-blue-500 mt-1">
+                  {stats.totalActive} ativos
+                </p>
               </div>
             </div>
           </CardContent>
@@ -188,25 +178,15 @@ const AIHExecutiveSummary = ({ aih, onRefresh, className = "" }: AIHExecutiveSum
 
         {/* Aprovados */}
         <Card className="border-green-200 bg-green-50">
-          <CardContent className="p-3">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <div>
-                <p className="text-xs text-green-600 font-medium">Aprovados</p>
-                <p className="text-lg font-bold text-green-800">{stats.approved}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Rejeitados */}
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-3">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="w-4 h-4 text-red-600" />
-              <div>
-                <p className="text-xs text-red-600 font-medium">Rejeitados</p>
-                <p className="text-lg font-bold text-red-800">{stats.rejected}</p>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <div className="flex-1">
+                <p className="text-sm text-green-600 font-medium">Aprovados</p>
+                <p className="text-2xl font-bold text-green-800">{stats.approved}</p>
+                <p className="text-xs text-green-500 mt-1">
+                  {stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0}% do total
+                </p>
               </div>
             </div>
           </CardContent>
@@ -214,28 +194,16 @@ const AIHExecutiveSummary = ({ aih, onRefresh, className = "" }: AIHExecutiveSum
 
         {/* Valor Total */}
         <Card className="border-emerald-200 bg-emerald-50">
-          <CardContent className="p-3">
-            <div className="flex items-center space-x-2">
-              <DollarSign className="w-4 h-4 text-emerald-600" />
-              <div>
-                <p className="text-xs text-emerald-600 font-medium">Valor</p>
-                <p className="text-sm font-bold text-emerald-800">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <DollarSign className="w-5 h-5 text-emerald-600" />
+              <div className="flex-1">
+                <p className="text-sm text-emerald-600 font-medium">Valor Total</p>
+                <p className="text-xl font-bold text-emerald-800">
                   {formatCurrency(stats.totalValue)}
                 </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Taxa de Processamento */}
-        <Card className="border-purple-200 bg-purple-50">
-          <CardContent className="p-3">
-            <div className="flex items-center space-x-2">
-              <Target className="w-4 h-4 text-purple-600" />
-              <div>
-                <p className="text-xs text-purple-600 font-medium">Taxa</p>
-                <p className="text-lg font-bold text-purple-800">
-                  {formatPercentage(stats.processingRate)}
+                <p className="text-xs text-emerald-500 mt-1">
+                  Procedimentos ativos
                 </p>
               </div>
             </div>
@@ -243,67 +211,15 @@ const AIHExecutiveSummary = ({ aih, onRefresh, className = "" }: AIHExecutiveSum
         </Card>
       </div>
 
-      {/* Indicadores Avançados */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {/* Confiança Média */}
-        <Card className="border-indigo-200 bg-indigo-50">
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Zap className="w-4 h-4 text-indigo-600" />
-                <div>
-                  <p className="text-xs text-indigo-600 font-medium">Confiança Média</p>
-                  <p className="text-lg font-bold text-indigo-800">
-                    {formatPercentage(stats.averageConfidence * 100)}
-                  </p>
-                </div>
-              </div>
-              <div className="w-2 h-8 bg-indigo-200 rounded-full overflow-hidden">
-                <div 
-                  className="bg-indigo-600 rounded-full transition-all duration-500"
-                  style={{ height: `${stats.averageConfidence * 100}%` }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Profissionais Únicos */}
-        <Card className="border-teal-200 bg-teal-50">
-          <CardContent className="p-3">
-            <div className="flex items-center space-x-2">
-              <Users className="w-4 h-4 text-teal-600" />
-              <div>
-                <p className="text-xs text-teal-600 font-medium">Profissionais</p>
-                <p className="text-lg font-bold text-teal-800">{stats.uniqueProfessionals}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Status da AIH */}
-        <Card className="border-slate-200 bg-slate-50">
-          <CardContent className="p-3">
-            <div className="flex items-center space-x-2">
-              <Shield className="w-4 h-4 text-slate-600" />
-              <div>
-                <p className="text-xs text-slate-600 font-medium">Status AIH</p>
-                <p className="text-sm font-bold text-slate-800 capitalize">{aih.status}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Alertas e Observações */}
+      {/* Alertas Críticos - Simplificado */}
       {(stats.rejected > 0 || stats.pending > stats.total * 0.5) && (
         <Card className="border-amber-200 bg-amber-50">
           <CardContent className="p-3">
             <div className="flex items-start space-x-2">
               <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
               <div className="flex-1">
-                <p className="text-xs text-amber-600 font-medium mb-1">Atenção Necessária</p>
-                <div className="text-xs text-amber-700 space-y-1">
+                <p className="text-sm text-amber-600 font-medium mb-1">Atenção Necessária</p>
+                <div className="text-sm text-amber-700 space-y-1">
                   {stats.rejected > 0 && (
                     <p>• {stats.rejected} procedimento(s) rejeitado(s) necessitam revisão</p>
                   )}
