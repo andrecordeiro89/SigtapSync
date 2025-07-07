@@ -355,7 +355,7 @@ export interface ProcedureAIH {
   descricao?: string;
   
   // Campos do matching
-  matchStatus: 'pending' | 'matched' | 'manual' | 'rejected';
+  matchStatus: 'pending' | 'matched' | 'manual' | 'rejected' | 'approved';
   matchConfidence?: number;
   sigtapProcedure?: SigtapProcedure;
   valorCalculado?: number;

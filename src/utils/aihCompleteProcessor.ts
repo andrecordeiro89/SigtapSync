@@ -275,8 +275,9 @@ export class AIHCompleteProcessor {
           data: match[8]?.trim() || '',
           descricao: match[9]?.trim() || '',
           
-          // Status inicial
-          matchStatus: 'pending'
+          // Status inicial - APROVADO por padrão
+          matchStatus: 'approved',
+          aprovado: true
         };
 
         if (procedimento.procedimento) {
@@ -315,7 +316,8 @@ export class AIHCompleteProcessor {
               aceitar: true,
               data: datasMatch?.[index] || '',
               descricao: `Procedimento ${codigo}`,
-              matchStatus: 'pending'
+              matchStatus: 'approved',
+              aprovado: true
             };
             
             procedimentos.push(procedimento);
@@ -483,7 +485,8 @@ export class AIHCompleteProcessor {
           aceitar: this.findAcceptField(parts),
           data: this.findDateField(parts) || '',
           descricao: this.findDescriptionField(parts, line) || '',
-          matchStatus: 'pending'
+          matchStatus: 'approved',
+          aprovado: true
         };
         
         procedimentos.push(procedimento);

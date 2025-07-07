@@ -29,7 +29,8 @@ import {
   Stethoscope,
   Database,
   Settings,
-  Save
+  Save,
+  Trash2
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -174,8 +175,35 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     });
   };
 
-  // Função para remover procedimento
+  // Função para remover procedimento (temporariamente)
   const handleRemoveProcedure = (sequencia: number) => {
+    const updatedProcedimentos = aihCompleta.procedimentos.map(proc =>
+      proc.sequencia === sequencia 
+        ? { ...proc, matchStatus: 'rejected' as const, aprovado: false }
+        : proc
+    );
+
+    const updatedAIH = calculateTotalsWithPercentage(updatedProcedimentos);
+    onUpdateAIH(updatedAIH);
+
+    toast({
+      title: "⚠️ Procedimento removido",
+      description: `Procedimento ${sequencia} foi marcado como rejeitado`,
+      variant: "destructive"
+    });
+  };
+  
+  // Função para excluir procedimento (permanentemente)
+  const handleDeleteProcedure = (sequencia: number) => {
+    const procedureToDelete = aihCompleta.procedimentos.find(p => p.sequencia === sequencia);
+    
+    if (!procedureToDelete) return;
+    
+    // Confirmar exclusão
+    if (!confirm(`Tem certeza que deseja EXCLUIR PERMANENTEMENTE o procedimento ${procedureToDelete.procedimento}?\n\nEsta ação não pode ser desfeita!`)) {
+      return;
+    }
+    
     const updatedProcedimentos = aihCompleta.procedimentos.filter(proc => proc.sequencia !== sequencia);
     
     // Resequenciar procedimentos
@@ -188,9 +216,30 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     onUpdateAIH(updatedAIH);
 
     toast({
-      title: "🗑️ Procedimento removido",
-      description: `Procedimento removido com sucesso`
+      title: "🗑️ Procedimento excluído",
+      description: `Procedimento ${procedureToDelete.procedimento} foi excluído permanentemente`,
+      variant: "destructive"
     });
+  };
+  
+  // Função para mostrar detalhes do procedimento
+  const handleShowProcedureDetails = (procedure: ProcedureAIH) => {
+    const details = [
+      `Sequência: ${procedure.sequencia}`,
+      `Código: ${procedure.procedimento}`,
+      `Descrição: ${procedure.descricao || 'N/A'}`,
+      `Data: ${procedure.data}`,
+      `CBO: ${procedure.cbo}`,
+      `Profissional: ${procedure.documentoProfissional}`,
+      `Participação: ${procedure.participacao}`,
+      `CNES: ${procedure.cnes}`,
+      `Status: ${procedure.matchStatus}`,
+      `Aprovado: ${procedure.aprovado ? 'Sim' : 'Não'}`,
+      `Valor Calculado: R$ ${(procedure.valorCalculado || 0).toFixed(2)}`,
+      `Confiança: ${procedure.matchConfidence ? (procedure.matchConfidence * 100).toFixed(1) + '%' : 'N/A'}`
+    ].join('\n');
+    
+    alert(`DETALHES DO PROCEDIMENTO:\n\n${details}`);
   };
 
   // Função para calcular totais aplicando lógica de porcentagem SUS
@@ -960,15 +1009,40 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                         </Button>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveProcedure(procedure.sequencia)}
-                          className="h-6 w-6 p-0 hover:bg-red-100 text-red-500 hover:text-red-700"
-                          title="Remover procedimento"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center justify-center space-x-1">
+                          {/* Botão Remover (amarelo) */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRemoveProcedure(procedure.sequencia)}
+                            className="h-7 px-2 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 border-yellow-200"
+                            title="Remover temporariamente"
+                          >
+                            <AlertTriangle className="w-3 h-3" />
+                          </Button>
+                          
+                          {/* Botão Excluir (vermelho) */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteProcedure(procedure.sequencia)}
+                            className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            title="Excluir permanentemente"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                          
+                          {/* Botão Info */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleShowProcedureDetails(procedure)}
+                            className="h-7 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200"
+                            title="Ver detalhes"
+                          >
+                            <Info className="w-3 h-3" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                     
@@ -1412,16 +1486,17 @@ const AIHMultiPageTester = () => {
       
       if (matchingResult.success) {
         // Atualizar procedimentos com resultados do matching
+        // TODOS os procedimentos são APROVADOS por padrão (conforme solicitação do operador)
         const updatedProcedimentos = aihData.procedimentos.map((proc, index) => {
           const matchDetail = matchingResult.matchingDetails[index];
           return {
             ...proc,
-            matchStatus: matchDetail.encontrado ? 'matched' as const : 'pending' as const,
+            matchStatus: matchDetail.encontrado ? 'matched' as const : 'approved' as const,
             matchConfidence: matchDetail.confidence,
             sigtapProcedure: matchDetail.sigtapMatch,
             valorCalculado: matchDetail.sigtapMatch?.valueHospTotal || 0,
             valorOriginal: matchDetail.sigtapMatch?.valueHospTotal || 0,
-            aprovado: matchDetail.encontrado
+            aprovado: true // SEMPRE aprovado
           };
         });
 
@@ -1429,8 +1504,8 @@ const AIHMultiPageTester = () => {
         const updatedAIH: AIHComplete = {
           ...aihData,
           procedimentos: updatedProcedimentos,
-          procedimentosAprovados: updatedProcedimentos.filter(p => p.aprovado).length,
-          procedimentosRejeitados: updatedProcedimentos.filter(p => !p.aprovado && p.matchStatus === 'pending').length,
+          procedimentosAprovados: updatedProcedimentos.length, // TODOS aprovados
+          procedimentosRejeitados: 0, // ZERO rejeitados por padrão
           valorTotalCalculado: matchingResult.valorTotalCalculado,
           statusGeral: 'aguardando_revisao'
         };

@@ -6,10 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Stethoscope, Settings, AlertTriangle, RotateCcw, Info, Activity } from 'lucide-react';
+import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
-import AIHProcedureManager from './AIHProcedureManager';
+
 import AIHExecutiveSummary from './AIHExecutiveSummary';
 import ProcedureInlineCard from './ProcedureInlineCard';
 import { formatCurrency as baseCurrency } from '../utils/validation';
@@ -101,7 +101,7 @@ interface UnifiedAIHData extends AIH {
 }
 
 const PatientManagement = () => {
-  const { user, hasFullAccess } = useAuth();
+  const { user, hasFullAccess, canManageProcedures } = useAuth();
   const currentHospitalId = user?.hospital_id;
   const { toast } = useToast();
   const persistenceService = new AIHPersistenceService();
@@ -132,8 +132,7 @@ const PatientManagement = () => {
   const [itemToDelete, setItemToDelete] = useState<{type: 'patient' | 'aih', id: string, name: string} | null>(null);
 
   // Estados para gerenciamento de procedimentos
-  const [procedureManagerOpen, setProcedureManagerOpen] = useState(false);
-  const [selectedAIHForProcedures, setSelectedAIHForProcedures] = useState<UnifiedAIHData | null>(null);
+
 
   // Estados para gerenciamento inline de procedimentos
   const [proceduresData, setProceduresData] = useState<{[aihId: string]: any[]}>({});
@@ -264,11 +263,6 @@ const PatientManagement = () => {
       setDeleteDialogOpen(false);
       setItemToDelete(null);
     }
-  };
-
-  const handleOpenProcedureManager = (aih: UnifiedAIHData) => {
-    setSelectedAIHForProcedures(aih);
-    setProcedureManagerOpen(true);
   };
 
   const handleProceduresChanged = () => {
@@ -876,7 +870,7 @@ const PatientManagement = () => {
                         <div className="bg-slate-50 p-4 rounded-lg">
                           <div className="flex items-center justify-between mb-3">
                             <h4 className="font-semibold text-slate-900 flex items-center space-x-2">
-                              <Stethoscope className="w-4 h-4" />
+                              <FileText className="w-4 h-4" />
                               <span>Procedimentos ({proceduresData[item.id].length})</span>
                             </h4>
                             {loadingProcedures[item.id] && (
@@ -889,7 +883,7 @@ const PatientManagement = () => {
                               <ProcedureInlineCard
                                 key={`${procedure.aih_id}_${procedure.procedure_sequence}`}
                                 procedure={procedure}
-                                isReadOnly={!hasFullAccess()}
+                                isReadOnly={!canManageProcedures()}
                                 onRemove={(proc) => handleRemoveProcedure(item.id, proc)}
                                 onDelete={(proc) => handleDeleteProcedure(item.id, proc)}
                                 onRestore={(proc) => handleRestoreProcedure(item.id, proc)}
@@ -903,63 +897,40 @@ const PatientManagement = () => {
                         </div>
                       )}
 
-                      {/* Ações Avançadas */}
-                      <div className="bg-blue-50 p-3 rounded-lg">
-                        <h4 className="font-semibold text-blue-900 mb-3">⚙️ Ações Avançadas</h4>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleOpenProcedureManager(item)}
-                            className="flex items-center space-x-2"
-                          >
-                            <Stethoscope className="w-4 h-4" />
-                            <span>Gerenciar Procedimentos</span>
-                          </Button>
-                          
-                          {/* Botão de Edição (para admins/diretores) */}
-                          {(user?.role === 'admin' || user?.role === 'director') && (
+                      {/* Ações Rápidas da AIH */}
+                      {(user?.role === 'admin' || user?.role === 'director' || user?.role === 'coordinator') && (
+                        <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                          <h4 className="font-semibold text-red-900 mb-3">🗑️ Ações de Exclusão</h4>
+                          <div className="flex flex-wrap gap-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              className="flex items-center space-x-2"
+                              onClick={() => handleDeleteRequest('aih', item.id, item.aih_number)}
+                              className="flex items-center space-x-2 text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
                             >
-                              <Edit className="w-4 h-4" />
-                              <span>Editar AIH</span>
+                              <Trash2 className="w-4 h-4" />
+                              <span>Excluir AIH</span>
                             </Button>
-                          )}
-                          
-                          {/* Botão de Exclusão (para coordenadores, diretores e admins) */}
-                          {(user?.role === 'admin' || user?.role === 'director' || user?.role === 'coordinator') && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDeleteRequest('aih', item.id, item.aih_number)}
-                                className="flex items-center space-x-2 text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                <span>Excluir AIH</span>
-                              </Button>
-                              
-                              {/* NOVO: Exclusão Completa */}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleCompleteDeleteRequest(
-                                  item.id, 
-                                  item.aih_number, 
-                                  item.patients?.name || 'Paciente não identificado'
-                                )}
-                                className="flex items-center space-x-2 text-red-800 hover:text-red-900 border-red-300 hover:border-red-400 bg-red-50 hover:bg-red-100"
-                              >
-                                <AlertTriangle className="w-4 h-4" />
-                                <span>Exclusão Completa</span>
-                              </Button>
-                            </>
-                          )}
+                            
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCompleteDeleteRequest(
+                                item.id, 
+                                item.aih_number, 
+                                item.patients?.name || 'Paciente não identificado'
+                              )}
+                              className="flex items-center space-x-2 text-red-800 hover:text-red-900 border-red-400 hover:border-red-500 bg-red-100 hover:bg-red-200"
+                            >
+                              <AlertTriangle className="w-4 h-4" />
+                              <span>Exclusão Completa</span>
+                            </Button>
+                          </div>
+                          <p className="text-xs text-red-600 mt-2">
+                            💡 <strong>Dica:</strong> Para excluir procedimentos individuais, use os botões nos cards dos procedimentos acima.
+                          </p>
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -994,28 +965,7 @@ const PatientManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Modal de Gerenciamento de Procedimentos */}
-      <Dialog open={procedureManagerOpen} onOpenChange={setProcedureManagerOpen}>
-        <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-              <Stethoscope className="w-5 h-5 text-blue-600" />
-              <span>Gerenciamento de Procedimentos</span>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
-            {selectedAIHForProcedures && (
-              <AIHProcedureManager
-                aihId={selectedAIHForProcedures.id}
-                aihNumber={selectedAIHForProcedures.aih_number}
-                patientName={selectedAIHForProcedures.patients?.name || 'Paciente não identificado'}
-                isReadOnly={!hasFullAccess()}
-                onProceduresChanged={handleProceduresChanged}
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+
 
       {/* Dialog de Confirmação de Deleção */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

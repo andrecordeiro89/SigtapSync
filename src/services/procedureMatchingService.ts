@@ -29,13 +29,15 @@ export class ProcedureMatchingService {
         const matchResult = await this.matchSingleProcedure(procedimento);
         
         // Atualizar procedimento com resultado do matching
+        // TODOS os procedimentos são APROVADOS por padrão (conforme solicitação do operador)
         const updatedProcedimento: ProcedureAIH = {
           ...procedimento,
-          matchStatus: matchResult.encontrado ? 'matched' : 'pending',
+          matchStatus: matchResult.encontrado ? 'matched' : 'approved',
           matchConfidence: matchResult.confidence,
           sigtapProcedure: matchResult.sigtapMatch,
           valorCalculado: matchResult.sigtapMatch?.valueHospTotal || 0,
-          valorOriginal: matchResult.sigtapMatch?.valueHospTotal || 0
+          valorOriginal: matchResult.sigtapMatch?.valueHospTotal || 0,
+          aprovado: true // SEMPRE aprovado
         };
 
         updatedProcedimentos.push(updatedProcedimento);

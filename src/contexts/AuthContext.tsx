@@ -45,6 +45,7 @@ export interface AuthContextType {
   isCoordinator: () => boolean;
   isAuditor: () => boolean;
   isTI: () => boolean;
+  canManageProcedures: () => boolean;
   getCurrentHospital: () => string | null;
   canAccessAllHospitals: () => boolean;
   getAccessibleHospitals: () => string[];
@@ -365,6 +366,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return user?.role === 'ti';
   };
 
+  // Verificar se pode gerenciar procedimentos (incluindo operadores)
+  const canManageProcedures = (): boolean => {
+    if (!user) return false;
+    
+    // Roles com permissão para gerenciar procedimentos
+    const allowedRoles: UserRole[] = ['developer', 'admin', 'director', 'coordinator', 'auditor', 'ti', 'user'];
+    
+    // Verificar role
+    if (allowedRoles.includes(user.role)) return true;
+    
+    // Verificar permissão específica
+    return hasPermission('manage_procedures') || hasPermission('delete_procedures');
+  };
+
   // Obter hospital atual
   const getCurrentHospital = (): string | null => {
     return user?.hospital_id || null;
@@ -386,6 +401,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isCoordinator,
     isAuditor,
     isTI,
+    canManageProcedures,
     getCurrentHospital,
     canAccessAllHospitals,
     getAccessibleHospitals,
