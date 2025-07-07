@@ -653,7 +653,7 @@ export class AIHMatchService {
       .from('aih_matches')
       .select('*')
       .eq('aih_id', aihId)
-      .order('overall_score', { ascending: false });
+      .order('"overall score"', { ascending: false });
     
     if (error) throw error;
     return data || [];
@@ -683,8 +683,8 @@ export class AIHMatchService {
     const { data, error } = await supabase
       .from('aih_matches')
       .select('*')
-      .gte('overall_score', minScore)
-      .order('overall_score', { ascending: false });
+      .gte('"overall score"', minScore)
+      .order('"overall score"', { ascending: false });
     
     if (error) throw error;
     return data || [];

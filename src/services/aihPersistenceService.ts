@@ -1494,7 +1494,7 @@ export class AIHPersistenceService {
       cid_valid: true,        // ✅ CORRIGIDO: era cid_value
       habilitation_valid: true,
       cbo_valid: true,
-      overall_score: Math.round(data.overall_score),
+      "overall score": Math.round(data.overall_score),
       calculated_value_amb: Math.round((data.sigtap_procedure.valueAmb || 0) * 100),
       calculated_value_hosp: Math.round((data.sigtap_procedure.valueHosp || 0) * 100),
       calculated_value_prof: Math.round((data.sigtap_procedure.valueProf || 0) * 100), // ✅ CORRIGIDO: era caculated_value_prof
@@ -1680,6 +1680,247 @@ export class AIHPersistenceService {
   }
 
   /**
+   * NOVO: Exclusão COMPLETA de AIH + Paciente (se não tiver outras AIHs)
+   * Esta função é uma versão mais inteligente que verifica se o paciente
+   * tem outras AIHs antes de excluí-lo também
+   */
+  async deleteCompleteAIH(aihId: string, userId: string, options?: {
+    forceDeletePatient?: boolean;
+    keepAuditTrail?: boolean;
+  }): Promise<{
+    aihDeleted: boolean;
+    patientDeleted: boolean;
+    patientId?: string;
+    patientName?: string;
+    message: string;
+  }> {
+    try {
+      console.log('🗑️ === EXCLUSÃO COMPLETA INICIADA ===');
+      console.log('📋 AIH ID:', aihId);
+      console.log('👤 Usuário:', userId);
+      console.log('⚙️ Opções:', options);
+
+      // 1. Buscar informações da AIH antes de deletar
+      const { data: aihInfo, error: aihInfoError } = await supabase
+        .from('aihs')
+        .select(`
+          id,
+          patient_id,
+          aih_number,
+          procedure_code,
+          admission_date,
+          patients!inner (
+            id,
+            name,
+            cns,
+            hospital_id
+          )
+        `)
+        .eq('id', aihId)
+        .single();
+
+      if (aihInfoError || !aihInfo) {
+        throw new Error(`AIH não encontrada: ${aihId}`);
+      }
+
+      const patientId = aihInfo.patient_id;
+      const patientName = (aihInfo.patients as any).name;
+      const hospitalId = (aihInfo.patients as any).hospital_id;
+
+      console.log('👤 Paciente encontrado:', patientName, `(${patientId})`);
+
+      // 2. Log de auditoria ANTES da exclusão (se requerido)
+      if (options?.keepAuditTrail) {
+        await this.logAuditEvent({
+          action: 'DELETE_COMPLETE_AIH',
+          table_name: 'aihs',
+          record_id: aihId,
+          details: {
+            aih_number: aihInfo.aih_number,
+            patient_id: patientId,
+            patient_name: patientName,
+            procedure_code: aihInfo.procedure_code,
+            deletion_reason: 'Complete deletion requested',
+            force_delete_patient: options?.forceDeletePatient || false
+          },
+          user_id: userId
+        });
+      }
+
+      // 3. Verificar se o paciente tem outras AIHs
+      const { data: otherAIHs, error: otherAIHsError } = await supabase
+        .from('aihs')
+        .select('id, aih_number')
+        .eq('patient_id', patientId)
+        .neq('id', aihId);
+
+      if (otherAIHsError) {
+        console.warn('⚠️ Erro ao verificar outras AIHs:', otherAIHsError);
+      }
+
+      const hasOtherAIHs = otherAIHs && otherAIHs.length > 0;
+      console.log(`🔍 Outras AIHs do paciente: ${hasOtherAIHs ? otherAIHs.length : 0}`);
+
+      // 4. Exclusão dos dados relacionados à AIH
+      console.log('🗑️ Deletando dados relacionados à AIH...');
+
+      // 4a. Deletar registros de auditoria da AIH (se não manter trilha)
+      if (!options?.keepAuditTrail) {
+        const { error: auditError } = await supabase
+          .from('audit_logs')
+          .delete()
+          .eq('record_id', aihId);
+
+        if (auditError) {
+          console.warn('⚠️ Erro ao deletar logs de auditoria:', auditError);
+        }
+      }
+
+      // 4b. Deletar registros de procedimentos
+      const { error: procedureError } = await supabase
+        .from('procedure_records')
+        .delete()
+        .eq('aih_id', aihId);
+
+      if (procedureError) {
+        console.warn('⚠️ Erro ao deletar procedimentos:', procedureError);
+      }
+
+      // 4c. Deletar matches dos procedimentos
+      const { error: matchError } = await supabase
+        .from('aih_matches')
+        .delete()
+        .eq('aih_id', aihId);
+
+      if (matchError) {
+        console.warn('⚠️ Erro ao deletar matches:', matchError);
+      }
+
+      // 5. Deletar a AIH
+      const { error: aihError } = await supabase
+        .from('aihs')
+        .delete()
+        .eq('id', aihId);
+
+      if (aihError) {
+        throw new Error(`Erro ao deletar AIH: ${aihError.message}`);
+      }
+
+      console.log('✅ AIH deletada com sucesso');
+
+      // 6. Decidir se deve deletar o paciente
+      let patientDeleted = false;
+      let shouldDeletePatient = false;
+
+      if (options?.forceDeletePatient) {
+        shouldDeletePatient = true;
+        console.log('🔧 Forçando exclusão do paciente');
+      } else if (!hasOtherAIHs) {
+        shouldDeletePatient = true;
+        console.log('👤 Paciente não tem outras AIHs, será excluído');
+      } else {
+        console.log('👤 Paciente mantido (possui outras AIHs)');
+      }
+
+      // 7. Executar exclusão do paciente se necessário
+      if (shouldDeletePatient) {
+        console.log('🗑️ Deletando paciente...');
+
+        // 7a. Deletar logs de auditoria do paciente (se não manter trilha)
+        if (!options?.keepAuditTrail) {
+          const { error: patientAuditError } = await supabase
+            .from('audit_logs')
+            .delete()
+            .eq('record_id', patientId);
+
+          if (patientAuditError) {
+            console.warn('⚠️ Erro ao deletar logs de auditoria do paciente:', patientAuditError);
+          }
+        }
+
+        // 7b. Deletar todas as AIHs restantes do paciente (se forçado)
+        if (options?.forceDeletePatient && hasOtherAIHs) {
+          console.log('🔥 Forçando exclusão de todas as AIHs do paciente...');
+          
+          for (const otherAIH of otherAIHs) {
+            await this.deleteAIH(otherAIH.id);
+          }
+        }
+
+        // 7c. Deletar o paciente
+        const { error: patientError } = await supabase
+          .from('patients')
+          .delete()
+          .eq('id', patientId);
+
+        if (patientError) {
+          console.warn('⚠️ Erro ao deletar paciente:', patientError);
+        } else {
+          patientDeleted = true;
+          console.log('✅ Paciente deletado com sucesso');
+        }
+      }
+
+      // 8. Log final de auditoria (se requerido)
+      if (options?.keepAuditTrail) {
+        await this.logAuditEvent({
+          action: 'COMPLETE_DELETION_FINISHED',
+          table_name: 'system',
+          record_id: null,
+          details: {
+            aih_id: aihId,
+            patient_id: patientId,
+            patient_deleted: patientDeleted,
+            other_aihs_count: hasOtherAIHs ? otherAIHs.length : 0,
+            final_status: 'SUCCESS'
+          },
+          user_id: userId
+        });
+      }
+
+      // 9. Resultado final
+      const result = {
+        aihDeleted: true,
+        patientDeleted,
+        patientId,
+        patientName,
+        message: patientDeleted 
+          ? `AIH e paciente ${patientName} excluídos completamente`
+          : `AIH excluída. Paciente ${patientName} mantido (possui outras AIHs)`
+      };
+
+      console.log('🎯 === EXCLUSÃO COMPLETA FINALIZADA ===');
+      console.log('📊 Resultado:', result);
+
+      return result;
+
+    } catch (error) {
+      console.error('❌ Erro na exclusão completa:', error);
+
+      // Log de erro (se requerido)
+      if (options?.keepAuditTrail) {
+        try {
+          await this.logAuditEvent({
+            action: 'COMPLETE_DELETION_ERROR',
+            table_name: 'system',
+            record_id: null,
+            details: {
+              aih_id: aihId,
+              error_message: error instanceof Error ? error.message : 'Erro desconhecido',
+              error_stack: error instanceof Error ? error.stack : undefined
+            },
+            user_id: userId
+          });
+        } catch (logError) {
+          console.error('❌ Erro ao registrar log de erro:', logError);
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  /**
    * NOVO: Busca procedimentos individuais por hospital
    */
   async getProcedureRecords(hospitalId: string, filters?: {
@@ -1744,6 +1985,326 @@ export class AIHPersistenceService {
       return data || [];
     } catch (error) {
       console.error('❌ Erro na busca de procedimentos:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * NOVO: Remove um procedimento específico da AIH (marca como removido)
+   */
+  async removeProcedureFromAIH(aihId: string, procedureSequence: number, userId: string): Promise<void> {
+    try {
+      console.log(`🔄 Removendo procedimento ${procedureSequence} da AIH ${aihId}...`);
+
+      // 1. Buscar a AIH atual
+      const { data: aih, error: aihError } = await supabase
+        .from('aihs')
+        .select('*')
+        .eq('id', aihId)
+        .single();
+
+      if (aihError || !aih) {
+        throw new Error(`AIH não encontrada: ${aihId}`);
+      }
+
+      // 2. Atualizar o status do procedimento na tabela procedure_records
+      const { error: updateError } = await supabase
+        .from('procedure_records')
+        .update({
+          match_status: 'removed',
+          updated_at: new Date().toISOString(),
+          updated_by: userId
+        })
+        .eq('aih_id', aihId)
+        .eq('sequencia', procedureSequence);
+
+      if (updateError) {
+        console.warn('⚠️ Erro ao atualizar procedure_records (pode não existir):', updateError);
+      }
+
+      // 3. Log de auditoria
+      await this.logAuditEvent({
+        action: 'REMOVE_PROCEDURE',
+        table_name: 'procedure_records',
+        record_id: `${aihId}_${procedureSequence}`,
+        details: {
+          aihId,
+          procedureSequence,
+          action: 'procedure_removed',
+          removedBy: userId
+        },
+        user_id: userId
+      });
+
+      // 4. Recalcular estatísticas da AIH
+      await this.recalculateAIHStatistics(aihId);
+
+      console.log(`✅ Procedimento ${procedureSequence} removido da AIH ${aihId}`);
+    } catch (error) {
+      console.error('❌ Erro ao remover procedimento:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * NOVO: Exclui permanentemente um procedimento da AIH
+   */
+  async deleteProcedureFromAIH(aihId: string, procedureSequence: number, userId: string): Promise<void> {
+    try {
+      console.log(`🗑️ Excluindo permanentemente procedimento ${procedureSequence} da AIH ${aihId}...`);
+
+      // 1. Log de auditoria ANTES da exclusão
+      await this.logAuditEvent({
+        action: 'DELETE_PROCEDURE',
+        table_name: 'procedure_records',
+        record_id: `${aihId}_${procedureSequence}`,
+        details: {
+          aihId,
+          procedureSequence,
+          action: 'procedure_deleted',
+          deletedBy: userId
+        },
+        user_id: userId
+      });
+
+      // 2. Excluir o procedimento da tabela procedure_records
+      const { error: deleteError } = await supabase
+        .from('procedure_records')
+        .delete()
+        .eq('aih_id', aihId)
+        .eq('sequencia', procedureSequence);
+
+      if (deleteError) {
+        console.warn('⚠️ Erro ao excluir de procedure_records (pode não existir):', deleteError);
+      }
+
+      // 3. Excluir matches relacionados
+      const { error: matchError } = await supabase
+        .from('aih_matches')
+        .delete()
+        .eq('aih_id', aihId)
+        .eq('sequencia', procedureSequence);
+
+      if (matchError) {
+        console.warn('⚠️ Erro ao excluir matches (pode não existir):', matchError);
+      }
+
+      // 4. Recalcular estatísticas da AIH
+      await this.recalculateAIHStatistics(aihId);
+
+      console.log(`✅ Procedimento ${procedureSequence} excluído permanentemente da AIH ${aihId}`);
+    } catch (error) {
+      console.error('❌ Erro ao excluir procedimento:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * NOVO: Restaura um procedimento removido
+   */
+  async restoreProcedureInAIH(aihId: string, procedureSequence: number, userId: string): Promise<void> {
+    try {
+      console.log(`♻️ Restaurando procedimento ${procedureSequence} da AIH ${aihId}...`);
+
+      // 1. Atualizar o status do procedimento
+      const { error: updateError } = await supabase
+        .from('procedure_records')
+        .update({
+          match_status: 'pending',
+          updated_at: new Date().toISOString(),
+          updated_by: userId
+        })
+        .eq('aih_id', aihId)
+        .eq('sequencia', procedureSequence);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // 2. Log de auditoria
+      await this.logAuditEvent({
+        action: 'RESTORE_PROCEDURE',
+        table_name: 'procedure_records',
+        record_id: `${aihId}_${procedureSequence}`,
+        details: {
+          aihId,
+          procedureSequence,
+          action: 'procedure_restored',
+          restoredBy: userId
+        },
+        user_id: userId
+      });
+
+      // 3. Recalcular estatísticas da AIH
+      await this.recalculateAIHStatistics(aihId);
+
+      console.log(`✅ Procedimento ${procedureSequence} restaurado na AIH ${aihId}`);
+    } catch (error) {
+      console.error('❌ Erro ao restaurar procedimento:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * NOVO: Recalcula estatísticas da AIH após mudanças nos procedimentos
+   */
+  private async recalculateAIHStatistics(aihId: string): Promise<void> {
+    try {
+      console.log(`🔄 Recalculando estatísticas da AIH ${aihId}...`);
+
+      // 1. Buscar todos os procedimentos ativos da AIH
+      const { data: procedures, error: procError } = await supabase
+        .from('procedure_records')
+        .select('*')
+        .eq('aih_id', aihId)
+        .neq('match_status', 'removed');
+
+      if (procError) {
+        console.warn('⚠️ Erro ao buscar procedimentos para recálculo:', procError);
+        return;
+      }
+
+      const activeProcedures = procedures || [];
+
+      // 2. Calcular estatísticas
+      const stats = {
+        total_procedures: activeProcedures.length,
+        approved_procedures: activeProcedures.filter(p => p.match_status === 'approved').length,
+        rejected_procedures: activeProcedures.filter(p => p.match_status === 'rejected').length,
+        calculated_total_value: activeProcedures
+          .filter(p => p.match_status === 'approved')
+          .reduce((sum, p) => sum + (p.value_charged || 0), 0),
+        requires_manual_review: activeProcedures.some(p => 
+          p.match_status === 'pending' || 
+          p.match_confidence < 0.8
+        ),
+        processing_status: this.determineProcessingStatus(activeProcedures),
+        updated_at: new Date().toISOString()
+      };
+
+      // 3. Atualizar a AIH
+      const { error: updateError } = await supabase
+        .from('aihs')
+        .update(stats)
+        .eq('id', aihId);
+
+      if (updateError) {
+        console.error('❌ Erro ao atualizar estatísticas da AIH:', updateError);
+      } else {
+        console.log(`✅ Estatísticas da AIH ${aihId} recalculadas:`, stats);
+      }
+    } catch (error) {
+      console.error('❌ Erro no recálculo de estatísticas:', error);
+    }
+  }
+
+  /**
+   * Determina o status de processamento baseado nos procedimentos
+   */
+  private determineProcessingStatus(procedures: any[]): string {
+    if (procedures.length === 0) {
+      return 'completed'; // Sem procedimentos = processada
+    }
+
+    const pendingCount = procedures.filter(p => p.match_status === 'pending').length;
+    const approvedCount = procedures.filter(p => p.match_status === 'approved').length;
+    const rejectedCount = procedures.filter(p => p.match_status === 'rejected').length;
+
+    if (pendingCount > 0) {
+      return 'pending'; // Ainda tem procedimentos pendentes
+    } else if (approvedCount > 0 || rejectedCount > 0) {
+      return 'completed'; // Todos foram revisados
+    } else {
+      return 'processing'; // Em processamento
+    }
+  }
+
+  /**
+   * NOVO: Busca procedimentos de uma AIH específica com detalhes
+   */
+  async getAIHProcedures(aihId: string): Promise<any[]> {
+    try {
+      console.log(`🔍 Buscando procedimentos para AIH: ${aihId}`);
+
+      // STEP 1: Primeiro tentar busca simples para diagnóstico
+      const { data: simpleData, error: simpleError } = await supabase
+        .from('procedure_records')
+        .select('*')
+        .eq('aih_id', aihId)
+        .order('sequencia', { ascending: true });
+
+      if (simpleError) {
+        console.error('❌ Erro na busca simples de procedimentos:', simpleError);
+        throw simpleError;
+      }
+
+      console.log(`📊 Busca simples encontrou ${simpleData?.length || 0} procedimentos`);
+
+      if (!simpleData || simpleData.length === 0) {
+        console.log('⚠️ Nenhum procedimento encontrado na busca simples');
+        return [];
+      }
+
+              // STEP 2: Tentar busca com joins se existem dados
+        try {
+          const { data: fullData, error: fullError } = await supabase
+            .from('procedure_records')
+            .select(`
+              *,
+              sigtap_procedures(
+                code,
+                description,
+                value_hosp_total,
+                complexity
+              )
+            `)
+            .eq('aih_id', aihId)
+            .order('sequencia', { ascending: true });
+
+        if (fullError) {
+          console.warn('⚠️ Erro na busca com joins, usando dados simples:', fullError);
+          return simpleData;
+        }
+
+        console.log(`✅ ${fullData?.length || 0} procedimentos com SIGTAP encontrados`);
+
+                  // STEP 3: Tentar adicionar matches (opcional)
+          try {
+            const { data: matchData, error: matchError } = await supabase
+              .from('aih_matches')
+              .select('"overall score", match_confidence, status, aih_id, procedure_id')
+              .eq('aih_id', aihId);
+
+            if (!matchError && matchData) {
+              // Combinar dados manualmente por procedure_id
+              const enrichedData = fullData?.map(proc => {
+                const matches = matchData.filter(m => 
+                  m.aih_id === proc.aih_id && 
+                  m.procedure_id === proc.procedure_id
+                );
+                
+                return {
+                  ...proc,
+                  aih_matches: matches.length > 0 ? matches : []
+                };
+              });
+
+            console.log(`🎯 Dados enriquecidos com ${matchData.length} matches`);
+            return enrichedData || fullData;
+          }
+        } catch (matchErr) {
+          console.warn('⚠️ Erro ao buscar matches, ignorando:', matchErr);
+        }
+
+        return fullData || simpleData;
+
+      } catch (joinError) {
+        console.warn('⚠️ Erro na busca com joins, usando dados simples:', joinError);
+        return simpleData;
+      }
+
+    } catch (error) {
+      console.error('❌ Erro geral na busca de procedimentos:', error);
       throw error;
     }
   }

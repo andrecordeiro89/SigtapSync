@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Correção - Campo Sequencia</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste de Correção: Campo Sequencia</h1>
+    <p>Testando se a correção <code>procedure_sequence → sequencia</code> resolveu o erro 400.</p>
+    
+    <button onclick="testProcedureQuery()">🧪 Testar Query Corrigida</button>
+    <button onclick="clearResults()">🧹 Limpar Resultados</button>
+    
+    <div id="results"></div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        // Configuração do Supabase (usar suas variáveis reais)
+        const supabaseUrl = 'https://fvtfxunakabdrlkocdme.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2dGZ4dW5ha2FiZHJsa29jZG1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMyNDI2NzcsImV4cCI6MjA0ODgxODY3N30.xpZiYGaHSfKHzwOePmSoIxYmPFWw4U6GInupvkVyDHU';
+        
+        window.supabase = createClient(supabaseUrl, supabaseKey);
+        
+        window.testProcedureQuery = async function() {
+            const results = document.getElementById('results');
+            const aihId = 'b9fc1770-aa93-4430-a34c-d2f6b39e0a78';
+            
+            addResult('🔄 Iniciando teste da query corrigida...', 'info');
+            
+            try {
+                console.log('🔍 Testando busca com campo correto: sequencia');
+                
+                // Teste 1: Busca simples com campo correto
+                const { data: simpleData, error: simpleError } = await supabase
+                    .from('procedure_records')
+                    .select('*')
+                    .eq('aih_id', aihId)
+                    .order('sequencia', { ascending: true });
+                
+                if (simpleError) {
+                    addResult(`❌ ERRO na busca simples: ${simpleError.message}`, 'error');
+                    console.error('Erro:', simpleError);
+                    return;
+                }
+                
+                addResult(`✅ Busca simples FUNCIONOU! Encontrados ${simpleData?.length || 0} procedimentos`, 'success');
+                
+                if (simpleData && simpleData.length > 0) {
+                    addResult(`📋 Estrutura do primeiro procedimento:`, 'info');
+                    addResult(`<pre>${JSON.stringify(simpleData[0], null, 2)}</pre>`, 'info');
+                    
+                    // Teste 2: Verificar quais campos realmente existem
+                    const firstRecord = simpleData[0];
+                    const fields = Object.keys(firstRecord);
+                    addResult(`📊 Campos disponíveis na tabela: ${fields.join(', ')}`, 'info');
+                    
+                    // Teste 3: Verificar se sequencia existe
+                    if ('sequencia' in firstRecord) {
+                        addResult(`✅ Campo 'sequencia' confirmado! Valor: ${firstRecord.sequencia}`, 'success');
+                    } else {
+                        addResult(`❌ Campo 'sequencia' NÃO existe!`, 'error');
+                    }
+                    
+                    // Teste 4: Tentar busca com joins
+                    try {
+                        const { data: fullData, error: fullError } = await supabase
+                            .from('procedure_records')
+                            .select(`
+                                *,
+                                sigtap_procedures(
+                                    code,
+                                    description,
+                                    value_hosp_total,
+                                    complexity
+                                )
+                            `)
+                            .eq('aih_id', aihId)
+                            .order('sequencia', { ascending: true });
+                        
+                        if (fullError) {
+                            addResult(`⚠️ Busca com joins falhou: ${fullError.message}`, 'error');
+                        } else {
+                            addResult(`✅ Busca com joins FUNCIONOU! ${fullData?.length || 0} registros`, 'success');
+                        }
+                    } catch (joinErr) {
+                        addResult(`⚠️ Erro no teste de joins: ${joinErr.message}`, 'error');
+                    }
+                } else {
+                    addResult(`⚠️ Nenhum procedimento encontrado para a AIH ${aihId}`, 'info');
+                }
+                
+            } catch (error) {
+                addResult(`❌ ERRO GERAL: ${error.message}`, 'error');
+                console.error('Erro geral:', error);
+            }
+        };
+        
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+        };
+        
+        function addResult(message, type) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            
+            // Scroll para o resultado mais recente
+            div.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html> 

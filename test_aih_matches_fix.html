@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Correção - Tabela AIH Matches</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        .warning { background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; max-height: 300px; }
+        .table-info { background: #e7f3ff; border: 1px solid #b3d9ff; padding: 15px; border-radius: 5px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste de Correção: Tabela AIH Matches</h1>
+    
+    <div class="table-info">
+        <h3>📋 Campos Corrigidos na Tabela aih_matches:</h3>
+        <ul>
+            <li><strong>"overall score"</strong> (com espaço) - era <code>overall_score</code></li>
+            <li><strong>calculated_value_amb</strong> - mantido correto</li>
+            <li><strong>calculated_value_hosp</strong> - mantido correto</li>
+            <li><strong>calculated_value_prof</strong> - mantido correto</li>
+            <li><strong>procedure_id</strong> - usado para join em vez de sequencia</li>
+        </ul>
+    </div>
+    
+    <button onclick="testAIHMatches()">🧪 Testar Tabela AIH Matches</button>
+    <button onclick="testProcedureJoin()">🔗 Testar Join com Procedure Records</button>
+    <button onclick="clearResults()">🧹 Limpar Resultados</button>
+    
+    <div id="results"></div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.skypack.dev/@supabase/supabase-js@2';
+        
+        // Configuração do Supabase
+        const supabaseUrl = 'https://fvtfxunakabdrlkocdme.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2dGZ4dW5ha2FiZHJsa29jZG1lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzMyNDI2NzcsImV4cCI6MjA0ODgxODY3N30.xpZiYGaHSfKHzwOePmSoIxYmPFWw4U6GInupvkVyDHU';
+        
+        window.supabase = createClient(supabaseUrl, supabaseKey);
+        
+        window.testAIHMatches = async function() {
+            const aihId = 'b9fc1770-aa93-4430-a34c-d2f6b39e0a78';
+            
+            addResult('🔄 Testando tabela aih_matches...', 'info');
+            
+            try {
+                // Teste 1: Buscar matches simples
+                const { data: matches, error: matchError } = await supabase
+                    .from('aih_matches')
+                    .select('*')
+                    .eq('aih_id', aihId);
+                
+                if (matchError) {
+                    addResult(`❌ ERRO ao buscar matches: ${matchError.message}`, 'error');
+                    return;
+                }
+                
+                addResult(`✅ Busca de matches FUNCIONOU! Encontrados ${matches?.length || 0} matches`, 'success');
+                
+                if (matches && matches.length > 0) {
+                    const firstMatch = matches[0];
+                    addResult(`📋 Estrutura do primeiro match:`, 'info');
+                    addResult(`<pre>${JSON.stringify(firstMatch, null, 2)}</pre>`, 'info');
+                    
+                    // Teste 2: Verificar campo "overall score"
+                    if ('overall score' in firstMatch) {
+                        addResult(`✅ Campo "overall score" encontrado! Valor: ${firstMatch['overall score']}`, 'success');
+                    } else if ('overall_score' in firstMatch) {
+                        addResult(`⚠️ Campo ainda está como "overall_score" (underscore)`, 'warning');
+                    } else {
+                        addResult(`❌ Campo "overall score" NÃO encontrado!`, 'error');
+                    }
+                    
+                    // Teste 3: Verificar campos calculated_value
+                    const calcFields = ['calculated_value_amb', 'calculated_value_hosp', 'calculated_value_prof'];
+                    calcFields.forEach(field => {
+                        if (field in firstMatch) {
+                            addResult(`✅ Campo ${field} encontrado! Valor: ${firstMatch[field]}`, 'success');
+                        } else {
+                            addResult(`❌ Campo ${field} NÃO encontrado!`, 'error');
+                        }
+                    });
+                    
+                    // Teste 4: Order by com campo corrigido
+                    try {
+                        const { data: orderedMatches, error: orderError } = await supabase
+                            .from('aih_matches')
+                            .select('id, "overall score", match_confidence')
+                            .eq('aih_id', aihId)
+                            .order('"overall score"', { ascending: false });
+                        
+                        if (orderError) {
+                            addResult(`❌ ERRO no order by: ${orderError.message}`, 'error');
+                        } else {
+                            addResult(`✅ Order by "overall score" FUNCIONOU! ${orderedMatches?.length || 0} registros ordenados`, 'success');
+                            if (orderedMatches && orderedMatches.length > 0) {
+                                addResult(`📊 Scores ordenados: ${orderedMatches.map(m => m['overall score']).join(', ')}`, 'info');
+                            }
+                        }
+                    } catch (orderErr) {
+                        addResult(`❌ Erro no teste de order by: ${orderErr.message}`, 'error');
+                    }
+                    
+                } else {
+                    addResult(`⚠️ Nenhum match encontrado para a AIH ${aihId}`, 'warning');
+                }
+                
+            } catch (error) {
+                addResult(`❌ ERRO GERAL: ${error.message}`, 'error');
+                console.error('Erro geral:', error);
+            }
+        };
+        
+        window.testProcedureJoin = async function() {
+            const aihId = 'b9fc1770-aa93-4430-a34c-d2f6b39e0a78';
+            
+            addResult('🔄 Testando join procedure_records + aih_matches...', 'info');
+            
+            try {
+                // Buscar procedimentos
+                const { data: procedures, error: procError } = await supabase
+                    .from('procedure_records')
+                    .select('*')
+                    .eq('aih_id', aihId)
+                    .order('sequencia', { ascending: true });
+                
+                if (procError) {
+                    addResult(`❌ ERRO ao buscar procedimentos: ${procError.message}`, 'error');
+                    return;
+                }
+                
+                addResult(`✅ Procedimentos encontrados: ${procedures?.length || 0}`, 'success');
+                
+                if (procedures && procedures.length > 0) {
+                    // Buscar matches para os procedimentos
+                    const { data: matches, error: matchError } = await supabase
+                        .from('aih_matches')
+                        .select('"overall score", match_confidence, status, aih_id, procedure_id')
+                        .eq('aih_id', aihId);
+                    
+                    if (matchError) {
+                        addResult(`❌ ERRO ao buscar matches: ${matchError.message}`, 'error');
+                        return;
+                    }
+                    
+                    addResult(`✅ Matches encontrados: ${matches?.length || 0}`, 'success');
+                    
+                    // Tentar fazer o join manual por procedure_id
+                    if (matches && matches.length > 0) {
+                        const enrichedData = procedures.map(proc => {
+                            const procMatches = matches.filter(m => 
+                                m.aih_id === proc.aih_id && 
+                                m.procedure_id === proc.procedure_id
+                            );
+                            
+                            return {
+                                procedure_code: proc.procedure_code,
+                                procedure_name: proc.procedure_name,
+                                sequencia: proc.sequencia,
+                                matches: procMatches.length
+                            };
+                        });
+                        
+                        addResult(`✅ Join manual FUNCIONOU!`, 'success');
+                        addResult(`📊 Dados enriquecidos:`, 'info');
+                        addResult(`<pre>${JSON.stringify(enrichedData, null, 2)}</pre>`, 'info');
+                        
+                        const totalMatches = enrichedData.reduce((sum, p) => sum + p.matches, 0);
+                        addResult(`📈 Total de matches vinculados: ${totalMatches}`, 'info');
+                    }
+                }
+                
+            } catch (error) {
+                addResult(`❌ ERRO GERAL no join: ${error.message}`, 'error');
+                console.error('Erro no join:', error);
+            }
+        };
+        
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+        };
+        
+        function addResult(message, type) {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            
+            // Scroll para o resultado mais recente
+            div.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html> 
