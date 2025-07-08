@@ -110,7 +110,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
         hospitalIds: selectedHospital === 'all' ? undefined : [selectedHospital],
         specialties: selectedSpecialty === 'all' ? undefined : [selectedSpecialty],
         searchTerm: searchTerm || undefined,
-        isActive: true // Filtrar apenas médicos ativos
+        isActive: true // Filtrar apenas médicos registrados no sistema
       };
 
       const [doctorsResult, doctorsAllResult, specialtiesResult, hospitalStatsResult, doctorStatsResult] = await Promise.all([
@@ -123,7 +123,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
 
       if (doctorsResult.success) {
         setRealDoctors(doctorsResult.data || []);
-        console.log('✅ Médicos ativos carregados:', doctorsResult.data?.length);
+        console.log('✅ Médicos registrados carregados:', doctorsResult.data?.length);
       }
 
       if (doctorsAllResult.success) {
@@ -304,7 +304,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               <FileText className="h-6 w-6 text-yellow-300" />
               )}
             </div>
-            <div className="text-blue-100">Médicos Ativos</div>
+            <div className="text-blue-100">Profissionais Registrados</div>
             <div className="text-sm text-blue-200 mt-1">
               {useRealData ? realSpecialties.length : specialties.length} especialidades
             </div>
@@ -312,139 +312,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
         </div>
       </div>
 
-      {/* CONTROLES PRINCIPAIS */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={handleCreateDoctor}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Adicionar Médico
-          </Button>
-          
-          <Button
-            variant="outline"
-            onClick={handleToggleDataSource}
-            className="flex items-center gap-2"
-          >
-            {useRealData ? (
-              <>
-                <Database className="h-4 w-4" />
-                Dados Reais
-              </>
-            ) : (
-              <>
-                <FileText className="h-4 w-4" />
-                Dados Mock
-              </>
-            )}
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Badge variant={useRealData ? "default" : "secondary"}>
-            {useRealData ? '✅ Persistência Ativa' : '⚠️ Dados de Teste'}
-          </Badge>
-        </div>
-      </div>
-
-      {/* FILTROS EXECUTIVOS */}
-      <ExecutiveDateFilters
-        onDateRangeChange={handleDateRangeChange}
-        onRefresh={handleRefresh}
-        onExport={handleExport}
-        isLoading={isLoading}
-        title="Filtros Médicos"
-        subtitle="Análise temporal e filtros do corpo clínico"
-      />
-
-      {/* FILTROS ADICIONAIS */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filtros Avançados</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Buscar Médicos</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Nome, CRM ou especialidade..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Hospital</label>
-              <Select value={selectedHospital} onValueChange={setSelectedHospital}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o hospital" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Hospitais</SelectItem>
-                  {useRealData ? (
-                    realHospitalStats.map((hospital) => (
-                      <SelectItem key={hospital.hospitalId} value={hospital.hospitalId}>
-                        {hospital.hospitalName}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    hospitalStats.map((hospital) => (
-                      <SelectItem key={hospital.hospitalId} value={hospital.hospitalId}>
-                        {hospital.hospitalName}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Especialidade</label>
-              <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a especialidade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as Especialidades</SelectItem>
-                  {useRealData ? (
-                    realSpecialties.map((specialty) => (
-                      <SelectItem key={specialty.id} value={specialty.name}>
-                        {specialty.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    specialties.map((specialty) => (
-                      <SelectItem key={specialty.id} value={specialty.name}>
-                        {specialty.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* MODAIS */}
-      <DoctorEditModal
-        isOpen={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
-        doctor={editingDoctor}
-        mode={editMode}
-        onSuccess={handleEditSuccess}
-      />
-
-      {/* KPIs MÉDICOS */}
+      {/* KPIs MÉDICOS - POSICIONADOS NO TOPO */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
           <CardContent className="p-4">
@@ -455,7 +323,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                   {isLoading ? '...' : useRealData ? realDoctorsAll.length : kpis.totalDoctors}
                 </p>
                 <p className="text-xs text-blue-500">
-                  {useRealData ? realDoctors.length : kpis.totalDoctors} ativos
+                  {useRealData ? realDoctors.length : kpis.totalDoctors} registrados
                 </p>
               </div>
               <Users className="h-8 w-8 text-blue-600" />
@@ -484,15 +352,15 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-purple-600">Taxa Aprovação</p>
+                <p className="text-sm font-medium text-purple-600">Hospitais</p>
                 <p className="text-2xl font-bold text-purple-800">
-                  {isLoading ? '...' : `${kpis.avgApprovalRate.toFixed(1)}%`}
+                  {isLoading ? '...' : kpis.totalHospitals}
                 </p>
                 <p className="text-xs text-purple-500">
-                  Meta: 90%
+                  Cobertura nacional
                 </p>
               </div>
-              <CheckCircle className="h-8 w-8 text-purple-600" />
+              <Building2 className="h-8 w-8 text-purple-600" />
             </div>
           </CardContent>
         </Card>
@@ -515,7 +383,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
         </Card>
       </div>
 
-      {/* TABS PRINCIPAIS */}
+      {/* TABS PRINCIPAIS - POSICIONADAS LOGO APÓS OS CARDS */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview" className="flex items-center space-x-2">
@@ -762,6 +630,182 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* CONTROLES E FILTROS UNIFICADOS */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Filter className="h-5 w-5" />
+            <span>Controles e Filtros</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* CONTROLES PRINCIPAIS */}
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handleCreateDoctor}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Adicionar Médico
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={handleToggleDataSource}
+                className="flex items-center gap-2"
+              >
+                {useRealData ? (
+                  <>
+                    <Database className="h-4 w-4" />
+                    Dados Reais
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4" />
+                    Dados Mock
+                  </>
+                )}
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={isLoading}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={handleExport}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Exportar
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Badge variant={useRealData ? "default" : "secondary"}>
+                {useRealData ? '✅ Persistência Ativa' : '⚠️ Dados de Teste'}
+              </Badge>
+            </div>
+          </div>
+
+          {/* FILTROS UNIFICADOS */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Search className="h-4 w-4" />
+                Buscar Médicos
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Nome, CRM ou especialidade..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Hospital
+              </label>
+              <Select value={selectedHospital} onValueChange={setSelectedHospital}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o hospital" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Hospitais</SelectItem>
+                  {useRealData ? (
+                    realHospitalStats.map((hospital) => (
+                      <SelectItem key={hospital.hospitalId} value={hospital.hospitalId}>
+                        {hospital.hospitalName}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    hospitalStats.map((hospital) => (
+                      <SelectItem key={hospital.hospitalId} value={hospital.hospitalId}>
+                        {hospital.hospitalName}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Stethoscope className="h-4 w-4" />
+                Especialidade
+              </label>
+              <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a especialidade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as Especialidades</SelectItem>
+                  {useRealData ? (
+                    realSpecialties.map((specialty) => (
+                      <SelectItem key={specialty.id} value={specialty.name}>
+                        {specialty.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    specialties.map((specialty) => (
+                      <SelectItem key={specialty.id} value={specialty.name}>
+                        {specialty.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Período
+              </label>
+              <Select 
+                value={`${Math.floor((dateRange.endDate.getTime() - dateRange.startDate.getTime()) / (1000 * 60 * 60 * 24))}`}
+                onValueChange={(days) => {
+                  const endDate = new Date();
+                  const startDate = new Date(endDate.getTime() - (parseInt(days) * 24 * 60 * 60 * 1000));
+                  setDateRange({ startDate, endDate });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Últimos 7 dias</SelectItem>
+                  <SelectItem value="30">Últimos 30 dias</SelectItem>
+                  <SelectItem value="90">Últimos 90 dias</SelectItem>
+                  <SelectItem value="365">Último ano</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* MODAIS */}
+      <DoctorEditModal
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        doctor={editingDoctor}
+        mode={editMode}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   );
 };

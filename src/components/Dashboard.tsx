@@ -21,6 +21,8 @@ interface HospitalInfo {
 interface DashboardStats {
   totalAIHs: number;
   processedToday: number;
+  hospitals_count?: number;
+  is_admin_mode?: boolean;
 }
 
 const Dashboard = () => {
@@ -74,31 +76,37 @@ const Dashboard = () => {
         setLoading(true);
         console.log('🔄 Carregando dados do dashboard...');
 
-        const hospitalId = canAccessAllHospitals ? undefined : user.hospital_id;
+        // ✅ MODO ADMINISTRADOR: Detectar se usuário tem acesso total
+        const isAdminMode = canAccessAllHospitals || user.full_access || user.hospital_id === 'ALL';
+        const hospitalId = isAdminMode ? 'ALL' : user.hospital_id;
+        
+        console.log(`🔐 Modo de acesso: ${isAdminMode ? 'ADMINISTRADOR (todos os hospitais)' : `USUÁRIO (hospital: ${hospitalId})`}`);
 
         // Carregar dados reais usando AIHPersistenceService
         const persistenceService = new AIHPersistenceService();
         
         // Carregar estatísticas reais do hospital
-        const realStats = await persistenceService.getHospitalStats(hospitalId || user.hospital_id);
+        const realStats = await persistenceService.getHospitalStats(hospitalId);
         
         // Calcular AIHs processadas hoje
         const today = new Date().toISOString().split('T')[0];
-        const todayAIHs = await persistenceService.getAIHs(hospitalId || user.hospital_id, {
+        const todayAIHs = await persistenceService.getAIHs(hospitalId, {
           dateFrom: today,
           dateTo: today,
           limit: 1000
         });
 
         // Buscar atividades recentes (AIHs criadas recentemente)
-        const recentAIHs = await persistenceService.getAIHs(hospitalId || user.hospital_id, {
+        const recentAIHs = await persistenceService.getAIHs(hospitalId, {
           limit: 10
         });
 
         // Processar dados para os cards
         setStats({
           totalAIHs: realStats.total_aihs,
-          processedToday: todayAIHs.length
+          processedToday: todayAIHs.length,
+          hospitals_count: realStats.hospitals_count,
+          is_admin_mode: realStats.is_admin_mode
         });
 
         // Processar atividade recente
@@ -108,7 +116,9 @@ const Dashboard = () => {
           aih_number: aih.aih_number,
           user_name: aih.processed_by_name || 'Sistema',
           user_email: 'operador@sistema.com',
-          hospital_name: hospitalInfo?.name || 'Hospital',
+          hospital_name: isAdminMode 
+            ? (aih.hospitals?.name || 'Hospital N/A')
+            : (hospitalInfo?.name || 'Hospital'),
           created_at: aih.created_at,
           operation_type: 'CREATE',
           patient_name: aih.patients?.name || 'Paciente'
@@ -116,7 +126,7 @@ const Dashboard = () => {
 
         setRecentActivity(processedActivity);
         setRecentAuditLogs(processedActivity);
-        console.log('✅ Dados reais carregados:', realStats);
+        console.log(`✅ Dados ${isAdminMode ? 'de TODOS os hospitais' : 'do hospital específico'} carregados:`, realStats);
 
       } catch (error) {
         console.error('❌ Erro geral ao carregar dashboard:', error);
@@ -181,17 +191,24 @@ const Dashboard = () => {
         <div className="flex items-center justify-between">
         <div>
             <h1 className="text-2xl font-bold">
-              Bem-vindo, {user.full_name || user.email?.split('@')[0]}!
+              Bem-vindo, {user.role === 'developer' ? 'Desenvolvedor' : user.role === 'admin' ? 'Administrador' : user.full_name || user.email?.split('@')[0]}!
             </h1>
             <p className="text-blue-100 mt-1">
-              Dashboard do Sistema SIGTAP Sync
+              {canAccessAllHospitals || user.full_access 
+                ? 'Dashboard Executivo - Todos os Hospitais' 
+                : 'Dashboard do Sistema SIGTAP'}
           </p>
         </div>
           <div className="text-right">
             <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
               {user.role.toUpperCase()}
             </Badge>
-            {hospitalInfo && (
+            {canAccessAllHospitals || user.full_access ? (
+              <p className="text-blue-100 text-sm mt-2">
+                <Building2 className="h-4 w-4 inline mr-1" />
+                Acesso Total - {stats.hospitals_count || 8} Hospitais
+              </p>
+            ) : hospitalInfo && (
               <p className="text-blue-100 text-sm mt-2">
                 <Building2 className="h-4 w-4 inline mr-1" />
                 {hospitalInfo.name}
@@ -256,7 +273,10 @@ const Dashboard = () => {
                 <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">Total de AIHs</p>
                 <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.totalAIHs}</p>
                 <p className="text-sm text-blue-600 mt-1">
-                  {stats.totalAIHs > 0 ? 'Registradas no sistema' : 'Nenhuma AIH registrada'}
+                  {stats.is_admin_mode 
+                    ? `Em ${stats.hospitals_count || 8} hospitais` 
+                    : (stats.totalAIHs > 0 ? 'Registradas no sistema' : 'Nenhuma AIH registrada')
+                  }
                 </p>
               </div>
             </div>
@@ -273,7 +293,10 @@ const Dashboard = () => {
                 <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">Processadas Hoje</p>
                 <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.processedToday}</p>
                 <p className="text-sm text-green-600 mt-1">
-                  {stats.processedToday > 0 ? `${stats.processedToday} nova${stats.processedToday !== 1 ? 's' : ''} hoje` : 'Nenhuma hoje'}
+                  {stats.is_admin_mode 
+                    ? `Todos os hospitais` 
+                    : (stats.processedToday > 0 ? `${stats.processedToday} nova${stats.processedToday !== 1 ? 's' : ''} hoje` : 'Nenhuma hoje')
+                  }
                 </p>
               </div>
             </div>

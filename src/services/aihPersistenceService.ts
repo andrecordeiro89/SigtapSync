@@ -917,10 +917,21 @@ export class AIHPersistenceService {
             status,
             match_confidence,
             validation_details
+          ),
+          hospitals (
+            id,
+            name
           )
-        `)
-        .eq('hospital_id', hospitalId)
-        .order('created_at', { ascending: false });
+        `);
+
+      // ✅ MODO ADMINISTRADOR: Se hospitalId for "ALL", undefined ou inválido, não filtrar por hospital
+      const isAdminMode = !hospitalId || hospitalId === 'ALL' || hospitalId === 'undefined';
+      
+      if (!isAdminMode) {
+        query = query.eq('hospital_id', hospitalId);
+      }
+      
+      query = query.order('created_at', { ascending: false });
 
       // Aplicar filtros
       if (filters?.status) {
@@ -1012,10 +1023,21 @@ export class AIHPersistenceService {
             admission_date,
             procedure_code,
             processing_status
+          ),
+          hospitals (
+            id,
+            name
           )
-        `)
-        .eq('hospital_id', hospitalId)
-        .order('name', { ascending: true });
+        `);
+
+      // ✅ MODO ADMINISTRADOR: Se hospitalId for "ALL", undefined ou inválido, não filtrar por hospital
+      const isAdminMode = !hospitalId || hospitalId === 'ALL' || hospitalId === 'undefined';
+      
+      if (!isAdminMode) {
+        query = query.eq('hospital_id', hospitalId);
+      }
+      
+      query = query.order('name', { ascending: true });
 
       // Aplicar filtros
       if (filters?.name) {
@@ -1051,22 +1073,33 @@ export class AIHPersistenceService {
   }
 
   /**
-   * Busca estatísticas do hospital
+   * Busca estatísticas do hospital (ou de todos os hospitais se for admin)
    */
   async getHospitalStats(hospitalId: string) {
     try {
-      // Buscar estatísticas de AIHs
-      const { data: aihStats } = await supabase
+      // ✅ MODO ADMINISTRADOR: Se hospitalId for "ALL", undefined ou inválido, agregar todos os hospitais
+      const isAdminMode = !hospitalId || hospitalId === 'ALL' || hospitalId === 'undefined';
+      
+      let aihQuery = supabase
         .from('aihs')
-        .select('processing_status, calculated_total_value')
-        .eq('hospital_id', hospitalId);
-
-      // Buscar contagem de pacientes
-      const { count: patientsCount } = await supabase
+        .select('processing_status, calculated_total_value, hospital_id');
+      
+      let patientsQuery = supabase
         .from('patients')
         .select('*', { count: 'exact', head: true })
-        .eq('hospital_id', hospitalId)
         .eq('is_active', true);
+
+      if (!isAdminMode) {
+        // Modo usuário normal: filtrar por hospital específico
+        aihQuery = aihQuery.eq('hospital_id', hospitalId);
+        patientsQuery = patientsQuery.eq('hospital_id', hospitalId);
+      }
+
+      // Buscar estatísticas de AIHs
+      const { data: aihStats } = await aihQuery;
+
+      // Buscar contagem de pacientes
+      const { count: patientsCount } = await patientsQuery;
 
       // Calcular estatísticas
       const stats = {
@@ -1076,9 +1109,13 @@ export class AIHPersistenceService {
         total_patients: patientsCount || 0,
         total_value: aihStats?.reduce((sum, aih) => sum + (aih.calculated_total_value || 0), 0) || 0,
         average_value: aihStats?.length ? 
-          (aihStats.reduce((sum, aih) => sum + (aih.calculated_total_value || 0), 0) / aihStats.length) : 0
+          (aihStats.reduce((sum, aih) => sum + (aih.calculated_total_value || 0), 0) / aihStats.length) : 0,
+        // ✅ ADICIONAR: Estatísticas por hospital (só para admins)
+        hospitals_count: isAdminMode ? new Set(aihStats?.map(a => a.hospital_id)).size : 1,
+        is_admin_mode: isAdminMode
       };
 
+      console.log(`📊 Estatísticas ${isAdminMode ? 'de TODOS os hospitais' : `do hospital ${hospitalId}`}:`, stats);
       return stats;
     } catch (error) {
       console.error('❌ Erro ao buscar estatísticas:', error);

@@ -106,13 +106,35 @@ BEGIN
     -- Roles especiais veem todos os hospitais
     IF user_role IN ('admin', 'auditoria', 'coordenacao', 'diretoria', 'medicos', 'ti', 'developer', 'coordinator', 'director', 'auditor') THEN
         RETURN QUERY
-        SELECT h.id, h.name, COALESCE(h.code, 'N/A')
+        SELECT h.id, h.name, 
+               CASE h.id::text
+                   WHEN '792a0316-92b4-4504-8238-491d284099a3' THEN 'CAR'
+                   WHEN '1d8ca73a-1927-462e-91c0-fa7004d0b377' THEN 'CAS'
+                   WHEN '019c7380-459d-4aa5-bbd8-2dba4f361e7e' THEN 'FAX'
+                   WHEN '47eddf6e-ac64-4433-acc1-7b644a2b43d0' THEN 'FOZ'
+                   WHEN 'a8978eaa-b90e-4dc8-8fd5-0af984374d34' THEN 'FRG'
+                   WHEN '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b' THEN 'SM'
+                   WHEN '1218dd7b-efcb-442e-ad2b-b72d04128cb9' THEN 'GUA'
+                   WHEN '01221e51-4bcd-4c45-b3d3-18d1df25c8f2' THEN 'ARA'
+                   ELSE 'N/A'
+               END as hospital_code
         FROM hospitals h
         ORDER BY h.name;
     ELSE
         -- Usuários básicos veem apenas seus hospitais
         RETURN QUERY
-        SELECT h.id, h.name, COALESCE(h.code, 'N/A')
+        SELECT h.id, h.name,
+               CASE h.id::text
+                   WHEN '792a0316-92b4-4504-8238-491d284099a3' THEN 'CAR'
+                   WHEN '1d8ca73a-1927-462e-91c0-fa7004d0b377' THEN 'CAS'
+                   WHEN '019c7380-459d-4aa5-bbd8-2dba4f361e7e' THEN 'FAX'
+                   WHEN '47eddf6e-ac64-4433-acc1-7b644a2b43d0' THEN 'FOZ'
+                   WHEN 'a8978eaa-b90e-4dc8-8fd5-0af984374d34' THEN 'FRG'
+                   WHEN '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b' THEN 'SM'
+                   WHEN '1218dd7b-efcb-442e-ad2b-b72d04128cb9' THEN 'GUA'
+                   WHEN '01221e51-4bcd-4c45-b3d3-18d1df25c8f2' THEN 'ARA'
+                   ELSE 'N/A'
+               END as hospital_code
         FROM hospitals h
         WHERE h.id::text = ANY(user_hospital_list)
         ORDER BY h.name;
@@ -153,7 +175,17 @@ CREATE OR REPLACE VIEW v_hospital_mapping AS
 SELECT 
     h.id as hospital_id,
     h.name as hospital_name,
-    h.code as hospital_code,
+    CASE h.id::text
+        WHEN '792a0316-92b4-4504-8238-491d284099a3' THEN 'CAR'
+        WHEN '1d8ca73a-1927-462e-91c0-fa7004d0b377' THEN 'CAS'
+        WHEN '019c7380-459d-4aa5-bbd8-2dba4f361e7e' THEN 'FAX'
+        WHEN '47eddf6e-ac64-4433-acc1-7b644a2b43d0' THEN 'FOZ'
+        WHEN 'a8978eaa-b90e-4dc8-8fd5-0af984374d34' THEN 'FRG'
+        WHEN '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b' THEN 'SM'
+        WHEN '1218dd7b-efcb-442e-ad2b-b72d04128cb9' THEN 'GUA'
+        WHEN '01221e51-4bcd-4c45-b3d3-18d1df25c8f2' THEN 'ARA'
+        ELSE 'UNKNOWN'
+    END as hospital_code,
     CASE h.id::text
         WHEN '792a0316-92b4-4504-8238-491d284099a3' THEN 'CAR'
         WHEN '1d8ca73a-1927-462e-91c0-fa7004d0b377' THEN 'CAS'
