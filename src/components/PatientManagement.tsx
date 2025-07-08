@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity } from 'lucide-react';
+import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity, CreditCard, Stethoscope } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
 
@@ -116,12 +116,8 @@ const PatientManagement = () => {
   // Estados de expansão unificados
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   
-  // Filtros unificados
+  // Filtros simplificados
   const [globalSearch, setGlobalSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('');
-  const [matchFilter, setMatchFilter] = useState('all');
-  const [processedByFilter, setProcessedByFilter] = useState('');
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(0);
@@ -148,6 +144,10 @@ const PatientManagement = () => {
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResults, setSyncResults] = useState<any>(null);
+
+  // NOVOS ESTADOS: Filtros por data
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // 🎯 NOVA FUNÇÃO: Recalcular valor total da AIH baseado nos procedimentos ativos
   const recalculateAIHTotal = (aihId: string, procedures: any[]) => {
@@ -176,6 +176,11 @@ const PatientManagement = () => {
       loadAllData();
     }
   }, [currentHospitalId]);
+
+  // Resetar página quando filtros mudarem
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [globalSearch, startDate, endDate]);
 
   const loadAllData = async () => {
     setIsLoading(true);
@@ -213,10 +218,6 @@ const PatientManagement = () => {
     try {
       console.log('🔍 Carregando AIHs para hospital:', currentHospitalId);
       const data = await persistenceService.getAIHs(currentHospitalId, {
-        status: statusFilter !== 'all' ? statusFilter : undefined,
-        aihNumber: globalSearch || undefined,
-        dateFrom: dateFilter || undefined,
-        processedBy: processedByFilter || undefined,
         limit: 100
       });
       setAIHs(data);
@@ -462,18 +463,30 @@ const PatientManagement = () => {
 
   // Filtros aplicados
   const filteredData = unifiedData.filter(item => {
+    // Filtro de busca por texto
     const matchesSearch = 
       item.aih_number.toLowerCase().includes(globalSearch.toLowerCase()) ||
       (item.patients?.name && item.patients.name.toLowerCase().includes(globalSearch.toLowerCase())) ||
       (item.patient?.cns && item.patient.cns.includes(globalSearch));
     
-    const matchesStatus = statusFilter === 'all' || item.processing_status === statusFilter;
-    const matchesDate = !dateFilter || item.admission_date >= dateFilter;
-    const matchesMatches = matchFilter === 'all' || 
-      (matchFilter === 'with_matches' && item.matches.length > 0) ||
-      (matchFilter === 'without_matches' && item.matches.length === 0);
+    // Filtro por intervalo de datas
+    let matchesDateRange = true;
+    if (startDate || endDate) {
+      const admissionDate = new Date(item.admission_date);
+      
+      if (startDate) {
+        const start = new Date(startDate);
+        matchesDateRange = matchesDateRange && admissionDate >= start;
+      }
+      
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999); // Include the entire end date
+        matchesDateRange = matchesDateRange && admissionDate <= end;
+      }
+    }
     
-    return matchesSearch && matchesStatus && matchesDate && matchesMatches;
+    return matchesSearch && matchesDateRange;
   });
 
   // Paginação unificada
@@ -625,179 +638,124 @@ const PatientManagement = () => {
         </div>
       </div>
 
-      {/* Estatísticas */}
+      {/* Estatísticas Simplificadas */}
       {stats && (
-        <div className={`grid grid-cols-1 md:grid-cols-2 ${isDirector ? 'lg:grid-cols-6' : 'lg:grid-cols-4'} gap-4`}>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <User className="w-4 h-4 text-blue-500" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <User className="w-6 h-6 text-blue-600" />
+                </div>
                 <div>
-                  <p className="text-xs text-gray-600">Pacientes</p>
-                  <p className="text-lg font-semibold">{stats.total_patients}</p>
+                  <p className="text-sm text-gray-600 font-medium">Total de Pacientes</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.total_patients}</p>
+                  <p className="text-xs text-blue-600 mt-1">Cadastrados no sistema</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <FileText className="w-4 h-4 text-green-500" />
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-green-100 rounded-lg">
+                  <FileText className="w-6 h-6 text-green-600" />
+                </div>
                 <div>
-                  <p className="text-xs text-gray-600">AIHs Total</p>
-                  <p className="text-lg font-semibold">{stats.total_aihs}</p>
+                  <p className="text-sm text-gray-600 font-medium">AIHs Processadas</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.total_aihs}</p>
+                  <p className="text-xs text-green-600 mt-1">Total no sistema</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-yellow-500" />
-                <div>
-                  <p className="text-xs text-gray-600">Pendentes</p>
-                  <p className="text-lg font-semibold">{stats.pending_aihs}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-4 h-4 text-green-500" />
-                <div>
-                  <p className="text-xs text-gray-600">Concluídas</p>
-                  <p className="text-lg font-semibold">{stats.completed_aihs}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Cards financeiros - Apenas para diretores */}
-          {isDirector && (
-            <>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-2">
-                    <DollarSign className="w-4 h-4 text-green-600" />
-                    <div>
-                      <p className="text-xs text-gray-600">Valor Total</p>
-                      <p className="text-lg font-semibold">{formatCurrency(stats.total_value)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="w-4 h-4 text-purple-500" />
-                    <div>
-                      <p className="text-xs text-gray-600">Valor Médio</p>
-                      <p className="text-lg font-semibold">{formatCurrency(stats.average_value)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
         </div>
       )}
 
-      {/* Painel de Ações Rápidas - Logo após os badges */}
-      {canManageProcedures && (
-        <Card className="border-l-4 border-l-red-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2">
-                  <AlertTriangle className="w-5 h-5 text-red-500" />
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Gerenciamento de AIHs</h3>
-                    <p className="text-xs text-gray-600">Ações administrativas para AIHs processadas</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Badge variant="outline" className="text-xs">
-                  📊 {filteredData.length} AIHs disponíveis
-                </Badge>
-                
-                {filteredData.length > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
-                    onClick={() => {
-                      toast({
-                        title: "Exclusão de AIHs",
-                        description: "Use os botões 🗑️ ao lado de cada AIH para excluir individualmente",
-                      });
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Excluir AIHs
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
-            {/* Filtros Unificados */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-                <Input
-                placeholder="Buscar AIH, paciente ou CNS..."
+
+      {/* Filtros Modernos */}
+      <Card className="border-l-4 border-l-blue-500 shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex items-center space-x-2 mb-4">
+            <Filter className="w-5 h-5 text-blue-600" />
+            <h3 className="text-lg font-semibold text-gray-900">Filtros de Pesquisa</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Campo de Busca */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 flex items-center space-x-1">
+                <Search className="w-4 h-4" />
+                <span>Buscar</span>
+              </label>
+              <Input
+                placeholder="AIH, paciente ou CNS..."
                 value={globalSearch}
                 onChange={(e) => setGlobalSearch(e.target.value)}
-                className="w-full"
+                className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
-            <div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os Status</SelectItem>
-                    <SelectItem value="pending">Pendente</SelectItem>
-                    <SelectItem value="processing">Processando</SelectItem>
-                    <SelectItem value="completed">Concluída</SelectItem>
-                    <SelectItem value="error">Erro</SelectItem>
-                  </SelectContent>
-                </Select>
-            </div>
-            <div>
-              <Select value={matchFilter} onValueChange={setMatchFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Matches" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="with_matches">Com Matches</SelectItem>
-                  <SelectItem value="without_matches">Sem Matches</SelectItem>
-                </SelectContent>
-              </Select>
+
+            {/* Data Início */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 flex items-center space-x-1">
+                <Calendar className="w-4 h-4" />
+                <span>Data Início</span>
+              </label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              />
             </div>
 
-            <div>
-                <Input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                />
+            {/* Data Fim */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 flex items-center space-x-1">
+                <Calendar className="w-4 h-4" />
+                <span>Data Fim</span>
+              </label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              />
             </div>
-              </div>
-            </CardContent>
-          </Card>
+          </div>
+
+          {/* Botões de Ação dos Filtros */}
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <Info className="w-4 h-4" />
+              <span>Use os filtros para refinar sua pesquisa por período</span>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setGlobalSearch('');
+                  setStartDate('');
+                  setEndDate('');
+                }}
+                className="text-gray-600 hover:text-gray-800"
+              >
+                <RotateCcw className="w-4 h-4 mr-1" />
+                Limpar
+              </Button>
+              
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
+                {filteredData.length} AIH{filteredData.length !== 1 ? 's' : ''} encontrada{filteredData.length !== 1 ? 's' : ''}
+              </Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Lista Unificada de AIHs */}
       <Card>
@@ -820,32 +778,74 @@ const PatientManagement = () => {
           ) : (
             <div className="space-y-4">
               {paginatedData.map((item) => (
-                <div key={item.id} className="border rounded-lg p-4">
+                <div key={item.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow bg-white">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleExpandAIH(item.id)}
-                        >
-                          {expandedItems.has(item.id) ? 
-                            <ChevronUp className="w-4 h-4" /> : 
-                            <ChevronDown className="w-4 h-4" />
-                          }
-                        </Button>
-                        <div>
-                          <h3 className="font-semibold">📄 {item.aih_number}</h3>
-                          <p className="text-sm text-gray-600">
-                            👤 {item.patients?.name || 'Paciente não identificado'}
-                          </p>
+                    <div className="flex items-center space-x-4 flex-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleExpandAIH(item.id)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        {expandedItems.has(item.id) ? 
+                          <ChevronUp className="w-5 h-5" /> : 
+                          <ChevronDown className="w-5 h-5" />
+                        }
+                      </Button>
+
+                      <div className="flex-1">
+                        {/* Nome do Paciente - Destaque Principal */}
+                        <div className="mb-2">
+                          <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
+                            <User className="w-5 h-5 text-blue-600" />
+                            <span>{item.patients?.name || 'Paciente não identificado'}</span>
+                          </h2>
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="default" className="bg-green-500 text-xs">
-                          ✅ Processada
-                        </Badge>
+
+                        {/* Informações da AIH */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                          <div className="flex items-center space-x-2">
+                            <FileText className="w-4 h-4 text-gray-500" />
+                            <div>
+                              <p className="text-xs text-gray-500 uppercase tracking-wide">AIH</p>
+                              <p className="font-semibold text-gray-900">{item.aih_number}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Calendar className="w-4 h-4 text-gray-500" />
+                            <div>
+                              <p className="text-xs text-gray-500 uppercase tracking-wide">Admissão</p>
+                              <p className="font-medium text-gray-700">{formatDate(item.admission_date)}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Activity className="w-4 h-4 text-gray-500" />
+                            <div>
+                              <p className="text-xs text-gray-500 uppercase tracking-wide">CID Principal</p>
+                              <p className="font-medium text-gray-700">{item.main_cid}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* CNS e Informações Adicionais */}
+                        <div className="mt-3 flex items-center space-x-4 text-sm text-gray-600">
+                          <span className="flex items-center space-x-1">
+                            <CreditCard className="w-4 h-4" />
+                            <span>CNS: {item.patients?.cns || 'Não informado'}</span>
+                          </span>
+                          {item.specialty && (
+                            <span className="flex items-center space-x-1">
+                              <Stethoscope className="w-4 h-4" />
+                              <span>{item.specialty}</span>
+                            </span>
+                          )}
+                          <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Processada
+                          </Badge>
+                        </div>
                       </div>
                     </div>
 
@@ -988,14 +988,11 @@ const PatientManagement = () => {
                                 <DollarSign className="w-4 h-4 mr-1" />
                                 Resumo Financeiro da AIH
                               </h5>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                                 {(() => {
                                   const approved = proceduresData[item.id].filter(p => p.match_status === 'matched' || p.match_status === 'manual');
-                                  const inactive = proceduresData[item.id].filter(p => p.match_status === 'rejected');
-                                  const pending = proceduresData[item.id].filter(p => p.match_status === 'pending');
                                   
                                   const approvedValue = approved.reduce((sum, p) => sum + (p.value_charged || p.sigtap_procedures?.value_hosp_total || 0), 0);
-                                  const inactiveValue = inactive.reduce((sum, p) => sum + (p.value_charged || p.sigtap_procedures?.value_hosp_total || 0), 0);
                                   
                                   return (
                                     <>
@@ -1003,16 +1000,6 @@ const PatientManagement = () => {
                                         <p className="font-medium text-green-800">{approved.length}</p>
                                         <p className="text-xs text-green-600">Aprovados</p>
                                         <p className="text-xs font-semibold text-green-700">{formatCurrency(approvedValue)}</p>
-                                      </div>
-                                      <div className="text-center p-2 bg-slate-50 rounded border border-slate-200">
-                                        <p className="font-medium text-slate-800">{inactive.length}</p>
-                                        <p className="text-xs text-slate-600">Inativos</p>
-                                        <p className="text-xs font-semibold text-slate-700">{formatCurrency(inactiveValue)}</p>
-                                      </div>
-                                      <div className="text-center p-2 bg-red-50 rounded border border-red-200">
-                                        <p className="font-medium text-red-800">{pending.length}</p>
-                                        <p className="text-xs text-red-600">Pendentes</p>
-                                        <p className="text-xs font-semibold text-red-700">R$ 0,00</p>
                                       </div>
                                       <div className="text-center p-2 bg-blue-50 rounded border border-blue-200">
                                         <p className="font-semibold text-blue-800">{formatCurrency(aihTotalValues[item.id])}</p>

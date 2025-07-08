@@ -158,8 +158,8 @@ const AIHExecutiveSummary = ({ aih, onRefresh, className = "" }: AIHExecutiveSum
         )}
       </div>
 
-      {/* Grid de Estatísticas - SIMPLIFICADO PARA 3 CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Grid de Estatísticas - SIMPLIFICADO PARA 2 CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Total de Procedimentos */}
         <Card className="border-blue-200 bg-blue-50">
           <CardContent className="p-4">
@@ -170,22 +170,6 @@ const AIHExecutiveSummary = ({ aih, onRefresh, className = "" }: AIHExecutiveSum
                 <p className="text-2xl font-bold text-blue-800">{stats.total}</p>
                 <p className="text-xs text-blue-500 mt-1">
                   {stats.totalActive} ativos
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Aprovados */}
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-              <div className="flex-1">
-                <p className="text-sm text-green-600 font-medium">Aprovados</p>
-                <p className="text-2xl font-bold text-green-800">{stats.approved}</p>
-                <p className="text-xs text-green-500 mt-1">
-                  {stats.total > 0 ? Math.round((stats.approved / stats.total) * 100) : 0}% do total
                 </p>
               </div>
             </div>

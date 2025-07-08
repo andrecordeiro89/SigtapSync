@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSupabaseAIH } from '../hooks/useSupabase';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import { AIHAuditService } from '../services/aihAuditService';
+import { AIHPersistenceService } from '../services/aihPersistenceService';
 
 interface HospitalInfo {
   id: string;
@@ -21,10 +21,6 @@ interface HospitalInfo {
 interface DashboardStats {
   totalAIHs: number;
   processedToday: number;
-  pendingReview: number;
-  auditLogsCount: number;
-  avgProcessingTime?: number;
-  successRate?: number;
 }
 
 const Dashboard = () => {
@@ -34,9 +30,7 @@ const Dashboard = () => {
   const [hospitalInfo, setHospitalInfo] = useState<HospitalInfo | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalAIHs: 0,
-    processedToday: 0,
-    pendingReview: 0,
-    auditLogsCount: 0
+    processedToday: 0
   });
   const [recentAuditLogs, setRecentAuditLogs] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
@@ -82,39 +76,47 @@ const Dashboard = () => {
 
         const hospitalId = canAccessAllHospitals ? undefined : user.hospital_id;
 
-        // Carregar dados em paralelo usando o novo serviço
-        const [statsResult, activityResult] = await Promise.all([
-          AIHAuditService.getAIHStats(hospitalId),
-          AIHAuditService.getRecentActivity(10, user.id, hospitalId)
-        ]);
+        // Carregar dados reais usando AIHPersistenceService
+        const persistenceService = new AIHPersistenceService();
+        
+        // Carregar estatísticas reais do hospital
+        const realStats = await persistenceService.getHospitalStats(hospitalId || user.hospital_id);
+        
+        // Calcular AIHs processadas hoje
+        const today = new Date().toISOString().split('T')[0];
+        const todayAIHs = await persistenceService.getAIHs(hospitalId || user.hospital_id, {
+          dateFrom: today,
+          dateTo: today,
+          limit: 1000
+        });
 
-        // Processar estatísticas
-        if (statsResult.success) {
-          setStats(statsResult.data);
-          console.log('✅ Estatísticas carregadas:', statsResult.data);
-        } else {
-          console.error('❌ Erro ao carregar estatísticas:', statsResult.error);
-          toast.error('Erro ao carregar estatísticas');
-          
-          // Usar dados de fallback
-          setStats({
-            totalAIHs: 0,
-            processedToday: 0,
-            pendingReview: 0,
-            auditLogsCount: 0
-          });
-        }
+        // Buscar atividades recentes (AIHs criadas recentemente)
+        const recentAIHs = await persistenceService.getAIHs(hospitalId || user.hospital_id, {
+          limit: 10
+        });
+
+        // Processar dados para os cards
+        setStats({
+          totalAIHs: realStats.total_aihs,
+          processedToday: todayAIHs.length
+        });
 
         // Processar atividade recente
-        if (activityResult.success) {
-          setRecentActivity(activityResult.data);
-          setRecentAuditLogs(activityResult.data); // Manter compatibilidade
-          console.log('✅ Atividade recente carregada:', activityResult.data.length, 'itens');
-        } else {
-          console.error('❌ Erro ao carregar atividade:', activityResult.error);
-          setRecentActivity([]);
-          setRecentAuditLogs([]);
-        }
+        const processedActivity = recentAIHs.map(aih => ({
+          id: aih.id,
+          action: 'AIH_CREATED',
+          aih_number: aih.aih_number,
+          user_name: aih.processed_by_name || 'Sistema',
+          user_email: 'operador@sistema.com',
+          hospital_name: hospitalInfo?.name || 'Hospital',
+          created_at: aih.created_at,
+          operation_type: 'CREATE',
+          patient_name: aih.patients?.name || 'Paciente'
+        }));
+
+        setRecentActivity(processedActivity);
+        setRecentAuditLogs(processedActivity);
+        console.log('✅ Dados reais carregados:', realStats);
 
       } catch (error) {
         console.error('❌ Erro geral ao carregar dashboard:', error);
@@ -141,6 +143,7 @@ const Dashboard = () => {
       'AIH_PROCESSING_STARTED': 'Processamento AIH iniciado',
       'AIH_PROCESSING_SUCCESS': 'AIH processada com sucesso',
       'AIH_PROCESSING_ERROR': 'Erro no processamento',
+      'AIH_CREATED': 'AIH cadastrada',
       'AIH_QUERY': 'Consulta de AIHs',
       'USER_CREATED': 'Usuário criado',
       'HOSPITAL_ACCESS_UPDATED': 'Acesso atualizado'
@@ -241,51 +244,37 @@ const Dashboard = () => {
         </Card>
       )}
 
-      {/* Estatísticas Rápidas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <FileText className="h-8 w-8 text-blue-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Total de AIHs</p>
-                <p className="text-2xl font-bold">{stats.totalAIHs}</p>
+      {/* Estatísticas Principais */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
+          <CardContent className="p-8">
+            <div className="flex items-center space-x-4">
+              <div className="p-4 bg-blue-100 rounded-lg">
+                <FileText className="h-10 w-10 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">Total de AIHs</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.totalAIHs}</p>
+                <p className="text-sm text-blue-600 mt-1">
+                  {stats.totalAIHs > 0 ? 'Registradas no sistema' : 'Nenhuma AIH registrada'}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Clock className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Processadas Hoje</p>
-                <p className="text-2xl font-bold">{stats.processedToday}</p>
+        <Card className="hover:shadow-md transition-shadow border-l-4 border-l-green-500">
+          <CardContent className="p-8">
+            <div className="flex items-center space-x-4">
+              <div className="p-4 bg-green-100 rounded-lg">
+                <Clock className="h-10 w-10 text-green-600" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <AlertCircle className="h-8 w-8 text-orange-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Pendente Revisão</p>
-                <p className="text-2xl font-bold">{stats.pendingReview}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Activity className="h-8 w-8 text-purple-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Logs de Auditoria</p>
-                <p className="text-2xl font-bold">{stats.auditLogsCount}</p>
+              <div>
+                <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">Processadas Hoje</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.processedToday}</p>
+                <p className="text-sm text-green-600 mt-1">
+                  {stats.processedToday > 0 ? `${stats.processedToday} nova${stats.processedToday !== 1 ? 's' : ''} hoje` : 'Nenhuma hoje'}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -313,32 +302,43 @@ const Dashboard = () => {
                 ))}
               </div>
             ) : recentActivity.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {recentActivity.map((log) => (
-                  <div key={log.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                    {getActionIcon(log.action)}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
-                        {getActionLabel(log.action)}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {formatTime(log.created_at)} • {log.user_name || log.user_email}
-                      </p>
-                      {log.aih_number && (
-                        <p className="text-xs text-blue-600 font-mono">
-                          AIH: {log.aih_number}
+                  <div key={log.id} className="p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border border-blue-200 hover:shadow-md transition-shadow">
+                    <div className="flex items-start space-x-3">
+                      {getActionIcon(log.action)}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {getActionLabel(log.action)}
+                          </p>
+                          <Badge variant="outline" className="text-xs bg-white">
+                            {log.operation_type}
+                          </Badge>
+                        </div>
+                        
+                        {log.aih_number && (
+                          <p className="text-sm text-blue-700 font-mono mb-1">
+                            📄 AIH: {log.aih_number}
+                          </p>
+                        )}
+                        
+                        {log.patient_name && (
+                          <p className="text-sm text-green-700 mb-1">
+                            👤 Paciente: {log.patient_name}
+                          </p>
+                        )}
+                        
+                        <p className="text-xs text-gray-600">
+                          🕒 {formatTime(log.created_at)} • 👨‍💼 {log.user_name || log.user_email}
                         </p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="outline" className="text-xs">
-                        {log.operation_type}
-                      </Badge>
-                      {log.hospital_name && (
-                        <p className="text-xs text-gray-400 mt-1">
-                          {log.hospital_name}
-                        </p>
-                      )}
+                        
+                        {log.hospital_name && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            🏥 {log.hospital_name}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
