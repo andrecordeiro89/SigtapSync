@@ -50,6 +50,18 @@ export interface AuthContextType {
   canAccessAllHospitals: () => boolean;
   getAccessibleHospitals: () => string[];
   logAuditAction: (action: string, details: any) => Promise<void>;
+  // Novas funções com integração SQL
+  checkHospitalAccessAsync: (hospitalId: string) => Promise<boolean>;
+  getAccessibleHospitalsFromDB: () => Promise<Array<{
+    hospital_id: string;
+    hospital_name: string;
+    hospital_code: string;
+  }>>;
+  getHospitalSelectOptions: () => Promise<Array<{
+    value: string;
+    label: string;
+    code: string;
+  }>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -161,13 +173,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: 'Usuário inativo. Contate o administrador.' };
       }
 
-      // Verificar acesso ao hospital
-      const hasAccess = userProfile.hospital_access.includes('ALL') || 
-                       userProfile.hospital_access.includes(hospitalId) ||
-                       hospitalId === 'ALL' && userProfile.hospital_access.includes('ALL');
+      // Verificar acesso ao hospital usando a nova função SQL
+      let hasAccess = false;
+      if (hospitalId === 'ALL') {
+        hasAccess = true; // Todos podem tentar fazer login como ALL
+      } else {
+        try {
+          const { data: accessCheck, error: accessError } = await supabase
+            .rpc('user_has_hospital_access', { 
+              target_hospital_id: hospitalId,
+              user_id: userProfile.id 
+            });
+          
+          if (accessError) {
+            console.error('Erro ao verificar acesso ao hospital:', accessError);
+            hasAccess = userProfile.hospital_access.includes('ALL') || 
+                       userProfile.hospital_access.includes(hospitalId);
+          } else {
+            hasAccess = accessCheck === true;
+          }
+        } catch (sqlError) {
+          console.warn('Fallback para verificação local de acesso:', sqlError);
+          hasAccess = userProfile.hospital_access.includes('ALL') || 
+                     userProfile.hospital_access.includes(hospitalId);
+        }
+      }
 
       if (!hasAccess) {
-        return { error: 'Você não tem acesso a esta opção' };
+        return { error: 'Você não tem acesso a este hospital' };
       }
 
       // Determinar se tem acesso total
@@ -336,6 +369,84 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return user.hospital_access;
   };
 
+  // Nova função para verificar acesso com função SQL
+  const checkHospitalAccessAsync = async (hospitalId: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    try {
+      const { data, error } = await supabase
+        .rpc('user_has_hospital_access', { 
+          target_hospital_id: hospitalId,
+          user_id: user.id 
+        });
+      
+      if (error) {
+        console.error('Erro ao verificar acesso ao hospital:', error);
+        return hasHospitalAccess(hospitalId); // Fallback para função local
+      }
+      
+      return data === true;
+    } catch (error) {
+      console.error('Erro na verificação assíncrona de acesso:', error);
+      return hasHospitalAccess(hospitalId); // Fallback para função local
+    }
+  };
+
+  // Função para obter hospitais acessíveis do banco
+  const getAccessibleHospitalsFromDB = async (): Promise<Array<{
+    hospital_id: string;
+    hospital_name: string;
+    hospital_code: string;
+  }>> => {
+    if (!user) return [];
+    
+    try {
+      const { data, error } = await supabase
+        .rpc('get_user_accessible_hospitals', { user_id: user.id });
+      
+      if (error) {
+        console.error('Erro ao obter hospitais acessíveis:', error);
+        return [];
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Erro na função getAccessibleHospitalsFromDB:', error);
+      return [];
+    }
+  };
+
+  // Função para obter opções de hospital para select/combobox
+  const getHospitalSelectOptions = async (): Promise<Array<{
+    value: string;
+    label: string;
+    code: string;
+  }>> => {
+    try {
+      const hospitals = await getAccessibleHospitalsFromDB();
+      
+      const options = hospitals.map(h => ({
+        value: h.hospital_id,
+        label: `${h.hospital_code} - ${h.hospital_name}`,
+        code: h.hospital_code
+      }));
+
+      // Adicionar opção ALL se usuário tem acesso total
+      if (user?.full_access) {
+        options.unshift({
+          value: 'ALL',
+          label: 'TODOS OS HOSPITAIS',
+          code: 'ALL'
+        });
+      }
+
+      return options;
+    } catch (error) {
+      console.error('Erro ao obter opções de hospital:', error);
+      return [];
+    }
+  };
+
   // Verificar se é desenvolvedor
   const isDeveloper = (): boolean => {
     return user?.role === 'developer';
@@ -405,7 +516,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     getCurrentHospital,
     canAccessAllHospitals,
     getAccessibleHospitals,
-    logAuditAction
+    logAuditAction,
+    // Novas funções com integração SQL
+    checkHospitalAccessAsync,
+    getAccessibleHospitalsFromDB,
+    getHospitalSelectOptions
   };
 
   return (
