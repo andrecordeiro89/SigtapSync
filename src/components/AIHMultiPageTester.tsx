@@ -354,16 +354,29 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       // Regra padrão: 100% para primeiro procedimento normal, 70% para os demais
       const porcentagem = isPrincipalEntreNormais ? 100 : 70;
       
-      const valorBase = proc.sigtapProcedure.valueHospTotal;
-      const valorCalculado = (valorBase * porcentagem) / 100;
+      // ✅ CALCULAR SP E SH SEPARADAMENTE PARA PROCEDIMENTOS NORMAIS
+      const valorTotalSigtap = proc.sigtapProcedure.valueHosp; // Total extraído
+      const valorSP = proc.sigtapProcedure.valueProf;          // SP
+      const valorSH = valorTotalSigtap - valorSP;              // SH = Total - SP
+      const valorSA = proc.sigtapProcedure.valueAmb;           // SA
+      
+      // Aplicar porcentagem aos valores SH e SP
+      const valorSHCalculado = (valorSH * porcentagem) / 100;
+      const valorSPCalculado = (valorSP * porcentagem) / 100;
+      const valorSACalculado = valorSA; // SA sempre 100%
+      const valorTotalCalculado = valorSHCalculado + valorSPCalculado + valorSACalculado;
 
       console.log(`📊 PROCEDIMENTO NORMAL - ${proc.procedimento} (${proc.sequencia}º na AIH, ${posicaoEntreNormais}º entre normais): ${porcentagem}%`);
 
       return {
         ...proc,
         porcentagemSUS: porcentagem,
-        valorCalculado,
-        valorOriginal: valorBase,
+        valorCalculado: valorTotalCalculado,
+        valorOriginal: valorSH + valorSP + valorSA,
+        // ✅ ADICIONAR CAMPOS SP E SH PARA PROCEDIMENTOS NORMAIS
+        valorCalculadoSH: valorSHCalculado,
+        valorCalculadoSP: valorSPCalculado,
+        valorCalculadoSA: valorSACalculado,
         isSpecialRule: false,
         isInstrument04: false,
         regraEspecial: `Regra padrão: ${porcentagem}% (${posicaoEntreNormais}º procedimento normal)`
@@ -1096,26 +1109,57 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                         </div>
                       </TableCell>
                       <TableCell>
-                        {/* NOVA COLUNA SIMPLIFICADA - APENAS TOTAL */}
-                        {procedure.valorCalculado && procedure.sigtapProcedure ? (
+                        {/* COLUNA VALORES - EXIBINDO AUTOMATICAMENTE SP + SH */}
+                        {procedure.sigtapProcedure && (procedure.valorCalculadoSH !== undefined || procedure.valorCalculadoSP !== undefined) ? (
+                          <div className="text-center py-2">
+                            <div className="font-bold text-lg text-green-600 mb-1">
+                              {formatCurrency((procedure.valorCalculadoSH || 0) + (procedure.valorCalculadoSP || 0))}
+                            </div>
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="text-xs text-gray-500">
+                                SP + SH
+                              </div>
+                              <div className="flex justify-center">
+                                {procedure.isInstrument04 ? (
+                                  <Badge variant="outline" className="text-xs px-2 bg-blue-100 text-blue-800 border-blue-300">
+                                    🎯 Instrumento 04
+                                  </Badge>
+                                ) : procedure.isSpecialRule ? (
+                                  <Badge variant="outline" className="text-xs px-2 bg-orange-100 text-orange-800 border-orange-300">
+                                    ⚡ Regra Especial
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs px-2">
+                                    {procedure.porcentagemSUS || (procedure.sequencia === 1 ? '100' : 'Manual')}% SUS
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : procedure.valorCalculado && procedure.sigtapProcedure ? (
                           <div className="text-center py-2">
                             <div className="font-bold text-lg text-green-600 mb-1">
                               {formatCurrency(procedure.valorCalculado)}
                             </div>
-                            <div className="flex justify-center">
-                              {procedure.isInstrument04 ? (
-                                <Badge variant="outline" className="text-xs px-2 bg-blue-100 text-blue-800 border-blue-300">
-                                  🎯 Instrumento 04
-                                </Badge>
-                              ) : procedure.isSpecialRule ? (
-                                <Badge variant="outline" className="text-xs px-2 bg-orange-100 text-orange-800 border-orange-300">
-                                  ⚡ Regra Especial
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-xs px-2">
-                                  {procedure.porcentagemSUS || (procedure.sequencia === 1 ? '100' : 'Manual')}% SUS
-                                </Badge>
-                              )}
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="text-xs text-gray-500">
+                                Valor Total
+                              </div>
+                              <div className="flex justify-center">
+                                {procedure.isInstrument04 ? (
+                                  <Badge variant="outline" className="text-xs px-2 bg-blue-100 text-blue-800 border-blue-300">
+                                    🎯 Instrumento 04
+                                  </Badge>
+                                ) : procedure.isSpecialRule ? (
+                                  <Badge variant="outline" className="text-xs px-2 bg-orange-100 text-orange-800 border-orange-300">
+                                    ⚡ Regra Especial
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs px-2">
+                                    {procedure.porcentagemSUS || (procedure.sequencia === 1 ? '100' : 'Manual')}% SUS
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </div>
                         ) : (
