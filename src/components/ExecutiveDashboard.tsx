@@ -29,11 +29,167 @@ import {
   Award
 } from 'lucide-react';
 
-// Importar os novos dashboards baseados nas views reais
-import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
-import HospitalRevenueDashboard from './HospitalRevenueDashboard';
+// Services
 import { DoctorsRevenueService, type DoctorAggregated, type SpecialtyStats, type HospitalStats as HospitalRevenueStats } from '../services/doctorsRevenueService';
-import { AIHBillingService, type CompleteBillingStats, type AIHBillingSummary, type AIHBillingByHospital, type AIHBillingByDoctor, type AIHBillingByProcedure, type AIHBillingByMonth } from '../services/aihBillingService';
+import { AIHBillingService, type CompleteBillingStats } from '../services/aihBillingService';
+import { supabase } from '../lib/supabase';
+import HospitalRevenueDashboard from './HospitalRevenueDashboard';
+import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
+
+// ✅ FUNÇÃO UTILITÁRIA PARA FORMATAR VALORES MONETÁRIOS
+const formatCurrency = (value: number | null | undefined): string => {
+  if (value == null || isNaN(value)) return 'R$ 0,00';
+  
+  // Se o valor for muito grande (provavelmente em centavos), converter para reais
+  const normalizedValue = value > 100000 ? value / 100 : value;
+  
+  return normalizedValue.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
+// ✅ FUNÇÃO PARA FORMATAR NÚMEROS INTEIROS
+const formatNumber = (value: number | null | undefined): string => {
+  if (value == null || isNaN(value)) return '0';
+  return Math.round(value).toLocaleString('pt-BR');
+};
+
+// ✅ FUNÇÃO PARA VALIDAR E NORMALIZAR VALORES
+const normalizeValue = (value: number | null | undefined): number => {
+  if (value == null || isNaN(value)) return 0;
+  
+  // Se o valor for muito grande (provavelmente em centavos), converter para reais
+  if (value > 100000) {
+    console.warn(`⚠️ Valor muito alto detectado: ${value}. Convertendo de centavos para reais.`);
+    return value / 100;
+  }
+  
+  return value;
+};
+
+// ✅ FUNÇÃO PARA CALCULAR PERCENTUAL SEGURO
+const calculatePercentage = (part: number, total: number): number => {
+  if (total === 0 || isNaN(part) || isNaN(total)) return 0;
+  return Math.round((part / total) * 100);
+};
+
+// ✅ FUNÇÃO PARA BUSCAR DADOS REAIS DAS AIHS (FALLBACK PARA VIEWS)
+const getRealAIHData = async () => {
+  try {
+    console.log('🔄 Buscando dados reais das AIHs processadas...');
+    
+    // Buscar AIHs simples
+    const { data: aihs, error: aihsError } = await supabase
+      .from('aihs')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (aihsError) {
+      console.error('❌ Erro ao buscar AIHs:', aihsError);
+      return null;
+    }
+
+    // Buscar hospitais
+    const { data: hospitals, error: hospitalsError } = await supabase
+      .from('hospitals')
+      .select('*');
+
+    if (hospitalsError) {
+      console.error('❌ Erro ao buscar hospitais:', hospitalsError);
+    }
+
+    console.log(`✅ Encontradas ${aihs?.length || 0} AIHs e ${hospitals?.length || 0} hospitais`);
+
+    if (!aihs || aihs.length === 0) {
+      return {
+        summary: null,
+        byHospital: [],
+        byDoctor: [],
+        byProcedure: [],
+        metrics: {
+          totalRevenue: 0,
+          totalAIHs: 0,
+          averageTicket: 0,
+          approvalRate: 0,
+          totalPatients: 0,
+          activeHospitals: 0,
+          activeDoctors: 0
+        }
+      };
+    }
+
+    // Calcular estatísticas por hospital
+    const hospitalMap = new Map();
+    const hospitalLookup = new Map((hospitals || []).map(h => [h.id, h]));
+
+    // Processar AIHs
+    aihs.forEach((aih: any) => {
+      const hospitalId = aih.hospital_id;
+      const hospital = hospitalLookup.get(hospitalId);
+      const hospitalName = hospital?.name || 'Hospital não informado';
+      const value = Number(aih.calculated_total_value || aih.original_value || 0);
+
+      if (!hospitalMap.has(hospitalId)) {
+        hospitalMap.set(hospitalId, {
+          hospital_id: hospitalId,
+          hospital_name: hospitalName,
+          total_aihs: 0,
+          total_value: 0,
+          approved_aihs: 0,
+          unique_doctors: 0
+        });
+      }
+
+      const stats = hospitalMap.get(hospitalId);
+      stats.total_aihs += 1;
+      stats.total_value += value;
+      stats.approved_aihs += 1; // Por enquanto, todas aprovadas
+    });
+
+    // Converter para array
+    const byHospital = Array.from(hospitalMap.values()).map((stats: any) => ({
+      ...stats,
+      avg_value_per_aih: stats.total_aihs > 0 ? stats.total_value / stats.total_aihs : 0
+    })).sort((a, b) => b.total_value - a.total_value);
+
+    // Calcular totais
+    const totalRevenue = byHospital.reduce((sum, h) => sum + h.total_value, 0);
+    const totalAIHs = byHospital.reduce((sum, h) => sum + h.total_aihs, 0);
+
+    const result = {
+      summary: {
+        total_aihs: totalAIHs,
+        total_value: totalRevenue,
+        avg_value_per_aih: totalAIHs > 0 ? totalRevenue / totalAIHs : 0,
+        approved_aihs: totalAIHs,
+        approved_value: totalRevenue
+      },
+      byHospital,
+      byDoctor: [],
+      byProcedure: [],
+      metrics: {
+        totalRevenue,
+        totalAIHs,
+        averageTicket: totalAIHs > 0 ? totalRevenue / totalAIHs : 0,
+        approvalRate: 100,
+        totalPatients: totalAIHs,
+        activeHospitals: byHospital.length,
+        activeDoctors: 0,
+        topHospitalByRevenue: byHospital[0] || null
+      }
+    };
+
+    console.log('📊 Dados reais compilados:', result);
+    return result;
+    
+  } catch (error) {
+    console.error('❌ Erro ao buscar dados reais das AIHs:', error);
+    return null;
+  }
+};
 
 interface ExecutiveDashboardProps {}
 
@@ -123,12 +279,21 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     try {
       console.log('📊 Carregando dados executivos reais...');
       
-      // Carregar dados reais em paralelo das views de faturamento + AIHs processadas
-      const [doctorsResult, specialtiesData, hospitalsData, billingStatsData] = await Promise.all([
+      // ✅ PRIMEIRO: Tentar carregar das views, se falhar usar dados reais das tabelas
+      let billingStatsData = null;
+      try {
+        billingStatsData = await AIHBillingService.getCompleteBillingStats();
+        console.log('✅ Dados carregados das views de billing');
+      } catch (error) {
+        console.warn('⚠️ Views de billing não disponíveis, buscando dados reais das tabelas:', error);
+        billingStatsData = await getRealAIHData();
+      }
+
+      // Carregar dados das views de médicos/hospitais em paralelo
+      const [doctorsResult, specialtiesData, hospitalsData] = await Promise.all([
         DoctorsRevenueService.getDoctorsAggregated({ pageSize: 1000 }), // Todos os médicos
         DoctorsRevenueService.getSpecialtyStats(),
-        DoctorsRevenueService.getHospitalStats(),
-        AIHBillingService.getCompleteBillingStats() // ✅ NOVO: Dados reais das AIHs das views
+        DoctorsRevenueService.getHospitalStats()
       ]);
       
       // Atualizar estados com dados reais
@@ -137,7 +302,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       setHospitalRevenueStats(hospitalsData);
       setBillingStats(billingStatsData);
       
-      // ✅ PRIORIZAR DADOS REAIS DAS AIHS PROCESSADAS (VIEWS)
+      // ✅ CALCULAR KPIS COM VALORES NORMALIZADOS E VALIDAÇÃO
       let totalRevenue = 0;
       let totalAIHs = 0;
       let averageTicket = 0;
@@ -147,29 +312,58 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       if (billingStatsData && billingStatsData.metrics.totalAIHs > 0) {
         // ✅ USAR DADOS REAIS DAS VIEWS DE BILLING
         console.log('✅ Usando dados reais das views de billing para KPIs!');
-        totalRevenue = billingStatsData.metrics.totalRevenue;
-        totalAIHs = billingStatsData.metrics.totalAIHs;
-        totalProcedures = billingStatsData.summary?.total_aihs || totalAIHs; // AIHs = procedimentos principais
-        averageTicket = billingStatsData.metrics.averageTicket;
-        approvalRate = billingStatsData.metrics.approvalRate;
+        console.log('📊 Dados brutos do billing:', {
+          totalRevenue: billingStatsData.metrics.totalRevenue,
+          totalAIHs: billingStatsData.metrics.totalAIHs,
+          averageTicket: billingStatsData.metrics.averageTicket
+        });
+        
+        totalRevenue = normalizeValue(billingStatsData.metrics.totalRevenue);
+        totalAIHs = billingStatsData.metrics.totalAIHs || 0;
+        totalProcedures = billingStatsData.summary?.total_aihs || totalAIHs;
+        averageTicket = normalizeValue(billingStatsData.metrics.averageTicket);
+        approvalRate = calculatePercentage(
+          billingStatsData.summary?.approved_aihs || 0,
+          totalAIHs
+        );
+        
+        console.log('✅ Valores normalizados:', {
+          totalRevenue,
+          totalAIHs,
+          averageTicket,
+          approvalRate
+        });
       } else {
         // ⚠️ FALLBACK: Usar dados das views de médicos (estimativas)
         console.log('⚠️ Usando dados estimados das views de médicos (sem AIHs processadas)');
-        totalRevenue = doctorsResult.doctors.reduce((sum, d) => 
-          sum + (d.total_revenue_12months_reais || 0), 0
+        
+        // Normalizar valores dos médicos
+        const normalizedDoctorRevenues = doctorsResult.doctors.map(d => 
+          normalizeValue(d.total_revenue_12months_reais || 0)
         );
+        
+        totalRevenue = normalizedDoctorRevenues.reduce((sum, revenue) => sum + revenue, 0);
         totalProcedures = doctorsResult.doctors.reduce((sum, d) => 
           sum + (d.total_procedures_12months || 0), 0
         );
-        totalAIHs = Math.round(totalProcedures / 3); // Estimativa de AIHs baseada nos procedimentos
+        totalAIHs = Math.round(totalProcedures / 3); // Estimativa conservadora
         
         const validPaymentRates = doctorsResult.doctors.filter(d => 
-          d.avg_payment_rate_12months != null
+          d.avg_payment_rate_12months != null && d.avg_payment_rate_12months > 0
         );
         approvalRate = validPaymentRates.length > 0 
-          ? validPaymentRates.reduce((sum, d) => sum + d.avg_payment_rate_12months, 0) / validPaymentRates.length
+          ? validPaymentRates.reduce((sum, d) => sum + (d.avg_payment_rate_12months || 0), 0) / validPaymentRates.length
           : 0;
+        
         averageTicket = totalAIHs > 0 ? totalRevenue / totalAIHs : 0;
+        
+        console.log('📊 Estimativas baseadas em médicos:', {
+          totalRevenue,
+          totalAIHs,
+          averageTicket,
+          approvalRate,
+          doctorsCount: doctorsResult.doctors.length
+        });
       }
 
       const activeDoctors = doctorsResult.doctors.filter(d => d.activity_status === 'ATIVO').length;
@@ -185,22 +379,22 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         monthlyGrowth: 12.5 // Manter mock por enquanto
       });
 
-      // Converter dados dos hospitais para o formato atual
+      // Converter dados dos hospitais para o formato atual com valores normalizados
       const hospitalStatsConverted: HospitalStats[] = hospitalsData.map(hospital => ({
         id: hospital.hospital_id || '',
         name: hospital.hospital_name || 'Nome não informado',
         aihCount: hospital.total_procedures || 0,
-        revenue: hospital.total_hospital_revenue_reais || 0,
+        revenue: normalizeValue(hospital.total_hospital_revenue_reais || 0),
         approvalRate: hospital.avg_payment_rate || 0,
         doctorCount: hospital.active_doctors_count || 0,
         avgProcessingTime: 2.1 // Mock por enquanto
       }));
       setHospitalStats(hospitalStatsConverted);
 
-      // Converter top 5 médicos para o formato atual
+      // Converter top 5 médicos para o formato atual com valores normalizados
       const topDoctors = doctorsResult.doctors
-        .filter(d => d.total_revenue_12months_reais != null)
-        .sort((a, b) => (b.total_revenue_12months_reais || 0) - (a.total_revenue_12months_reais || 0))
+        .filter(d => d.total_revenue_12months_reais != null && d.total_revenue_12months_reais > 0)
+        .sort((a, b) => normalizeValue(b.total_revenue_12months_reais || 0) - normalizeValue(a.total_revenue_12months_reais || 0))
         .slice(0, 5);
         
       const doctorStatsConverted: DoctorStats[] = topDoctors.map(doctor => ({
@@ -212,7 +406,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         hospitalName: doctor.primary_hospital_name || (doctor.hospitals_list || '').split(' | ')[0] || 'Hospital não informado',
         aihCount: Math.round((doctor.total_procedures_12months || 0) / 3), // Estimativa de AIHs
         procedureCount: doctor.total_procedures_12months || 0,
-        revenue: doctor.total_revenue_12months_reais || 0,
+        revenue: normalizeValue(doctor.total_revenue_12months_reais || 0),
         avgConfidence: doctor.avg_payment_rate_12months || 0
       }));
       setDoctorStats(doctorStatsConverted);
@@ -313,7 +507,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           </div>
           <div className="text-right">
             <div className="text-3xl font-bold">
-              R$ {isLoading ? '...' : kpiData.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              {isLoading ? '...' : formatCurrency(kpiData.totalRevenue)}
             </div>
             <div className="text-blue-200 text-lg">Faturamento Total</div>
             {lastUpdate && (
@@ -382,13 +576,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           <CardContent className="p-6 text-center">
             <DollarSign className="h-10 w-10 mx-auto mb-3 text-green-600" />
             <div className="text-3xl font-bold text-green-700">
-              R$ {isLoading ? '...' : kpiData.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              {isLoading ? '...' : formatCurrency(kpiData.totalRevenue)}
             </div>
             <div className="text-sm text-green-600 font-medium">Faturamento Total</div>
             <div className="text-xs text-gray-500 mt-1">
               {kpiData.monthlyGrowth > 0 && (
                 <span className="text-green-600">
-                  ↗ +{kpiData.monthlyGrowth}% vs mês anterior
+                  ↗ +{kpiData.monthlyGrowth.toFixed(1)}% vs mês anterior
                 </span>
               )}
             </div>
@@ -399,11 +593,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           <CardContent className="p-6 text-center">
             <FileText className="h-10 w-10 mx-auto mb-3 text-blue-600" />
             <div className="text-3xl font-bold text-blue-700">
-              {isLoading ? '...' : kpiData.totalAIHs.toLocaleString('pt-BR')}
+              {isLoading ? '...' : formatNumber(kpiData.totalAIHs)}
             </div>
             <div className="text-sm text-blue-600 font-medium">AIHs Processadas</div>
             <div className="text-xs text-gray-500 mt-1">
-              Ticket médio: R$ {kpiData.averageTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              Ticket médio: {formatCurrency(kpiData.averageTicket)}
             </div>
           </CardContent>
         </Card>
@@ -482,42 +676,42 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="text-center p-3 bg-white rounded-lg border">
                     <div className="text-2xl font-bold text-green-700">
-                      R$ {billingStats.metrics.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      {formatCurrency(normalizeValue(billingStats.metrics.totalRevenue))}
                     </div>
                     <div className="text-sm text-green-600">Faturamento Total</div>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl font-bold text-blue-700">{billingStats.metrics.totalAIHs}</div>
+                    <div className="text-2xl font-bold text-blue-700">{formatNumber(billingStats.metrics.totalAIHs)}</div>
                     <div className="text-sm text-blue-600">AIHs Processadas</div>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg border">
                     <div className="text-2xl font-bold text-purple-700">
-                      {billingStats.summary?.approved_aihs || 0} + {billingStats.summary?.pending_aihs || 0}
+                      {formatNumber(billingStats.summary?.approved_aihs || 0)} + {formatNumber(billingStats.summary?.pending_aihs || 0)}
                     </div>
                     <div className="text-sm text-purple-600">Aprovadas + Pendentes</div>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg border">
                     <div className="text-2xl font-bold text-orange-700">
-                      {billingStats.metrics.approvalRate.toFixed(1)}%
+                      {(billingStats.metrics.approvalRate || 0).toFixed(1)}%
                     </div>
                     <div className="text-sm text-orange-600">Taxa Aprovação</div>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg border">
                     <div className="text-2xl font-bold text-indigo-700">
-                      R$ {billingStats.metrics.averageTicket.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      {formatCurrency(normalizeValue(billingStats.metrics.averageTicket))}
                     </div>
                     <div className="text-sm text-indigo-600">Ticket Médio</div>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl font-bold text-teal-700">{billingStats.metrics.totalPatients}</div>
+                    <div className="text-2xl font-bold text-teal-700">{formatNumber(billingStats.metrics.totalPatients)}</div>
                     <div className="text-sm text-teal-600">Pacientes (est.)</div>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl font-bold text-red-700">{billingStats.metrics.activeHospitals}</div>
+                    <div className="text-2xl font-bold text-red-700">{formatNumber(billingStats.metrics.activeHospitals)}</div>
                     <div className="text-sm text-red-600">Hospitais</div>
                   </div>
                   <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl font-bold text-gray-700">{billingStats.metrics.activeDoctors}</div>
+                    <div className="text-2xl font-bold text-gray-700">{formatNumber(billingStats.metrics.activeDoctors)}</div>
                     <div className="text-sm text-gray-600">Médicos</div>
                   </div>
                 </div>
@@ -549,8 +743,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     <div className="font-medium text-gray-700 mb-2">🏆 Top Performer</div>
                     <div className="text-sm">
                       <strong>{billingStats.metrics.topHospitalByRevenue.hospital_name}</strong> - 
-                      R$ {billingStats.metrics.topHospitalByRevenue.total_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} 
-                      ({billingStats.metrics.topHospitalByRevenue.total_aihs} AIHs)
+                      {formatCurrency(normalizeValue(billingStats.metrics.topHospitalByRevenue.total_value))} 
+                      ({formatNumber(billingStats.metrics.topHospitalByRevenue.total_aihs)} AIHs)
                     </div>
                   </div>
                 )}
@@ -615,10 +809,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                         </div>
                         <div className="text-right">
                           <div className="font-bold text-green-700">
-                            R$ {hospital.total_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </div>
-                          <div className="text-xs text-gray-600">
-                            {((hospital.approved_aihs / hospital.total_aihs) * 100).toFixed(1)}% aprovação
+                            {formatCurrency(normalizeValue(hospital.total_value))}
                           </div>
                         </div>
                       </div>
@@ -645,6 +836,85 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
         {/* TAB: ESPECIALIDADES */}
         <TabsContent value="specialties" className="space-y-6">
+          {/* KPIs de Especialidades */}
+          {billingStats && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <Card className="border-gray-200 bg-gray-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Stethoscope className="h-8 w-8 text-gray-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-700">Top Especialidade</p>
+                      <p className="text-xl font-bold text-gray-800">
+                        {billingStats.byDoctor.length > 0 
+                          ? billingStats.byDoctor[0]?.doctor_specialty || 'N/A'
+                          : 'N/A'
+                        }
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Maior faturamento
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-blue-200 bg-blue-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Users className="h-8 w-8 text-blue-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-blue-700">Especialidades Ativas</p>
+                      <p className="text-2xl font-bold text-blue-800">
+                        {formatNumber(new Set(billingStats.byDoctor.map(d => d.doctor_specialty)).size)}
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Diferentes especialidades
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-green-200 bg-green-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <DollarSign className="h-8 w-8 text-green-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-green-700">Valor por Especialidade</p>
+                      <p className="text-2xl font-bold text-green-800">
+                        {formatCurrency(normalizeValue(
+                          billingStats.metrics.totalRevenue / 
+                          Math.max(1, new Set(billingStats.byDoctor.map(d => d.doctor_specialty)).size)
+                        ))}
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">
+                        Média por especialidade
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-purple-200 bg-purple-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Award className="h-8 w-8 text-purple-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-purple-700">Performance Geral</p>
+                      <p className="text-2xl font-bold text-purple-800">
+                        {billingStats.metrics.approvalRate.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-purple-600 mt-1">
+                        Taxa de aprovação média
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           <SpecialtyRevenueDashboard />
         </TabsContent>
 
@@ -679,7 +949,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                         </div>
                         <div className="text-right">
                           <div className="text-xl font-bold text-green-700">
-                            R$ {doctor.total_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {formatCurrency(normalizeValue(doctor.total_value))}
                           </div>
                           <div className="text-xs text-gray-600">
                             {((doctor.approved_aihs / doctor.total_aihs) * 100).toFixed(1)}% aprovação
@@ -697,7 +967,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                         </div>
                         <div>
                           <span className="text-gray-600">Ticket Médio:</span>
-                          <div className="font-semibold">R$ {doctor.avg_value_per_aih.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                          <div className="font-semibold">{formatCurrency(normalizeValue(doctor.avg_value_per_aih))}</div>
                         </div>
                         <div>
                           <span className="text-gray-600">Hospitais:</span>
@@ -720,6 +990,82 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
         {/* TAB: PROCEDIMENTOS */}
         <TabsContent value="procedures" className="space-y-6">
+          {/* KPIs de Procedimentos */}
+          {billingStats && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <Card className="border-purple-200 bg-purple-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <FileText className="h-8 w-8 text-purple-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-purple-700">Total de Procedimentos</p>
+                      <p className="text-2xl font-bold text-purple-800">
+                        {formatNumber(billingStats.byProcedure.reduce((sum, p) => sum + p.total_aihs, 0))}
+                      </p>
+                      <p className="text-xs text-purple-600 mt-1">
+                        Procedimentos realizados
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-blue-200 bg-blue-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Activity className="h-8 w-8 text-blue-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-blue-700">Tipos Únicos</p>
+                      <p className="text-2xl font-bold text-blue-800">
+                        {formatNumber(billingStats.byProcedure.length)}
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Códigos diferentes
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-green-200 bg-green-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <DollarSign className="h-8 w-8 text-green-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-green-700">Valor Total</p>
+                      <p className="text-2xl font-bold text-green-800">
+                        {formatCurrency(normalizeValue(billingStats.byProcedure.reduce((sum, p) => sum + p.total_value, 0)))}
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">
+                        Faturamento dos procedimentos
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-orange-200 bg-orange-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <TrendingUp className="h-8 w-8 text-orange-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-orange-700">Ticket Médio</p>
+                      <p className="text-2xl font-bold text-orange-800">
+                        {formatCurrency(normalizeValue(
+                          billingStats.byProcedure.reduce((sum, p) => sum + p.total_value, 0) /
+                          billingStats.byProcedure.reduce((sum, p) => sum + p.total_aihs, 0)
+                        ))}
+                      </p>
+                      <p className="text-xs text-orange-600 mt-1">
+                        Valor médio por procedimento
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -749,7 +1095,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                         </div>
                         <div className="text-right">
                           <div className="text-xl font-bold text-purple-700">
-                            R$ {procedure.total_value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {formatCurrency(normalizeValue(procedure.total_value))}
                           </div>
                           <div className="text-xs text-gray-600">
                             {((procedure.approved_aihs / procedure.total_aihs) * 100).toFixed(1)}% aprovação
@@ -763,7 +1109,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                         </div>
                         <div>
                           <span className="text-gray-600">Valor Médio:</span>
-                          <div className="font-semibold">R$ {procedure.avg_value_per_aih.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                          <div className="font-semibold">{formatCurrency(normalizeValue(procedure.avg_value_per_aih))}</div>
                         </div>
                         <div>
                           <span className="text-gray-600">Hospitais:</span>

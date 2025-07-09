@@ -26,6 +26,17 @@ import {
 } from 'lucide-react';
 import { DoctorsRevenueService, type HospitalStats, type DoctorAggregated } from '../services/doctorsRevenueService';
 
+// ✅ FUNÇÃO PARA FORMATAÇÃO DE MOEDA
+const formatCurrency = (value: number | null | undefined): string => {
+  if (value == null || isNaN(value)) return 'R$ 0,00';
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+};
+
 const HospitalRevenueDashboard: React.FC = () => {
   const [hospitalStats, setHospitalStats] = useState<HospitalStats[]>([]);
   const [uniqueDoctors, setUniqueDoctors] = useState<DoctorAggregated[]>([]);
@@ -154,14 +165,17 @@ const HospitalRevenueDashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-green-200 bg-green-50">
           <CardContent className="p-6">
             <div className="flex items-center">
-              <DollarSign className="h-8 w-8 text-emerald-600" />
+              <DollarSign className="h-8 w-8 text-green-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Faturamento Total</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  R$ {totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                <p className="text-sm font-medium text-green-700">Faturamento Mensal</p>
+                <p className="text-2xl font-bold text-green-800">
+                  {formatCurrency(totalRevenue / 12)}
+                </p>
+                <p className="text-xs text-green-600 mt-1">
+                  Média mensal baseada no total anual
                 </p>
               </div>
             </div>
@@ -175,7 +189,7 @@ const HospitalRevenueDashboard: React.FC = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Média por Hospital</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  R$ {avgRevenuePerHospital.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  {formatCurrency(avgRevenuePerHospital)}
                 </p>
               </div>
             </div>
