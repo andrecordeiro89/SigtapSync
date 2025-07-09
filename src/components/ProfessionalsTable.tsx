@@ -62,13 +62,20 @@ const ProfessionalsTable: React.FC<ProfessionalsTableProps> = ({ className = '' 
     isLoading,
     error,
     totalCount,
+    currentPage,
+    totalPages,
     hasMore,
+    hasPrevious,
+    pageSize,
     availableSpecialties,
     availableHospitals,
     availableRoles,
     availableDepartments,
     applyFilters,
+    refreshCurrentPage,
     loadNextPage,
+    loadPreviousPage,
+    goToPage,
     resetData
   } = useProfessionalViews();
 
@@ -183,6 +190,8 @@ const ProfessionalsTable: React.FC<ProfessionalsTableProps> = ({ className = '' 
     handleApplyFilters();
   };
 
+
+
   /**
    * 🔄 EXPANDIR/RECOLHER LINHA
    * Controla expansão das linhas para edição de observações
@@ -249,8 +258,8 @@ const ProfessionalsTable: React.FC<ProfessionalsTableProps> = ({ className = '' 
         setEditingNotes(null);
         setTempNotes('');
         
-        // Atualizar dados
-        handleRefresh();
+        // Atualizar dados mantendo a página atual
+        await refreshCurrentPage();
         
         console.log('✅ Observações salvas com sucesso');
       } else {
@@ -343,8 +352,8 @@ const ProfessionalsTable: React.FC<ProfessionalsTableProps> = ({ className = '' 
         isPrimaryHospital: false
       });
       
-      // Atualizar dados
-      handleRefresh();
+      // Atualizar dados mantendo a página atual
+      await refreshCurrentPage();
       
       console.log('✅ Dados profissionais salvos com sucesso');
       
@@ -1056,70 +1065,94 @@ const ProfessionalsTable: React.FC<ProfessionalsTableProps> = ({ className = '' 
             </Table>
           </div>
 
-          {/* PAGINAÇÃO TRADICIONAL */}
+          {/* PAGINAÇÃO FUNCIONAL */}
           {totalCount > 0 && (
-            <div className="mt-6 flex items-center justify-between">
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-sm text-gray-600">
-                Mostrando {professionals.length} de {totalCount} profissionais
+                Mostrando página {currentPage} de {totalPages} ({totalCount} profissionais no total)
               </div>
               
               <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
+                {/* Botão Anterior */}
+                <Button
+                  variant="outline"
                   size="sm"
-                  onClick={() => {
-                    // TODO: Implementar página anterior quando o hook estiver atualizado
-                    console.log('Página anterior');
-                  }}
-                  disabled={isLoading || professionals.length === 0}
+                  onClick={loadPreviousPage}
+                  disabled={isLoading || !hasPrevious}
                   className="flex items-center gap-1"
                 >
                   <ChevronDown className="h-4 w-4 rotate-90" />
                   Anterior
                 </Button>
                 
+                {/* Números das páginas */}
                 <div className="flex items-center space-x-1">
-                  {/* Números das páginas - simulação baseada nos dados atuais */}
-                  {Array.from({ length: Math.min(5, Math.ceil(totalCount / 20)) }).map((_, i) => {
-                    const pageNum = i + 1;
-                    const isCurrentPage = i === 0; // Por enquanto sempre primeira página
+                  {/* Primeira página */}
+                  {currentPage > 3 && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToPage(1)}
+                        disabled={isLoading}
+                        className="w-10 h-8"
+                      >
+                        1
+                      </Button>
+                      {currentPage > 4 && <span className="text-gray-400">...</span>}
+                    </>
+                  )}
+                  
+                  {/* Páginas ao redor da atual */}
+                  {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                    let pageNum;
+                    
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    if (pageNum < 1 || pageNum > totalPages) return null;
+                    
+                    const isCurrentPage = pageNum === currentPage;
                     
                     return (
                       <Button
                         key={pageNum}
                         variant={isCurrentPage ? "default" : "outline"}
                         size="sm"
-                        onClick={() => {
-                          // TODO: Implementar navegação por página quando o hook estiver atualizado
-                          console.log(`Ir para página ${pageNum}`);
-                        }}
-                disabled={isLoading}
-                        className="w-10 h-8"
-              >
-                        {pageNum}
-              </Button>
-                    );
-                  })}
-                  
-                  {Math.ceil(totalCount / 20) > 5 && (
-                    <>
-                      <span className="text-gray-400">...</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          // TODO: Implementar ir para última página
-                          console.log('Última página');
-                        }}
+                        onClick={() => goToPage(pageNum)}
                         disabled={isLoading}
                         className="w-10 h-8"
                       >
-                        {Math.ceil(totalCount / 20)}
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                  
+                  {/* Última página */}
+                  {currentPage < totalPages - 2 && totalPages > 5 && (
+                    <>
+                      {currentPage < totalPages - 3 && <span className="text-gray-400">...</span>}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToPage(totalPages)}
+                        disabled={isLoading}
+                        className="w-10 h-8"
+                      >
+                        {totalPages}
                       </Button>
                     </>
                   )}
                 </div>
                 
+                {/* Botão Próxima */}
                 <Button
                   variant="outline"
                   size="sm"

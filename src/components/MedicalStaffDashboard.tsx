@@ -39,7 +39,7 @@ import ExecutiveDateFilters from './ExecutiveDateFilters';
 import DoctorsAnalyticsService from '../services/doctorsAnalyticsService';
 import { DoctorsCrudService } from '../services/doctorsCrudService';
 import DoctorEditModal from './DoctorEditModal';
-import ProfessionalsTable from './ProfessionalsTable';
+import ProfessionalsTableNew from './ProfessionalsTableNew';
 import { 
   MedicalKPIData, 
   MedicalAnalytics, 
@@ -567,7 +567,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
 
         {/* TAB: LISTA DE PROFISSIONAIS */}
         <TabsContent value="professionals" className="space-y-4">
-          <ProfessionalsTable />
+          <ProfessionalsTableNew />
         </TabsContent>
 
         {/* TAB: PERFORMANCE */}

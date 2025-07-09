@@ -40,7 +40,8 @@ export class ProfessionalViewsService {
       }
 
       if (filters.specialty && filters.specialty !== 'all') {
-        query = query.or(`doctor_specialty.ilike.%${filters.specialty}%,doctor_secondary_specialties.cs.{${filters.specialty}}`);
+        // Usar apenas doctor_specialty que existe na view doctor_hospital_info
+        query = query.ilike('doctor_specialty', `%${filters.specialty}%`);
       }
 
       if (filters.searchTerm) {
@@ -51,21 +52,21 @@ export class ProfessionalViewsService {
       }
 
       if (filters.status && filters.status !== 'all') {
+        console.log('⚠️ Filtros de status temporariamente desabilitados - campos doctor_is_active/doctor_is_sus_enabled não confirmados na view');
+        // TODO: Reativar quando campos forem confirmados na view doctor_hospital_info
+        /*
         switch (filters.status) {
           case 'active':
             query = query.eq('doctor_is_active', true);
-            console.log('⚠️ Filtro link_is_active ignorado - campo não disponível');
             break;
           case 'inactive':
             query = query.eq('doctor_is_active', false);
-            console.log('⚠️ Filtro link_is_active ignorado - campo não disponível');
             break;
           case 'sus_enabled':
-            // Verificar se esse campo existe
-            console.log('⚠️ Tentando filtrar por doctor_is_sus_enabled');
             query = query.eq('doctor_is_sus_enabled', true);
             break;
         }
+        */
       }
 
       // Filtros temporariamente desabilitados - campos não disponíveis na view
@@ -99,7 +100,9 @@ export class ProfessionalViewsService {
           query = query.order('hospital_name', { ascending: sortOrder === 'asc' });
           break;
         case 'status':
-          query = query.order('doctor_is_active', { ascending: sortOrder === 'desc' });
+          // Campo doctor_is_active não confirmado - usar ordenação por nome como fallback
+          console.log('⚠️ Ordenação por status desabilitada - usando nome como fallback');
+          query = query.order('doctor_name', { ascending: sortOrder === 'asc' });
           break;
         default:
           query = query.order('doctor_name', { ascending: true });
@@ -124,10 +127,28 @@ export class ProfessionalViewsService {
         this.getDepartmentsList()
       ]);
 
-      // Contar total sem paginação
-      const { count: totalCount } = await supabase
+      // Contar total sem paginação (aplicando mesmos filtros para contagem precisa)
+      let countQuery = supabase
         .from('doctor_hospital_info')
         .select('*', { count: 'exact', head: true });
+
+      // Aplicar mesmos filtros da query principal
+      if (filters.hospitalId && filters.hospitalId !== 'all') {
+        countQuery = countQuery.eq('hospital_id', filters.hospitalId);
+      }
+
+      if (filters.specialty && filters.specialty !== 'all') {
+        countQuery = countQuery.ilike('doctor_specialty', `%${filters.specialty}%`);
+      }
+
+      if (filters.searchTerm) {
+        const searchTerm = filters.searchTerm.toLowerCase();
+        countQuery = countQuery.or(
+          `doctor_name.ilike.%${searchTerm}%,doctor_crm.ilike.%${searchTerm}%,doctor_cns.ilike.%${searchTerm}%`
+        );
+      }
+
+      const { count: totalCount } = await countQuery;
 
       const result: ProfessionalsListData = {
         doctors: doctors || [],
@@ -172,7 +193,8 @@ export class ProfessionalViewsService {
       }
 
       if (filters.specialty && filters.specialty !== 'all') {
-        query = query.or(`primary_specialty.ilike.%${filters.specialty}%,secondary_specialties.cs.{${filters.specialty}}`);
+        // Tentar primary_specialty primeiro, fallback para doctor_specialty se não existir
+        query = query.or(`primary_specialty.ilike.%${filters.specialty}%,doctor_specialty.ilike.%${filters.specialty}%`);
       }
 
       if (filters.searchTerm) {

@@ -212,16 +212,47 @@ export function useProfessionalViews() {
   }, [loadProfessionals]);
 
   /**
+   * 🔄 ATUALIZAR PÁGINA ATUAL
+   * Recarrega apenas a página atual sem resetar posição
+   */
+  const refreshCurrentPage = useCallback(async () => {
+    await loadProfessionals(filters, currentPage, true);
+  }, [loadProfessionals, filters, currentPage]);
+
+  /**
    * 📄 CARREGAR PRÓXIMA PÁGINA
-   * Paginação - carrega mais dados
+   * Paginação - carrega próxima página (substitui dados)
    */
   const loadNextPage = useCallback(async () => {
-    if (isLoading) return;
+    if (isLoading || !hasMore) return;
     
     const nextPage = currentPage + 1;
     setCurrentPage(nextPage);
-    await loadProfessionals(filters, nextPage, false);
+    await loadProfessionals(filters, nextPage, true); // true = substitui dados
+  }, [isLoading, currentPage, filters, loadProfessionals, professionals.length, totalCount]);
+
+  /**
+   * 📄 CARREGAR PÁGINA ANTERIOR
+   * Paginação - carrega página anterior (substitui dados)
+   */
+  const loadPreviousPage = useCallback(async () => {
+    if (isLoading || currentPage <= 1) return;
+    
+    const prevPage = currentPage - 1;
+    setCurrentPage(prevPage);
+    await loadProfessionals(filters, prevPage, true); // true = substitui dados
   }, [isLoading, currentPage, filters, loadProfessionals]);
+
+  /**
+   * 📄 IR PARA PÁGINA ESPECÍFICA
+   * Paginação - navega para página específica
+   */
+  const goToPage = useCallback(async (pageNumber: number) => {
+    if (isLoading || pageNumber < 1 || pageNumber > Math.ceil(totalCount / pageSize)) return;
+    
+    setCurrentPage(pageNumber);
+    await loadProfessionals(filters, pageNumber, true); // true = substitui dados
+  }, [isLoading, totalCount, pageSize, filters, loadProfessionals]);
 
   /**
    * 🔄 RESETAR DADOS
@@ -258,7 +289,9 @@ export function useProfessionalViews() {
   }, [loadInitialData]);
 
   // Valores calculados
-  const hasMore = professionals.length < totalCount;
+  const totalPages = Math.ceil(totalCount / pageSize);
+  const hasMore = currentPage < totalPages;
+  const hasPrevious = currentPage > 1;
   const isFilterActive = Object.keys(filters).some(key => 
     filters[key as keyof ProfessionalsFilters] !== undefined && 
     filters[key as keyof ProfessionalsFilters] !== 'all' && 
@@ -280,7 +313,9 @@ export function useProfessionalViews() {
     currentPage,
     totalCount,
     pageSize,
+    totalPages,
     hasMore,
+    hasPrevious,
     isFilterActive,
     
     // Dados auxiliares
@@ -299,7 +334,10 @@ export function useProfessionalViews() {
     
     // Funções de controle
     applyFilters,
+    refreshCurrentPage,
     loadNextPage,
+    loadPreviousPage,
+    goToPage,
     resetData,
     loadInitialData
   };

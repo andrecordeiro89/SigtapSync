@@ -29,6 +29,11 @@ import {
   Award
 } from 'lucide-react';
 
+// Importar os novos dashboards baseados nas views reais
+import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
+import HospitalRevenueDashboard from './HospitalRevenueDashboard';
+import { DoctorsRevenueService, type DoctorAggregated, type SpecialtyStats, type HospitalStats as HospitalRevenueStats } from '../services/doctorsRevenueService';
+
 interface ExecutiveDashboardProps {}
 
 interface KPIData {
@@ -97,6 +102,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [doctorStats, setDoctorStats] = useState<DoctorStats[]>([]);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
 
+  // Estados para dados reais das views
+  const [doctorsData, setDoctorsData] = useState<DoctorAggregated[]>([]);
+  const [specialtyStats, setSpecialtyStats] = useState<SpecialtyStats[]>([]);
+  const [hospitalRevenueStats, setHospitalRevenueStats] = useState<HospitalRevenueStats[]>([]);
+
   // Authentication
   const { user, isDirector, isAdmin, isCoordinator, isTI, hasPermission } = useAuth();
 
@@ -109,76 +119,119 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     
     setIsLoading(true);
     try {
-      console.log('📊 Carregando dados executivos...');
+      console.log('📊 Carregando dados executivos reais...');
       
-      // Simular carregamento de dados (implementar services reais depois)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Carregar dados reais em paralelo das views de faturamento
+      const [doctorsResult, specialtiesData, hospitalsData] = await Promise.all([
+        DoctorsRevenueService.getDoctorsAggregated({ pageSize: 1000 }), // Todos os médicos
+        DoctorsRevenueService.getSpecialtyStats(),
+        DoctorsRevenueService.getHospitalStats()
+      ]);
       
-      // Mock Data - substituir por dados reais
+      // Atualizar estados com dados reais
+      setDoctorsData(doctorsResult.doctors);
+      setSpecialtyStats(specialtiesData);
+      setHospitalRevenueStats(hospitalsData);
+      
+      // Calcular KPIs reais baseados nos dados das views
+      const totalRevenue = doctorsResult.doctors.reduce((sum, d) => 
+        sum + (d.total_revenue_12months_reais || 0), 0
+      );
+      const totalProcedures = doctorsResult.doctors.reduce((sum, d) => 
+        sum + (d.total_procedures_12months || 0), 0
+      );
+      const activeDoctors = doctorsResult.doctors.filter(d => d.activity_status === 'ATIVO').length;
+      const validPaymentRates = doctorsResult.doctors.filter(d => 
+        d.avg_payment_rate_12months != null
+      );
+      const avgPaymentRate = validPaymentRates.length > 0 
+        ? validPaymentRates.reduce((sum, d) => sum + d.avg_payment_rate_12months, 0) / validPaymentRates.length
+        : 0;
+      const averageTicket = totalProcedures > 0 ? totalRevenue / totalProcedures : 0;
+      
       setKpiData({
-        totalRevenue: 2350000.50,
-        totalAIHs: 1247,
-        averageTicket: 1884.32,
-        approvalRate: 94.2,
-        activeHospitals: 8,
-        activeDoctors: 142,
-        processingTime: 2.3,
-        monthlyGrowth: 12.5
+        totalRevenue,
+        totalAIHs: totalProcedures,
+        averageTicket,
+        approvalRate: avgPaymentRate,
+        activeHospitals: hospitalsData.length,
+        activeDoctors: activeDoctors,
+        processingTime: 2.3, // Manter mock por enquanto
+        monthlyGrowth: 12.5 // Manter mock por enquanto
       });
 
-      setHospitalStats([
-        {
-          id: '1',
-          name: 'Hospital Maternidade Nossa Senhora Aparecida',
-          aihCount: 324,
-          revenue: 610500.75,
-          approvalRate: 96.8,
-          doctorCount: 45,
-          avgProcessingTime: 1.8
-        },
-        {
-          id: '2', 
-          name: 'Hospital Municipal 18 de Dezembro',
-          aihCount: 287,
-          revenue: 425300.20,
-          approvalRate: 92.1,
-          doctorCount: 32,
-          avgProcessingTime: 2.1
-        }
-      ]);
+      // Converter dados dos hospitais para o formato atual
+      const hospitalStatsConverted: HospitalStats[] = hospitalsData.map(hospital => ({
+        id: hospital.hospital_id || '',
+        name: hospital.hospital_name || 'Nome não informado',
+        aihCount: hospital.total_procedures || 0,
+        revenue: hospital.total_hospital_revenue_reais || 0,
+        approvalRate: hospital.avg_payment_rate || 0,
+        doctorCount: hospital.active_doctors_count || 0,
+        avgProcessingTime: 2.1 // Mock por enquanto
+      }));
+      setHospitalStats(hospitalStatsConverted);
 
-      setDoctorStats([
-        {
-          id: '1',
-          name: 'Dr. João Silva',
-          cns: '123456789012345',
-          crm: '12345',
-          specialty: 'Cardiologia',
-          hospitalName: 'Hospital Maternidade Nossa Senhora Aparecida',
-          aihCount: 45,
-          procedureCount: 127,
-          revenue: 89500.75,
-          avgConfidence: 94.2
-        }
-      ]);
+      // Converter top 5 médicos para o formato atual
+      const topDoctors = doctorsResult.doctors
+        .filter(d => d.total_revenue_12months_reais != null)
+        .sort((a, b) => (b.total_revenue_12months_reais || 0) - (a.total_revenue_12months_reais || 0))
+        .slice(0, 5);
+        
+      const doctorStatsConverted: DoctorStats[] = topDoctors.map(doctor => ({
+        id: doctor.doctor_id || '',
+        name: doctor.doctor_name || 'Nome não informado',
+        cns: doctor.doctor_cns || '',
+        crm: doctor.doctor_crm || '',
+        specialty: doctor.doctor_specialty || 'Não informado',
+        hospitalName: doctor.primary_hospital_name || (doctor.hospitals_list || '').split(' | ')[0] || 'Hospital não informado',
+        aihCount: Math.round((doctor.total_procedures_12months || 0) / 3), // Estimativa de AIHs
+        procedureCount: doctor.total_procedures_12months || 0,
+        revenue: doctor.total_revenue_12months_reais || 0,
+        avgConfidence: doctor.avg_payment_rate_12months || 0
+      }));
+      setDoctorStats(doctorStatsConverted);
 
-      setAlerts([
-        {
-          id: '1',
+      // Gerar alertas baseados nos dados reais
+      const alertsGenerated: AlertItem[] = [];
+      
+      // Alerta para hospitais com baixa taxa de aprovação
+      const lowApprovalHospitals = hospitalsData.filter(h => 
+        h.avg_payment_rate != null && h.avg_payment_rate < 90
+      );
+      lowApprovalHospitals.forEach(hospital => {
+        const paymentRate = hospital.avg_payment_rate || 0;
+        alertsGenerated.push({
+          id: `hospital_${hospital.hospital_id}`,
           type: 'warning',
           title: 'Taxa de Aprovação Baixa',
-          message: 'Hospital Municipal São José com 87% de aprovação (abaixo da meta de 90%)',
+          message: `${hospital.hospital_name} com ${paymentRate.toFixed(1)}% de aprovação (abaixo da meta de 90%)`,
           timestamp: new Date().toISOString(),
           priority: 'high'
-        }
-      ]);
+        });
+      });
+      
+      // Alerta para médicos inativos
+      const inactiveDoctors = doctorsResult.doctors.filter(d => d.activity_status === 'INATIVO').length;
+      if (inactiveDoctors > 0) {
+        alertsGenerated.push({
+          id: 'inactive_doctors',
+          type: 'info',
+          title: 'Médicos Inativos',
+          message: `${inactiveDoctors} médicos sem atividade nos últimos 90 dias`,
+          timestamp: new Date().toISOString(),
+          priority: 'medium'
+        });
+      }
+      
+      setAlerts(alertsGenerated);
 
       setLastUpdate(new Date());
-      console.log('✅ Dados executivos carregados com sucesso');
+      console.log(`✅ Dados executivos carregados: ${doctorsResult.doctors.length} médicos, ${specialtiesData.length} especialidades, ${hospitalsData.length} hospitais`);
       
     } catch (error) {
       console.error('❌ Erro ao carregar dados executivos:', error);
-      toast.error('Erro ao carregar dados do dashboard executivo');
+      toast.error('Erro ao carregar dados do dashboard executivo: ' + (error as Error).message);
     } finally {
       setIsLoading(false);
     }
@@ -359,7 +412,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
       {/* TABS PRINCIPAIS */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 bg-blue-100">
+        <TabsList className="grid w-full grid-cols-5 bg-blue-100">
           <TabsTrigger value="overview" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <Eye className="h-4 w-4 mr-2" />
             Visão Geral
@@ -368,8 +421,12 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             <Hospital className="h-4 w-4 mr-2" />
             Hospitais
           </TabsTrigger>
-          <TabsTrigger value="doctors" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+          <TabsTrigger value="specialties" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <Stethoscope className="h-4 w-4 mr-2" />
+            Especialidades
+          </TabsTrigger>
+          <TabsTrigger value="doctors" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            <Users className="h-4 w-4 mr-2" />
             Médicos
           </TabsTrigger>
           <TabsTrigger value="reports" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
@@ -428,55 +485,12 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
         {/* TAB: HOSPITAIS */}
         <TabsContent value="hospitals" className="space-y-6">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Hospital className="h-5 w-5 text-blue-600" />
-                Performance por Hospital
-              </CardTitle>
-              <CardDescription>
-                Análise detalhada do desempenho de cada unidade
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {hospitalStats.map((hospital) => (
-                  <div key={hospital.id} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-gray-900">{hospital.name}</h4>
-                      <Badge 
-                        className={
-                          hospital.approvalRate >= 95 ? 'bg-green-100 text-green-800' :
-                          hospital.approvalRate >= 90 ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }
-                      >
-                        {hospital.approvalRate.toFixed(1)}% aprovação
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-600">AIHs:</span>
-                        <div className="font-semibold">{hospital.aihCount}</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Faturamento:</span>
-                        <div className="font-semibold">R$ {hospital.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Médicos:</span>
-                        <div className="font-semibold">{hospital.doctorCount}</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Tempo Médio:</span>
-                        <div className="font-semibold">{hospital.avgProcessingTime}h</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <HospitalRevenueDashboard />
+        </TabsContent>
+
+        {/* TAB: ESPECIALIDADES */}
+        <TabsContent value="specialties" className="space-y-6">
+          <SpecialtyRevenueDashboard />
         </TabsContent>
 
         {/* TAB: MÉDICOS */}
