@@ -13,17 +13,10 @@ import {
   Hospital,
   DollarSign,
   FileText,
-  Download,
-  RefreshCw,
-  Calendar,
-  Filter,
-  Eye,
   AlertTriangle,
   CheckCircle,
   Clock,
   Activity,
-  PieChart,
-  Building2,
   Stethoscope,
   Target,
   Award
@@ -483,25 +476,21 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
-      {/* HEADER EXECUTIVO */}
-      <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-purple-800 text-white p-8 rounded-xl shadow-2xl">
+      {/* CABEÇALHO */}
+      <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-purple-800 text-white p-6 rounded-xl shadow-lg">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-              <BarChart4 className="h-10 w-10" />
+            <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+              <BarChart4 className="h-8 w-8" />
               Dashboard Executivo
             </h1>
-            <p className="text-blue-100 text-lg">
+            <p className="text-blue-100">
               Central de Inteligência e Relatórios para Diretoria
             </p>
             <div className="flex items-center gap-4 mt-3">
               <Badge className="bg-blue-700 text-white">
                 <Award className="h-4 w-4 mr-1" />
-                Perfil: {user?.role?.toUpperCase()}
-              </Badge>
-              <Badge className="bg-purple-700 text-white">
-                <Building2 className="h-4 w-4 mr-1" />
-                Acesso Total: {kpiData.activeHospitals} Hospitais
+                {user?.role?.toUpperCase()}
               </Badge>
             </div>
           </div>
@@ -520,61 +509,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         </div>
       </div>
 
-      {/* CONTROLES EXECUTIVOS */}
-      <Card className="border-blue-200 shadow-lg">
-        <CardHeader className="bg-blue-50">
-          <CardTitle className="flex items-center gap-2 text-blue-800">
-            <Filter className="h-5 w-5" />
-            Controles Executivos
-          </CardTitle>
-          <CardDescription>
-            Configure a visão dos dados conforme suas necessidades de análise
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4 items-center">
-            {/* Período */}
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-600" />
-              <span className="text-sm font-medium">Período:</span>
-              <Select value={selectedTimeRange} onValueChange={setSelectedTimeRange}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7d">Últimos 7 dias</SelectItem>
-                  <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                  <SelectItem value="90d">Últimos 3 meses</SelectItem>
-                  <SelectItem value="6m">Últimos 6 meses</SelectItem>
-                  <SelectItem value="1y">Último ano</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Refresh */}
-            <Button 
-              onClick={loadExecutiveData} 
-              disabled={isLoading}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              {isLoading ? 'Atualizando...' : 'Atualizar'}
-            </Button>
-
-            {/* Export */}
-            <Button variant="outline" className="border-green-300 text-green-700 hover:bg-green-50">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar Relatório
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* KPIS EXECUTIVOS */}
+      {/* 4 CARDS PRINCIPAIS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-green-200 shadow-lg hover:shadow-xl transition-shadow">
+        <Card className="border-green-200 shadow-lg hover:shadow-xl transition-shadow bg-gradient-to-br from-green-50 to-green-100">
           <CardContent className="p-6 text-center">
-            <DollarSign className="h-10 w-10 mx-auto mb-3 text-green-600" />
+            <DollarSign className="h-12 w-12 mx-auto mb-3 text-green-600" />
             <div className="text-3xl font-bold text-green-700">
               {isLoading ? '...' : formatCurrency(kpiData.totalRevenue)}
             </div>
@@ -589,9 +528,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-blue-200 shadow-lg hover:shadow-xl transition-shadow">
+        <Card className="border-blue-200 shadow-lg hover:shadow-xl transition-shadow bg-gradient-to-br from-blue-50 to-blue-100">
           <CardContent className="p-6 text-center">
-            <FileText className="h-10 w-10 mx-auto mb-3 text-blue-600" />
+            <FileText className="h-12 w-12 mx-auto mb-3 text-blue-600" />
             <div className="text-3xl font-bold text-blue-700">
               {isLoading ? '...' : formatNumber(kpiData.totalAIHs)}
             </div>
@@ -602,9 +541,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-purple-200 shadow-lg hover:shadow-xl transition-shadow">
+        <Card className="border-purple-200 shadow-lg hover:shadow-xl transition-shadow bg-gradient-to-br from-purple-50 to-purple-100">
           <CardContent className="p-6 text-center">
-            <CheckCircle className="h-10 w-10 mx-auto mb-3 text-purple-600" />
+            <CheckCircle className="h-12 w-12 mx-auto mb-3 text-purple-600" />
             <div className="text-3xl font-bold text-purple-700">
               {isLoading ? '...' : kpiData.approvalRate.toFixed(1)}%
             </div>
@@ -615,9 +554,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-orange-200 shadow-lg hover:shadow-xl transition-shadow">
+        <Card className="border-orange-200 shadow-lg hover:shadow-xl transition-shadow bg-gradient-to-br from-orange-50 to-orange-100">
           <CardContent className="p-6 text-center">
-            <Activity className="h-10 w-10 mx-auto mb-3 text-orange-600" />
+            <Activity className="h-12 w-12 mx-auto mb-3 text-orange-600" />
             <div className="text-3xl font-bold text-orange-700">
               {isLoading ? '...' : kpiData.processingTime.toFixed(1)}h
             </div>
@@ -629,13 +568,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         </Card>
       </div>
 
-      {/* TABS PRINCIPAIS */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 bg-blue-100">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            <Eye className="h-4 w-4 mr-2" />
-            Visão Geral
-          </TabsTrigger>
+
+
+      <Tabs defaultValue="hospitals" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5 bg-blue-100">
           <TabsTrigger value="hospitals" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <Hospital className="h-4 w-4 mr-2" />
             Hospitais
@@ -658,176 +594,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           </TabsTrigger>
         </TabsList>
 
-        {/* TAB: VISÃO GERAL */}
-        <TabsContent value="overview" className="space-y-6">
-          {/* ✅ SEÇÃO: AIHS PROCESSADAS (DADOS REAIS DAS VIEWS) */}
-          {billingStats && billingStats.metrics.totalAIHs > 0 && (
-            <Card className="shadow-lg border-green-200 bg-green-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-green-800">
-                  <FileText className="h-5 w-5" />
-                  AIHs Processadas - Dados das Views
-                </CardTitle>
-                <CardDescription className="text-green-700">
-                  Estatísticas baseadas nas {billingStats.metrics.totalAIHs} AIHs processadas (views completas)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl font-bold text-green-700">
-                      {formatCurrency(normalizeValue(billingStats.metrics.totalRevenue))}
-                    </div>
-                    <div className="text-sm text-green-600">Faturamento Total</div>
-                  </div>
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl font-bold text-blue-700">{formatNumber(billingStats.metrics.totalAIHs)}</div>
-                    <div className="text-sm text-blue-600">AIHs Processadas</div>
-                  </div>
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl font-bold text-purple-700">
-                      {formatNumber(billingStats.summary?.approved_aihs || 0)} + {formatNumber(billingStats.summary?.pending_aihs || 0)}
-                    </div>
-                    <div className="text-sm text-purple-600">Aprovadas + Pendentes</div>
-                  </div>
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl font-bold text-orange-700">
-                      {(billingStats.metrics.approvalRate || 0).toFixed(1)}%
-                    </div>
-                    <div className="text-sm text-orange-600">Taxa Aprovação</div>
-                  </div>
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl font-bold text-indigo-700">
-                      {formatCurrency(normalizeValue(billingStats.metrics.averageTicket))}
-                    </div>
-                    <div className="text-sm text-indigo-600">Ticket Médio</div>
-                  </div>
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl font-bold text-teal-700">{formatNumber(billingStats.metrics.totalPatients)}</div>
-                    <div className="text-sm text-teal-600">Pacientes (est.)</div>
-                  </div>
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl font-bold text-red-700">{formatNumber(billingStats.metrics.activeHospitals)}</div>
-                    <div className="text-sm text-red-600">Hospitais</div>
-                  </div>
-                  <div className="text-center p-3 bg-white rounded-lg border">
-                    <div className="text-2xl font-bold text-gray-700">{formatNumber(billingStats.metrics.activeDoctors)}</div>
-                    <div className="text-sm text-gray-600">Médicos</div>
-                  </div>
-                </div>
-                
-                {/* Status de Processamento */}
-                <div className="mt-4 p-3 bg-white rounded-lg border">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-gray-700">Status de Processamento</span>
-                  </div>
-                  <div className="flex gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <span>Aprovadas: {billingStats.summary?.approved_aihs || 0}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                      <span>Pendentes: {billingStats.summary?.pending_aihs || 0}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                      <span>Rejeitadas: {billingStats.summary?.rejected_aihs || 0}</span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Top Performers */}
-                {billingStats.metrics.topHospitalByRevenue && (
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg border">
-                    <div className="font-medium text-gray-700 mb-2">🏆 Top Performer</div>
-                    <div className="text-sm">
-                      <strong>{billingStats.metrics.topHospitalByRevenue.hospital_name}</strong> - 
-                      {formatCurrency(normalizeValue(billingStats.metrics.topHospitalByRevenue.total_value))} 
-                      ({formatNumber(billingStats.metrics.topHospitalByRevenue.total_aihs)} AIHs)
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-blue-600" />
-                  Resumo Executivo
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Hospitais Ativos</span>
-                    <Badge className="bg-blue-100 text-blue-800">{kpiData.activeHospitals}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Médicos Ativos</span>
-                    <Badge className="bg-green-100 text-green-800">{kpiData.activeDoctors}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Taxa de Crescimento</span>
-                    <Badge className="bg-purple-100 text-purple-800">+{kpiData.monthlyGrowth}%</Badge>
-                  </div>
-                  {billingStats && (
-                    <div className="border-t pt-3 mt-4">
-                      <div className="text-sm text-gray-600 mb-2">Fonte dos Dados:</div>
-                      <Badge className="bg-green-100 text-green-800 mr-2">
-                        ✓ AIHs Views: {billingStats.metrics.totalAIHs}
-                      </Badge>
-                      <Badge className="bg-blue-100 text-blue-800">
-                        Médicos Views: {kpiData.activeDoctors}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PieChart className="h-5 w-5 text-purple-600" />
-                  {billingStats ? 'Distribuição por Hospital (Views)' : 'Faturamento por Hospital'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {billingStats && billingStats.byHospital.length > 0 ? (
-                  <div className="space-y-3">
-                    {billingStats.byHospital.slice(0, 5).map((hospital, index) => (
-                      <div key={hospital.hospital_id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                        <div>
-                          <div className="font-medium text-sm">{hospital.hospital_name}</div>
-                          <div className="text-xs text-gray-600">
-                            {hospital.total_aihs} AIHs | {hospital.unique_doctors} médicos
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold text-green-700">
-                            {formatCurrency(normalizeValue(hospital.total_value))}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="h-48 bg-gray-50 rounded-lg flex items-center justify-center">
-                    <div className="text-center text-gray-500">
-                      <PieChart className="h-8 w-8 mx-auto mb-2" />
-                      <div className="text-sm">Aguardando dados das views...</div>
-                      <div className="text-xs">Processe algumas AIHs para ver estatísticas</div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
 
         {/* TAB: HOSPITAIS */}
         <TabsContent value="hospitals" className="space-y-6">
