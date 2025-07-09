@@ -21,6 +21,31 @@ import {
 } from './ui/sidebar';
 import { Button } from './ui/button';
 
+// Estilos CSS personalizados para animações premium
+const premiumStyles = `
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+  }
+  
+  .premium-gradient {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .premium-shadow {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+  
+  .premium-hover:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+`;
+
 interface SidebarNavigationProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
@@ -39,7 +64,8 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       icon: Home,
       description: 'Visão geral do sistema',
       requiresAdmin: false,
-      order: 1
+      order: 1,
+      color: 'from-blue-500 to-indigo-600'
     },
     {
       id: 'sigtap',
@@ -47,7 +73,8 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       icon: Upload,
       description: 'Importação da tabela - Apenas diretoria/admin',
       requiresAdmin: true,
-      order: 2
+      order: 2,
+      color: 'from-purple-500 to-violet-600'
     },
     {
       id: 'sigtap-viewer',
@@ -55,7 +82,8 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       icon: Search,
       description: 'Visualizar procedimentos',
       requiresAdmin: false,
-      order: 3
+      order: 3,
+      color: 'from-emerald-500 to-teal-600'
     },
     {
       id: 'aih-multipage-tester',
@@ -63,7 +91,8 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       icon: FileUp,
       description: 'Upload e processamento oficial de AIHs',
       requiresAdmin: false,
-      order: 4
+      order: 4,
+      color: 'from-orange-500 to-red-600'
     },
     {
       id: 'patients',
@@ -71,7 +100,8 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       icon: Users,
       description: 'Cadastro e gerenciamento',
       requiresAdmin: false,
-      order: 5
+      order: 5,
+      color: 'from-cyan-500 to-blue-600'
     },
     {
       id: 'executive-dashboard',
@@ -80,7 +110,8 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       description: 'Central de inteligência e relatórios para diretoria',
       requiresAdmin: true,
       requiresExecutive: true,
-      order: 6
+      order: 6,
+      color: 'from-pink-500 to-purple-600'
     },
     {
       id: 'medical-staff',
@@ -89,7 +120,8 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       description: 'Gestão e análise do corpo clínico médico',
       requiresAdmin: true,
       requiresExecutive: true,
-      order: 7
+      order: 7,
+      color: 'from-indigo-500 to-purple-600'
     },
     {
       id: 'audit-dashboard',
@@ -98,7 +130,8 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       description: 'Auditoria e rastreamento de AIH por analista',
       requiresAdmin: false,
       requiresAuditor: true,
-      order: 8
+      order: 8,
+      color: 'from-amber-500 to-orange-600'
     },
     {
       id: 'aih-upload',
@@ -107,7 +140,8 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       description: 'Teste de rastreabilidade - Apenas desenvolvimento',
       requiresAdmin: true,
       requiresDeveloper: true,
-      order: 9
+      order: 9,
+      color: 'from-slate-500 to-gray-600'
     }
   ];
 
@@ -238,37 +272,58 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
 
   return (
     <>
-      <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r-0 shadow-lg">
+      {/* Injeção de estilos CSS premium */}
+      <style>{premiumStyles}</style>
+      
+      <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r-0 shadow-2xl shadow-slate-900/10">
         {/* HEADER - Logo e Nome da Empresa com Design Premium */}
-        <SidebarHeader className="border-b border-sidebar-border bg-gradient-to-r from-blue-50 to-indigo-50 p-6">
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <div className="absolute inset-0 bg-blue-600 rounded-lg blur-sm opacity-20"></div>
-              <Building2 className="relative h-9 w-9 text-blue-600 flex-shrink-0 drop-shadow-sm" />
-            </div>
-            <div className="group-data-[collapsible=icon]:hidden">
-              <div className="text-xl font-bold bg-gradient-to-r from-gray-900 to-blue-900 bg-clip-text text-transparent leading-tight">
-                SIGTAP
+        <SidebarHeader className="relative border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50 p-6 backdrop-blur-sm">
+          {/* Background decorativo */}
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-500/5 to-blue-500/5"></div>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full blur-3xl"></div>
+          
+          <div className="relative flex items-center space-x-4">
+            <div className="relative group">
+              {/* Efeito de brilho atrás do ícone */}
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl blur-md opacity-20 group-hover:opacity-30 transition-opacity duration-300"></div>
+              
+              {/* Container do ícone com gradiente */}
+              <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-2.5 shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
+                <Building2 className="h-6 w-6 text-white drop-shadow-sm" />
               </div>
-              <div className="text-sm font-semibold text-blue-600 leading-tight tracking-wide">
-                Sync
-              </div>
+              
+              {/* Pulse effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl animate-pulse opacity-20"></div>
             </div>
-            {canAccessAllHospitals() && (
-              <Badge variant="outline" className="group-data-[collapsible=icon]:hidden ml-auto bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 border-purple-200 text-xs px-3 py-1.5 font-medium shadow-sm">
-                <Globe className="h-3 w-3 mr-1.5" />
-                ADMIN
-              </Badge>
-            )}
+            
+            <div className="group-data-[collapsible=icon]:hidden flex-1">
+              <div className="flex items-baseline space-x-2">
+                <div className="text-2xl font-black bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 bg-clip-text text-transparent tracking-tight">
+                  SIGTAP
+                </div>
+                <div className="text-sm font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent tracking-wider">
+                  Sync
+                </div>
+              </div>
+              <div className="text-xs text-slate-600 mt-0.5 font-medium tracking-wide">
+                Billing Wizard v3.0
+              </div>
+              {canAccessAllHospitals() && (
+                <Badge className="mt-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 text-xs px-3 py-1.5 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                  <Globe className="h-3 w-3 mr-1.5" />
+                  ADMIN
+                </Badge>
+              )}
+            </div>
           </div>
         </SidebarHeader>
 
         {/* CONTENT - Menu de Navegação com Design Premium */}
-        <SidebarContent className="p-3 space-y-1">
+        <SidebarContent className="p-4 space-y-1">
           <SidebarGroup>
-            <SidebarGroupLabel className="text-xs font-bold text-gray-600 uppercase tracking-wider px-3 py-2 bg-gray-50/50 rounded-md mb-2">
+            <SidebarGroupLabel className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/80 rounded-xl mb-3 border border-slate-200/60">
               <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-pulse"></div>
                 <span>Navegação</span>
               </div>
             </SidebarGroupLabel>
@@ -286,68 +341,98 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                         isActive={isActive}
                         tooltip={tab.description}
                         className={`
-                          w-full relative overflow-hidden transition-all duration-300 ease-in-out
+                          w-full relative overflow-hidden transition-all duration-500 ease-out group/menu-item
                           ${isActive 
-                            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 scale-[1.02] border-0' 
-                            : 'hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50 hover:shadow-md hover:scale-[1.01] hover:border-blue-200/50'
+                            ? `bg-gradient-to-r ${tab.color} text-white shadow-lg scale-[1.02] translate-x-1` 
+                            : `hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50/50 hover:shadow-md hover:scale-[1.01] hover:translate-x-0.5`
                           }
-                          group/menu-item rounded-xl p-3 mb-1 border border-transparent
-                          focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
+                          rounded-2xl p-4 mb-2 backdrop-blur-sm
+                          transform-gpu
                         `}
                         style={{
-                          animationDelay: `${index * 50}ms`
+                          animationDelay: `${index * 75}ms`,
+                          animationFillMode: 'both'
                         }}
                       >
+                        {/* Background decorativo */}
                         <div className={`
-                          flex items-center justify-center w-8 h-8 rounded-lg mr-3 transition-all duration-300
+                          absolute inset-0 rounded-2xl transition-all duration-500
                           ${isActive 
-                            ? 'bg-white/20 shadow-lg' 
-                            : 'bg-gray-100 group-hover/menu-item:bg-blue-100 group-hover/menu-item:shadow-md'
+                            ? 'bg-gradient-to-r from-white/10 to-transparent' 
+                            : 'bg-gradient-to-r from-transparent to-transparent group-hover/menu-item:from-slate-50 group-hover/menu-item:to-blue-50/30'
+                          }
+                        `}></div>
+                        
+                        {/* Container do ícone com design premium */}
+                        <div className={`
+                          relative flex items-center justify-center w-10 h-10 rounded-xl mr-4 transition-all duration-500
+                          ${isActive 
+                            ? 'bg-white/20 shadow-lg backdrop-blur-sm' 
+                            : 'bg-gradient-to-br from-slate-100 to-slate-200/80 group-hover/menu-item:bg-gradient-to-br group-hover/menu-item:from-blue-100 group-hover/menu-item:to-indigo-100/80 group-hover/menu-item:shadow-lg'
                           }
                         `}>
                           <Icon className={`
-                            h-4 w-4 transition-all duration-300
+                            h-5 w-5 transition-all duration-500
                             ${isActive 
-                              ? 'text-white drop-shadow-sm' 
-                              : 'text-gray-600 group-hover/menu-item:text-blue-600'
+                              ? 'text-white drop-shadow-sm scale-110' 
+                              : 'text-slate-600 group-hover/menu-item:text-blue-600 group-hover/menu-item:scale-110'
                             }
                           `} />
                         </div>
-                        <span className={`
-                          font-medium transition-all duration-300
-                          ${isActive 
-                            ? 'text-white drop-shadow-sm' 
-                            : 'text-gray-700 group-hover/menu-item:text-blue-700'
-                          }
-                        `}>
-                          {tab.label}
-                        </span>
+                        
+                        <div className="relative flex-1">
+                          <span className={`
+                            font-semibold transition-all duration-500 text-sm
+                            ${isActive 
+                              ? 'text-white drop-shadow-sm' 
+                              : 'text-slate-700 group-hover/menu-item:text-blue-700'
+                            }
+                          `}>
+                            {tab.label}
+                          </span>
+                          
+                          {/* Descrição sutil */}
+                          <div className={`
+                            text-xs mt-0.5 transition-all duration-500 group-data-[collapsible=icon]:hidden
+                            ${isActive 
+                              ? 'text-white/80' 
+                              : 'text-slate-500 group-hover/menu-item:text-blue-600/80'
+                            }
+                          `}>
+                            {tab.description.split(' - ')[0]}
+                          </div>
+                        </div>
                         
                         {/* Badge especial para sistema oficial - apenas para developers/ti */}
                         {tab.id === 'aih-multipage-tester' && isDeveloper && (
-                          <Badge variant="outline" className={`
-                            ml-auto text-xs transition-all duration-300 group-data-[collapsible=icon]:hidden
+                          <Badge className={`
+                            ml-auto text-xs transition-all duration-500 group-data-[collapsible=icon]:hidden
                             ${isActive 
                               ? 'bg-white/20 text-white border-white/30 shadow-sm' 
-                              : 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-green-200 group-hover/menu-item:shadow-md'
+                              : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0 shadow-lg group-hover/menu-item:shadow-xl'
                             }
                           `}>
                             <div className="flex items-center space-x-1">
                               <div className="w-1.5 h-1.5 bg-current rounded-full animate-pulse"></div>
-                              <span>OFICIAL</span>
+                              <span className="font-semibold">OFICIAL</span>
                             </div>
                           </Badge>
                         )}
 
-                        {/* Indicador de ativo com animação */}
+                        {/* Indicador de ativo com design premium */}
                         {isActive && (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-full shadow-lg animate-pulse"></div>
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full shadow-lg">
+                            <div className="absolute inset-0 bg-white rounded-r-full animate-pulse"></div>
+                          </div>
                         )}
 
                         {/* Efeito de shimmer para item ativo */}
                         {isActive && (
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 animate-shimmer"></div>
                         )}
+                        
+                        {/* Efeito de brilho no hover */}
+                        <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover/menu-item:opacity-100 transition-opacity duration-500"></div>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -358,87 +443,97 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
         </SidebarContent>
 
         {/* FOOTER - Informações do Usuário com Design Premium */}
-        <SidebarFooter className="border-t border-sidebar-border bg-gradient-to-r from-gray-50 to-blue-50/30 p-4">
+        <SidebarFooter className="border-t border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50 p-4 backdrop-blur-sm">
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton className={`
-                    w-full transition-all duration-300 ease-in-out
-                    data-[state=open]:bg-gradient-to-r data-[state=open]:from-blue-500 data-[state=open]:to-blue-600 
-                    data-[state=open]:text-white data-[state=open]:shadow-lg data-[state=open]:shadow-blue-500/25
-                    hover:bg-gradient-to-r hover:from-gray-100 hover:to-blue-100 hover:shadow-md hover:scale-[1.02]
-                    rounded-xl p-3 border border-transparent hover:border-blue-200/50
+                    w-full transition-all duration-500 ease-out group/user-button
+                    data-[state=open]:bg-gradient-to-r data-[state=open]:from-blue-500 data-[state=open]:to-indigo-600 
+                    data-[state=open]:text-white data-[state=open]:shadow-xl data-[state=open]:shadow-blue-500/25 data-[state=open]:scale-[1.02]
+                    hover:bg-gradient-to-r hover:from-slate-100 hover:to-blue-100/80 hover:shadow-lg hover:scale-[1.01]
+                    rounded-2xl p-4 border border-transparent hover:border-blue-200/50
                     focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
-                    group/user-button
+                    backdrop-blur-sm
                   `}>
                     <div className="relative">
-                      <Avatar className="h-8 w-8 ring-2 ring-white shadow-lg">
+                      <Avatar className="h-10 w-10 ring-2 ring-white shadow-xl transition-all duration-300 group-hover/user-button:shadow-2xl">
                         <AvatarFallback className={`text-sm font-bold transition-all duration-300 ${
                           canAccessAllHospitals() 
-                            ? 'bg-gradient-to-br from-purple-400 to-pink-500 text-white' 
-                            : 'bg-gradient-to-br from-blue-400 to-indigo-500 text-white'
+                            ? 'bg-gradient-to-br from-purple-500 to-pink-600 text-white' 
+                            : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white'
                         }`}>
                           {getInitials(user.full_name, user.email)}
                         </AvatarFallback>
                       </Avatar>
                       {canAccessAllHospitals() && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white">
-                          <Crown className="h-2 w-2 text-white" />
+                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white">
+                          <Crown className="h-2.5 w-2.5 text-white" />
                         </div>
                       )}
-                      {/* Indicador de status online */}
-                      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm animate-pulse"></div>
+                      {/* Indicador de status online com design premium */}
+                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-gradient-to-br from-emerald-400 to-green-500 rounded-full border-2 border-white shadow-lg">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-500 rounded-full animate-pulse"></div>
+                      </div>
                     </div>
-                    <div className="group-data-[collapsible=icon]:hidden flex-1 text-left min-w-0 ml-3">
-                      <div className="text-sm font-semibold text-gray-900 truncate group-data-[state=open]/user-button:text-white transition-colors duration-300">
+                    <div className="group-data-[collapsible=icon]:hidden flex-1 text-left min-w-0 ml-4">
+                      <div className="text-sm font-semibold text-slate-900 truncate group-data-[state=open]/user-button:text-white transition-all duration-300">
                         {user.full_name || user.email?.split('@')[0]}
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="text-xs text-gray-600 truncate group-data-[state=open]/user-button:text-blue-100 transition-colors duration-300">
+                      <div className="flex items-center space-x-2 mt-1">
+                        <div className="text-xs text-slate-600 truncate group-data-[state=open]/user-button:text-blue-100 transition-all duration-300 font-medium">
                           {roleConfig?.label || 'Usuário'}
                         </div>
                         {canAccessAllHospitals() && (
-                          <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200 px-2 py-0.5">
+                          <Badge className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 px-2 py-0.5 shadow-lg">
                             ADMIN
                           </Badge>
                         )}
                       </div>
                     </div>
-                    <div className="group-data-[collapsible=icon]:hidden opacity-60 group-hover/user-button:opacity-100 transition-opacity duration-300">
-                      <div className="text-xs text-gray-400 group-data-[state=open]/user-button:text-blue-200">
-                        ⚙️
+                    <div className="group-data-[collapsible=icon]:hidden opacity-60 group-hover/user-button:opacity-100 transition-all duration-300">
+                      <div className="text-sm text-slate-400 group-data-[state=open]/user-button:text-blue-200 group-hover/user-button:text-blue-600 transition-all duration-300">
+                        <Settings className="h-4 w-4" />
                       </div>
                     </div>
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 
-                <DropdownMenuContent className="w-96 shadow-premium-lg border-0 bg-white/95 backdrop-blur-xl" align="end" forceMount>
+                <DropdownMenuContent className="w-96 shadow-2xl border-0 bg-white/95 backdrop-blur-2xl rounded-3xl overflow-hidden" align="end" forceMount>
                   {/* Informações do Usuário com Design Premium */}
-                  <div className="flex items-center space-x-3 p-6 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className={`font-medium ${
-                        canAccessAllHospitals() 
-                          ? 'bg-purple-100 text-purple-700' 
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
-                        {getInitials(user.full_name, user.email)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                  <div className="relative flex items-center space-x-4 p-6 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50 backdrop-blur-sm">
+                    <div className="relative">
+                      <Avatar className="h-12 w-12 ring-2 ring-white shadow-lg">
+                        <AvatarFallback className={`font-semibold text-sm ${
+                          canAccessAllHospitals() 
+                            ? 'bg-gradient-to-br from-purple-500 to-pink-600 text-white' 
+                            : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white'
+                        }`}>
+                          {getInitials(user.full_name, user.email)}
+                        </AvatarFallback>
+                      </Avatar>
+                      {canAccessAllHospitals() && (
+                        <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white">
+                          <Crown className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="relative flex-1 min-w-0">
+                      <p className="text-base font-semibold text-slate-900 truncate">
                         {user.full_name || user.email?.split('@')[0]}
                       </p>
-                      <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                      <div className="flex gap-1 mt-1">
+                      <p className="text-sm text-slate-600 truncate">{user.email}</p>
+                      <div className="flex gap-2 mt-2">
                         {roleConfig && (
-                          <Badge variant="outline" className={`${roleConfig.color} text-xs`}>
+                          <Badge className={`${roleConfig.color} text-xs shadow-sm`}>
                             <roleConfig.icon className="h-3 w-3 mr-1" />
                             {roleConfig.label}
                           </Badge>
                         )}
                         {canAccessAllHospitals() && (
-                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
+                          <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 text-xs shadow-sm">
                             <Shield className="h-3 w-3 mr-1" />
                             FULL ACCESS
                           </Badge>
@@ -448,31 +543,31 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                   </div>
 
                   {/* Informações de Acesso com Design Premium */}
-                  <div className={`p-4 border-b border-gray-100 ${
-                    canAccessAllHospitals() 
-                      ? 'bg-gradient-to-r from-purple-50 to-pink-50' 
-                      : 'bg-gradient-to-r from-blue-50 to-indigo-50'
-                  }`}>
-                    <div className={`flex items-center ${
-                      canAccessAllHospitals() ? 'text-purple-700' : 'text-blue-700'
-                    }`}>
-                      {canAccessAllHospitals() ? (
-                        <Globe className="h-4 w-4 mr-2" />
-                      ) : (
-                        <Building2 className="h-4 w-4 mr-2" />
-                      )}
-                      <div>
-                        <p className="text-xs font-medium">
+                  <div className="relative p-5 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
+                    <div className="flex items-center space-x-3">
+                      <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${
+                        canAccessAllHospitals() 
+                          ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg' 
+                          : 'bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg'
+                      }`}>
+                        {canAccessAllHospitals() ? (
+                          <Globe className="h-5 w-5" />
+                        ) : (
+                          <Building2 className="h-5 w-5" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-slate-900">
                           {canAccessAllHospitals() ? 'Acesso Administrativo' : 'Hospital Atual'}
                         </p>
-                        <p className={`text-xs ${
+                        <p className={`text-sm font-medium ${
                           canAccessAllHospitals() ? 'text-purple-600' : 'text-blue-600'
                         }`}>
                           {getHospitalDisplayName()}
                         </p>
                       </div>
                     </div>
-                    <p className={`text-xs mt-1 ${
+                    <p className={`text-xs mt-3 ${
                       canAccessAllHospitals() ? 'text-purple-600' : 'text-blue-600'
                     }`}>
                       {canAccessAllHospitals() 
@@ -483,50 +578,85 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                   </div>
 
                   {/* Informações sobre funcionalidades disponíveis com Design Premium */}
-                  <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-green-50">
-                    <p className="text-sm font-semibold text-gray-800 mb-3 flex items-center">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                      Funcionalidades Disponíveis
-                    </p>
-                    <div className="space-y-1">
-                      <p className="text-xs text-green-600">✅ Dashboard</p>
-                      <p className="text-xs text-green-600">✅ Consulta SIGTAP</p>
-                      <p className="text-xs text-green-600">✅ AIH Avançado (Sistema Oficial)</p>
-                      <p className="text-xs text-green-600">✅ Gerenciamento de Pacientes</p>
+                  <div className="relative p-5 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-lg">
+                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                      </div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Funcionalidades Disponíveis
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                        <p className="text-xs text-emerald-600 font-medium">Dashboard</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                        <p className="text-xs text-emerald-600 font-medium">Consulta SIGTAP</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                        <p className="text-xs text-emerald-600 font-medium">AIH Avançado (Sistema Oficial)</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
+                        <p className="text-xs text-emerald-600 font-medium">Gerenciamento de Pacientes</p>
+                      </div>
                       {hasFullAccess() && (
                         <>
-                          <p className="text-xs text-blue-600">✅ Importação SIGTAP (Diretoria)</p>
-                          <p className="text-xs text-blue-600">✅ Upload AIH (Testes)</p>
-                          <p className="text-xs text-blue-600">✅ Relatórios Executivos</p>
-                          <p className="text-xs text-purple-600">✅ Todas as funcionalidades administrativas</p>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                            <p className="text-xs text-blue-600 font-medium">Importação SIGTAP (Diretoria)</p>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                            <p className="text-xs text-blue-600 font-medium">Upload AIH (Testes)</p>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                            <p className="text-xs text-blue-600 font-medium">Relatórios Executivos</p>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-1.5 h-1.5 bg-purple-500 rounded-full"></div>
+                            <p className="text-xs text-purple-600 font-medium">Todas as funcionalidades administrativas</p>
+                          </div>
                         </>
                       )}
                       {!hasFullAccess() && (
-                        <p className="text-xs text-gray-500">ℹ️ Perfil operador - Interface otimizada para uso diário</p>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div>
+                          <p className="text-xs text-slate-500 font-medium">Perfil operador - Interface otimizada para uso diário</p>
+                        </div>
                       )}
                     </div>
                   </div>
 
                   {/* Permissões com Design Premium */}
-                  <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-blue-50">
-                    <p className="text-sm font-semibold text-gray-800 mb-3 flex items-center">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></div>
-                      Suas Permissões
-                    </p>
-                    <div className="flex flex-wrap gap-1">
+                  <div className="relative p-5 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg">
+                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                      </div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Suas Permissões
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
                       {canAccessAllHospitals() ? (
-                        <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
+                        <Badge className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 shadow-sm">
                           TODAS AS PERMISSÕES
                         </Badge>
                       ) : (
                         <>
                           {user.permissions.slice(0, 3).map((perm, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
+                            <Badge key={index} className="text-xs bg-gradient-to-r from-slate-500 to-slate-600 text-white border-0 shadow-sm">
                               {perm}
                             </Badge>
                           ))}
                           {user.permissions.length > 3 && (
-                            <Badge variant="secondary" className="text-xs">
+                            <Badge className="text-xs bg-gradient-to-r from-slate-400 to-slate-500 text-white border-0 shadow-sm">
                               +{user.permissions.length - 3} mais
                             </Badge>
                           )}
@@ -537,40 +667,44 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
 
                   {/* Descrição do Role com Design Premium */}
                   {roleConfig && (
-                    <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-indigo-50">
-                      <p className="text-sm text-gray-700 italic flex items-center">
-                        <div className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></div>
-                        {roleConfig.description}
-                      </p>
+                    <div className="relative p-5 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white shadow-lg">
+                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                        </div>
+                        <p className="text-sm text-slate-700 font-medium italic">
+                          {roleConfig.description}
+                        </p>
+                      </div>
                     </div>
                   )}
 
                   {/* Menu Items com Design Premium */}
-                  <div className="p-2 bg-gray-50">
+                  <div className="p-4 bg-gradient-to-br from-slate-50 to-slate-100/50 space-y-2">
                     <DropdownMenuItem 
-                      className="cursor-pointer premium-hover focus-glow rounded-lg p-3 transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50" 
+                      className="cursor-pointer rounded-2xl p-4 transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:shadow-md hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group" 
                       onClick={() => setShowProfileModal(true)}
                     >
-                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 mr-3">
-                        <Settings className="h-4 w-4 text-blue-600" />
+                      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg mr-4 group-hover:shadow-lg transition-all duration-300">
+                        <Settings className="h-5 w-5" />
                       </div>
-                      <span className="font-medium text-gray-700">Configurações</span>
+                      <span className="font-semibold text-slate-700 group-hover:text-blue-700 transition-colors duration-300">Configurações</span>
                     </DropdownMenuItem>
                     
-                    <DropdownMenuSeparator className="my-2" />
+                    <DropdownMenuSeparator className="my-3 border-slate-200/60" />
                     
                     <DropdownMenuItem 
-                      className="cursor-pointer premium-hover focus-glow rounded-lg p-3 transition-all duration-300 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 text-red-600 focus:text-red-600"
+                      className="cursor-pointer rounded-2xl p-4 transition-all duration-300 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 hover:shadow-md hover:scale-[1.01] text-red-600 focus:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 group"
                       onClick={handleLogout}
                       disabled={isLoggingOut}
                     >
-                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-100 mr-3">
-                        <LogOut className="h-4 w-4 text-red-600" />
+                      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 text-white shadow-lg mr-4 group-hover:shadow-lg transition-all duration-300">
+                        <LogOut className="h-5 w-5" />
                       </div>
-                      <span className="font-medium">
+                      <span className="font-semibold group-hover:text-red-700 transition-colors duration-300">
                         {isLoggingOut ? (
                           <div className="flex items-center">
-                            <div className="animate-spin-elegant w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full mr-2"></div>
+                            <div className="animate-spin w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full mr-2"></div>
                             Saindo...
                           </div>
                         ) : (

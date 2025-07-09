@@ -18,37 +18,125 @@ import {
   DollarSign, 
   TrendingUp,
   BarChart3,
-  AlertTriangle,
-  ChevronDown,
-  ChevronUp,
-  Stethoscope
+  AlertTriangle
 } from 'lucide-react';
 import { DoctorsRevenueService, type HospitalStats, type DoctorAggregated } from '../services/doctorsRevenueService';
 import { supabase } from '../lib/supabase';
 
-// ✅ FUNÇÃO PARA FORMATAÇÃO DE MOEDA
+// 🔍 CONTROLE DE DEBUG - Altere para false para remover logs
+let DEBUG_ENABLED = true;
+
+const debugLog = (message: string, ...args: any[]) => {
+  if (DEBUG_ENABLED) {
+    console.log(message, ...args);
+  }
+};
+
+const toggleDebug = () => {
+  DEBUG_ENABLED = !DEBUG_ENABLED;
+  console.log(`🔧 DEBUG ${DEBUG_ENABLED ? 'HABILITADO' : 'DESABILITADO'}`);
+};
+
+// ✅ FUNÇÃO PARA FORMATAÇÃO DE MOEDA COM CORREÇÃO AUTOMÁTICA
 const formatCurrency = (value: number | null | undefined): string => {
   if (value == null || isNaN(value)) return 'R$ 0,00';
+  
+  // 🔍 DEBUG: Log do valor antes da formatação
+  debugLog(`🔍 formatCurrency - Valor recebido: ${value} (tipo: ${typeof value})`);
+  
+  // Aplicar correção automática se necessário
+  const correctedValue = detectAndFixDecimalIssues(value);
+  
+  // 🔍 DEBUG: Log se houve correção
+  if (correctedValue !== value) {
+    debugLog(`🔧 formatCurrency - Valor corrigido: ${value} → ${correctedValue}`);
+  }
+  
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(value);
+  }).format(correctedValue);
+};
+
+// ✅ FUNÇÃO PARA DETECTAR E CORRIGIR VALORES COM CASAS DECIMAIS INCORRETAS
+const detectAndFixDecimalIssues = (value: number): number => {
+  if (value <= 0) return value;
+  
+  // Se o valor tem mais de 2 casas decimais significativas, pode ser um problema
+  const decimalPart = value % 1;
+  const integerPart = Math.floor(value);
+  
+  debugLog(`🔍 detectAndFixDecimalIssues - Valor: ${value}, Parte inteira: ${integerPart}, Parte decimal: ${decimalPart}`);
+  
+  // CENÁRIO 1: Valor alto com casas decimais (provável em centavos)
+  // Ex: 123456.78 → 1234.56, 176095.00 → 1760.95
+  if (value > 50000 && decimalPart > 0) {
+    const candidate = value / 100;
+    debugLog(`🔍 detectAndFixDecimalIssues - Candidato para correção (÷100): ${candidate}`);
+    
+    // Se o candidato está numa faixa mais razoável para contexto hospitalar
+    if (candidate >= 500 && candidate <= 50000) {
+      debugLog(`✅ detectAndFixDecimalIssues - Correção aplicada (÷100): ${value} → ${candidate}`);
+      return candidate;
+    }
+  }
+  
+  // CENÁRIO 2: Valor inteiro muito alto (provável em centavos)
+  // Ex: 123456 → 1234.56, 176095 → 1760.95, 91485 → 914.85
+  if (value > 50000 && decimalPart === 0) {
+    const candidate = value / 100;
+    debugLog(`🔍 detectAndFixDecimalIssues - Candidato para correção inteiro (÷100): ${candidate}`);
+    
+    // Se o candidato está numa faixa mais razoável para contexto hospitalar
+    if (candidate >= 500 && candidate <= 50000) {
+      debugLog(`✅ detectAndFixDecimalIssues - Correção aplicada inteiro (÷100): ${value} → ${candidate}`);
+      return candidate;
+    }
+  }
+  
+  // CENÁRIO 3: Detectar padrões específicos de centavos (mais conservador)
+  // Ex: 12345.67 pode ser 123.45 se for uma faixa suspeita
+  if (value > 10000 && value < 50000 && decimalPart > 0) {
+    const candidate = value / 100;
+    // Verificar se o candidato faz mais sentido baseado em contexto hospitalar
+    if (candidate >= 100 && candidate <= 5000) {
+      debugLog(`🔍 detectAndFixDecimalIssues - Candidato contextual: ${candidate}`);
+      // Aplicar correção apenas se o valor original parece suspeito (mais de 5 dígitos)
+      if (String(value).length > 5) {
+        debugLog(`✅ detectAndFixDecimalIssues - Correção contextual aplicada: ${value} → ${candidate}`);
+        return candidate;
+      }
+    }
+  }
+  
+  // Se não precisa de correção, retornar o valor original
+  debugLog(`🔍 detectAndFixDecimalIssues - Valor mantido: ${value}`);
+  return value;
 };
 
 // ✅ FUNÇÃO PARA NORMALIZAR VALORES (CORRIGIR CENTAVOS → REAIS)
 const normalizeValue = (value: number | null | undefined): number => {
   if (value == null || isNaN(value)) return 0;
   
+  // 🔍 DEBUG: Log do valor antes da normalização
+  debugLog(`🔍 normalizeValue - Valor original: ${value} (tipo: ${typeof value})`);
+  
+  // Aplicar detecção e correção de problemas decimais
+  const fixedValue = detectAndFixDecimalIssues(value);
+  
   // Para valores vindos das views, eles já estão em formato correto
   // Mas ainda vamos verificar se há valores exorbitantes (possíveis centavos)
-  if (value > 1000000) { // Valor muito alto (mais de 1 milhão)
-    console.warn(`⚠️ Valor muito alto detectado: ${value}. Possivelmente em centavos, normalizando...`);
-    return value / 100;
+  if (fixedValue > 1000000) { // Valor muito alto (mais de 1 milhão)
+    debugLog(`⚠️ Valor muito alto detectado: ${fixedValue}. Possivelmente em centavos, normalizando...`);
+    const normalized = fixedValue / 100;
+    debugLog(`🔍 normalizeValue - Valor normalizado: ${normalized}`);
+    return normalized;
   }
   
-  return value;
+  debugLog(`🔍 normalizeValue - Valor final: ${fixedValue}`);
+  return fixedValue;
 };
 
 // ✅ FUNÇÃO PARA BUSCAR FATURAMENTO REAL POR HOSPITAL USANDO VIEW
@@ -75,13 +163,21 @@ const getRealHospitalRevenue = async (hospitalId: string): Promise<number> => {
     }
 
     // Usar valor total da view (já processado e normalizado)
-    const totalValue = normalizeValue(Number(summary.total_value || 0));
-    const approvedValue = normalizeValue(Number(summary.approved_value || 0));
+    const rawTotalValue = Number(summary.total_value || 0);
+    const rawApprovedValue = Number(summary.approved_value || 0);
+    
+    // 🔍 DEBUG: Log valores antes da normalização
+    debugLog(`🔍 Hospital ${hospitalId} - Valores RAW da view: total=${rawTotalValue}, approved=${rawApprovedValue}`);
+    
+    const totalValue = normalizeValue(rawTotalValue);
+    const approvedValue = normalizeValue(rawApprovedValue);
 
-    console.log(`✅ Hospital ${hospitalId}: Total: R$ ${totalValue.toFixed(2)} | Aprovado: R$ ${approvedValue.toFixed(2)}`);
+    debugLog(`✅ Hospital ${hospitalId}: Total: R$ ${totalValue.toFixed(2)} | Aprovado: R$ ${approvedValue.toFixed(2)}`);
     
     // Retornar valor aprovado (mais confiável) ou total se não houver aprovado
-    return approvedValue > 0 ? approvedValue : totalValue;
+    const finalValue = approvedValue > 0 ? approvedValue : totalValue;
+    debugLog(`🔍 Hospital ${hospitalId} - Valor final retornado: ${finalValue}`);
+    return finalValue;
     
   } catch (error) {
     console.error(`❌ Erro ao buscar faturamento via view do hospital ${hospitalId}:`, error);
@@ -542,8 +638,6 @@ interface HospitalCardProps {
 }
 
 const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, realRevenue, proceduresData }) => {
-  const [showDoctors, setShowDoctors] = useState(false);
-  const [showProcedures, setShowProcedures] = useState(false);
   
   // Filtrar médicos deste hospital
   const hospitalDoctors = uniqueDoctors.filter(doctor => 
@@ -568,9 +662,6 @@ const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, re
         <div className="flex items-center space-x-2">
           <Badge variant={hospitalDoctors.length > 10 ? "default" : "secondary"}>
             {hospitalDoctors.length} médicos
-          </Badge>
-          <Badge variant={activeDoctors.length > 5 ? "default" : "outline"}>
-            {activeDoctors.length} ativos
           </Badge>
           {doctorsWithMultipleHospitals.length > 0 && (
             <Badge variant="outline" className="text-orange-600">
@@ -601,22 +692,52 @@ const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, re
             <span className="text-xs text-green-600 font-medium">Faturamento</span>
           </div>
           <p className="text-lg font-bold text-green-900 mt-1">
-            {formatCurrency(realRevenue)}
+            {(() => {
+              // 🔍 DEBUG: Log do valor no card de Faturamento
+              debugLog(`🔍 Card Faturamento [${hospital.hospital_name}] - realRevenue: ${realRevenue} (tipo: ${typeof realRevenue})`);
+              
+              // Verificar se o valor será corrigido
+              const originalValue = realRevenue;
+              const correctedValue = detectAndFixDecimalIssues(originalValue);
+              const wasCorrected = correctedValue !== originalValue;
+              
+              return (
+                <span className={wasCorrected ? 'text-orange-700' : ''}>
+                  {formatCurrency(realRevenue)}
+                  {wasCorrected && (
+                    <span className="text-xs text-orange-500 ml-1" title={`Valor original: ${originalValue}`}>
+                      *
+                    </span>
+                  )}
+                </span>
+              );
+            })()}
           </p>
           <p className="text-xs text-green-600">
-            {realRevenue > 0 ? 'Valor aprovado' : 'Sem dados'}
+            {(() => {
+              if (realRevenue === 0) return 'Sem dados';
+              
+              const originalValue = realRevenue;
+              const correctedValue = detectAndFixDecimalIssues(originalValue);
+              const wasCorrected = correctedValue !== originalValue;
+              
+                             if (wasCorrected) {
+                 return (
+                   <span className="text-orange-600">
+                     Valor corrigido (era R$ {originalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                   </span>
+                 );
+               }
+              
+              return 'Valor aprovado';
+            })()}
           </p>
         </div>
 
-        <div className="bg-purple-50 p-3 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors" onClick={() => setShowProcedures(!showProcedures)}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <BarChart3 className="w-4 h-4 text-purple-600 mr-2" />
-              <span className="text-xs text-purple-600 font-medium">Procedimentos</span>
-            </div>
-            <div className="text-purple-600">
-              {showProcedures ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </div>
+        <div className="bg-purple-50 p-3 rounded-lg">
+          <div className="flex items-center">
+            <BarChart3 className="w-4 h-4 text-purple-600 mr-2" />
+            <span className="text-xs text-purple-600 font-medium">Procedimentos</span>
           </div>
           <p className="text-lg font-bold text-purple-900 mt-1">
             {proceduresData.count.toLocaleString('pt-BR')}
@@ -638,168 +759,11 @@ const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, re
         </div>
       </div>
 
-      {/* Botão para mostrar médicos */}
-      <div className="mt-4 pt-4 border-t border-gray-200">
-        <div className="flex items-center justify-between">
-          <span className="text-gray-600">Faturamento médio por médico:</span>
-          <span className="font-semibold text-gray-900">
-            {hospitalDoctors.length > 0 
-              ? formatCurrency(realRevenue / hospitalDoctors.length)
-              : 'R$ 0,00'
-            }
-          </span>
-        </div>
-        
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => setShowDoctors(!showDoctors)}
-          className="w-full mt-3"
-        >
-          {showDoctors ? (
-            <>
-              <ChevronUp className="w-4 h-4 mr-2" />
-              Ocultar Médicos
-            </>
-          ) : (
-            <>
-              <ChevronDown className="w-4 h-4 mr-2" />
-              Ver Médicos ({hospitalDoctors.length})
-            </>
-          )}
-        </Button>
-      </div>
 
-      {/* ✅ Lista de Médicos (NEW) */}
-      {showDoctors && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <h5 className="font-semibold mb-3 flex items-center">
-            <Stethoscope className="w-4 h-4 mr-2" />
-            Médicos desta unidade ({hospitalDoctors.length})
-          </h5>
-          
-          {hospitalDoctors.length === 0 ? (
-            <p className="text-gray-500 text-sm">Nenhum médico cadastrado neste hospital.</p>
-          ) : (
-            <div className="space-y-2">
-              {hospitalDoctors.map(doctor => doctor && doctor.doctor_id ? (
-                <div key={doctor.doctor_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex-1">
-                    <div className="flex items-center">
-                      <span className="font-medium text-gray-900">{doctor.doctor_name || 'Nome não informado'}</span>
-                      {doctor.hospitals_count > 1 && (
-                        <Badge variant="outline" className="ml-2 text-xs text-orange-600">
-                          {doctor.hospitals_count} hospitais
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      <span>CRM: {doctor.doctor_crm || 'N/A'}</span>
-                      <span className="ml-4">CNS: {doctor.doctor_cns || 'N/A'}</span>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      <span>{doctor.doctor_specialty || 'Especialidade não informada'}</span>
-                      {doctor.hospitals_count > 1 && doctor.hospitals_list && (
-                        <span className="ml-4 text-orange-600">
-                          Atende: {doctor.hospitals_list}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={doctor.activity_status === 'ATIVO' ? 'default' : 'secondary'}>
-                      {doctor.activity_status || 'N/A'}
-                    </Badge>
-                    <div className="text-right text-sm">
-                      <div className="font-medium text-gray-900">
-                        {formatCurrency(normalizeValue(doctor.total_revenue_12months_reais || 0))}
-                      </div>
-                      <div className="text-gray-500">
-                        {doctor.total_procedures_12months || 0} procedimentos
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : null)}
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* ✅ Lista de Procedimentos (NEW) */}
-      {showProcedures && (
-        <div className="mt-4 pt-4 border-t border-gray-200">
-          <h5 className="font-semibold mb-3 flex items-center">
-            <BarChart3 className="w-4 h-4 mr-2" />
-            Procedimentos realizados ({proceduresData.count})
-          </h5>
-          
-          {proceduresData.procedures.length === 0 ? (
-            <p className="text-gray-500 text-sm">Nenhum procedimento registrado neste hospital.</p>
-          ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {proceduresData.procedures.slice(0, 10).map((procedure, index) => (
-                <div key={procedure.code} className="flex items-start justify-between p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
-                  <div className="flex-1">
-                    <div className="flex items-center flex-wrap gap-2">
-                      <span className="font-medium text-gray-900 text-sm">{procedure.code}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {procedure.count}x
-                      </Badge>
-                      {procedure.complexity && (
-                        <Badge variant="outline" className="text-xs text-purple-600">
-                          {procedure.complexity}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1" style={{ 
-                      display: '-webkit-box', 
-                      WebkitLineClamp: 2, 
-                      WebkitBoxOrient: 'vertical' as any, 
-                      overflow: 'hidden' 
-                    }}>
-                      {procedure.description || 'Descrição não disponível'}
-                    </div>
-                    {(procedure.totalAIHs || procedure.totalPatients) && (
-                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                        {procedure.totalAIHs && (
-                          <span>AIHs: {procedure.totalAIHs}</span>
-                        )}
-                        {procedure.totalPatients && (
-                          <span>Pacientes: {procedure.totalPatients}</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-right text-sm ml-4 min-w-24">
-                    <div className="font-medium text-gray-900 mb-1">
-                      {formatCurrency(procedure.totalValue)}
-                    </div>
-                    <div className="text-gray-500 text-xs">
-                      {formatCurrency(procedure.avgValue)} médio
-                    </div>
-                    {procedure.approvedValue && procedure.approvedValue !== procedure.totalValue && (
-                      <div className="text-green-600 text-xs mt-1">
-                        ✓ {formatCurrency(procedure.approvedValue)} aprovado
-                      </div>
-                    )}
-                    {procedure.baseValue && procedure.baseValue !== procedure.avgValue && (
-                      <div className="text-blue-600 text-xs">
-                        Base: {formatCurrency(procedure.baseValue)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {proceduresData.procedures.length > 10 && (
-                <div className="text-center text-sm text-gray-500 pt-2">
-                  ... e mais {proceduresData.procedures.length - 10} procedimentos
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+
+
+
     </div>
   );
 };
