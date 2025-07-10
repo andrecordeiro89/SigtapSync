@@ -6,6 +6,47 @@ import { isValidParticipationCode, formatParticipationCode, getParticipationInfo
 // Configurar worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
+/**
+ * 🛡️ FILTRO DE INTERFACE: Função utilitária para garantir que anestesistas não apareçam na tela
+ * Uso: procedimentos.filter(filterOutAnesthesia)
+ */
+export const filterOutAnesthesia = (procedimento: ProcedureAIH): boolean => {
+  // 🎯 PRIORIDADE 1: CBO 225151 - CRITÉRIO OFICIAL CONFIRMADO PELO HOSPITAL
+  const cbo = (procedimento.cbo || '').trim();
+  if (cbo === '225151') {
+    console.log(`🚫 INTERFACE-FILTRO: Anestesista removido da tela - CBO 225151`);
+    return false; // Filtrar (não exibir)
+  }
+  
+  // 🎯 PRIORIDADE 2: Detecção por texto na participação (backup para casos edge)
+  const participacao = (procedimento.participacao || '').toLowerCase().trim();
+  
+  // Se não há participação definida, não é anestesista
+  if (!participacao) {
+    return true; // Não filtrar (exibir)
+  }
+  
+  // 📋 TERMOS DE ANESTESIA EM PORTUGUÊS - como backup
+  const anesthesiaTerms = [
+    'anestesista', 'anestesiologista', 'anestesiol', 'anestes', 'anes', 'anest',
+    'anestsista', 'anestesita', 'anestesis', 'anastesista', 'anastesiologista',
+    'anesthesi', 'anesthesiol', 'anest.', 'anes.'
+  ];
+  
+  // Verificar se algum termo de anestesia está presente na participação
+  const isAnesthesia = anesthesiaTerms.some(term => 
+    participacao.includes(term)
+  );
+  
+  if (isAnesthesia) {
+    const foundTerm = anesthesiaTerms.find(term => participacao.includes(term));
+    console.log(`🚫 INTERFACE-FILTRO: Anestesista removido da tela - Termo "${foundTerm}" na participação`);
+    return false; // Filtrar (não exibir)
+  }
+  
+  return true; // Não filtrar (exibir)
+};
+
 export class AIHCompleteProcessor {
   private aihProcessor: AIHPDFProcessor;
 
@@ -248,34 +289,45 @@ export class AIHCompleteProcessor {
         continue;
       }
       
-      // 🎯 SKIP: Cabeçalhos e informações do hospital (preservar)
+      // 🚫 PRIORIDADE ABSOLUTA: FILTRAR ANESTESIA ANTES DE QUALQUER COISA
+      const lowerLine = trimmedLine.toLowerCase();
+      const hasAnesthesiaCBO = trimmedLine.includes('225151');
+      
+      // 📋 DETECÇÃO EXPANDIDA DE ANESTESIA - MÚLTIPLOS TERMOS
+      const anesthesiaTerms = [
+        'anestesista', 'anestesiologista', 'anestesiologia', 'anestesiologic',
+        'anestesiol', 'anestes', 'anes', 'anest', 'anestesi',
+        'anestsista', 'anestesita', 'anestesis', 'anastesista', 'anastesiologista',
+        'anesthesi', 'anesthesiol', 'anest.', 'anes.', 'anestesista.',
+        // Variações com espaços ou caracteres especiais
+        'anestesi ', ' anestesi', 'anestes ', ' anestes'
+      ];
+      
+      const hasAnesthesiaText = anesthesiaTerms.some(term => lowerLine.includes(term));
+      
+      if (hasAnesthesiaCBO || hasAnesthesiaText) {
+        const foundTerm = hasAnesthesiaCBO ? 'CBO 225151' : 
+                         anesthesiaTerms.find(term => lowerLine.includes(term)) || 'termo de anestesia';
+        console.log(`🚫 ANESTESIA FILTRADA: ${trimmedLine.substring(0, 80)}...`);
+        console.log(`   📋 Motivo: ${foundTerm}`);
+        console.log(`   🎯 STATUS: REMOVIDO COMPLETAMENTE (MESMO SE FOR CABEÇALHO)`);
+        removedLines.push(line);
+        continue; // NÃO adicionar à lista filtrada
+      }
+      
+      // 🎯 VERIFICAÇÃO SECUNDÁRIA: Cabeçalhos (após filtro de anestesia)
       if (this.isHeaderOrSystemLine(trimmedLine)) {
         filteredLines.push(line);
         console.log(`📋 CABEÇALHO PRESERVADO: ${trimmedLine.substring(0, 60)}...`);
         continue;
       }
       
-      // 🎯 VERIFICAR: Apenas linhas que parecem ser procedimentos
+      // 🎯 VERIFICAR: Linhas que parecem ser procedimentos (após todos os filtros)
       if (this.isProcedureLine(trimmedLine)) {
-        const lowerLine = trimmedLine.toLowerCase();
-        
-        // 🚫 FILTRO ESPECÍFICO: CBO 225151 ou texto "anestesista" em linhas de procedimento
-        const hasAnesthesiaCBO = trimmedLine.includes('225151');
-        const hasAnesthesiaText = lowerLine.includes('anestesista') || 
-                                 lowerLine.includes('anestesiologista') ||
-                                 lowerLine.includes('anestesiol');
-        
-        if (hasAnesthesiaCBO || hasAnesthesiaText) {
-          console.log(`🚫 PROCEDIMENTO FILTRADO: ${trimmedLine.substring(0, 80)}...`);
-          console.log(`   📋 Motivo: ${hasAnesthesiaCBO ? 'CBO 225151' : 'Texto de anestesia'}`);
-          removedLines.push(line);
-          // NÃO adicionar à lista filtrada
-        } else {
-          console.log(`✅ PROCEDIMENTO MANTIDO: ${trimmedLine.substring(0, 60)}...`);
-          filteredLines.push(line);
-        }
+        console.log(`✅ PROCEDIMENTO MANTIDO: ${trimmedLine.substring(0, 60)}...`);
+        filteredLines.push(line);
       } else {
-        // Não é linha de procedimento - preservar sempre
+        // Não é linha de procedimento - preservar sempre (já passou por todos os filtros)
         console.log(`📄 LINHA NÃO-PROCEDIMENTO PRESERVADA: ${trimmedLine.substring(0, 60)}...`);
         filteredLines.push(line);
       }
@@ -525,7 +577,7 @@ export class AIHCompleteProcessor {
         return [];
       }
       
-      const procedimentos: ProcedureAIH[] = [];
+      let procedimentos: ProcedureAIH[] = [];
       
       // Patterns para extrair dados da tabela de procedimentos - REFINADOS
       const patterns = {
@@ -621,6 +673,30 @@ export class AIHCompleteProcessor {
       }
 
       console.log(`📊 Total de procedimentos extraídos: ${procedimentos.length}`);
+      
+      // 🛡️ FILTRO PÓS-EXTRAÇÃO: Segunda camada de proteção SUS
+      const procedimentosAntes = procedimentos.length;
+      procedimentos = procedimentos.filter(proc => {
+        const isAnesthesia = this.isAnesthesiaProcedure(proc);
+        if (isAnesthesia) {
+          const reason = this.getFilterReason(proc);
+          console.log(`🚫 PÓS-FILTRO: Anestesista removido - ${reason}`);
+          console.log(`   📋 Procedimento: ${proc.procedimento} - ${proc.descricao || 'Sem descrição'}`);
+          console.log(`   👨‍⚕️ CBO: "${proc.cbo}" | Participação: "${proc.participacao}"`);
+        }
+        return !isAnesthesia;
+      });
+      
+      const procedimentosRemovidos = procedimentosAntes - procedimentos.length;
+      if (procedimentosRemovidos > 0) {
+        console.log(`🛡️ PÓS-FILTRO APLICADO:`);
+        console.log(`   📊 Procedimentos antes: ${procedimentosAntes}`);
+        console.log(`   ✅ Procedimentos após: ${procedimentos.length}`);
+        console.log(`   🚫 Anestesistas removidos: ${procedimentosRemovidos}`);
+        console.log(`   🎯 GARANTIA: Nenhum anestesista passará para a interface`);
+      } else {
+        console.log(`✅ PÓS-FILTRO: Nenhum anestesista detectado após extração`);
+      }
       
       // 📊 ESTATÍSTICAS DO PRÉ-FILTRO SUS
       if (removedLines.length > 0) {

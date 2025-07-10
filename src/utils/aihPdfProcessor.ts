@@ -528,7 +528,13 @@ export class AIHPDFProcessor {
         const aihMatch = text.match(/(\d{11,13}-\d)/i);
         if (aihMatch) {
           data.numeroAIH = aihMatch[1];
-          console.log(`🔧 Fallback numeroAIH: "${aihMatch[1]}"`);
+          console.log(`�� Fallback numeroAIH encontrado: "${aihMatch[1]}"`);
+          missingRequired.splice(missingRequired.indexOf('numeroAIH'), 1);
+          extractedCount++;
+        } else {
+          // ✅ NOVA LÓGICA: Se não encontrar número da AIH, usar "-" para controle por nome
+          data.numeroAIH = "-";
+          console.log(`🔧 Fallback numeroAIH: "-" (controle por nome de paciente)`);
           missingRequired.splice(missingRequired.indexOf('numeroAIH'), 1);
           extractedCount++;
         }
@@ -593,8 +599,8 @@ export class AIHPDFProcessor {
       id: crypto.randomUUID(),
       hospitalId: hospitalContext?.hospitalId,
       
-      // Apresentação da AIH
-      numeroAIH: data.numeroAIH,
+      // Apresentação da AIH - ✅ NOVA LÓGICA: usar "-" se não tiver número
+      numeroAIH: data.numeroAIH || "-",
       situacao: data.situacao || '',
       tipo: data.tipo || '',
       dataAutorizacao: this.convertDate(data.dataAutorizacao),
@@ -715,7 +721,7 @@ export class AIHPDFProcessor {
     const errors: Array<{ line: number; field: string; message: string }> = [];
 
     // Validações obrigatórias
-    if (!aih.numeroAIH) {
+    if (!aih.numeroAIH || (aih.numeroAIH !== "-" && aih.numeroAIH.trim() === "")) {
       errors.push({ line: 1, field: 'numeroAIH', message: 'Número da AIH é obrigatório' });
     }
 

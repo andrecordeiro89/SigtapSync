@@ -58,6 +58,7 @@ import {
   requiresPayment, 
   isValidParticipationCode 
 } from '../config/participationCodes';
+import { filterOutAnesthesia } from '../utils/aihCompleteProcessor';
 
 // Declaração de tipo para jsPDF com autoTable
 declare module 'jspdf' {
@@ -689,9 +690,16 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600">Número AIH</label>
-                  <p className="text-gray-900 font-mono text-sm font-semibold bg-blue-50 px-2 py-1 rounded">
-                    {aihCompleta.numeroAIH}
-                  </p>
+                  <div className="text-gray-900 font-mono text-sm font-semibold bg-blue-50 px-2 py-1 rounded">
+                    {aihCompleta.numeroAIH === "-" ? (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-orange-600">-</span>
+                        <span className="text-xs text-orange-600 italic">(controle por nome)</span>
+                      </div>
+                    ) : (
+                      aihCompleta.numeroAIH
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600">Situação</label>
@@ -1086,7 +1094,9 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {aihCompleta.procedimentos.map((procedure) => (
+                {aihCompleta.procedimentos
+                  .filter(filterOutAnesthesia) // 🛡️ FILTRO SUS: Remove anestesistas da tela
+                  .map((procedure) => (
                   <React.Fragment key={procedure.sequencia}>
                     <TableRow className="hover:bg-gray-50">
                       <TableCell className="font-medium text-center">{procedure.sequencia}</TableCell>
@@ -1807,8 +1817,10 @@ const AIHMultiPageTester = () => {
       return;
     }
 
-    // Usar dados reais da AIH processada
-    const procedimentosAprovados = aihCompleta.procedimentos.filter(p => p.aprovado);
+    // Usar dados reais da AIH processada (com filtro de anestesistas)
+    const procedimentosAprovados = aihCompleta.procedimentos
+      .filter(filterOutAnesthesia) // 🛡️ FILTRO SUS: Remove anestesistas
+      .filter(p => p.aprovado);
     const totalOriginal = procedimentosAprovados.reduce((sum, p) => sum + (p.valorOriginal || 0), 0);
     const totalSigtap = procedimentosAprovados.reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
     const totalDiferenca = totalOriginal - totalSigtap;
@@ -1895,7 +1907,7 @@ const AIHMultiPageTester = () => {
     
     yPos += 10;
     
-    // Preparar dados da tabela
+    // Preparar dados da tabela (já filtrados para remover anestesistas)
     const tableData = procedimentosAprovados.map(proc => [
       proc.sequencia.toString(),
       proc.procedimento,
