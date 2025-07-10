@@ -4,98 +4,127 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Textarea } from './ui/textarea';
+import { Label } from './ui/label';
 import { 
   Stethoscope, 
   Users, 
   Building2, 
-  TrendingUp, 
   Search,
-  Award,
-  Activity,
   DollarSign,
-  CheckCircle,
-  AlertTriangle,
   UserCheck,
-  UserX,
   FileText,
-  BarChart3,
-  PieChart,
-  Calendar,
-  Filter,
   RefreshCw,
   Download,
-  Eye,
-  Clock,
-  Star,
-  Target,
-  Zap,
   Edit3,
   UserPlus,
-  Database
+  Database,
+  Eye,
+  Save,
+  X,
+  AlertCircle,
+  Check,
+  Calendar,
+  TrendingUp,
+  Activity,
+  Filter,
+  Loader2,
+  Award,
+  MapPin,
+  Phone,
+  Mail,
+  Banknote,
+  BarChart3,
+  User,
+  ChevronDown,
+  ChevronUp,
+  Target,
+  ClipboardList,
+  MessageSquare,
+  Hash,
+  BarChart2,
+  RotateCcw,
+  Plus
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import ExecutiveDateFilters from './ExecutiveDateFilters';
-import DoctorsAnalyticsService from '../services/doctorsAnalyticsService';
 import { DoctorsCrudService } from '../services/doctorsCrudService';
-import DoctorEditModal from './DoctorEditModal';
-import ProfessionalsTableNew from './ProfessionalsTableNew';
 import { 
-  MedicalKPIData, 
-  MedicalAnalytics, 
-  DoctorStats, 
-  MedicalSpecialty, 
-  HospitalMedicalStats,
-  DateRange,
-  MedicalDoctor 
+  MedicalDoctor,
+  MedicalSpecialty,
+  HospitalMedicalStats
 } from '../types';
+import { toast } from './ui/use-toast';
+
+// ================================================================
+// TIPOS PARA CONTRATOS
+// ================================================================
+
+interface DoctorContract {
+  id: string;
+  doctorId: string;
+  contractType: 'meta' | 'producao';
+  targetProcedures?: number; // Para contratos por meta
+  productionRate?: number; // Para contratos por produção (%)
+  description: string;
+  startDate: string;
+  endDate?: string;
+  isActive: boolean;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface DoctorNote {
+  id: string;
+  doctorId: string;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
 
 interface MedicalStaffDashboardProps {
   className?: string;
 }
+
+// ================================================================
+// COMPONENTE PRINCIPAL
+// ================================================================
 
 const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className }) => {
   const { user, isDirector, isAdmin, isCoordinator, isTI, hasPermission } = useAuth();
   
   // Estados
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [dateRange, setDateRange] = useState<DateRange>({
-    startDate: new Date(new Date().setDate(new Date().getDate() - 30)),
-    endDate: new Date()
-  });
+  const [doctors, setDoctors] = useState<MedicalDoctor[]>([]);
+  const [specialties, setSpecialties] = useState<MedicalSpecialty[]>([]);
+  const [hospitalStats, setHospitalStats] = useState<HospitalMedicalStats[]>([]);
+  const [contracts, setContracts] = useState<DoctorContract[]>([]);
+  const [doctorNotes, setDoctorNotes] = useState<DoctorNote[]>([]);
+  
+  // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHospital, setSelectedHospital] = useState<string>('all');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
+  const [selectedContractType, setSelectedContractType] = useState<string>('all');
   
-        // Estados para persistência real
-      const [realDoctors, setRealDoctors] = useState<MedicalDoctor[]>([]);
-      const [realDoctorsAll, setRealDoctorsAll] = useState<MedicalDoctor[]>([]);
-      const [realSpecialties, setRealSpecialties] = useState<MedicalSpecialty[]>([]);
-      const [realHospitalStats, setRealHospitalStats] = useState<HospitalMedicalStats[]>([]);
-      const [realDoctorStats, setRealDoctorStats] = useState<DoctorStats[]>([]);
-      const [useRealData, setUseRealData] = useState(true);
+  // Controle de expansão
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [editingNotes, setEditingNotes] = useState<Set<string>>(new Set());
+  const [tempNotes, setTempNotes] = useState<{[key: string]: string}>({});
   
-  // Estados para edição
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editingDoctor, setEditingDoctor] = useState<MedicalDoctor | null>(null);
-  const [editMode, setEditMode] = useState<'create' | 'edit'>('edit');
-  
-  // Dados (mock para fallback)
-  const [kpis, setKpis] = useState<MedicalKPIData>({
-    totalDoctors: 0,
-    totalSpecialties: 0,
-    totalHospitals: 0,
-    avgRevenuePerDoctor: 0,
-    totalRevenue: 0,
-    avgApprovalRate: 0,
-    monthlyGrowth: 0,
-    topSpecialty: ''
-  });
-  const [analytics, setAnalytics] = useState<MedicalAnalytics | null>(null);
-  const [doctorStats, setDoctorStats] = useState<DoctorStats[]>([]);
-  const [specialties, setSpecialties] = useState<MedicalSpecialty[]>([]);
-  const [hospitalStats, setHospitalStats] = useState<HospitalMedicalStats[]>([]);
+  // Controle de criação de contrato inline
+  const [creatingContract, setCreatingContract] = useState<Set<string>>(new Set());
+  const [contractForms, setContractForms] = useState<{[key: string]: {
+    contractType: 'meta' | 'producao';
+    targetProcedures: number;
+    productionRate: number;
+    description: string;
+    startDate: string;
+    endDate: string;
+    notes: string;
+  }}>({});
 
   // Verificar acesso
   const hasAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('medical_management');
@@ -104,157 +133,367 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
   const loadRealData = async () => {
     setIsLoading(true);
     try {
-      console.log('🩺 [REAL] Carregando dados médicos do banco...');
+      console.log('🩺 Carregando dados médicos...');
       
       const filters = {
         hospitalIds: selectedHospital === 'all' ? undefined : [selectedHospital],
         specialties: selectedSpecialty === 'all' ? undefined : [selectedSpecialty],
         searchTerm: searchTerm || undefined,
-        isActive: true // Filtrar apenas médicos registrados no sistema
+        isActive: true
       };
 
-      const [doctorsResult, doctorsAllResult, specialtiesResult, hospitalStatsResult, doctorStatsResult] = await Promise.all([
+      const [doctorsResult, specialtiesResult, hospitalStatsResult] = await Promise.all([
         DoctorsCrudService.getAllDoctors(filters),
-        DoctorsCrudService.getAllDoctors({ ...filters, isActive: undefined }), // Todos os médicos
         DoctorsCrudService.getMedicalSpecialties(),
-        DoctorsCrudService.getHospitalMedicalStats(),
-        DoctorsCrudService.getDoctorStats(filters)
+        DoctorsCrudService.getHospitalMedicalStats()
       ]);
 
       if (doctorsResult.success) {
-        setRealDoctors(doctorsResult.data || []);
-        console.log('✅ Médicos registrados carregados:', doctorsResult.data?.length);
-      }
-
-      if (doctorsAllResult.success) {
-        setRealDoctorsAll(doctorsAllResult.data || []);
-        console.log('✅ Todos os médicos carregados:', doctorsAllResult.data?.length);
+        setDoctors(doctorsResult.data || []);
+        console.log('✅ Médicos carregados:', doctorsResult.data?.length);
       }
 
       if (specialtiesResult.success) {
-        setRealSpecialties(specialtiesResult.data || []);
+        setSpecialties(specialtiesResult.data || []);
         console.log('✅ Especialidades carregadas:', specialtiesResult.data?.length);
       }
 
       if (hospitalStatsResult.success) {
-        setRealHospitalStats(hospitalStatsResult.data || []);
-        console.log('✅ Estatísticas hospitalares carregadas:', hospitalStatsResult.data?.length);
+        setHospitalStats(hospitalStatsResult.data || []);
+        console.log('✅ Hospitais carregados:', hospitalStatsResult.data?.length);
       }
 
-      if (doctorStatsResult.success) {
-        setRealDoctorStats(doctorStatsResult.data || []);
-        console.log('✅ Estatísticas médicas carregadas:', doctorStatsResult.data?.length);
-      }
+      // Carregar contratos e anotações
+      await loadContracts();
+      await loadDoctorNotes();
 
-      // Atualizar KPIs com dados reais
-      setKpis({
-        totalDoctors: doctorsResult.data?.length || 0,
-        totalSpecialties: specialtiesResult.data?.length || 0,
-        totalHospitals: hospitalStatsResult.data?.length || 0,
-        avgRevenuePerDoctor: doctorStatsResult.data ? 
-          Math.round((doctorStatsResult.data.reduce((sum, doc) => sum + doc.revenue, 0) / doctorStatsResult.data.length) || 0) : 0,
-        totalRevenue: doctorStatsResult.data?.reduce((sum, doc) => sum + doc.revenue, 0) || 0,
-        avgApprovalRate: doctorStatsResult.data ? 
-          Math.round((doctorStatsResult.data.reduce((sum, doc) => sum + doc.approvalRate, 0) / doctorStatsResult.data.length) || 0) : 0,
-        monthlyGrowth: 5.2, // Calculado dinamicamente depois
-        topSpecialty: specialtiesResult.data?.[0]?.name || 'N/A'
+    } catch (error) {
+      console.error('❌ Erro ao carregar dados:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao carregar dados médicos"
       });
-
-    } catch (error) {
-      console.error('❌ Erro ao carregar dados reais:', error);
-      // Fallback para dados mock
-      setUseRealData(false);
-      loadMockData();
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Carregar dados mock (fallback)
-  const loadMockData = async () => {
-    setIsLoading(true);
-    try {
-      console.log('🎭 [MOCK] Carregando dados mock...');
-      
-      const filters = {
-        dateRange,
-        hospitalIds: selectedHospital === 'all' ? undefined : [selectedHospital],
-        specialties: selectedSpecialty === 'all' ? undefined : [selectedSpecialty],
-        searchTerm: searchTerm || undefined
-      };
-
-      const [kpiData, analyticsData, doctorsData, specialtiesData, hospitalsData] = await Promise.all([
-        DoctorsAnalyticsService.getMedicalKPIs(filters),
-        DoctorsAnalyticsService.getMedicalAnalytics(filters),
-        DoctorsAnalyticsService.getDoctorStats(filters),
-        DoctorsAnalyticsService.getMedicalSpecialties(),
-        DoctorsAnalyticsService.getHospitalMedicalStats()
-      ]);
-
-      setKpis(kpiData);
-      setAnalytics(analyticsData);
-      setDoctorStats(doctorsData);
-      setSpecialties(specialtiesData);
-      setHospitalStats(hospitalsData);
-    } catch (error) {
-      console.error('Erro ao carregar dados mock:', error);
-    } finally {
-      setIsLoading(false);
-    }
+  // Carregar contratos (mock por enquanto)
+  const loadContracts = async () => {
+    // Mock data para exemplo
+    const mockContracts: DoctorContract[] = [
+      {
+        id: '1',
+        doctorId: '1',
+        contractType: 'meta',
+        targetProcedures: 50,
+        description: 'Meta de 50 procedimentos mensais',
+        startDate: '2024-01-01',
+        isActive: true,
+        notes: 'Contrato renovado em janeiro',
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z'
+      }
+    ];
+    setContracts(mockContracts);
   };
 
-  // Carregar dados baseado no modo
-  const loadData = async () => {
-    if (useRealData) {
-      await loadRealData();
-    } else {
-      await loadMockData();
-    }
+  // Carregar anotações dos médicos
+  const loadDoctorNotes = async () => {
+    // Mock data para exemplo
+    const mockNotes: DoctorNote[] = [];
+    setDoctorNotes(mockNotes);
   };
 
-  // Efeitos
-  useEffect(() => {
-    if (hasAccess) {
-      loadData();
-    }
-  }, [dateRange, selectedHospital, selectedSpecialty, searchTerm, useRealData]);
+  // Filtrar médicos
+  const filteredDoctors = doctors.filter(doctor => {
+    const matchesSearch = !searchTerm || 
+      doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doctor.crm.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doctor.speciality?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesHospital = selectedHospital === 'all' || 
+      doctor.hospitalName?.toLowerCase().includes(selectedHospital.toLowerCase());
+    
+    const matchesSpecialty = selectedSpecialty === 'all' || 
+      doctor.speciality === selectedSpecialty;
+    
+    const matchesContractType = selectedContractType === 'all' || 
+      getDoctorContract(doctor.id)?.contractType === selectedContractType;
+    
+    return matchesSearch && matchesHospital && matchesSpecialty && matchesContractType;
+  });
+
+  // Obter contrato do médico
+  const getDoctorContract = (doctorId: string) => {
+    return contracts.find(contract => contract.doctorId === doctorId && contract.isActive);
+  };
+
+  // Obter anotações do médico
+  const getDoctorNote = (doctorId: string) => {
+    return doctorNotes.find(note => note.doctorId === doctorId);
+  };
 
   // Handlers
-  const handleDateRangeChange = (range: DateRange) => {
-    setDateRange(range);
-  };
-
   const handleRefresh = () => {
     loadData();
   };
 
+  const loadData = async () => {
+    await loadRealData();
+  };
+
+  const handleResetContract = async (doctor: MedicalDoctor) => {
+    try {
+      // Desativar todos os contratos do médico
+      setContracts(prev => 
+        prev.map(contract => 
+          contract.doctorId === doctor.id 
+            ? { ...contract, isActive: false, updatedAt: new Date().toISOString() }
+            : contract
+        )
+      );
+
+      // Limpar anotações se necessário
+      setDoctorNotes(prev => prev.filter(note => note.doctorId !== doctor.id));
+
+      // Fechar expansão se estiver aberta
+      setExpandedRows(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(doctor.id);
+        return newSet;
+      });
+
+      // Limpar estados de criação
+      setCreatingContract(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(doctor.id);
+        return newSet;
+      });
+
+      toast({
+        title: "Sucesso",
+        description: `Contrato do Dr. ${doctor.name} foi resetado com sucesso`
+      });
+
+    } catch (error) {
+      console.error('Erro ao resetar contrato:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao resetar contrato do médico"
+      });
+    }
+  };
+
+  const handleStartCreateContract = (doctorId: string) => {
+    setCreatingContract(prev => new Set([...prev, doctorId]));
+    setContractForms(prev => ({
+      ...prev,
+      [doctorId]: {
+        contractType: 'meta',
+        targetProcedures: 0,
+        productionRate: 0,
+        description: '',
+        startDate: '',
+        endDate: '',
+        notes: ''
+      }
+    }));
+  };
+
+  const handleCancelCreateContract = (doctorId: string) => {
+    setCreatingContract(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(doctorId);
+      return newSet;
+    });
+    setContractForms(prev => {
+      const newForms = { ...prev };
+      delete newForms[doctorId];
+      return newForms;
+    });
+  };
+
+  const handleSaveContract = async (doctorId: string) => {
+    const form = contractForms[doctorId];
+    if (!form) return;
+
+    try {
+      const newContract: DoctorContract = {
+        id: Date.now().toString(),
+        doctorId,
+        contractType: form.contractType,
+        targetProcedures: form.contractType === 'meta' ? form.targetProcedures : undefined,
+        productionRate: form.contractType === 'producao' ? form.productionRate : undefined,
+        description: form.description,
+        startDate: form.startDate,
+        endDate: form.endDate || undefined,
+        isActive: true,
+        notes: form.notes,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      setContracts(prev => [...prev, newContract]);
+      
+      // Limpar estados de criação
+      setCreatingContract(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(doctorId);
+        return newSet;
+      });
+      setContractForms(prev => {
+        const newForms = { ...prev };
+        delete newForms[doctorId];
+        return newForms;
+      });
+
+      toast({
+        title: "Sucesso",
+        description: "Contrato salvo com sucesso"
+      });
+
+    } catch (error) {
+      console.error('Erro ao salvar contrato:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao salvar contrato"
+      });
+    }
+  };
+
+  const handleUpdateContractForm = (doctorId: string, field: string, value: any) => {
+    setContractForms(prev => ({
+      ...prev,
+      [doctorId]: {
+        ...prev[doctorId],
+        [field]: value
+      }
+    }));
+  };
+
   const handleExport = () => {
-    console.log('Exportando dados médicos...');
+    toast({
+      title: "Exportação",
+      description: "Exportando dados dos profissionais..."
+    });
   };
 
-  // Handlers para edição
-  const handleCreateDoctor = () => {
-    setEditingDoctor(null);
-    setEditMode('create');
-    setEditModalOpen(true);
+  const getContractTypeBadge = (type: string) => {
+    const types = {
+      meta: { label: 'Meta', color: 'bg-blue-100 text-blue-800', icon: Target },
+      producao: { label: 'Produção', color: 'bg-green-100 text-green-800', icon: BarChart2 }
+    };
+    
+    const typeInfo = types[type as keyof typeof types] || types.meta;
+    const IconComponent = typeInfo.icon;
+    
+    return (
+      <Badge className={`${typeInfo.color} flex items-center gap-1`}>
+        <IconComponent className="h-3 w-3" />
+        {typeInfo.label}
+      </Badge>
+    );
   };
 
-  const handleEditDoctor = (doctor: MedicalDoctor) => {
-    setEditingDoctor(doctor);
-    setEditMode('edit');
-    setEditModalOpen(true);
+  // Controle de expansão
+  const toggleRowExpansion = (doctorId: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(doctorId)) {
+      newExpanded.delete(doctorId);
+      // Cancelar criação de contrato se estiver aberta
+      setCreatingContract(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(doctorId);
+        return newSet;
+      });
+    } else {
+      newExpanded.add(doctorId);
+    }
+    setExpandedRows(newExpanded);
   };
 
-  const handleEditSuccess = () => {
-    setEditModalOpen(false);
-    setEditingDoctor(null);
-    // Recarregar dados
-    loadData();
+  const startEditingNote = (doctorId: string) => {
+    const currentNote = getDoctorNote(doctorId);
+    setTempNotes(prev => ({
+      ...prev,
+      [doctorId]: currentNote?.note || ''
+    }));
+    setEditingNotes(prev => new Set([...prev, doctorId]));
   };
 
-  const handleToggleDataSource = () => {
-    setUseRealData(!useRealData);
+  const cancelEditingNote = (doctorId: string) => {
+    setEditingNotes(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(doctorId);
+      return newSet;
+    });
+    setTempNotes(prev => {
+      const newNotes = { ...prev };
+      delete newNotes[doctorId];
+      return newNotes;
+    });
   };
+
+  const saveNote = async (doctorId: string) => {
+    const noteText = tempNotes[doctorId] || '';
+    
+    try {
+      const existingNote = getDoctorNote(doctorId);
+      
+      if (existingNote) {
+        // Atualizar nota existente
+        const updatedNote = {
+          ...existingNote,
+          note: noteText,
+          updatedAt: new Date().toISOString()
+        };
+        setDoctorNotes(prev => 
+          prev.map(note => note.id === existingNote.id ? updatedNote : note)
+        );
+      } else {
+        // Criar nova nota
+        const newNote: DoctorNote = {
+          id: Date.now().toString(),
+          doctorId,
+          note: noteText,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          createdBy: user?.id || 'unknown'
+        };
+        setDoctorNotes(prev => [...prev, newNote]);
+      }
+
+      setEditingNotes(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(doctorId);
+        return newSet;
+      });
+
+      toast({
+        title: "Sucesso",
+        description: "Anotação salva com sucesso"
+      });
+
+    } catch (error) {
+      console.error('Erro ao salvar anotação:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Erro ao salvar anotação"
+      });
+    }
+  };
+
+  // Carrega dados no mount
+  useEffect(() => {
+    if (hasAccess) {
+      loadData();
+    }
+  }, [hasAccess]);
 
   // Renderizar se não tem acesso
   if (!hasAccess) {
@@ -267,15 +506,6 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             Esta seção é exclusiva para diretoria, administração, coordenação e TI.
             Somente usuários com permissões médicas podem acessar os dados do corpo clínico.
           </p>
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center justify-center space-x-2">
-              <UserCheck className="h-5 w-5 text-blue-600" />
-              <span className="text-sm font-medium text-blue-800">Permissões Necessárias</span>
-            </div>
-            <div className="mt-2 text-sm text-blue-700">
-              Director | Administrator | Coordinator | TI
-            </div>
-          </div>
         </div>
       </div>
     );
@@ -283,7 +513,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* HEADER EXECUTIVO */}
+      {/* HEADER */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-lg shadow-lg">
         <div className="flex items-center justify-between">
           <div>
@@ -292,39 +522,30 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               <span>Corpo Médico</span>
             </h1>
             <p className="text-blue-100">
-              Gestão completa do corpo clínico e análise de performance médica
+              Gestão de profissionais com contratos por meta e produção
             </p>
           </div>
           <div className="text-right">
             <div className="text-3xl font-bold flex items-center gap-2">
-              {isLoading ? '...' : useRealData ? realDoctors.length : kpis.totalDoctors}
-              {useRealData ? (
-                              <Database className="h-6 w-6 text-green-300" />
-            ) : (
-              <FileText className="h-6 w-6 text-yellow-300" />
-              )}
+              {isLoading ? '...' : filteredDoctors.length}
+              <Users className="h-6 w-6 text-blue-300" />
             </div>
-            <div className="text-blue-100">Profissionais Registrados</div>
+            <div className="text-blue-100">Profissionais</div>
             <div className="text-sm text-blue-200 mt-1">
-              {useRealData ? realSpecialties.length : specialties.length} especialidades
+              {contracts.filter(c => c.isActive).length} contratos ativos
             </div>
           </div>
         </div>
       </div>
 
-      {/* KPIs MÉDICOS - POSICIONADOS NO TOPO */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* RESUMO RÁPIDO */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-blue-600">Total Médicos</p>
-                <p className="text-2xl font-bold text-blue-800">
-                  {isLoading ? '...' : useRealData ? realDoctorsAll.length : kpis.totalDoctors}
-                </p>
-                <p className="text-xs text-blue-500">
-                  {useRealData ? realDoctors.length : kpis.totalDoctors} registrados
-                </p>
+                <p className="text-2xl font-bold text-blue-800">{doctors.length}</p>
               </div>
               <Users className="h-8 w-8 text-blue-600" />
             </div>
@@ -335,15 +556,12 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-600">Faturamento</p>
+                <p className="text-sm font-medium text-green-600">Contratos Meta</p>
                 <p className="text-2xl font-bold text-green-800">
-                  R$ {isLoading ? '...' : kpis.totalRevenue.toLocaleString('pt-BR')}
-                </p>
-                <p className="text-xs text-green-500">
-                  Média: R$ {kpis.avgRevenuePerDoctor.toLocaleString('pt-BR')}
+                  {contracts.filter(c => c.isActive && c.contractType === 'meta').length}
                 </p>
               </div>
-              <DollarSign className="h-8 w-8 text-green-600" />
+              <Target className="h-8 w-8 text-green-600" />
             </div>
           </CardContent>
         </Card>
@@ -352,15 +570,12 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-purple-600">Hospitais</p>
+                <p className="text-sm font-medium text-purple-600">Contratos Produção</p>
                 <p className="text-2xl font-bold text-purple-800">
-                  {isLoading ? '...' : kpis.totalHospitals}
-                </p>
-                <p className="text-xs text-purple-500">
-                  Cobertura nacional
+                  {contracts.filter(c => c.isActive && c.contractType === 'producao').length}
                 </p>
               </div>
-              <Building2 className="h-8 w-8 text-purple-600" />
+              <BarChart2 className="h-8 w-8 text-purple-600" />
             </div>
           </CardContent>
         </Card>
@@ -370,12 +585,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-orange-600">Especialidades</p>
-                <p className="text-2xl font-bold text-orange-800">
-                  {isLoading ? '...' : kpis.totalSpecialties}
-                </p>
-                <p className="text-xs text-orange-500">
-                  Líder: {kpis.topSpecialty}
-                </p>
+                <p className="text-2xl font-bold text-orange-800">{specialties.length}</p>
               </div>
               <Award className="h-8 w-8 text-orange-600" />
             </div>
@@ -383,414 +593,113 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
         </Card>
       </div>
 
-      {/* TABS PRINCIPAIS - POSICIONADAS LOGO APÓS OS CARDS */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview" className="flex items-center space-x-2">
-            <BarChart3 className="h-4 w-4" />
-            <span>Visão Geral</span>
-          </TabsTrigger>
-          <TabsTrigger value="hospitals" className="flex items-center space-x-2">
-            <Building2 className="h-4 w-4" />
-            <span>Por Hospital</span>
-          </TabsTrigger>
-          <TabsTrigger value="specialties" className="flex items-center space-x-2">
-            <Stethoscope className="h-4 w-4" />
-            <span>Especialidades</span>
-          </TabsTrigger>
-          <TabsTrigger value="professionals" className="flex items-center space-x-2">
-            <Users className="h-4 w-4" />
-            <span>Lista de Profissionais</span>
-          </TabsTrigger>
-          <TabsTrigger value="performance" className="flex items-center space-x-2">
-            <TrendingUp className="h-4 w-4" />
-            <span>Performance</span>
-          </TabsTrigger>
-        </TabsList>
-
-        {/* TAB: VISÃO GERAL */}
-        <TabsContent value="overview" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Resumo de Atividades */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Activity className="h-5 w-5" />
-                  <span>Atividades Recentes</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Dr. Carlos Silva</p>
-                      <p className="text-xs text-gray-600">Aprovou 5 procedimentos • 2h atrás</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Dra. Maria Santos</p>
-                      <p className="text-xs text-gray-600">Atingiu 95% de aprovação • 4h atrás</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Dr. João Oliveira</p>
-                      <p className="text-xs text-gray-600">Novo especialista em Cardiologia • 1d atrás</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Alertas */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <AlertTriangle className="h-5 w-5 text-orange-600" />
-                  <span>Alertas</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Taxa de Aprovação Baixa</p>
-                      <p className="text-xs text-gray-600">Dr. Pedro Costa - 65% nos últimos 30 dias</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <Target className="h-4 w-4 text-blue-600" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Meta Atingida</p>
-                      <p className="text-xs text-gray-600">Cardiologia atingiu R$ 2.5M em faturamento</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* TAB: POR HOSPITAL */}
-        <TabsContent value="hospitals" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Building2 className="h-5 w-5" />
-                <span>Performance por Hospital</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {hospitalStats.map((hospital) => (
-                  <div key={hospital.hospitalId} className="border rounded-lg p-4 hover:bg-gray-50">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h4 className="font-semibold text-gray-900">{hospital.hospitalName}</h4>
-                        <p className="text-sm text-gray-600">
-                          {hospital.totalDoctors} médicos • {hospital.specialties.length} especialidades
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="bg-blue-100 text-blue-700">
-                        {hospital.avgApprovalRate.toFixed(1)}% aprovação
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-600">Faturamento:</span>
-                        <div className="font-semibold">R$ {hospital.totalRevenue.toLocaleString('pt-BR')}</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Procedimentos:</span>
-                        <div className="font-semibold">{hospital.totalProcedures}</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Tempo Médio:</span>
-                        <div className="font-semibold">{hospital.avgProcessingTime}h</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">Médicos:</span>
-                        <div className="font-semibold">{hospital.totalDoctors}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* TAB: ESPECIALIDADES */}
-        <TabsContent value="specialties" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Stethoscope className="h-5 w-5" />
-                <span>Distribuição por Especialidade</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {specialties.map((specialty) => (
-                  <div key={specialty.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-gray-900">{specialty.name}</h4>
-                      <Badge variant="outline">{specialty.doctorCount} médicos</Badge>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Faturamento Médio:</span>
-                        <span className="font-medium">R$ {specialty.averageRevenue.toLocaleString('pt-BR')}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Total Procedimentos:</span>
-                        <span className="font-medium">{specialty.totalProcedures}</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full" 
-                          style={{ width: `${Math.min((specialty.doctorCount / kpis.totalDoctors) * 100, 100)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* TAB: LISTA DE PROFISSIONAIS */}
-        <TabsContent value="professionals" className="space-y-4">
-          <ProfessionalsTableNew />
-        </TabsContent>
-
-        {/* TAB: PERFORMANCE */}
-        <TabsContent value="performance" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <TrendingUp className="h-5 w-5" />
-                <span>Top Performers</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {doctorStats.slice(0, 10).map((doctor, index) => (
-                  <div key={doctor.id} className="flex items-center space-x-4 p-3 border rounded-lg hover:bg-gray-50">
-                    <div className="flex-shrink-0">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                        index === 0 ? 'bg-yellow-500' : 
-                        index === 1 ? 'bg-gray-400' : 
-                        index === 2 ? 'bg-orange-500' : 'bg-blue-500'
-                      }`}>
-                        {index + 1}
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <h4 className="font-semibold text-gray-900">{doctor.name}</h4>
-                        <Badge variant="outline" className="text-xs">
-                          {doctor.crm}
-                        </Badge>
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        {doctor.speciality} • {doctor.hospitalName}
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4 text-sm">
-                      <div className="text-center">
-                        <div className="font-semibold text-green-600">
-                          R$ {doctor.revenue.toLocaleString('pt-BR')}
-                        </div>
-                        <div className="text-gray-500">Faturamento</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-semibold text-blue-600">
-                          {doctor.approvalRate.toFixed(1)}%
-                        </div>
-                        <div className="text-gray-500">Aprovação</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-semibold text-purple-600">
-                          {doctor.procedureCount}
-                        </div>
-                        <div className="text-gray-500">Procedimentos</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* CONTROLES E FILTROS UNIFICADOS */}
+      {/* CONTROLES E FILTROS */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Filter className="h-5 w-5" />
-            <span>Controles e Filtros</span>
+            <span>Filtros e Controles</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* CONTROLES PRINCIPAIS */}
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={handleCreateDoctor}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                Adicionar Médico
-              </Button>
-              
-              <Button
-                variant="outline"
-                onClick={handleToggleDataSource}
-                className="flex items-center gap-2"
-              >
-                {useRealData ? (
-                  <>
-                    <Database className="h-4 w-4" />
-                    Dados Reais
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-4 w-4" />
-                    Dados Mock
-                  </>
-                )}
-              </Button>
+        <CardContent className="space-y-4">
+          {/* Botões de ação */}
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={handleRefresh}
+              disabled={isLoading}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
 
-              <Button
-                variant="outline"
-                onClick={handleRefresh}
-                disabled={isLoading}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                Atualizar
-              </Button>
+            <Button
+              onClick={handleExport}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Exportar
+            </Button>
 
-              <Button
-                variant="outline"
-                onClick={handleExport}
-                className="flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Exportar
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Badge variant={useRealData ? "default" : "secondary"}>
-                {useRealData ? '✅ Persistência Ativa' : '⚠️ Dados de Teste'}
-              </Badge>
-            </div>
+            <Badge variant="default" className="flex items-center gap-1">
+              <Database className="h-3 w-3" />
+              Dados Reais
+            </Badge>
           </div>
 
-          {/* FILTROS UNIFICADOS */}
+          {/* Filtros */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
                 <Search className="h-4 w-4" />
-                Buscar Médicos
-              </label>
+                Buscar
+              </Label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Nome, CRM ou especialidade..."
+                  placeholder="Nome ou especialidade..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
                 Hospital
-              </label>
+              </Label>
               <Select value={selectedHospital} onValueChange={setSelectedHospital}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o hospital" />
+                  <SelectValue placeholder="Selecione hospital" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os Hospitais</SelectItem>
-                  {useRealData ? (
-                    realHospitalStats.map((hospital) => (
-                      <SelectItem key={hospital.hospitalId} value={hospital.hospitalId}>
-                        {hospital.hospitalName}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    hospitalStats.map((hospital) => (
-                      <SelectItem key={hospital.hospitalId} value={hospital.hospitalId}>
-                        {hospital.hospitalName}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Stethoscope className="h-4 w-4" />
-                Especialidade
-              </label>
-              <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a especialidade" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as Especialidades</SelectItem>
-                  {useRealData ? (
-                    realSpecialties.map((specialty) => (
-                      <SelectItem key={specialty.id} value={specialty.name}>
-                        {specialty.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    specialties.map((specialty) => (
-                      <SelectItem key={specialty.id} value={specialty.name}>
-                        {specialty.name}
-                      </SelectItem>
-                    ))
-                  )}
+                  {hospitalStats.map((hospital) => (
+                    <SelectItem key={hospital.hospitalId} value={hospital.hospitalId}>
+                      {hospital.hospitalName}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Período
-              </label>
-              <Select 
-                value={`${Math.floor((dateRange.endDate.getTime() - dateRange.startDate.getTime()) / (1000 * 60 * 60 * 24))}`}
-                onValueChange={(days) => {
-                  const endDate = new Date();
-                  const startDate = new Date(endDate.getTime() - (parseInt(days) * 24 * 60 * 60 * 1000));
-                  setDateRange({ startDate, endDate });
-                }}
-              >
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Stethoscope className="h-4 w-4" />
+                Especialidade
+              </Label>
+              <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Período" />
+                  <SelectValue placeholder="Selecione especialidade" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="7">Últimos 7 dias</SelectItem>
-                  <SelectItem value="30">Últimos 30 dias</SelectItem>
-                  <SelectItem value="90">Últimos 90 dias</SelectItem>
-                  <SelectItem value="365">Último ano</SelectItem>
+                  <SelectItem value="all">Todas as Especialidades</SelectItem>
+                  {specialties.map((specialty) => (
+                    <SelectItem key={specialty.id} value={specialty.name}>
+                      {specialty.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Tipo de Contrato
+              </Label>
+              <Select value={selectedContractType} onValueChange={setSelectedContractType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo de contrato" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Tipos</SelectItem>
+                  <SelectItem value="meta">Meta</SelectItem>
+                  <SelectItem value="producao">Produção</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -798,14 +707,395 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
         </CardContent>
       </Card>
 
-      {/* MODAIS */}
-      <DoctorEditModal
-        isOpen={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
-        doctor={editingDoctor}
-        mode={editMode}
-        onSuccess={handleEditSuccess}
-      />
+      {/* TABELA DE PROFISSIONAIS */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Users className="h-5 w-5" />
+            <span>Lista de Profissionais</span>
+            <Badge variant="secondary">
+              {filteredDoctors.length} profissionais
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center space-x-4">
+                  <div className="h-12 w-12 bg-gray-200 rounded-full animate-pulse" />
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
+                    <div className="h-3 bg-gray-200 rounded w-1/2 mt-1 animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Profissional</TableHead>
+                    <TableHead>Especialidade</TableHead>
+                    <TableHead>Hospital</TableHead>
+                    <TableHead>Contrato</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredDoctors.map((doctor) => {
+                    const contract = getDoctorContract(doctor.id);
+                    const isExpanded = expandedRows.has(doctor.id);
+                    const isCreating = creatingContract.has(doctor.id);
+                    
+                    return (
+                      <React.Fragment key={doctor.id}>
+                        <TableRow className={isExpanded ? 'bg-blue-50' : ''}>
+                          <TableCell>
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <User className="h-5 w-5 text-blue-600" />
+                              </div>
+                              <div>
+                                <div className="font-medium">{doctor.name}</div>
+                                <div className="text-sm text-gray-500">CRM: {doctor.crm}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {doctor.speciality || 'Não informado'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {doctor.hospitalName || 'Não informado'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {contract ? (
+                              <div className="space-y-1">
+                                {getContractTypeBadge(contract.contractType)}
+                                <div className="text-xs text-gray-500">
+                                  {contract.contractType === 'meta' && contract.targetProcedures 
+                                    ? `${contract.targetProcedures} proc/mês`
+                                    : contract.contractType === 'producao' && contract.productionRate
+                                    ? `${contract.productionRate}% produção`
+                                    : 'Definir parâmetros'
+                                  }
+                                </div>
+                              </div>
+                            ) : (
+                              <Badge variant="outline" className="text-gray-500">
+                                Sem contrato
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {contract ? (
+                              <Badge variant="default" className="bg-green-100 text-green-800">
+                                <Check className="h-3 w-3 mr-1" />
+                                Ativo
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Pendente
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex space-x-2">
+                              <Button
+                                onClick={() => toggleRowExpansion(doctor.id)}
+                                size="sm"
+                                variant="outline"
+                                title={isExpanded ? "Recolher" : "Expandir"}
+                              >
+                                {isExpanded ? 
+                                  <ChevronUp className="h-4 w-4" /> : 
+                                  <ChevronDown className="h-4 w-4" />
+                                }
+                              </Button>
+                              {contract && (
+                                <Button
+                                  onClick={() => handleResetContract(doctor)}
+                                  size="sm"
+                                  variant="outline"
+                                  title="Resetar contrato"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        
+                        {/* LINHA EXPANDIDA */}
+                        {isExpanded && (
+                          <TableRow className="bg-blue-50">
+                            <TableCell colSpan={6} className="border-t">
+                              <div className="p-4 space-y-4">
+                                {/* SEM CONTRATO - FORMULÁRIO DE CRIAÇÃO */}
+                                {!contract && (
+                                  <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                                        <Plus className="h-4 w-4" />
+                                        {isCreating ? 'Criando Contrato' : 'Criar Contrato'}
+                                      </h4>
+                                      {!isCreating && (
+                                        <Button
+                                          onClick={() => handleStartCreateContract(doctor.id)}
+                                          size="sm"
+                                          className="bg-green-600 hover:bg-green-700"
+                                        >
+                                          <Plus className="h-4 w-4 mr-2" />
+                                          Novo Contrato
+                                        </Button>
+                                      )}
+                                    </div>
+
+                                    {isCreating && contractForms[doctor.id] && (
+                                      <div className="bg-white p-4 rounded-lg border space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                          <div className="space-y-2">
+                                            <Label>Tipo de Contrato</Label>
+                                            <Select 
+                                              value={contractForms[doctor.id].contractType}
+                                              onValueChange={(value) => handleUpdateContractForm(doctor.id, 'contractType', value)}
+                                            >
+                                              <SelectTrigger>
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="meta">
+                                                  <div className="flex items-center gap-2">
+                                                    <Target className="h-4 w-4" />
+                                                    Meta de Procedimentos
+                                                  </div>
+                                                </SelectItem>
+                                                <SelectItem value="producao">
+                                                  <div className="flex items-center gap-2">
+                                                    <BarChart2 className="h-4 w-4" />
+                                                    Produção (% do faturamento)
+                                                  </div>
+                                                </SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+
+                                          <div className="space-y-2">
+                                            <Label>Descrição do Contrato</Label>
+                                            <Input
+                                              value={contractForms[doctor.id].description}
+                                              onChange={(e) => handleUpdateContractForm(doctor.id, 'description', e.target.value)}
+                                              placeholder="Ex: Contrato de cardiologia com meta mensal"
+                                            />
+                                          </div>
+                                        </div>
+
+                                        {contractForms[doctor.id].contractType === 'meta' && (
+                                          <div className="space-y-2">
+                                            <Label>Meta de Procedimentos (por mês)</Label>
+                                            <Input
+                                              type="number"
+                                              value={contractForms[doctor.id].targetProcedures}
+                                              onChange={(e) => handleUpdateContractForm(doctor.id, 'targetProcedures', Number(e.target.value))}
+                                              placeholder="Ex: 50"
+                                            />
+                                          </div>
+                                        )}
+
+                                        {contractForms[doctor.id].contractType === 'producao' && (
+                                          <div className="space-y-2">
+                                            <Label>Percentual da Produção (%)</Label>
+                                            <Input
+                                              type="number"
+                                              value={contractForms[doctor.id].productionRate}
+                                              onChange={(e) => handleUpdateContractForm(doctor.id, 'productionRate', Number(e.target.value))}
+                                              placeholder="Ex: 30"
+                                              min="0"
+                                              max="100"
+                                            />
+                                          </div>
+                                        )}
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                          <div className="space-y-2">
+                                            <Label>Data de Início</Label>
+                                            <Input
+                                              type="date"
+                                              value={contractForms[doctor.id].startDate}
+                                              onChange={(e) => handleUpdateContractForm(doctor.id, 'startDate', e.target.value)}
+                                            />
+                                          </div>
+                                          <div className="space-y-2">
+                                            <Label>Data de Fim (Opcional)</Label>
+                                            <Input
+                                              type="date"
+                                              value={contractForms[doctor.id].endDate}
+                                              onChange={(e) => handleUpdateContractForm(doctor.id, 'endDate', e.target.value)}
+                                            />
+                                          </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                          <Label>Observações</Label>
+                                          <Textarea
+                                            value={contractForms[doctor.id].notes}
+                                            onChange={(e) => handleUpdateContractForm(doctor.id, 'notes', e.target.value)}
+                                            placeholder="Informações adicionais sobre o contrato..."
+                                          />
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                          <Button
+                                            onClick={() => handleSaveContract(doctor.id)}
+                                            className="bg-green-600 hover:bg-green-700"
+                                          >
+                                            <Save className="h-4 w-4 mr-2" />
+                                            Salvar Contrato
+                                          </Button>
+                                          <Button
+                                            onClick={() => handleCancelCreateContract(doctor.id)}
+                                            variant="outline"
+                                          >
+                                            <X className="h-4 w-4 mr-2" />
+                                            Cancelar
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* COM CONTRATO - DETALHES E ANOTAÇÕES */}
+                                {contract && (
+                                  <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                                        <ClipboardList className="h-4 w-4" />
+                                        Detalhes do Contrato e Anotações
+                                      </h4>
+                                    </div>
+                                    
+                                    {/* Informações do contrato */}
+                                    <div className="bg-white p-3 rounded-lg border">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                          <ClipboardList className="h-4 w-4 text-blue-600" />
+                                          <span className="font-medium">Detalhes do Contrato</span>
+                                        </div>
+                                        {getContractTypeBadge(contract.contractType)}
+                                      </div>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                        <div>
+                                          <span className="text-gray-600">Descrição:</span>
+                                          <div className="font-medium">{contract.description || 'Não informado'}</div>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-600">Parâmetro:</span>
+                                          <div className="font-medium">
+                                            {contract.contractType === 'meta' && contract.targetProcedures 
+                                              ? `${contract.targetProcedures} procedimentos/mês`
+                                              : contract.contractType === 'producao' && contract.productionRate
+                                              ? `${contract.productionRate}% da produção`
+                                              : 'Não definido'
+                                            }
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-600">Início:</span>
+                                          <div className="font-medium">
+                                            {new Date(contract.startDate).toLocaleDateString('pt-BR')}
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-600">Fim:</span>
+                                          <div className="font-medium">
+                                            {contract.endDate ? 
+                                              new Date(contract.endDate).toLocaleDateString('pt-BR') : 
+                                              'Indeterminado'
+                                            }
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Área de anotações */}
+                                    <div className="bg-white p-3 rounded-lg border">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                          <MessageSquare className="h-4 w-4 text-green-600" />
+                                          <span className="font-medium">Anotações</span>
+                                        </div>
+                                        {!editingNotes.has(doctor.id) && (
+                                          <Button
+                                            onClick={() => startEditingNote(doctor.id)}
+                                            size="sm"
+                                            variant="outline"
+                                          >
+                                            <Edit3 className="h-4 w-4 mr-2" />
+                                            Editar
+                                          </Button>
+                                        )}
+                                      </div>
+                                      
+                                      {editingNotes.has(doctor.id) ? (
+                                        <div className="space-y-3">
+                                          <Textarea
+                                            value={tempNotes[doctor.id] || ''}
+                                            onChange={(e) => setTempNotes(prev => ({
+                                              ...prev,
+                                              [doctor.id]: e.target.value
+                                            }))}
+                                            placeholder="Adicione suas anotações sobre o contrato, metas, observações especiais..."
+                                            className="min-h-[100px]"
+                                          />
+                                          <div className="flex gap-2">
+                                            <Button
+                                              onClick={() => saveNote(doctor.id)}
+                                              size="sm"
+                                              className="bg-green-600 hover:bg-green-700"
+                                            >
+                                              <Save className="h-4 w-4 mr-2" />
+                                              Salvar
+                                            </Button>
+                                            <Button
+                                              onClick={() => cancelEditingNote(doctor.id)}
+                                              size="sm"
+                                              variant="outline"
+                                            >
+                                              <X className="h-4 w-4 mr-2" />
+                                              Cancelar
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div className="text-sm text-gray-600">
+                                          {getDoctorNote(doctor.id)?.note || 'Nenhuma anotação registrada. Clique em "Editar" para adicionar.'}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

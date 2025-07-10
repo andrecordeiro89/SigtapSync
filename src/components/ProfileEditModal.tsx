@@ -128,7 +128,7 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ children, isOpen: e
     const config = roleConfig[role as keyof typeof roleConfig] || roleConfig.user;
     
     return (
-      <Badge className={config.className}>
+      <Badge className={`${config.className} text-xs`}>
         {config.label}
       </Badge>
     );
@@ -156,79 +156,84 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ children, isOpen: e
         </DialogTrigger>
       )}
       
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
-            <User className="w-5 h-5" />
+      <DialogContent className="sm:max-w-[460px] max-h-[85vh] overflow-y-auto">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="flex items-center space-x-2 text-lg">
+            <User className="w-4 h-4" />
             <span>Editar Perfil do Usuário</span>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-4 py-2">
           {/* Informações do Sistema */}
-          <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-            <h3 className="font-semibold text-gray-900">Informações do Sistema</h3>
-            <div className="grid grid-cols-1 gap-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Email:</span>
-                <span className="font-medium">{user?.email}</span>
+          <div className="bg-gray-50 p-3 rounded-lg space-y-1.5">
+            <h3 className="font-medium text-gray-900 text-sm">Informações do Sistema</h3>
+            <div className="grid grid-cols-1 gap-1.5 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 text-xs">Email:</span>
+                <span className="font-medium text-xs truncate ml-2 max-w-[250px]">{user?.email}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Função:</span>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 text-xs">Função:</span>
                 {user?.role && getRoleBadge(user.role)}
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">ID do Usuário:</span>
-                <code className="text-xs bg-gray-200 px-2 py-1 rounded">{user?.id}</code>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 text-xs">ID do Usuário:</span>
+                <code className="text-xs bg-gray-200 px-1.5 py-0.5 rounded text-[10px] truncate max-w-[200px]">{user?.id}</code>
               </div>
             </div>
           </div>
 
           {/* Formulário de Edição */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div>
-              <Label htmlFor="full_name">Nome Completo *</Label>
+              <Label htmlFor="full_name" className="text-sm">Nome Completo *</Label>
               <Input
                 id="full_name"
                 value={formData.full_name}
                 onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
                 placeholder="Digite seu nome completo"
                 disabled={isLoading}
+                className="text-sm h-9"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-1 leading-tight">
                 Este nome será exibido nas AIHs processadas e nos relatórios da diretoria
               </p>
             </div>
 
             <div>
-              <Label htmlFor="email">Email (Não Editável)</Label>
+              <Label htmlFor="email" className="text-sm">Email (Não Editável)</Label>
               <Input
                 id="email"
                 value={formData.email}
                 disabled
-                className="bg-gray-100"
+                className="bg-gray-100 text-sm h-9"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-1 leading-tight">
                 O email não pode ser alterado pelo usuário
               </p>
             </div>
           </div>
 
           {/* Botões de Ação */}
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex justify-end space-x-2 pt-2">
             <Button
               variant="outline"
               onClick={handleCancel}
               disabled={isLoading}
+              size="sm"
+              className="text-sm h-8"
             >
-              <X className="w-4 h-4 mr-2" />
+              <X className="w-3 h-3 mr-1" />
               Cancelar
             </Button>
             <Button
               onClick={handleSave}
               disabled={isLoading || !formData.full_name.trim()}
+              size="sm"
+              className="text-sm h-8"
             >
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="w-3 h-3 mr-1" />
               {isLoading ? 'Salvando...' : 'Salvar'}
             </Button>
           </div>

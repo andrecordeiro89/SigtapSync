@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { AlertCircle, CheckCircle, Clock, Users, Building2, FileText, Activity, ShieldCheck } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Users, Building2, FileText, Activity, ShieldCheck, BookOpen, ArrowRight, Database, Search, Upload, Save, Eye } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSupabaseAIH } from '../hooks/useSupabase';
 import { supabase } from '../lib/supabase';
@@ -37,6 +37,12 @@ const Dashboard = () => {
   const [recentAuditLogs, setRecentAuditLogs] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // ✅ Função para verificar se é usuário de diretoria
+  const isManagementRole = (): boolean => {
+    if (!user) return false;
+    return ['admin', 'ti', 'coordinator', 'director', 'auditor', 'developer'].includes(user.role);
+  };
 
   // Carregar informações do hospital atual
   useEffect(() => {
@@ -170,6 +176,64 @@ const Dashboard = () => {
     });
   };
 
+  // ✅ Card explicativo para usuários comuns - Versão compacta
+  const SystemExplanationCard = () => (
+    <Card className="hover:shadow-md transition-shadow border-l-4 border-l-purple-500 h-[400px] flex flex-col">
+      <CardHeader className="pb-3 flex-shrink-0">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <BookOpen className="h-5 w-5 text-purple-600" />
+          Como Funciona o Sistema
+        </CardTitle>
+        <CardDescription className="text-sm">
+          Fluxo de processamento AIH
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pt-0 flex-1">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg">
+            <Search className="h-4 w-4 text-blue-600 flex-shrink-0" />
+            <div>
+              <h4 className="font-medium text-blue-900 text-sm">1. Consulta SIGTAP</h4>
+              <p className="text-xs text-blue-700">Tabela oficial de procedimentos SUS</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 p-2 bg-green-50 rounded-lg">
+            <Upload className="h-4 w-4 text-green-600 flex-shrink-0" />
+            <div>
+              <h4 className="font-medium text-green-900 text-sm">2. Upload de Documentos</h4>
+              <p className="text-xs text-green-700">Excel, PDF e ZIP com IA</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 p-2 bg-orange-50 rounded-lg">
+            <Database className="h-4 w-4 text-orange-600 flex-shrink-0" />
+            <div>
+              <h4 className="font-medium text-orange-900 text-sm">3. Extração Inteligente</h4>
+              <p className="text-xs text-orange-700">Processo feito com IA</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 p-2 bg-purple-50 rounded-lg">
+            <Save className="h-4 w-4 text-purple-600 flex-shrink-0" />
+            <div>
+              <h4 className="font-medium text-purple-900 text-sm">4. Salvamento Seguro</h4>
+              <p className="text-xs text-purple-700">Auditoria completa integrada</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 p-2 bg-indigo-50 rounded-lg">
+            <Eye className="h-4 w-4 text-indigo-600 flex-shrink-0" />
+            <div>
+              <h4 className="font-medium text-indigo-900 text-sm">5. Consulta de Pacientes</h4>
+              <p className="text-xs text-indigo-700">Acesso rápido aos dados</p>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   if (!user) {
     return (
       <div className="p-6">
@@ -185,251 +249,338 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header com informações do usuário */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white">
+    <div className="p-4 space-y-4">
+      {/* Header com informações do usuário - Versão compacta */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-4 text-white">
         <div className="flex items-center justify-between">
-        <div>
-            <h1 className="text-2xl font-bold">
+          <div>
+            <h1 className="text-xl font-bold">
               Bem-vindo, {user.role === 'developer' ? 'Desenvolvedor' : user.role === 'admin' ? 'Administrador' : user.full_name || user.email?.split('@')[0]}!
             </h1>
-            <p className="text-blue-100 mt-1">
-              {canAccessAllHospitals || user.full_access 
-                ? 'Dashboard Executivo - Todos os Hospitais' 
-                : 'Dashboard do Sistema SIGTAP'}
-          </p>
-        </div>
-          <div className="text-right">
-            <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-              {user.role.toUpperCase()}
-            </Badge>
-            {canAccessAllHospitals || user.full_access ? (
-              <p className="text-blue-100 text-sm mt-2">
-                <Building2 className="h-4 w-4 inline mr-1" />
-                Acesso Total - {stats.hospitals_count || 8} Hospitais
-              </p>
-            ) : hospitalInfo && (
-              <p className="text-blue-100 text-sm mt-2">
-                <Building2 className="h-4 w-4 inline mr-1" />
-                {hospitalInfo.name}
-              </p>
-            )}
+            <p className="text-blue-100 text-sm mt-1">
+              {isManagementRole() 
+                ? 'Todos os Hospitais' 
+                : (hospitalInfo?.name || 'Dashboard do Sistema SIGTAP')}
+            </p>
+          </div>
+          <div className="text-right flex items-center">
+            <div className="p-3 bg-white/10 rounded-full">
+              <ShieldCheck className="h-8 w-8 text-white" />
+            </div>
           </div>
         </div>
       </div>
       
-      {/* Informações do Hospital */}
+      {/* Informações do Hospital - Versão compacta */}
       {hospitalInfo && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+        <Card className="h-[140px] flex flex-col">
+          <CardHeader className="pb-3 flex-shrink-0">
+            <CardTitle className="flex items-center gap-2 text-lg">
               <Building2 className="h-5 w-5 text-blue-600" />
               Hospital Atual
             </CardTitle>
-            <CardDescription>
-              Informações do hospital selecionado para esta sessão
+            <CardDescription className="text-sm">
+              Informações do hospital selecionado
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <CardContent className="pt-0 flex-1">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <p className="text-sm text-gray-500">Nome</p>
-                <p className="font-medium">{hospitalInfo.name}</p>
+                <p className="text-xs text-gray-500">Nome</p>
+                <p className="font-medium text-sm">{hospitalInfo.name}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">CNPJ</p>
-                <p className="font-medium">{hospitalInfo.cnpj}</p>
+                <p className="text-xs text-gray-500">CNPJ</p>
+                <p className="font-medium text-sm">{hospitalInfo.cnpj}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Localização</p>
-                <p className="font-medium">
+                <p className="text-xs text-gray-500">Localização</p>
+                <p className="font-medium text-sm">
                   {hospitalInfo.city && hospitalInfo.state 
                     ? `${hospitalInfo.city}, ${hospitalInfo.state}`
                     : 'Não informado'}
                 </p>
               </div>
             </div>
-            <div className="mt-4 flex items-center gap-2">
-              <Badge variant={hospitalInfo.is_active ? "default" : "secondary"}>
-                {hospitalInfo.is_active ? 'Ativo' : 'Inativo'}
-              </Badge>
-              <span className="text-sm text-gray-500">
-                Acesso a {user.hospital_access.length} {user.hospital_access.length === 1 ? 'hospital' : 'hospitais'}
-              </span>
-            </div>
+
           </CardContent>
         </Card>
       )}
 
-      {/* Estatísticas Principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
-          <CardContent className="p-8">
-            <div className="flex items-center space-x-4">
-              <div className="p-4 bg-blue-100 rounded-lg">
-                <FileText className="h-10 w-10 text-blue-600" />
+      {/* ✅ Estatísticas Principais - Apenas para Diretoria - Versão compacta */}
+      {isManagementRole() && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="hover:shadow-md transition-shadow border-l-4 border-l-blue-500 h-[120px] flex flex-col">
+            <CardContent className="p-4 flex-1 flex items-center">
+              <div className="flex items-center space-x-3 w-full">
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <FileText className="h-6 w-6 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total de AIHs</p>
+                  <p className="text-2xl font-bold text-gray-900">{loading ? '...' : stats.totalAIHs}</p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    {stats.is_admin_mode 
+                      ? `Em ${stats.hospitals_count || 8} hospitais` 
+                      : (stats.totalAIHs > 0 ? 'Registradas no sistema' : 'Nenhuma AIH registrada')
+                    }
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">Total de AIHs</p>
-                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.totalAIHs}</p>
-                <p className="text-sm text-blue-600 mt-1">
-                  {stats.is_admin_mode 
-                    ? `Em ${stats.hospitals_count || 8} hospitais` 
-                    : (stats.totalAIHs > 0 ? 'Registradas no sistema' : 'Nenhuma AIH registrada')
-                  }
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card className="hover:shadow-md transition-shadow border-l-4 border-l-green-500">
-          <CardContent className="p-8">
-            <div className="flex items-center space-x-4">
-              <div className="p-4 bg-green-100 rounded-lg">
-                <Clock className="h-10 w-10 text-green-600" />
+          <Card className="hover:shadow-md transition-shadow border-l-4 border-l-green-500 h-[120px] flex flex-col">
+            <CardContent className="p-4 flex-1 flex items-center">
+              <div className="flex items-center space-x-3 w-full">
+                <div className="p-3 bg-green-100 rounded-lg">
+                  <Clock className="h-6 w-6 text-green-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Processadas Hoje</p>
+                  <p className="text-2xl font-bold text-gray-900">{loading ? '...' : stats.processedToday}</p>
+                  <p className="text-xs text-green-600 mt-1">
+                    {stats.is_admin_mode 
+                      ? `Todos os hospitais` 
+                      : (stats.processedToday > 0 ? `${stats.processedToday} nova${stats.processedToday !== 1 ? 's' : ''} hoje` : 'Nenhuma hoje')
+                    }
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-600 uppercase tracking-wide">Processadas Hoje</p>
-                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.processedToday}</p>
-                <p className="text-sm text-green-600 mt-1">
-                  {stats.is_admin_mode 
-                    ? `Todos os hospitais` 
-                    : (stats.processedToday > 0 ? `${stats.processedToday} nova${stats.processedToday !== 1 ? 's' : ''} hoje` : 'Nenhuma hoje')
-                  }
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      {/* Atividade Recente */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Logs de Auditoria Recentes */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-purple-600" />
-              Atividade Recente
-            </CardTitle>
-            <CardDescription>
-              Suas últimas ações no sistema com rastreabilidade completa
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="animate-pulse bg-gray-200 h-16 rounded"></div>
-                ))}
-              </div>
-            ) : recentActivity.length > 0 ? (
-              <div className="space-y-4">
-                {recentActivity.map((log) => (
-                  <div key={log.id} className="p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border border-blue-200 hover:shadow-md transition-shadow">
-                    <div className="flex items-start space-x-3">
-                      {getActionIcon(log.action)}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <p className="text-sm font-semibold text-gray-900">
-                            {getActionLabel(log.action)}
-                          </p>
-                          <Badge variant="outline" className="text-xs bg-white">
-                            {log.operation_type}
-                          </Badge>
-                        </div>
-                        
-                        {log.aih_number && (
-                          <p className="text-sm text-blue-700 font-mono mb-1">
-                            📄 AIH: {log.aih_number}
-                          </p>
-                        )}
-                        
-                        {log.patient_name && (
-                          <p className="text-sm text-green-700 mb-1">
-                            👤 Paciente: {log.patient_name}
-                          </p>
-                        )}
-                        
-                        <p className="text-xs text-gray-600">
-                          🕒 {formatTime(log.created_at)} • 👨‍💼 {log.user_name || log.user_email}
-                        </p>
-                        
-                        {log.hospital_name && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            🏥 {log.hospital_name}
-                          </p>
-                        )}
-                      </div>
+      {/* ✅ Cards para Usuários Comuns - Layout 2 colunas */}
+      {!isManagementRole() && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <SystemExplanationCard />
+          
+          {/* Status do Sistema para Usuários */}
+          <Card className="h-[400px] flex flex-col">
+            <CardHeader className="pb-3 flex-shrink-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                Status do Sistema
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Verificações de integridade
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0 flex-1">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+                  <div className="flex items-center">
+                    <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium">Autenticação</p>
+                      <p className="text-xs text-gray-500">Sistema de login ativo</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Activity className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p>Nenhuma atividade recente encontrada</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Status do Sistema */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              Status do Sistema
-            </CardTitle>
-            <CardDescription>
-              Verificações de integridade e conectividade
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                <div className="flex items-center">
-                  <CheckCircle className="h-5 w-5 text-green-600 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium">Autenticação</p>
-                    <p className="text-xs text-gray-500">Sistema de login ativo</p>
-                  </div>
+                  <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
+                    Ativo
+                  </Badge>
                 </div>
-                <Badge variant="default" className="bg-green-100 text-green-800">
-                  Ativo
-                </Badge>
-              </div>
 
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-center">
-                  <Building2 className="h-5 w-5 text-blue-600 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium">Hospital Conectado</p>
-                    <p className="text-xs text-gray-500">Dados do hospital disponíveis</p>
+                <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
+                  <div className="flex items-center">
+                    <Building2 className="h-4 w-4 text-blue-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium">Hospital Conectado</p>
+                      <p className="text-xs text-gray-500">Dados disponíveis</p>
+                    </div>
                   </div>
+                  <Badge variant="default" className="bg-blue-100 text-blue-800 text-xs">
+                    Conectado
+                  </Badge>
                 </div>
-                <Badge variant="default" className="bg-blue-100 text-blue-800">
-                  Conectado
-                </Badge>
-              </div>
 
-              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                <div className="flex items-center">
-                  <ShieldCheck className="h-5 w-5 text-purple-600 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium">Auditoria</p>
-                    <p className="text-xs text-gray-500">Rastreabilidade completa</p>
+                <div className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
+                  <div className="flex items-center">
+                    <ShieldCheck className="h-4 w-4 text-purple-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium">Auditoria</p>
+                      <p className="text-xs text-gray-500">Rastreabilidade completa</p>
+                    </div>
                   </div>
+                  <Badge variant="default" className="bg-purple-100 text-purple-800 text-xs">
+                    Ativo
+                  </Badge>
                 </div>
-                <Badge variant="default" className="bg-purple-100 text-purple-800">
-                  Ativo
-                </Badge>
+
+                <div className="flex items-center justify-between p-2 bg-yellow-50 rounded-lg">
+                  <div className="flex items-center">
+                    <FileText className="h-4 w-4 text-yellow-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium">SIGTAP Atualizado</p>
+                      <p className="text-xs text-gray-500">Tabela oficial</p>
+                    </div>
+                  </div>
+                  <Badge variant="default" className="bg-yellow-100 text-yellow-800 text-xs">
+                    Atualizado
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-indigo-50 rounded-lg">
+                  <div className="flex items-center">
+                    <Users className="h-4 w-4 text-indigo-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium">Processamento IA</p>
+                      <p className="text-xs text-gray-500">Extração automática</p>
+                    </div>
+                  </div>
+                  <Badge variant="default" className="bg-indigo-100 text-indigo-800 text-xs">
+                    Ativo
+                  </Badge>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ✅ Layout Responsivo baseado no Role - Apenas para Diretoria */}
+      {isManagementRole() && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Logs de Auditoria Recentes */}
+          <Card className="h-[400px] flex flex-col">
+            <CardHeader className="pb-3 flex-shrink-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Activity className="h-5 w-5 text-purple-600" />
+                Atividade Recente
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Suas últimas ações no sistema
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0 flex-1 overflow-hidden">
+              {loading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="animate-pulse bg-gray-200 h-12 rounded"></div>
+                  ))}
+                </div>
+              ) : recentActivity.length > 0 ? (
+                <div className="space-y-2 overflow-y-auto max-h-full">
+                  {recentActivity.slice(0, 3).map((log) => (
+                    <div key={log.id} className="p-3 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg border border-blue-200 hover:shadow-md transition-shadow">
+                      <div className="flex items-start space-x-2">
+                        {getActionIcon(log.action)}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <p className="text-sm font-semibold text-gray-900">
+                              {getActionLabel(log.action)}
+                            </p>
+                            <Badge variant="outline" className="text-xs bg-white">
+                              {log.operation_type}
+                            </Badge>
+                          </div>
+                          
+                          {log.aih_number && (
+                            <p className="text-xs text-blue-700 font-mono mb-1">
+                              📄 AIH: {log.aih_number}
+                            </p>
+                          )}
+                          
+                          {log.patient_name && (
+                            <p className="text-xs text-green-700 mb-1">
+                              👤 Paciente: {log.patient_name}
+                            </p>
+                          )}
+                          
+                          <p className="text-xs text-gray-600">
+                            🕒 {formatTime(log.created_at)} • 👨‍💼 {log.user_name || log.user_email}
+                          </p>
+                          
+                          {log.hospital_name && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              🏥 {log.hospital_name}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-gray-500 flex-1 flex flex-col justify-center">
+                  <Activity className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                  <p className="text-sm">Nenhuma atividade recente encontrada</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Status do Sistema */}
+          <Card className="h-[400px] flex flex-col">
+            <CardHeader className="pb-3 flex-shrink-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                Status do Sistema
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Verificações de integridade e conectividade
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0 flex-1">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+                  <div className="flex items-center">
+                    <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium">Autenticação</p>
+                      <p className="text-xs text-gray-500">Sistema de login ativo</p>
+                    </div>
+                  </div>
+                  <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
+                    Ativo
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
+                  <div className="flex items-center">
+                    <Building2 className="h-4 w-4 text-blue-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium">Hospital Conectado</p>
+                      <p className="text-xs text-gray-500">Dados do hospital disponíveis</p>
+                    </div>
+                  </div>
+                  <Badge variant="default" className="bg-blue-100 text-blue-800 text-xs">
+                    Conectado
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
+                  <div className="flex items-center">
+                    <ShieldCheck className="h-4 w-4 text-purple-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium">Auditoria</p>
+                      <p className="text-xs text-gray-500">Rastreabilidade completa</p>
+                    </div>
+                  </div>
+                  <Badge variant="default" className="bg-purple-100 text-purple-800 text-xs">
+                    Ativo
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-indigo-50 rounded-lg">
+                  <div className="flex items-center">
+                    <Users className="h-4 w-4 text-indigo-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium">Processamento IA</p>
+                      <p className="text-xs text-gray-500">Extração automática</p>
+                    </div>
+                  </div>
+                  <Badge variant="default" className="bg-indigo-100 text-indigo-800 text-xs">
+                    Ativo
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

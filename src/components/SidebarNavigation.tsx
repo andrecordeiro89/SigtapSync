@@ -450,12 +450,12 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 
-                <DropdownMenuContent className="w-96 shadow-2xl border-0 bg-white/95 backdrop-blur-2xl rounded-3xl overflow-hidden" align="end" forceMount>
+                <DropdownMenuContent className="w-80 max-h-[85vh] overflow-y-auto shadow-xl border-0 bg-white/95 backdrop-blur-xl rounded-2xl" align="end" forceMount>
                   {/* Informações do Usuário com Design Premium */}
-                  <div className="relative flex items-center space-x-4 p-6 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50 backdrop-blur-sm">
+                  <div className="relative flex items-center space-x-3 p-3 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
                     <div className="relative">
-                      <Avatar className="h-12 w-12 ring-2 ring-white shadow-lg">
-                        <AvatarFallback className={`font-semibold text-sm ${
+                      <Avatar className="h-8 w-8 ring-1 ring-white shadow-sm">
+                        <AvatarFallback className={`font-medium text-xs ${
                           canAccessAllHospitals() 
                             ? 'bg-gradient-to-br from-purple-500 to-pink-600 text-white' 
                             : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white'
@@ -464,28 +464,28 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                         </AvatarFallback>
                       </Avatar>
                       {canAccessAllHospitals() && (
-                        <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white">
-                          <Crown className="h-3 w-3 text-white" />
+                        <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-sm ring-1 ring-white">
+                          <Crown className="h-2 w-2 text-white" />
                         </div>
                       )}
                     </div>
                     
                     <div className="relative flex-1 min-w-0">
-                      <p className="text-base font-semibold text-slate-900 truncate">
+                      <p className="text-xs font-medium text-slate-900 truncate">
                         {user.full_name || user.email?.split('@')[0]}
                       </p>
-                      <p className="text-sm text-slate-600 truncate">{user.email}</p>
-                      <div className="flex gap-2 mt-2">
+                      <p className="text-xs text-slate-600 truncate">{user.email}</p>
+                      <div className="flex gap-1 mt-1">
                         {roleConfig && (
-                          <Badge className={`${roleConfig.color} text-xs shadow-sm`}>
-                            <roleConfig.icon className="h-3 w-3 mr-1" />
+                          <Badge className={`${roleConfig.color} text-xs py-0 shadow-sm`}>
+                            <roleConfig.icon className="h-2 w-2 mr-1" />
                             {roleConfig.label}
                           </Badge>
                         )}
                         {canAccessAllHospitals() && (
-                          <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 text-xs shadow-sm">
-                            <Shield className="h-3 w-3 mr-1" />
-                            FULL ACCESS
+                          <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 text-xs py-0 shadow-sm">
+                            <Shield className="h-2 w-2 mr-1" />
+                            FULL
                           </Badge>
                         )}
                       </div>
@@ -493,121 +493,121 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                   </div>
 
                   {/* Informações de Acesso com Design Premium */}
-                  <div className="relative p-5 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
-                    <div className="flex items-center space-x-3">
-                      <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${
+                  <div className="relative p-2 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
+                    <div className="flex items-center space-x-2">
+                      <div className={`flex items-center justify-center w-6 h-6 rounded-lg ${
                         canAccessAllHospitals() 
-                          ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg' 
-                          : 'bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg'
+                          ? 'bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-sm' 
+                          : 'bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-sm'
                       }`}>
                         {canAccessAllHospitals() ? (
-                          <Globe className="h-5 w-5" />
+                          <Globe className="h-3 w-3" />
                         ) : (
-                          <Building2 className="h-5 w-5" />
+                          <Building2 className="h-3 w-3" />
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-semibold text-slate-900">
-                          {canAccessAllHospitals() ? 'Acesso Administrativo' : 'Hospital Atual'}
+                        <p className="text-xs font-medium text-slate-900">
+                          {canAccessAllHospitals() ? 'Acesso Admin' : 'Hospital Atual'}
                         </p>
-                        <p className={`text-sm font-medium ${
+                        <p className={`text-xs font-medium ${
                           canAccessAllHospitals() ? 'text-purple-600' : 'text-blue-600'
                         }`}>
                           {getHospitalDisplayName()}
                         </p>
                       </div>
                     </div>
-                    <p className={`text-xs mt-3 ${
+                    <p className={`text-xs mt-1 ${
                       canAccessAllHospitals() ? 'text-purple-600' : 'text-blue-600'
                     }`}>
                       {canAccessAllHospitals() 
-                        ? 'Controle total sobre todos os hospitais' 
-                        : `Acesso a ${user.hospital_access.length} ${user.hospital_access.length === 1 ? 'hospital' : 'hospitais'}`
+                        ? 'Controle total' 
+                        : `${user.hospital_access.length} ${user.hospital_access.length === 1 ? 'hospital' : 'hospitais'}`
                       }
                     </p>
                   </div>
 
                   {/* Informações sobre funcionalidades disponíveis com Design Premium */}
-                  <div className="relative p-5 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-lg">
-                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                  <div className="relative p-2 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-sm">
+                        <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                       </div>
-                      <p className="text-sm font-semibold text-slate-800">
-                        Funcionalidades Disponíveis
+                      <p className="text-xs font-medium text-slate-800">
+                        Funcionalidades
                       </p>
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                        <p className="text-xs text-emerald-600 font-medium">Dashboard</p>
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-1.5">
+                        <div className="w-1 h-1 bg-emerald-500 rounded-full"></div>
+                        <p className="text-xs text-emerald-600">Dashboard</p>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                        <p className="text-xs text-emerald-600 font-medium">Consulta SIGTAP</p>
+                      <div className="flex items-center space-x-1.5">
+                        <div className="w-1 h-1 bg-emerald-500 rounded-full"></div>
+                        <p className="text-xs text-emerald-600">Consulta SIGTAP</p>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                        <p className="text-xs text-emerald-600 font-medium">AIH Avançado (Sistema Oficial)</p>
+                      <div className="flex items-center space-x-1.5">
+                        <div className="w-1 h-1 bg-emerald-500 rounded-full"></div>
+                        <p className="text-xs text-emerald-600">AIH Avançado</p>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
-                        <p className="text-xs text-emerald-600 font-medium">Gerenciamento de Pacientes</p>
+                      <div className="flex items-center space-x-1.5">
+                        <div className="w-1 h-1 bg-emerald-500 rounded-full"></div>
+                        <p className="text-xs text-emerald-600">Pacientes</p>
                       </div>
                       {hasFullAccess() && (
                         <>
-                          <div className="flex items-center space-x-2">
-                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                            <p className="text-xs text-blue-600 font-medium">Importação SIGTAP (Diretoria)</p>
+                          <div className="flex items-center space-x-1.5">
+                            <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                            <p className="text-xs text-blue-600">Import SIGTAP</p>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                            <p className="text-xs text-blue-600 font-medium">Upload AIH (Testes)</p>
+                          <div className="flex items-center space-x-1.5">
+                            <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                            <p className="text-xs text-blue-600">Upload AIH</p>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
-                            <p className="text-xs text-blue-600 font-medium">Relatórios Executivos</p>
+                          <div className="flex items-center space-x-1.5">
+                            <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                            <p className="text-xs text-blue-600">Relatórios</p>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <div className="w-1.5 h-1.5 bg-purple-500 rounded-full"></div>
-                            <p className="text-xs text-purple-600 font-medium">Todas as funcionalidades administrativas</p>
+                          <div className="flex items-center space-x-1.5">
+                            <div className="w-1 h-1 bg-purple-500 rounded-full"></div>
+                            <p className="text-xs text-purple-600">Admin Total</p>
                           </div>
                         </>
                       )}
                       {!hasFullAccess() && (
-                        <div className="flex items-center space-x-2">
-                          <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div>
-                          <p className="text-xs text-slate-500 font-medium">Perfil operador - Interface otimizada para uso diário</p>
+                        <div className="flex items-center space-x-1.5">
+                          <div className="w-1 h-1 bg-slate-400 rounded-full"></div>
+                          <p className="text-xs text-slate-500">Perfil operador</p>
                         </div>
                       )}
                     </div>
                   </div>
 
                   {/* Permissões com Design Premium */}
-                  <div className="relative p-5 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg">
-                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                  <div className="relative p-2 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-sm">
+                        <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                       </div>
-                      <p className="text-sm font-semibold text-slate-800">
-                        Suas Permissões
+                      <p className="text-xs font-medium text-slate-800">
+                        Permissões
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1">
                       {canAccessAllHospitals() ? (
-                        <Badge className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 shadow-sm">
-                          TODAS AS PERMISSÕES
+                        <Badge className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 py-0 shadow-sm">
+                          TODAS
                         </Badge>
                       ) : (
                         <>
-                          {user.permissions.slice(0, 3).map((perm, index) => (
-                            <Badge key={index} className="text-xs bg-gradient-to-r from-slate-500 to-slate-600 text-white border-0 shadow-sm">
+                          {user.permissions.slice(0, 2).map((perm, index) => (
+                            <Badge key={index} className="text-xs bg-gradient-to-r from-slate-500 to-slate-600 text-white border-0 py-0 shadow-sm">
                               {perm}
                             </Badge>
                           ))}
-                          {user.permissions.length > 3 && (
-                            <Badge className="text-xs bg-gradient-to-r from-slate-400 to-slate-500 text-white border-0 shadow-sm">
-                              +{user.permissions.length - 3} mais
+                          {user.permissions.length > 2 && (
+                            <Badge className="text-xs bg-gradient-to-r from-slate-400 to-slate-500 text-white border-0 py-0 shadow-sm">
+                              +{user.permissions.length - 2}
                             </Badge>
                           )}
                         </>
@@ -617,12 +617,12 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
 
                   {/* Descrição do Role com Design Premium */}
                   {roleConfig && (
-                    <div className="relative p-5 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
-                      <div className="flex items-center space-x-3">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white shadow-lg">
-                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                    <div className="relative p-2 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 text-white shadow-sm">
+                          <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                         </div>
-                        <p className="text-sm text-slate-700 font-medium italic">
+                        <p className="text-xs text-slate-700 leading-tight">
                           {roleConfig.description}
                         </p>
                       </div>
@@ -630,31 +630,31 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                   )}
 
                   {/* Menu Items com Design Premium */}
-                  <div className="p-4 bg-gradient-to-br from-slate-50 to-slate-100/50 space-y-2">
+                  <div className="p-2 bg-gradient-to-br from-slate-50 to-slate-100/50 space-y-1">
                     <DropdownMenuItem 
-                      className="cursor-pointer rounded-2xl p-4 transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group" 
+                      className="cursor-pointer rounded-xl p-2 transition-all duration-200 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 group" 
                       onClick={() => setShowProfileModal(true)}
                     >
-                      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg mr-4 group-hover:shadow-lg transition-all duration-300">
-                        <Settings className="h-5 w-5" />
+                      <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-sm mr-2 group-hover:shadow-sm transition-all duration-200">
+                        <Settings className="h-3 w-3" />
                       </div>
-                      <span className="font-semibold text-slate-700 group-hover:text-blue-700 transition-colors duration-300">Configurações</span>
+                      <span className="text-xs font-medium text-slate-700 group-hover:text-blue-700 transition-colors duration-200">Configurações</span>
                     </DropdownMenuItem>
                     
-                    <DropdownMenuSeparator className="my-3 border-slate-200/60" />
+                    <DropdownMenuSeparator className="my-1 border-slate-200/60" />
                     
                     <DropdownMenuItem 
-                      className="cursor-pointer rounded-2xl p-4 transition-all duration-300 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 hover:shadow-md text-red-600 focus:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 group"
+                      className="cursor-pointer rounded-xl p-2 transition-all duration-200 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 hover:shadow-sm text-red-600 focus:text-red-600 focus:outline-none focus:ring-1 focus:ring-red-500 group"
                       onClick={handleLogout}
                       disabled={isLoggingOut}
                     >
-                      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 text-white shadow-lg mr-4 group-hover:shadow-lg transition-all duration-300">
-                        <LogOut className="h-5 w-5" />
+                      <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 text-white shadow-sm mr-2 group-hover:shadow-sm transition-all duration-200">
+                        <LogOut className="h-3 w-3" />
                       </div>
-                      <span className="font-semibold group-hover:text-red-700 transition-colors duration-300">
+                      <span className="text-xs font-medium group-hover:text-red-700 transition-colors duration-200">
                         {isLoggingOut ? (
                           <div className="flex items-center">
-                            <div className="animate-spin w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full mr-2"></div>
+                            <div className="animate-spin w-3 h-3 border border-red-600 border-t-transparent rounded-full mr-1"></div>
                             Saindo...
                           </div>
                         ) : (

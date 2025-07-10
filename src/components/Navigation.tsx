@@ -339,11 +339,11 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                 </Button>
               </DropdownMenuTrigger>
               
-              <DropdownMenuContent className="w-96" align="end" forceMount>
+              <DropdownMenuContent className="w-80 max-h-[85vh] overflow-y-auto" align="end" forceMount>
                 {/* Informações do Usuário */}
-                <div className="flex items-center space-x-2 p-4 border-b">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className={`font-medium ${
+                <div className="flex items-center space-x-2 p-3 border-b">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className={`font-medium text-xs ${
                       canAccessAllHospitals() 
                         ? 'bg-purple-100 text-purple-700' 
                         : 'bg-blue-100 text-blue-700'
@@ -352,21 +352,21 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-xs font-medium text-gray-900 truncate">
                       {user.full_name || user.email?.split('@')[0]}
                     </p>
                     <p className="text-xs text-gray-500 truncate">{user.email}</p>
                     <div className="flex gap-1 mt-1">
                       {roleConfig && (
-                        <Badge variant="outline" className={`${roleConfig.color} text-xs`}>
-                          <roleConfig.icon className="h-3 w-3 mr-1" />
+                        <Badge variant="outline" className={`${roleConfig.color} text-xs py-0`}>
+                          <roleConfig.icon className="h-2 w-2 mr-1" />
                           {roleConfig.label}
                         </Badge>
                       )}
                       {canAccessAllHospitals() && (
-                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs">
-                          <Shield className="h-3 w-3 mr-1" />
-                          FULL ACCESS
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs py-0">
+                          <Shield className="h-2 w-2 mr-1" />
+                          FULL
                         </Badge>
                       )}
                     </div>
@@ -374,20 +374,20 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                 </div>
 
                 {/* Informações de Acesso */}
-                <div className={`p-3 border-b ${
+                <div className={`p-2 border-b ${
                   canAccessAllHospitals() ? 'bg-purple-50' : 'bg-blue-50'
                 }`}>
                   <div className={`flex items-center ${
                     canAccessAllHospitals() ? 'text-purple-700' : 'text-blue-700'
                   }`}>
                     {canAccessAllHospitals() ? (
-                      <Globe className="h-4 w-4 mr-2" />
+                      <Globe className="h-3 w-3 mr-1" />
                     ) : (
-                      <Building2 className="h-4 w-4 mr-2" />
+                      <Building2 className="h-3 w-3 mr-1" />
                     )}
                     <div>
                       <p className="text-xs font-medium">
-                        {canAccessAllHospitals() ? 'Acesso Administrativo' : 'Hospital Atual'}
+                        {canAccessAllHospitals() ? 'Acesso Admin' : 'Hospital Atual'}
                       </p>
                       <p className={`text-xs ${
                         canAccessAllHospitals() ? 'text-purple-600' : 'text-blue-600'
@@ -396,56 +396,56 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                       </p>
                     </div>
                   </div>
-                  <p className={`text-xs mt-1 ${
+                  <p className={`text-xs mt-0.5 ${
                     canAccessAllHospitals() ? 'text-purple-600' : 'text-blue-600'
                   }`}>
                     {canAccessAllHospitals() 
-                      ? 'Controle total sobre todos os hospitais' 
-                      : `Acesso a ${user.hospital_access.length} ${user.hospital_access.length === 1 ? 'hospital' : 'hospitais'}`
+                      ? 'Controle total' 
+                      : `${user.hospital_access.length} ${user.hospital_access.length === 1 ? 'hospital' : 'hospitais'}`
                     }
                   </p>
                 </div>
 
                 {/* Informações sobre funcionalidades disponíveis */}
-                <div className="p-3 border-b">
-                  <p className="text-xs font-medium text-gray-700 mb-2">Funcionalidades Disponíveis:</p>
-                  <div className="space-y-1">
+                <div className="p-2 border-b">
+                  <p className="text-xs font-medium text-gray-700 mb-1">Funcionalidades:</p>
+                  <div className="space-y-0.5">
                     <p className="text-xs text-green-600">✅ Dashboard</p>
                     <p className="text-xs text-green-600">✅ Consulta SIGTAP</p>
-                    <p className="text-xs text-green-600">✅ AIH Avançado (Sistema Oficial)</p>
-                    <p className="text-xs text-green-600">✅ Gerenciamento de Pacientes</p>
+                    <p className="text-xs text-green-600">✅ AIH Avançado</p>
+                    <p className="text-xs text-green-600">✅ Pacientes</p>
                     {hasFullAccess() && (
                       <>
-                        <p className="text-xs text-blue-600">✅ Importação SIGTAP (Diretoria)</p>
-                        <p className="text-xs text-blue-600">✅ Upload AIH (Testes)</p>
-                        <p className="text-xs text-blue-600">✅ Relatórios Executivos</p>
-                        <p className="text-xs text-purple-600">✅ Todas as funcionalidades administrativas</p>
+                        <p className="text-xs text-blue-600">✅ Import SIGTAP</p>
+                        <p className="text-xs text-blue-600">✅ Upload AIH</p>
+                        <p className="text-xs text-blue-600">✅ Relatórios</p>
+                        <p className="text-xs text-purple-600">✅ Admin Total</p>
                       </>
                     )}
                     {!hasFullAccess() && (
-                      <p className="text-xs text-gray-500">ℹ️ Perfil operador - Interface otimizada para uso diário</p>
+                      <p className="text-xs text-gray-500">ℹ️ Perfil operador</p>
                     )}
                   </div>
                 </div>
 
                 {/* Permissões */}
-                <div className="p-3 border-b">
-                  <p className="text-xs font-medium text-gray-700 mb-2">Suas Permissões:</p>
+                <div className="p-2 border-b">
+                  <p className="text-xs font-medium text-gray-700 mb-1">Permissões:</p>
                   <div className="flex flex-wrap gap-1">
                     {canAccessAllHospitals() ? (
-                      <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700">
-                        TODAS AS PERMISSÕES
+                      <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-700 py-0">
+                        TODAS
                       </Badge>
                     ) : (
                       <>
-                        {user.permissions.slice(0, 3).map((perm, index) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
+                        {user.permissions.slice(0, 2).map((perm, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs py-0">
                             {perm}
                           </Badge>
                         ))}
-                        {user.permissions.length > 3 && (
-                          <Badge variant="secondary" className="text-xs">
-                            +{user.permissions.length - 3} mais
+                        {user.permissions.length > 2 && (
+                          <Badge variant="secondary" className="text-xs py-0">
+                            +{user.permissions.length - 2}
                           </Badge>
                         )}
                       </>
@@ -455,8 +455,8 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
 
                 {/* Descrição do Role */}
                 {roleConfig && (
-                  <div className="p-3 border-b">
-                    <p className="text-xs text-gray-600">{roleConfig.description}</p>
+                  <div className="p-2 border-b">
+                    <p className="text-xs text-gray-600 leading-tight">{roleConfig.description}</p>
                   </div>
                 )}
 
