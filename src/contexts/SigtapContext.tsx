@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
 import { useSigtapData } from '../hooks/useSigtapData';
 import { SigtapProcedure } from '../types';
 import { SigtapProcessingResult } from '../utils/sigtapProcessor';
@@ -20,6 +20,11 @@ interface SigtapContextType {
   loadFromSupabase: () => Promise<void>;
   saveToSupabase: (procedures: SigtapProcedure[], versionName: string) => Promise<void>;
   forceReload: () => Promise<void>;
+  
+  // ✅ NOVOS CAMPOS PARA CACHE INTELIGENTE
+  isInitialLoading: boolean;
+  lastCacheUpdate: string | null;
+  cacheStatus: 'empty' | 'loading' | 'cached' | 'error';
 }
 
 const SigtapContext = createContext<SigtapContextType | undefined>(undefined);
@@ -28,25 +33,21 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
   const sigtapData = useSigtapData();
   const [isSupabaseEnabled, setIsSupabaseEnabled] = useState(false);
   
-  // Verificar se Supabase está configurado
-  useEffect(() => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    
-    if (supabaseUrl && supabaseKey && supabaseUrl !== 'sua_url_do_supabase_aqui') {
-      setIsSupabaseEnabled(true);
-      console.log('🚀 Supabase habilitado - carregando dados...');
-      loadFromSupabase();
-    } else {
-      console.log('ℹ️ Supabase não configurado - usando Context API local');
-    }
-  }, []);
+  // ✅ NOVOS ESTADOS PARA CACHE INTELIGENTE
+  const [isInitialLoading, setIsInitialLoading] = useState(false);
+  const [lastCacheUpdate, setLastCacheUpdate] = useState<string | null>(null);
+  const [cacheStatus, setCacheStatus] = useState<'empty' | 'loading' | 'cached' | 'error'>('empty');
 
-  const loadFromSupabase = async () => {
+  // ✅ DEFINIR loadFromSupabase PRIMEIRO usando useCallback para evitar dependências circulares
+  const loadFromSupabase = useCallback(async () => {
     if (!isSupabaseEnabled) return;
     
     try {
       console.log('📥 🔧 CARREGAMENTO INTELIGENTE - DETECTANDO FONTE DE DADOS...');
+      
+      // ✅ MARCAR COMO CARREGANDO
+      setIsInitialLoading(true);
+      setCacheStatus('loading');
       
       // Import dinâmico para evitar problemas de módulo
       const { SigtapService } = await import('../services/supabaseService');
@@ -73,6 +74,10 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
         // Carregar dados do upload
         await sigtapData.importSigtapFile(null, uploadedProcedures);
         
+        // ✅ MARCAR CACHE COMO ATUALIZADO
+        setLastCacheUpdate(new Date().toISOString());
+        setCacheStatus('cached');
+        
         console.log('✅ CARREGAMENTO UPLOAD CONCLUÍDO - dados persistentes carregados');
         return; // ✅ SUCESSO - sair da função
       }
@@ -94,16 +99,89 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
         // Carregar dados oficiais
         await sigtapData.importSigtapFile(null, officialProcedures);
         
+        // ✅ MARCAR CACHE COMO ATUALIZADO
+        setLastCacheUpdate(new Date().toISOString());
+        setCacheStatus('cached');
+        
         console.log('✅ CARREGAMENTO OFICIAL CONCLUÍDO - dados oficiais carregados');
       } else {
         console.error('❌ ERRO: Nenhum procedimento encontrado em NENHUMA tabela');
         console.log('💡 SOLUÇÃO: Importe um arquivo PDF/Excel/ZIP primeiro');
+        setCacheStatus('error');
       }
     } catch (error) {
       console.error('❌ Erro ao carregar dados do Supabase:', error);
       console.error('❌ Detalhes completos do erro:', JSON.stringify(error, null, 2));
+      setCacheStatus('error');
+    } finally {
+      // ✅ SEMPRE FINALIZAR ESTADO DE LOADING
+      setIsInitialLoading(false);
     }
-  };
+  }, [isSupabaseEnabled, sigtapData]);
+
+  // ✅ CACHE INTELIGENTE: Verificar se precisa recarregar
+  const shouldReload = useCallback((): boolean => {
+    // Se não há dados, sempre recarregar
+    if (sigtapData.procedures.length === 0) {
+      console.log('🔄 CACHE: Nenhum dado - recarregando...');
+      return true;
+    }
+    
+    // Se não há cache timestamp, recarregar
+    if (!lastCacheUpdate) {
+      console.log('🔄 CACHE: Sem timestamp - recarregando...');
+      return true;
+    }
+    
+    // Verificar se cache está muito antigo (30 minutos)
+    const now = new Date().getTime();
+    const cacheTime = new Date(lastCacheUpdate).getTime();
+    const cacheAge = now - cacheTime;
+    const maxAge = 30 * 60 * 1000; // 30 minutos
+    
+    if (cacheAge > maxAge) {
+      console.log(`🔄 CACHE: Expirado (${Math.round(cacheAge / 60000)}min) - recarregando...`);
+      return true;
+    }
+    
+    console.log(`✅ CACHE: Válido (${Math.round(cacheAge / 60000)}min) - usando cache`);
+    return false;
+  }, [sigtapData.procedures.length, lastCacheUpdate]);
+
+  // ✅ CARREGAMENTO AUTOMÁTICO INTELIGENTE
+  useEffect(() => {
+    const initializeData = async () => {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseKey && supabaseUrl !== 'sua_url_do_supabase_aqui') {
+        setIsSupabaseEnabled(true);
+        console.log('🚀 Supabase habilitado - verificando cache...');
+        
+        // ✅ VERIFICAR SE PRECISA RECARREGAR
+        if (shouldReload()) {
+          console.log('🔄 Cache inválido - carregando dados...');
+          await loadFromSupabase();
+        } else {
+          console.log('✅ Cache válido - dados já disponíveis');
+          setCacheStatus('cached');
+        }
+      } else {
+        console.log('ℹ️ Supabase não configurado - usando Context API local');
+        setCacheStatus('error');
+      }
+    };
+    
+    initializeData();
+  }, []); // ✅ Dependências vazias para executar apenas uma vez
+
+  // ✅ RECARREGAR AUTOMATICAMENTE se dados sumiram
+  useEffect(() => {
+    if (isSupabaseEnabled && sigtapData.procedures.length === 0 && cacheStatus !== 'loading') {
+      console.log('🔄 Dados perdidos - recarregando automaticamente...');
+      loadFromSupabase();
+    }
+  }, [isSupabaseEnabled, sigtapData.procedures.length, cacheStatus, loadFromSupabase]);
 
   const saveToSupabase = async (procedures: SigtapProcedure[], versionName: string) => {
     if (!isSupabaseEnabled) {
@@ -152,6 +230,10 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
       await SigtapService.setActiveVersion(version.id);
       console.log('✅ Versão ativada');
       
+      // ✅ ATUALIZAR CACHE APÓS SALVAR
+      setLastCacheUpdate(new Date().toISOString());
+      setCacheStatus('cached');
+      
       console.log('🎉 Dados salvos no Supabase com sucesso!');
       console.log(`📊 ${procedures.length} procedimentos persistidos no banco de dados`);
     } catch (error) {
@@ -188,9 +270,11 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
     return result;
   };
 
-  // Função para forçar recarregamento
+  // ✅ FUNÇÃO PARA FORÇAR RECARREGAMENTO COM CACHE RESET
   const forceReload = async () => {
     console.log('🔄 Forçando recarregamento dos dados...');
+    setCacheStatus('loading');
+    setLastCacheUpdate(null);
     sigtapData.clearData();
     await loadFromSupabase();
   };
@@ -201,7 +285,12 @@ export const SigtapProvider = ({ children }: { children: ReactNode }) => {
     isSupabaseEnabled,
     loadFromSupabase,
     saveToSupabase,
-    forceReload
+    forceReload,
+    
+    // ✅ NOVOS VALORES PARA CACHE INTELIGENTE
+    isInitialLoading: isInitialLoading || sigtapData.isLoading,
+    lastCacheUpdate,
+    cacheStatus
   };
 
   return (

@@ -67,7 +67,21 @@ const cleanText = (text: string): string => {
 };
 
 const SigtapViewer = () => {
-  const { procedures, totalProcedures, lastImportDate, error, clearData, forceReload, isLoading, importSigtapFile } = useSigtapContext();
+  const { 
+    procedures, 
+    totalProcedures, 
+    lastImportDate, 
+    error, 
+    clearData, 
+    forceReload, 
+    isLoading, 
+    importSigtapFile,
+    // ✅ NOVOS CAMPOS PARA CACHE INTELIGENTE
+    isInitialLoading,
+    lastCacheUpdate,
+    cacheStatus
+  } = useSigtapContext();
+  
   const { hasFullAccess } = useAuth(); // Hook para verificar permissões
   const [searchTerm, setSearchTerm] = useState('');
   const [complexityFilter, setComplexityFilter] = useState('all');
@@ -79,6 +93,23 @@ const SigtapViewer = () => {
 
   // Verificar se usuário tem acesso administrativo (diretoria)
   const isAdminUser = hasFullAccess();
+
+  // ✅ ESTADOS COMBINADOS PARA LOADING
+  const isCurrentlyLoading = isLoading || isInitialLoading;
+  const hasData = procedures.length > 0;
+  const showLoadingState = isCurrentlyLoading || cacheStatus === 'loading';
+
+  // ✅ INFORMAÇÕES DE CACHE PARA DEBUG
+  const getCacheInfo = () => {
+    if (!lastCacheUpdate) return 'Sem cache';
+    
+    const now = new Date().getTime();
+    const cacheTime = new Date(lastCacheUpdate).getTime();
+    const cacheAge = now - cacheTime;
+    const minutes = Math.round(cacheAge / 60000);
+    
+    return `Cache: ${minutes}min atrás`;
+  };
 
   const filteredProcedures = useMemo(() => {
     if (!procedures.length) return [];
@@ -195,8 +226,63 @@ const SigtapViewer = () => {
     }
   };
 
-  // Se não há dados carregados
-  if (!procedures.length) {
+  // ✅ NOVA TELA DE LOADING DURANTE CARREGAMENTO INICIAL
+  if (showLoadingState && !hasData) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Consulta SIGTAP</h2>
+          <p className="text-gray-600 mt-1">Carregando procedimentos automaticamente...</p>
+        </div>
+
+        <Card>
+          <CardContent className="p-8 text-center space-y-6">
+            <div className="flex items-center justify-center space-x-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <div className="text-left">
+                <div className="text-xl font-semibold text-gray-900">
+                  Carregando dados SIGTAP
+                </div>
+                <div className="text-gray-600">
+                  {cacheStatus === 'loading' ? 'Buscando procedimentos do banco...' : 'Preparando dados...'}
+                </div>
+              </div>
+            </div>
+
+            {/* Barra de progresso visual */}
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div className="bg-blue-600 h-2.5 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+            </div>
+
+            {/* Status do cache */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
+              <div className="flex items-center">
+                <div className="animate-pulse h-2 w-2 bg-blue-500 rounded-full mr-3"></div>
+                <div>
+                  <h4 className="text-blue-800 font-medium">Sistema de Cache Inteligente</h4>
+                  <p className="text-blue-700 text-sm mt-1">
+                    {cacheStatus === 'loading' && 'Carregando dados do Supabase...'}
+                    {cacheStatus === 'cached' && 'Dados em cache - carregando...'}
+                    {cacheStatus === 'empty' && 'Inicializando sistema...'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Informações técnicas */}
+            <div className="text-xs text-gray-500 space-y-1">
+              <div>Status: {cacheStatus}</div>
+              <div>Procedimentos esperados: {totalProcedures || '4886'}</div>
+              <div>{getCacheInfo()}</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // ✅ TELA DE ERRO SE NÃO HÁ DADOS E NÃO ESTÁ CARREGANDO
+  if (!hasData && !showLoadingState) {
     return (
       <div className="space-y-6">
         <div>
@@ -213,17 +299,9 @@ const SigtapViewer = () => {
                 Nenhum procedimento SIGTAP encontrado
               </h3>
               <p className="text-gray-600 mb-4">
-                Os dados não estão carregados na tela. Vamos verificar e carregar seus {totalProcedures || '4886'} procedimentos.
+                Os dados não estão carregados. O sistema tentou carregar automaticamente mas não encontrou dados.
               </p>
             </div>
-
-            {/* Status Loading */}
-            {isLoading && (
-              <div className="flex items-center justify-center space-x-2 text-blue-600">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                <span>Carregando dados do banco...</span>
-              </div>
-            )}
 
             {/* Erro */}
             {error && (
@@ -238,25 +316,40 @@ const SigtapViewer = () => {
               </div>
             )}
 
+            {/* Status do cache */}
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 text-left">
+              <div className="flex">
+                <AlertCircle className="h-5 w-5 text-orange-400 mt-0.5 mr-2" />
+                <div>
+                  <h4 className="text-orange-800 font-medium">Status do Sistema:</h4>
+                  <div className="text-orange-700 text-sm mt-1 space-y-1">
+                    <div>Cache: {cacheStatus}</div>
+                    <div>{getCacheInfo()}</div>
+                    <div>Último carregamento: {lastImportDate ? new Date(lastImportDate).toLocaleString('pt-BR') : 'Nunca'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Botões de Ação */}
             <div className="space-y-3">
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button 
                   onClick={handleForceReload}
-                  disabled={isLoading}
+                  disabled={isCurrentlyLoading}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
                   <Search className="h-4 w-4 mr-2" />
-                  Carregar Dados do Banco
+                  {isCurrentlyLoading ? 'Carregando...' : 'Recarregar Dados'}
                 </Button>
                 
                 <Button 
                   onClick={handleClearCache}
                   variant="outline"
-                  disabled={isLoading}
+                  disabled={isCurrentlyLoading}
                 >
                   <AlertCircle className="h-4 w-4 mr-2" />
-                  Limpar Cache e Recarregar
+                  Limpar Cache
                 </Button>
               </div>
 
@@ -267,27 +360,13 @@ const SigtapViewer = () => {
                   <div>
                     <h4 className="text-blue-800 font-medium">Como resolver:</h4>
                     <ul className="text-blue-700 text-sm mt-1 space-y-1">
-                      <li>1. Clique em "Carregar Dados do Banco" para buscar seus procedimentos</li>
-                      <li>2. Se não funcionar, clique em "Limpar Cache e Recarregar"</li>
+                      <li>1. Clique em "Recarregar Dados" para forçar nova busca</li>
+                      <li>2. Se não funcionar, clique em "Limpar Cache"</li>
                       <li>3. Em último caso, vá para a aba "SIGTAP" e faça novo upload</li>
                     </ul>
                   </div>
                 </div>
               </div>
-
-              {/* Informações técnicas para debug */}
-              <details className="text-left">
-                <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
-                  Informações técnicas (para suporte)
-                </summary>
-                <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-3 rounded border font-mono">
-                  <div>Total Procedimentos Registrados: {totalProcedures || 'Não informado'}</div>
-                  <div>Última Importação: {lastImportDate || 'Nunca'}</div>
-                  <div>Supabase Habilitado: {isLoading ? 'Verificando...' : 'Sim'}</div>
-                  <div>Status Loading: {isLoading ? 'Sim' : 'Não'}</div>
-                  <div>Procedimentos Carregados: {procedures.length}</div>
-                </div>
-              </details>
             </div>
           </CardContent>
         </Card>
@@ -295,6 +374,7 @@ const SigtapViewer = () => {
     );
   }
 
+  // ✅ TELA PRINCIPAL COM DADOS CARREGADOS
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -313,6 +393,14 @@ const SigtapViewer = () => {
               </span>
               <Badge variant={procedures.length >= 10000 ? 'destructive' : procedures.length < 2000 ? 'secondary' : 'default'}>
                 {procedures.length >= 10000 ? '⚠️ Limite' : procedures.length < 2000 ? '❌ Incompleto' : '✅ Completo'}
+              </Badge>
+              
+              {/* ✅ INDICADOR DE CACHE */}
+              <Badge variant="outline" className="text-xs">
+                {cacheStatus === 'cached' && '💾 Cache'}
+                {cacheStatus === 'loading' && '⏳ Carregando'}
+                {cacheStatus === 'error' && '❌ Erro'}
+                {cacheStatus === 'empty' && '🔄 Vazio'}
               </Badge>
             </div>
           </div>
@@ -348,33 +436,47 @@ const SigtapViewer = () => {
               onClick={handleClearCache}
               variant="outline" 
               className="flex items-center space-x-2 bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100"
-              disabled={isLoading}
+              disabled={isCurrentlyLoading}
               title="Limpar cache e recarregar dados - Apenas Diretoria"
             >
-              {isLoading ? '⏳' : '🧹'} Cache
+              {isCurrentlyLoading ? '⏳' : '🧹'} Cache
             </Button>
             <Button 
               onClick={handleForceReload}
               variant="outline" 
               className="flex items-center space-x-2 bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
-              disabled={isLoading}
+              disabled={isCurrentlyLoading}
               title="Recarregar dados do banco - Apenas Diretoria"
             >
-              {isLoading ? '⏳' : '🔧'} Reload
+              {isCurrentlyLoading ? '⏳' : '🔧'} Reload
             </Button>
           </div>
         )}
-
-
       </div>
+
+      {/* ✅ INDICADOR DE LOADING SE CARREGANDO NO BACKGROUND */}
+      {showLoadingState && hasData && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="flex items-center space-x-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            <span className="text-blue-700 text-sm">Atualizando dados em background...</span>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Filtros</span>
-            <Badge variant="secondary">
-              {filteredProcedures.length} de {totalProcedures} resultados
-            </Badge>
+            <div className="flex items-center space-x-2">
+              <Badge variant="secondary">
+                {filteredProcedures.length} de {totalProcedures} resultados
+              </Badge>
+              {/* ✅ INFO DE CACHE */}
+              <span className="text-xs text-gray-500">
+                {getCacheInfo()}
+              </span>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
