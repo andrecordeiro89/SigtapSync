@@ -105,7 +105,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
     },
     {
       id: 'executive-dashboard',
-      label: 'Dashboard Executivo',
+      label: 'Analytics',
       icon: BarChart4,
       description: 'Central de inteligência e relatórios para diretoria',
       requiresAdmin: true,
@@ -275,7 +275,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       {/* Injeção de estilos CSS premium */}
       <style>{premiumStyles}</style>
       
-      <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r-0 shadow-2xl shadow-slate-900/10">
+      <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r-0 shadow-2xl shadow-slate-900/10 h-screen flex flex-col">
         {/* HEADER - Logo e Nome da Empresa com Design Premium */}
         <SidebarHeader className="relative border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50 p-6 backdrop-blur-sm">
           {/* Background decorativo */}
@@ -319,9 +319,9 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
         </SidebarHeader>
 
         {/* CONTENT - Menu de Navegação com Design Premium */}
-        <SidebarContent className="p-4 space-y-1">
+        <SidebarContent className="px-4 py-6 space-y-3 flex-1 overflow-y-auto">
           <SidebarGroup>
-            <SidebarGroupLabel className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/80 rounded-xl mb-3 border border-slate-200/60">
+            <SidebarGroupLabel className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/80 rounded-xl mb-4 border border-slate-200/60">
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-pulse"></div>
                 <span>Navegação</span>
@@ -341,98 +341,52 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                         isActive={isActive}
                         tooltip={tab.description}
                         className={`
-                          w-full relative overflow-hidden transition-all duration-500 ease-out group/menu-item
+                          w-full relative transition-all duration-200 ease-out group/menu-item
                           ${isActive 
-                            ? `bg-gradient-to-r ${tab.color} text-white shadow-lg scale-[1.02] translate-x-1` 
-                            : `hover:bg-gradient-to-r hover:from-slate-50 hover:to-blue-50/50 hover:shadow-md hover:scale-[1.01] hover:translate-x-0.5`
+                            ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-500' 
+                            : 'hover:bg-slate-50 text-slate-700 hover:text-blue-600'
                           }
-                          rounded-2xl p-4 mb-2 backdrop-blur-sm
-                          transform-gpu
+                          rounded-lg px-4 py-3 mb-2 min-h-[3rem]
                         `}
-                        style={{
-                          animationDelay: `${index * 75}ms`,
-                          animationFillMode: 'both'
-                        }}
                       >
-                        {/* Background decorativo */}
+                        {/* Container do ícone simples */}
                         <div className={`
-                          absolute inset-0 rounded-2xl transition-all duration-500
+                          flex items-center justify-center w-9 h-9 rounded-lg mr-3 transition-all duration-200
                           ${isActive 
-                            ? 'bg-gradient-to-r from-white/10 to-transparent' 
-                            : 'bg-gradient-to-r from-transparent to-transparent group-hover/menu-item:from-slate-50 group-hover/menu-item:to-blue-50/30'
-                          }
-                        `}></div>
-                        
-                        {/* Container do ícone com design premium */}
-                        <div className={`
-                          relative flex items-center justify-center w-10 h-10 rounded-xl mr-4 transition-all duration-500
-                          ${isActive 
-                            ? 'bg-white/20 shadow-lg backdrop-blur-sm' 
-                            : 'bg-gradient-to-br from-slate-100 to-slate-200/80 group-hover/menu-item:bg-gradient-to-br group-hover/menu-item:from-blue-100 group-hover/menu-item:to-indigo-100/80 group-hover/menu-item:shadow-lg'
+                            ? 'bg-blue-100 text-blue-600' 
+                            : 'bg-slate-100 text-slate-600 group-hover/menu-item:bg-blue-100 group-hover/menu-item:text-blue-600'
                           }
                         `}>
-                          <Icon className={`
-                            h-5 w-5 transition-all duration-500
-                            ${isActive 
-                              ? 'text-white drop-shadow-sm scale-110' 
-                              : 'text-slate-600 group-hover/menu-item:text-blue-600 group-hover/menu-item:scale-110'
-                            }
-                          `} />
+                          <Icon className="h-4 w-4" />
                         </div>
                         
-                        <div className="relative flex-1">
+                        <div className="flex-1 flex items-center">
                           <span className={`
-                            font-semibold transition-all duration-500 text-sm
+                            font-medium text-sm leading-5
                             ${isActive 
-                              ? 'text-white drop-shadow-sm' 
-                              : 'text-slate-700 group-hover/menu-item:text-blue-700'
+                              ? 'text-blue-700' 
+                              : 'text-slate-700 group-hover/menu-item:text-blue-600'
                             }
                           `}>
                             {tab.label}
                           </span>
-                          
-                          {/* Descrição sutil */}
-                          <div className={`
-                            text-xs mt-0.5 transition-all duration-500 group-data-[collapsible=icon]:hidden
-                            ${isActive 
-                              ? 'text-white/80' 
-                              : 'text-slate-500 group-hover/menu-item:text-blue-600/80'
-                            }
-                          `}>
-                            {tab.description.split(' - ')[0]}
-                          </div>
                         </div>
                         
                         {/* Badge especial para sistema oficial - apenas para developers/ti */}
                         {tab.id === 'aih-multipage-tester' && isDeveloper && (
                           <Badge className={`
-                            ml-auto text-xs transition-all duration-500 group-data-[collapsible=icon]:hidden
+                            ml-auto text-xs group-data-[collapsible=icon]:hidden
                             ${isActive 
-                              ? 'bg-white/20 text-white border-white/30 shadow-sm' 
-                              : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-0 shadow-lg group-hover/menu-item:shadow-xl'
+                              ? 'bg-blue-100 text-blue-700 border-blue-200' 
+                              : 'bg-emerald-100 text-emerald-700 border-emerald-200'
                             }
                           `}>
                             <div className="flex items-center space-x-1">
-                              <div className="w-1.5 h-1.5 bg-current rounded-full animate-pulse"></div>
-                              <span className="font-semibold">OFICIAL</span>
+                              <div className="w-1.5 h-1.5 bg-current rounded-full"></div>
+                              <span className="font-medium">OFICIAL</span>
                             </div>
                           </Badge>
                         )}
-
-                        {/* Indicador de ativo com design premium */}
-                        {isActive && (
-                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full shadow-lg">
-                            <div className="absolute inset-0 bg-white rounded-r-full animate-pulse"></div>
-                          </div>
-                        )}
-
-                        {/* Efeito de shimmer para item ativo */}
-                        {isActive && (
-                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 animate-shimmer"></div>
-                        )}
-                        
-                        {/* Efeito de brilho no hover */}
-                        <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover/menu-item:opacity-100 transition-opacity duration-500"></div>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -443,59 +397,55 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
         </SidebarContent>
 
         {/* FOOTER - Informações do Usuário com Design Premium */}
-        <SidebarFooter className="border-t border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50 p-4 backdrop-blur-sm">
+        <SidebarFooter className="border-t border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50 px-4 py-6 backdrop-blur-sm mt-auto">
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton className={`
-                    w-full transition-all duration-500 ease-out group/user-button
-                    data-[state=open]:bg-gradient-to-r data-[state=open]:from-blue-500 data-[state=open]:to-indigo-600 
-                    data-[state=open]:text-white data-[state=open]:shadow-xl data-[state=open]:shadow-blue-500/25 data-[state=open]:scale-[1.02]
-                    hover:bg-gradient-to-r hover:from-slate-100 hover:to-blue-100/80 hover:shadow-lg hover:scale-[1.01]
-                    rounded-2xl p-4 border border-transparent hover:border-blue-200/50
+                    w-full transition-all duration-200 ease-out group/user-button
+                    data-[state=open]:bg-blue-100 data-[state=open]:text-blue-700
+                    hover:bg-slate-100
+                    rounded-lg px-4 py-4 border border-transparent hover:border-blue-200/50
                     focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
-                    backdrop-blur-sm
+                    min-h-[4.5rem]
                   `}>
-                    <div className="relative">
-                      <Avatar className="h-10 w-10 ring-2 ring-white shadow-xl transition-all duration-300 group-hover/user-button:shadow-2xl">
-                        <AvatarFallback className={`text-sm font-bold transition-all duration-300 ${
+                    <div className="relative flex-shrink-0">
+                      <Avatar className="h-12 w-12 ring-2 ring-white shadow-lg">
+                        <AvatarFallback className={`text-sm font-bold ${
                           canAccessAllHospitals() 
-                            ? 'bg-gradient-to-br from-purple-500 to-pink-600 text-white' 
-                            : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white'
+                            ? 'bg-purple-500 text-white' 
+                            : 'bg-blue-500 text-white'
                         }`}>
                           {getInitials(user.full_name, user.email)}
                         </AvatarFallback>
                       </Avatar>
                       {canAccessAllHospitals() && (
-                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white">
-                          <Crown className="h-2.5 w-2.5 text-white" />
+                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white">
+                          <Crown className="h-3 w-3 text-white" />
                         </div>
                       )}
-                      {/* Indicador de status online com design premium */}
-                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-gradient-to-br from-emerald-400 to-green-500 rounded-full border-2 border-white shadow-lg">
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-green-500 rounded-full animate-pulse"></div>
+                      {/* Indicador de status online */}
+                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white">
                       </div>
                     </div>
                     <div className="group-data-[collapsible=icon]:hidden flex-1 text-left min-w-0 ml-4">
-                      <div className="text-sm font-semibold text-slate-900 truncate group-data-[state=open]/user-button:text-white transition-all duration-300">
+                      <div className="text-sm font-semibold text-slate-900 truncate group-data-[state=open]/user-button:text-blue-700 transition-all duration-200">
                         {user.full_name || user.email?.split('@')[0]}
                       </div>
                       <div className="flex items-center space-x-2 mt-1">
-                        <div className="text-xs text-slate-600 truncate group-data-[state=open]/user-button:text-blue-100 transition-all duration-300 font-medium">
+                        <div className="text-xs text-slate-600 truncate group-data-[state=open]/user-button:text-blue-600 transition-all duration-200 font-medium">
                           {roleConfig?.label || 'Usuário'}
                         </div>
                         {canAccessAllHospitals() && (
-                          <Badge className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 px-2 py-0.5 shadow-lg">
+                          <Badge className="text-xs bg-purple-500 text-white border-0 px-2 py-0.5">
                             ADMIN
                           </Badge>
                         )}
                       </div>
                     </div>
-                    <div className="group-data-[collapsible=icon]:hidden opacity-60 group-hover/user-button:opacity-100 transition-all duration-300">
-                      <div className="text-sm text-slate-400 group-data-[state=open]/user-button:text-blue-200 group-hover/user-button:text-blue-600 transition-all duration-300">
-                        <Settings className="h-4 w-4" />
-                      </div>
+                    <div className="group-data-[collapsible=icon]:hidden opacity-60 group-hover/user-button:opacity-100 transition-all duration-200 flex-shrink-0">
+                      <Settings className="h-4 w-4 text-slate-400 group-data-[state=open]/user-button:text-blue-600 group-hover/user-button:text-blue-600" />
                     </div>
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
@@ -682,7 +632,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                   {/* Menu Items com Design Premium */}
                   <div className="p-4 bg-gradient-to-br from-slate-50 to-slate-100/50 space-y-2">
                     <DropdownMenuItem 
-                      className="cursor-pointer rounded-2xl p-4 transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:shadow-md hover:scale-[1.01] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group" 
+                      className="cursor-pointer rounded-2xl p-4 transition-all duration-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 group" 
                       onClick={() => setShowProfileModal(true)}
                     >
                       <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-lg mr-4 group-hover:shadow-lg transition-all duration-300">
@@ -694,7 +644,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                     <DropdownMenuSeparator className="my-3 border-slate-200/60" />
                     
                     <DropdownMenuItem 
-                      className="cursor-pointer rounded-2xl p-4 transition-all duration-300 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 hover:shadow-md hover:scale-[1.01] text-red-600 focus:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 group"
+                      className="cursor-pointer rounded-2xl p-4 transition-all duration-300 hover:bg-gradient-to-r hover:from-red-50 hover:to-pink-50 hover:shadow-md text-red-600 focus:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 group"
                       onClick={handleLogout}
                       disabled={isLoggingOut}
                     >
