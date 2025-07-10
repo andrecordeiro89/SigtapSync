@@ -235,9 +235,10 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     const regraEspecialPrincipal = getSpecialRule(procedimentoPrincipal);
     const temRegraEspecialGeral = Boolean(regraEspecialPrincipal);
     
-    console.log('🔄 ANÁLISE DA AIH:');
+    console.log('🔄 ANÁLISE DA AIH (FATURAMENTO HOSPITALAR - APENAS SH + SP):');
     console.log('📋 Procedimento Principal:', procedimentoPrincipal);
     console.log('🏥 Regra Especial Detectada:', regraEspecialPrincipal ? regraEspecialPrincipal.procedureName : 'Nenhuma');
+    console.log('⚠️  IMPORTANTE: SA (Serviços Ambulatoriais) NÃO É FATURADO EM AIH');
     
     // ✅ SEPARAR PROCEDIMENTOS POR TIPO
     const procedimentosInstrumento04: ProcedureAIH[] = [];
@@ -284,21 +285,23 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
         const valorTotalSigtap = proc.sigtapProcedure.valueHosp; // Total extraído
         const valorSP = proc.sigtapProcedure.valueProf;          // SP
         const valorSH = valorTotalSigtap - valorSP;              // SH = Total - SP
-        const valorSA = proc.sigtapProcedure.valueAmb;           // SA
+        const valorSA = proc.sigtapProcedure.valueAmb;           // SA (informativo apenas)
         
         console.log(`🎯 INSTRUMENTO 04 - ${proc.procedimento} (${proc.sequencia}º): SEMPRE 100%`);
+        console.log(`   💰 FATURAMENTO: SH=${valorSH.toFixed(2)} + SP=${valorSP.toFixed(2)} = ${(valorSH + valorSP).toFixed(2)}`);
+        console.log(`   ℹ️  SA (não faturado): ${valorSA.toFixed(2)}`);
         
         return {
           ...proc,
           porcentagemSUS: 100, // Sempre 100% para Instrumento 04
-          valorCalculado: valorSH + valorSP + valorSA, // Valor total sem desconto
-          valorOriginal: valorSH + valorSP + valorSA,
+          valorCalculado: valorSH + valorSP, // ✅ CORREÇÃO: SH + SP apenas (sem SA)
+          valorOriginal: valorSH + valorSP,  // ✅ CORREÇÃO: SH + SP apenas (sem SA)
           // Campos específicos para Instrumento 04
           isInstrument04: true,
           instrument04Rule: 'Instrumento 04 - AIH (Proc. Especial) - Sempre 100%',
           valorCalculadoSH: valorSH,
           valorCalculadoSP: valorSP,
-          valorCalculadoSA: valorSA,
+          valorCalculadoSA: valorSA, // Mantido para exibição informativa
           isSpecialRule: true, // Marcar como regra especial para interface
           regraEspecial: 'Instrumento 04 - AIH (Proc. Especial)'
         };
@@ -309,7 +312,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
         const valorTotalSigtap = proc.sigtapProcedure.valueHosp; // Total extraído
         const valorSP = proc.sigtapProcedure.valueProf;          // SP
         const valorSH = valorTotalSigtap - valorSP;              // SH = Total - SP
-        const valorSA = proc.sigtapProcedure.valueAmb;           // SA
+        const valorSA = proc.sigtapProcedure.valueAmb;           // SA (informativo apenas)
         
         // ✅ CALCULAR POSIÇÃO SEQUENCIAL ENTRE TODOS OS PROCEDIMENTOS COM REGRA ESPECIAL
         const procedimentosOrdenados = procedimentosComRegrasEspeciais
@@ -324,20 +327,22 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
 
         const valorSHCalculado = (valorSH * hospPercentage) / 100;
         const valorSPCalculado = valorSP; // SP sempre 100%
-        const valorSACalculado = valorSA; // SA sempre 100%
-        const valorTotalCalculado = valorSHCalculado + valorSPCalculado + valorSACalculado;
+        const valorSACalculado = valorSA; // SA informativo (não faturado)
+        const valorTotalCalculado = valorSHCalculado + valorSPCalculado; // ✅ CORREÇÃO: SH + SP apenas
         
         console.log(`🏥 REGRA ESPECIAL - ${proc.procedimento} (${proc.sequencia}º na AIH, ${posicaoNaRegra}º na regra ${regraEspecialPrincipal.procedureName}): SH=${hospPercentage}%, SP=100%`);
+        console.log(`   💰 FATURAMENTO: SH=${valorSHCalculado.toFixed(2)} + SP=${valorSPCalculado.toFixed(2)} = ${valorTotalCalculado.toFixed(2)}`);
+        console.log(`   ℹ️  SA (não faturado): ${valorSACalculado.toFixed(2)}`);
         
         return {
           ...proc,
           porcentagemSUS: hospPercentage, // Para compatibilidade com interface
-          valorCalculado: valorTotalCalculado,
-          valorOriginal: valorSH + valorSP + valorSA,
+          valorCalculado: valorTotalCalculado,        // ✅ CORREÇÃO: SH + SP apenas
+          valorOriginal: valorSH + valorSP,           // ✅ CORREÇÃO: SH + SP apenas
           // Campos adicionais para cirurgias especiais
           valorCalculadoSH: valorSHCalculado,
           valorCalculadoSP: valorSPCalculado,
-          valorCalculadoSA: valorSACalculado,
+          valorCalculadoSA: valorSACalculado, // Mantido para exibição informativa
           regraEspecial: `${regraEspecialPrincipal.rule.type} - ${regraEspecialPrincipal.procedureName}`,
           isSpecialRule: true,
           isInstrument04: false // Não é Instrumento 04
@@ -359,34 +364,38 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       const valorTotalSigtap = proc.sigtapProcedure.valueHosp; // Total extraído
       const valorSP = proc.sigtapProcedure.valueProf;          // SP
       const valorSH = valorTotalSigtap - valorSP;              // SH = Total - SP
-      const valorSA = proc.sigtapProcedure.valueAmb;           // SA
+      const valorSA = proc.sigtapProcedure.valueAmb;           // SA (informativo apenas)
       
-      // Aplicar porcentagem aos valores SH e SP
+      // ✅ CORREÇÃO: SP sempre 100% em procedimentos normais (conforme regras SUS)
       const valorSHCalculado = (valorSH * porcentagem) / 100;
-      const valorSPCalculado = (valorSP * porcentagem) / 100;
-      const valorSACalculado = valorSA; // SA sempre 100%
-      const valorTotalCalculado = valorSHCalculado + valorSPCalculado + valorSACalculado;
+      const valorSPCalculado = valorSP; // ✅ CORREÇÃO: SP sempre 100%
+      const valorSACalculado = valorSA; // SA informativo (não faturado)
+      const valorTotalCalculado = valorSHCalculado + valorSPCalculado; // ✅ CORREÇÃO: SH + SP apenas
 
-      console.log(`📊 PROCEDIMENTO NORMAL - ${proc.procedimento} (${proc.sequencia}º na AIH, ${posicaoEntreNormais}º entre normais): ${porcentagem}%`);
+      console.log(`📊 PROCEDIMENTO NORMAL - ${proc.procedimento} (${proc.sequencia}º na AIH, ${posicaoEntreNormais}º entre normais): SH=${porcentagem}%, SP=100%`);
+      console.log(`   💰 FATURAMENTO: SH=${valorSHCalculado.toFixed(2)} + SP=${valorSPCalculado.toFixed(2)} = ${valorTotalCalculado.toFixed(2)}`);
+      console.log(`   ℹ️  SA (não faturado): ${valorSACalculado.toFixed(2)}`);
 
       return {
         ...proc,
         porcentagemSUS: porcentagem,
-        valorCalculado: valorTotalCalculado,
-        valorOriginal: valorSH + valorSP + valorSA,
+        valorCalculado: valorTotalCalculado,        // ✅ CORREÇÃO: SH + SP apenas
+        valorOriginal: valorSH + valorSP,           // ✅ CORREÇÃO: SH + SP apenas
         // ✅ ADICIONAR CAMPOS SP E SH PARA PROCEDIMENTOS NORMAIS
         valorCalculadoSH: valorSHCalculado,
         valorCalculadoSP: valorSPCalculado,
-        valorCalculadoSA: valorSACalculado,
+        valorCalculadoSA: valorSACalculado, // Mantido para exibição informativa
         isSpecialRule: false,
         isInstrument04: false,
-        regraEspecial: `Regra padrão: ${porcentagem}% (${posicaoEntreNormais}º procedimento normal)`
+        regraEspecial: `Regra padrão: SH=${porcentagem}%, SP=100% (${posicaoEntreNormais}º procedimento normal)`
       };
     });
 
     const valorTotalCalculado = procedimentosComPercentagem
       .filter(p => p.aprovado)
       .reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
+
+    console.log(`💰 VALOR TOTAL FATURADO (SH + SP): R$ ${valorTotalCalculado.toFixed(2)}`);
 
     return {
       ...aihCompleta,
@@ -483,7 +492,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           const valorSPCalculado = valorSP; // 100%
           const valorSACalculado = valorSA; // 100%
           
-          const valorFinal = valorSHCalculado + valorSPCalculado + valorSACalculado;
+          const valorFinal = valorSHCalculado + valorSPCalculado; // ✅ CORREÇÃO: SH + SP apenas
           
           const updatedSigtapProcedure = {
             ...proc.sigtapProcedure,
@@ -498,7 +507,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
             sigtapProcedure: updatedSigtapProcedure,
             porcentagemSUS: 100, // Sempre 100%
             valorCalculado: valorFinal,
-            valorOriginal: valorSH + valorSP + valorSA,
+            valorOriginal: valorSH + valorSP, // ✅ CORREÇÃO: SH + SP apenas
             // Campos específicos para Instrumento 04
             isInstrument04: true,
             instrument04Rule: 'Instrumento 04 - AIH (Proc. Especial) - Sempre 100%',
@@ -529,7 +538,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           const valorSPCalculado = valorSP; // SP sempre 100%
           const valorSACalculado = valorSA; // SA sempre 100%
           
-          const valorFinal = valorSHCalculado + valorSPCalculado + valorSACalculado;
+          const valorFinal = valorSHCalculado + valorSPCalculado; // ✅ CORREÇÃO: SH + SP apenas
           
           const updatedSigtapProcedure = {
             ...proc.sigtapProcedure,
@@ -1278,12 +1287,18 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                         {editingValues.has(procedure.sequencia) ? (
                                   // MODO EDIÇÃO
                                   <div className="bg-yellow-50 rounded border-2 border-yellow-200 p-4">
-                                    <div className="text-sm font-medium text-gray-700 mb-3">✏️ Editando Valores:</div>
+                                    <div className="text-sm font-medium text-gray-700 mb-2">✏️ Editando Valores:</div>
+                                    <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded mb-3 border-l-4 border-orange-300">
+                                      ⚠️ <strong>AIH fatura apenas SH + SP.</strong> SA é informativo (não faturado em AIH).
+                                    </div>
                                     
                                     {/* GRID DE VALORES */}
                                     <div className="grid grid-cols-3 gap-3 mb-4">
                               <div className="text-center">
-                                        <label className="text-xs font-medium text-gray-600 block mb-1">SA (Ambulatorial)</label>
+                                        <label className="text-xs font-medium text-gray-500 block mb-1">
+                                          SA (Ambulatorial) 
+                                          <span className="block text-xs text-gray-400 italic">ℹ️ Informativo</span>
+                                        </label>
                                 <input
                                   type="number"
                                   step="0.01"
@@ -1295,7 +1310,9 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                       valorAmb: Number(e.target.value)
                                     }
                                   }))}
-                                          className="w-full px-2 py-2 text-sm border rounded text-center"
+                                          className="w-full px-2 py-2 text-sm border rounded text-center bg-gray-50 text-gray-600"
+                                          disabled
+                                          title="SA é apenas informativo - não faturado em AIH"
                                 />
                               </div>
                               <div className="text-center">
@@ -1513,34 +1530,45 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                       {procedure.isInstrument04 ? (
                                         <div className="text-xs space-y-1">
                                           <div className="text-blue-700 font-medium mb-1">
-                                            ✅ Procedimento sempre cobrado a 100% (SH, SP e SA)
+                                            ✅ Instrumento 04 - Sempre 100% (faturamento: SH + SP)
                                           </div>
-                                          <div className="flex justify-between">
-                                            <span>SH (100%):</span>
-                                            <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSH || 0)}</span>
+                                          <div className="flex justify-between bg-green-50 px-2 py-1 rounded">
+                                            <span className="text-green-700">💰 SH (100%):</span>
+                                            <span className="font-semibold text-green-700">{formatCurrency(procedure.valorCalculadoSH || 0)}</span>
                                           </div>
-                                          <div className="flex justify-between">
-                                            <span>SP (100%):</span>
-                                            <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSP || 0)}</span>
+                                          <div className="flex justify-between bg-green-50 px-2 py-1 rounded">
+                                            <span className="text-green-700">💰 SP (100%):</span>
+                                            <span className="font-semibold text-green-700">{formatCurrency(procedure.valorCalculadoSP || 0)}</span>
                                           </div>
-                                          <div className="flex justify-between">
-                                            <span>SA (100%):</span>
-                                            <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSA || 0)}</span>
+                                          <div className="flex justify-between bg-gray-50 px-2 py-1 rounded">
+                                            <span className="text-gray-500">ℹ️ SA (informativo):</span>
+                                            <span className="font-semibold text-gray-500">{formatCurrency(procedure.valorCalculadoSA || 0)}</span>
+                                          </div>
+                                          <div className="flex justify-between border-t pt-1 mt-1">
+                                            <span className="font-bold text-blue-700">💰 TOTAL FATURADO:</span>
+                                            <span className="font-bold text-blue-700">{formatCurrency((procedure.valorCalculadoSH || 0) + (procedure.valorCalculadoSP || 0))}</span>
                                           </div>
                                         </div>
                                       ) : procedure.isSpecialRule ? (
                                         <div className="text-xs space-y-1">
-                                          <div className="flex justify-between">
-                                            <span>SH ({procedure.porcentagemSUS}%):</span>
-                                            <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSH || 0)}</span>
+                                          <div className="text-orange-700 font-medium mb-1">
+                                            ⚡ Regra Especial - Faturamento: SH + SP
                                           </div>
-                                          <div className="flex justify-between">
-                                            <span>SP (100%):</span>
-                                            <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSP || 0)}</span>
+                                          <div className="flex justify-between bg-green-50 px-2 py-1 rounded">
+                                            <span className="text-green-700">💰 SH ({procedure.porcentagemSUS}%):</span>
+                                            <span className="font-semibold text-green-700">{formatCurrency(procedure.valorCalculadoSH || 0)}</span>
                                           </div>
-                                          <div className="flex justify-between">
-                                            <span>SA (100%):</span>
-                                            <span className="font-semibold">{formatCurrency(procedure.valorCalculadoSA || 0)}</span>
+                                          <div className="flex justify-between bg-green-50 px-2 py-1 rounded">
+                                            <span className="text-green-700">💰 SP (100%):</span>
+                                            <span className="font-semibold text-green-700">{formatCurrency(procedure.valorCalculadoSP || 0)}</span>
+                                          </div>
+                                          <div className="flex justify-between bg-gray-50 px-2 py-1 rounded">
+                                            <span className="text-gray-500">ℹ️ SA (informativo):</span>
+                                            <span className="font-semibold text-gray-500">{formatCurrency(procedure.valorCalculadoSA || 0)}</span>
+                                          </div>
+                                          <div className="flex justify-between border-t pt-1 mt-1">
+                                            <span className="font-bold text-orange-700">💰 TOTAL FATURADO:</span>
+                                            <span className="font-bold text-orange-700">{formatCurrency((procedure.valorCalculadoSH || 0) + (procedure.valorCalculadoSP || 0))}</span>
                                           </div>
                                         </div>
                                       ) : (

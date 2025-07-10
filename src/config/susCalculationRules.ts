@@ -4,10 +4,12 @@
  * Este arquivo contém as regras específicas para procedimentos que seguem
  * lógica de cobrança em múltiplos procedimentos no SUS.
  * 
- * REGRA UNIVERSAL: Serviços Profissionais (SP) sempre 100%
- * VARIAÇÃO: Serviços Hospitalares (SH) com percentuais decrescentes
+ * 💰 FATURAMENTO AIH: APENAS SH + SP
+ * - SH (Serviços Hospitalares): com percentuais variáveis por posição
+ * - SP (Serviços Profissionais): sempre 100%
+ * - SA (Serviços Ambulatoriais): INFORMATIVO (não faturado em AIH)
  * 
- * NOVA REGRA: Instrumento 04 - AIH (Proc. Especial) sempre 100%
+ * NOVA REGRA: Instrumento 04 - AIH (Proc. Especial) sempre 100% (SH + SP)
  */
 
 // Interface para definir regras especiais de cálculo
