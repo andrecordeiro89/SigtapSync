@@ -110,6 +110,17 @@ export const HOSPITALS: Record<string, Hospital> = {
       'faturamento.ara01@sigtap.com',
       'faturamento.ara02@sigtap.com'
     ]
+  },
+  APU: {
+    id: '', // ID será definido quando o hospital for criado no banco
+    name: 'Hospital Torao Tokuda',
+    code: 'APU',
+    displayName: 'APU - Hospital Torao Tokuda (Apucarana)',
+    users: [
+      'faturamento.apu@sigtap.com',
+      'faturamento.apu01@sigtap.com',
+      'faturamento.apu02@sigtap.com'
+    ]
   }
 };
 

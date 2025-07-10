@@ -39,6 +39,11 @@ const EMAIL_HOSPITAL_MAP: Record<string, UserClassification> = {
   'faturamento.ara01@sigtap.com': { role: 'user', permissions: ['basic_access'], hospital_access: [], full_access: false },
   'faturamento.ara02@sigtap.com': { role: 'user', permissions: ['basic_access'], hospital_access: [], full_access: false },
   
+  // Hospital Torao Tokuda (Apucarana) - NOVO
+  'faturamento.apu@sigtap.com': { role: 'user', permissions: ['basic_access'], hospital_access: [], full_access: false },
+  'faturamento.apu01@sigtap.com': { role: 'user', permissions: ['basic_access'], hospital_access: [], full_access: false },
+  'faturamento.apu02@sigtap.com': { role: 'user', permissions: ['basic_access'], hospital_access: [], full_access: false },
+  
   // Hospital Municipal Juarez Barreto de Macedo (Faxinal)
   'faturamento.fax@sigtap.com': { role: 'user', permissions: ['basic_access'], hospital_access: [], full_access: false },
   'faturamento.fax01@sigtap.com': { role: 'user', permissions: ['basic_access'], hospital_access: [], full_access: false },
@@ -81,6 +86,7 @@ const EMAIL_HOSPITAL_MAP: Record<string, UserClassification> = {
 const getHospitalCodeFromEmail = (email: string): string | null => {
   const hospitalCodes: Record<string, string> = {
     'ara': 'arapongas', // Hospital Municipal 18 de Dezembro
+    'apu': 'apucarana', // Hospital Torao Tokuda - NOVO
     'fax': 'faxinal',   // Hospital Municipal Juarez Barreto de Macedo
     'cas': 'cascavel',  // HUOP
     'foz': 'foz',       // Hospital Nossa Senhora Aparecida
