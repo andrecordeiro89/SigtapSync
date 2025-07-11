@@ -29,42 +29,30 @@ export default defineConfig(({ mode }) => ({
       transformMixedEsModules: true
     },
     rollupOptions: {
-      external: [],
+      external: ['@rollup/rollup-linux-x64-gnu'],
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
-          supabase: ['@supabase/supabase-js'],
-          pdf: ['pdfjs-dist'],
-          ui: ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu']
-        },
-        // Configurações específicas para resolver problemas do Rollup
-        inlineDynamicImports: false,
-        format: 'es'
-      },
-      // Configurações para evitar problemas com dependências nativas
-      treeshake: {
-        moduleSideEffects: false
+          pdfjs: ['pdfjs-dist']
+        }
       }
     },
     target: 'esnext',
-    sourcemap: false,
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true,
-        drop_debugger: true
-      }
+        drop_console: mode === 'production',
+        drop_debugger: mode === 'production',
+      },
     },
-    // Configurações específicas para ambientes de CI/CD
-    emptyOutDir: true,
-    assetsDir: 'assets',
-    chunkSizeWarningLimit: 1000
+    sourcemap: false,
+    chunkSizeWarningLimit: 2000,
   },
-  worker: {
-    format: 'es'
-  },
-  // Configurações para melhorar compatibilidade com Node.js em ambientes de build
   define: {
-    global: 'globalThis'
-  }
+    global: 'globalThis',
+  },
+  esbuild: {
+    target: 'esnext',
+    drop: mode === 'production' ? ['console', 'debugger'] : [],
+  },
 }));

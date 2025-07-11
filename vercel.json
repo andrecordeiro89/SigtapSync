@@ -8,12 +8,14 @@
       "NPM_CONFIG_TARGET_ARCH": "x64",
       "NPM_CONFIG_CACHE": ".npm",
       "NPM_CONFIG_OPTIONAL": "true",
+      "NPM_CONFIG_FORCE": "true",
+      "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
       "SKIP_INSTALL_SIMPLE_GIT_HOOKS": "1"
     }
   },
-  "buildCommand": "cp .npmrc.vercel .npmrc && npm ci --prefer-offline && npm run build",
+  "buildCommand": "chmod +x vercel-build.sh && ./vercel-build.sh",
   "outputDirectory": "dist",
-  "installCommand": "cp .npmrc.vercel .npmrc && npm ci --prefer-offline --include=optional",
+  "installCommand": "echo 'Usando script customizado de build'",
   "devCommand": "npm run dev",
   "functions": {
     "app/api/*.ts": {
