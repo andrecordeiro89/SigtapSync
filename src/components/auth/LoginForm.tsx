@@ -74,6 +74,11 @@ const EMAIL_HOSPITAL_MAP: Record<string, UserClassification> = {
   'faturamento.frg01@sigtap.com': { role: 'user', permissions: ['basic_access'], hospital_access: [], full_access: false },
   'faturamento.frg02@sigtap.com': { role: 'user', permissions: ['basic_access'], hospital_access: [], full_access: false },
   
+  // Hospital Regional Centro Oeste (Guarapuava)
+  'faturamento.gua@sigtap.com': { role: 'user', permissions: ['basic_access'], hospital_access: [], full_access: false },
+  'faturamento.gua01@sigtap.com': { role: 'user', permissions: ['basic_access'], hospital_access: [], full_access: false },
+  'faturamento.gua02@sigtap.com': { role: 'user', permissions: ['basic_access'], hospital_access: [], full_access: false },
+  
   // ACESSO TOTAL
   'diretoria@sigtap.com': { role: 'director', permissions: ['full_access', 'all_hospitals', 'system_admin'], hospital_access: ['ALL'], full_access: true },
   'ti@sigtap.com': { role: 'ti', permissions: ['full_access', 'all_hospitals', 'system_admin', 'technical_support'], hospital_access: ['ALL'], full_access: true },
@@ -92,7 +97,8 @@ const getHospitalCodeFromEmail = (email: string): string | null => {
     'foz': 'foz',       // Hospital Nossa Senhora Aparecida
     'sm': 'santa-maria', // Hospital Municipal Santa Alice
     'car': 'carambei',   // Hospital Municipal São José
-    'frg': 'foz-maternidade' // Hospital Maternidade Nossa Senhora Aparecida
+    'frg': 'foz-maternidade', // Hospital Maternidade Nossa Senhora Aparecida
+    'gua': 'guarapuava' // Hospital Regional Centro Oeste
   };
 
   for (const [code, hospitalId] of Object.entries(hospitalCodes)) {
