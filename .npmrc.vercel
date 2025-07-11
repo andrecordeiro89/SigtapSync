@@ -1,8 +1,14 @@
-# Configurações NPM para desenvolvimento local e deploy
+# Configurações NPM específicas para deploy no Vercel (Linux)
 engine-strict=true
 save-exact=false
 prefer-offline=true
 fund=false
+
+# Configurações específicas para Rollup no Linux
+platform=linux
+arch=x64
+target-platform=linux
+target-arch=x64
 
 # Configurações de cache
 cache=.npm
@@ -14,5 +20,5 @@ fetch-retries=3
 fetch-retry-mintimeout=10000
 fetch-retry-maxtimeout=60000
 
-# Configurações para dependências opcionais (permite falhar sem erro)
+# Configurações para dependências opcionais
 optional=true 

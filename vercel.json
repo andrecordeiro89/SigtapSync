@@ -7,12 +7,13 @@
       "NPM_CONFIG_TARGET_PLATFORM": "linux",
       "NPM_CONFIG_TARGET_ARCH": "x64",
       "NPM_CONFIG_CACHE": ".npm",
+      "NPM_CONFIG_OPTIONAL": "true",
       "SKIP_INSTALL_SIMPLE_GIT_HOOKS": "1"
     }
   },
-  "buildCommand": "npm ci && npm run build",
+  "buildCommand": "cp .npmrc.vercel .npmrc && npm ci --prefer-offline && npm run build",
   "outputDirectory": "dist",
-  "installCommand": "npm ci --prefer-offline --no-audit",
+  "installCommand": "cp .npmrc.vercel .npmrc && npm ci --prefer-offline --include=optional",
   "devCommand": "npm run dev",
   "functions": {
     "app/api/*.ts": {
