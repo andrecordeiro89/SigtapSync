@@ -12,7 +12,9 @@
     "preview": "vite preview",
     "verify-build": "npm run build:check && npm run preview",
     "copy-pdf-worker": "copyfiles -u 3 node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/",
-    "postinstall": "npm run copy-pdf-worker"
+    "postinstall": "npm run copy-pdf-worker",
+    "preinstall": "npx only-allow npm",
+    "clean": "rm -rf node_modules package-lock.json && npm install"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -80,6 +82,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
+    "@rollup/rollup-linux-x64-gnu": "^4.24.4",
     "@tailwindcss/typography": "^0.5.15",
     "@types/node": "^22.5.5",
     "@types/react": "^18.3.3",
@@ -93,11 +96,20 @@
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
     "lovable-tagger": "^1.1.7",
+    "only-allow": "^1.2.1",
     "postcss": "^8.4.47",
+    "rollup": "^4.24.4",
     "tailwindcss": "^3.4.11",
     "terser": "^5.43.1",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1"
+    "vite": "^5.4.10"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "overrides": {
+    "rollup": "^4.24.4"
   }
 }
