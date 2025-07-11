@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development",
     "build:prod": "vite build --mode production",
     "build:check": "npm run copy-pdf-worker && vite build --mode production",
-    "build:vercel": "npm run copy-pdf-worker-safe && vite build",
+    "build:vercel": "npm run copy-pdf-worker-safe && vite build --mode production --minify esbuild --config vite.config.safe.ts",
     "lint": "eslint .",
     "preview": "vite preview",
     "verify-build": "npm run build:check && npm run preview",
