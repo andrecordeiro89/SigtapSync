@@ -1,0 +1,62 @@
+[build]
+  # Comando de build otimizado para Netlify
+  command = "npm run build:netlify"
+  # Diretório onde os arquivos built ficam
+  publish = "dist"
+  # Instalar dependências com flags de compatibilidade
+  CI = true
+
+[build.environment]
+  # Configurações de Node.js
+  NODE_VERSION = "18"
+  NPM_VERSION = "9"
+  NODE_OPTIONS = "--max-old-space-size=4096"
+  
+# Configurações para SPA (Single Page Application)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers de segurança e performance
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Headers específicos para arquivos PDF Worker
+[[headers]]
+  for = "/pdf.worker.min.mjs"
+  [headers.values]
+    Content-Type = "application/javascript"
+    Cache-Control = "public, max-age=31536000"
+
+# Headers para assets estáticos
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Headers para favicon
+[[headers]]
+  for = "/favicon.*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+# Configurações para contexto de deploy
+[context.production]
+  command = "npm run build:netlify"
+  
+[context.deploy-preview]
+  command = "npm run build:netlify"
+  
+[context.branch-deploy]
+  command = "npm run build:netlify"
+
+# Configurações de Plugin (se necessário para análise de bundle)
+[[plugins]]
+  package = "@netlify/plugin-lighthouse" 

@@ -18,7 +18,8 @@
     "postinstall": "npm run copy-pdf-worker-safe || echo 'Postinstall completed with warnings'",
     "clean": "rm -rf node_modules package-lock.json && npm install",
     "clean-install": "rm -rf node_modules .npm package-lock.json && npm install --force --include=optional",
-    "fix-rollup": "npm install @rollup/rollup-linux-x64-gnu@latest --save-optional --force"
+    "fix-rollup": "npm install @rollup/rollup-linux-x64-gnu@latest --save-optional --force",
+    "build:netlify": "npm run copy-pdf-worker-safe && vite build --mode production"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
