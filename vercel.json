@@ -1,25 +1,15 @@
 {
-  "build": {
-    "env": {
-      "NODE_OPTIONS": "--max-old-space-size=4096",
-      "NPM_CONFIG_PLATFORM": "linux",
-      "NPM_CONFIG_ARCH": "x64",
-      "NPM_CONFIG_TARGET_PLATFORM": "linux",
-      "NPM_CONFIG_TARGET_ARCH": "x64",
-      "NPM_CONFIG_CACHE": ".npm",
-      "NPM_CONFIG_OPTIONAL": "true",
-      "NPM_CONFIG_FORCE": "true",
-      "NPM_CONFIG_LEGACY_PEER_DEPS": "true",
-      "SKIP_INSTALL_SIMPLE_GIT_HOOKS": "1"
-    }
-  },
-  "buildCommand": "chmod +x vercel-build.sh && ./vercel-build.sh",
+  "version": 2,
+  "buildCommand": "npm run build:vercel",
   "outputDirectory": "dist",
-  "installCommand": "echo 'Usando script customizado de build'",
-  "devCommand": "npm run dev",
+  "installCommand": "npm install --legacy-peer-deps",
+  "framework": "vite",
+  "env": {
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  },
   "functions": {
     "app/api/*.ts": {
-      "maxDuration": 30
+      "runtime": "nodejs18.x"
     }
   },
   "rewrites": [
@@ -30,41 +20,11 @@
   ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/pdf.worker.min.mjs",
       "headers": [
         {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        }
-      ]
-    },
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/(.*\\.(js|css|woff2?|ico|svg))",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
+          "key": "Content-Type",
+          "value": "application/javascript"
         }
       ]
     }
