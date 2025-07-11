@@ -481,20 +481,45 @@ export class AIHPersistenceService {
     try {
       console.log('📄 Criando registro AIH...');
 
-      // Verificar se já existe AIH com mesmo número
-      const { data: existingAIH } = await supabase
-        .from('aihs')
-        .select('id')
-        .eq('hospital_id', hospitalId)
-        .eq('aih_number', aih.numeroAIH)
-        .single();
+      // ✅ VERIFICAÇÃO INTELIGENTE DE DUPLICATAS
+      if (aih.numeroAIH === "-") {
+        // 🆕 LÓGICA ESPECIAL PARA AIHs SEM NÚMERO: Permitir múltiplas "-" mas alertar sobre possíveis duplicatas
+        console.log('🔧 AIH sem número detectada - verificação inteligente opcional');
+        
+        // Buscar outras AIHs com "-" para o mesmo paciente
+        const { data: dashAIHs, error: dashError } = await supabase
+          .from('aihs')
+          .select('id, aih_number, admission_date, procedure_code, created_at')
+          .eq('hospital_id', hospitalId)
+          .eq('patient_id', patientId)
+          .eq('aih_number', '-')
+          .limit(5);
 
-      if (existingAIH) {
-        return {
-          success: false,
-          message: `AIH ${aih.numeroAIH} já existe no sistema`,
-          errors: ['AIH duplicada']
-        };
+        if (!dashError && dashAIHs && dashAIHs.length > 0) {
+          console.log(`🔍 Encontradas ${dashAIHs.length} AIHs com "-" para este paciente`);
+          dashAIHs.forEach((existing, index) => {
+            console.log(`   ${index + 1}. Data: ${existing.admission_date}, Proc: ${existing.procedure_code}`);
+          });
+        }
+        
+        console.log('✅ Permitindo inserção de nova AIH com "-" (sem bloqueio)');
+      } else {
+        // 🔄 LÓGICA NORMAL PARA AIHs COM NÚMERO
+        console.log('🔍 Verificando duplicata por número de AIH...');
+        const { data: existingAIH } = await supabase
+          .from('aihs')
+          .select('id')
+          .eq('hospital_id', hospitalId)
+          .eq('aih_number', aih.numeroAIH)
+          .single();
+
+        if (existingAIH) {
+          return {
+            success: false,
+            message: `AIH ${aih.numeroAIH} já existe no sistema`,
+            errors: ['AIH duplicada']
+          };
+        }
       }
 
       // Dados básicos (sempre funcionam)
@@ -1137,22 +1162,46 @@ export class AIHPersistenceService {
       console.log(`👤 Paciente: ${aihCompleta.nomePaciente}`);
       console.log(`📋 Procedimentos: ${aihCompleta.procedimentos?.length || 0}`);
 
-      // ✅ VERIFICAÇÃO PRÉVIA DE DUPLICATAS
-      console.log('🔍 Verificando se AIH já existe no sistema...');
-      const { data: existingAIH, error: checkError } = await supabase
-        .from('aihs')
-        .select('id, aih_number, created_at')
-        .eq('hospital_id', hospitalId)
-        .eq('aih_number', aihCompleta.numeroAIH)
-        .single();
+      // ✅ VERIFICAÇÃO INTELIGENTE DE DUPLICATAS
+      console.log('🔍 Verificando duplicatas com lógica inteligente...');
+      
+      if (aihCompleta.numeroAIH === "-") {
+        // 🆕 LÓGICA ESPECIAL PARA AIHs SEM NÚMERO: Controle por paciente + data + procedimento
+        console.log('🔧 AIH sem número detectada - aplicando controle por paciente + data + procedimento');
+        
+        const isDuplicate = await this.checkDashAIHDuplicate(
+          aihCompleta,
+          hospitalId
+        );
+        
+        if (isDuplicate) {
+          console.warn(`⚠️ Possível duplicata detectada para paciente ${aihCompleta.nomePaciente}`);
+          return {
+            success: false,
+            message: `Possível duplicata: já existe AIH para paciente "${aihCompleta.nomePaciente}" na data ${aihCompleta.dataInicio} com procedimento similar. Verifique se não é a mesma internação.`,
+            errors: ['Possível duplicata por controle inteligente - verifique manualmente']
+          };
+        }
+        
+        console.log('✅ Nenhuma duplicata detectada para AIH sem número - prosseguindo...');
+      } else {
+        // 🔄 LÓGICA NORMAL PARA AIHs COM NÚMERO
+        console.log('🔍 Verificando duplicata por número de AIH...');
+        const { data: existingAIH, error: checkError } = await supabase
+          .from('aihs')
+          .select('id, aih_number, created_at')
+          .eq('hospital_id', hospitalId)
+          .eq('aih_number', aihCompleta.numeroAIH)
+          .single();
 
-      if (existingAIH) {
-        console.warn(`⚠️ AIH ${aihCompleta.numeroAIH} já existe no sistema (ID: ${existingAIH.id})`);
-        return {
-          success: false,
-          message: `AIH ${aihCompleta.numeroAIH} já existe no sistema (salva em ${new Date(existingAIH.created_at).toLocaleDateString()})`,
-          errors: ['AIH duplicada - use a função de edição para atualizar']
-        };
+        if (existingAIH) {
+          console.warn(`⚠️ AIH ${aihCompleta.numeroAIH} já existe no sistema (ID: ${existingAIH.id})`);
+          return {
+            success: false,
+            message: `AIH ${aihCompleta.numeroAIH} já existe no sistema (salva em ${new Date(existingAIH.created_at).toLocaleDateString()})`,
+            errors: ['AIH duplicada - use a função de edição para atualizar']
+          };
+        }
       }
 
       // ETAPA 1: Criar AIH básica (como antes)
@@ -2825,6 +2874,116 @@ export class AIHPersistenceService {
       console.error('Error in saveProcedureRecordFixed:', error);
       return false;
     }
+  }
+
+  /**
+   * 🆕 NOVO: Verifica duplicatas inteligentes para AIHs com número "-"
+   * Controle baseado em: paciente + data de internação + procedimento principal
+   */
+  private static async checkDashAIHDuplicate(
+    aihCompleta: any,
+    hospitalId: string
+  ): Promise<boolean> {
+    try {
+      console.log('🔍 === VERIFICAÇÃO INTELIGENTE DE DUPLICATA PARA AIH "-" ===');
+      console.log(`👤 Paciente: ${aihCompleta.nomePaciente}`);
+      console.log(`📅 Data início: ${aihCompleta.dataInicio}`);
+      console.log(`⚕️ Procedimento: ${aihCompleta.procedimentoPrincipal}`);
+      console.log(`🏥 Hospital: ${hospitalId}`);
+
+      // 1. Buscar paciente pelo nome e hospital
+      const { data: patients, error: patientError } = await supabase
+        .from('patients')
+        .select('id, name, cns, birth_date')
+        .eq('hospital_id', hospitalId)
+        .ilike('name', aihCompleta.nomePaciente)
+        .limit(5); // Máximo 5 pacientes com nome similar
+
+      if (patientError) {
+        console.warn('⚠️ Erro ao buscar pacientes:', patientError.message);
+        return false; // Em caso de erro, permitir inserção
+      }
+
+      if (!patients || patients.length === 0) {
+        console.log('✅ Nenhum paciente encontrado com esse nome - não há duplicata');
+        return false;
+      }
+
+      console.log(`🔍 Encontrados ${patients.length} pacientes com nome similar`);
+
+      // 2. Para cada paciente encontrado, verificar AIHs existentes
+      for (const patient of patients) {
+        console.log(`🔍 Verificando paciente: ${patient.name} (${patient.id})`);
+
+        // Buscar AIHs deste paciente na mesma data (±3 dias para margem)
+        const dataInicio = new Date(aihCompleta.dataInicio);
+        const dataInicioMinus = new Date(dataInicio);
+        dataInicioMinus.setDate(dataInicio.getDate() - 3);
+        const dataInicioPlus = new Date(dataInicio);
+        dataInicioPlus.setDate(dataInicio.getDate() + 3);
+
+        const { data: existingAIHs, error: aihError } = await supabase
+          .from('aihs')
+          .select('id, aih_number, admission_date, procedure_code, created_at')
+          .eq('patient_id', patient.id)
+          .gte('admission_date', dataInicioMinus.toISOString().split('T')[0])
+          .lte('admission_date', dataInicioPlus.toISOString().split('T')[0])
+          .limit(10);
+
+        if (aihError) {
+          console.warn('⚠️ Erro ao buscar AIHs:', aihError.message);
+          continue;
+        }
+
+        if (!existingAIHs || existingAIHs.length === 0) {
+          console.log(`✅ Nenhuma AIH encontrada para ${patient.name} na data similar`);
+          continue;
+        }
+
+        console.log(`📋 Encontradas ${existingAIHs.length} AIHs para ${patient.name} em datas próximas`);
+
+        // 3. Verificar se alguma AIH tem procedimento similar
+        for (const existingAIH of existingAIHs) {
+          const existingProcedureCode = this.extractProcedureCode(existingAIH.procedure_code);
+          const newProcedureCode = this.extractProcedureCode(aihCompleta.procedimentoPrincipal);
+
+          console.log(`🔍 Comparando procedimentos:`);
+          console.log(`   - Existente: ${existingProcedureCode} (AIH: ${existingAIH.aih_number})`);
+          console.log(`   - Nova: ${newProcedureCode}`);
+
+          // Se os códigos de procedimento são iguais, é uma possível duplicata
+          if (existingProcedureCode === newProcedureCode) {
+            console.warn(`🚨 POSSÍVEL DUPLICATA DETECTADA:`);
+            console.warn(`   - Paciente: ${patient.name}`);
+            console.warn(`   - Procedimento: ${existingProcedureCode}`);
+            console.warn(`   - Data existente: ${existingAIH.admission_date}`);
+            console.warn(`   - Data nova: ${aihCompleta.dataInicio}`);
+            console.warn(`   - AIH existente: ${existingAIH.aih_number} (ID: ${existingAIH.id})`);
+            
+            return true; // Duplicata detectada
+          }
+        }
+      }
+
+      console.log('✅ Nenhuma duplicata detectada após verificação completa');
+      return false;
+
+    } catch (error) {
+      console.error('❌ Erro na verificação de duplicata:', error);
+      // Em caso de erro, permitir inserção para não bloquear o sistema
+      return false;
+    }
+  }
+
+  /**
+   * 🔧 AUXILIAR: Extrai apenas o código do procedimento (sem descrição)
+   */
+  private static extractProcedureCode(procedure: string): string {
+    if (!procedure) return '';
+    
+    // Extrair código no formato XX.XX.XX.XXX-X
+    const match = procedure.match(/(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/);
+    return match ? match[1] : procedure.substring(0, 15).trim();
   }
 }
 
