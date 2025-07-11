@@ -3,14 +3,23 @@
   command = "npm run build:netlify"
   # Diretório onde os arquivos built ficam
   publish = "dist"
-  # Instalar dependências com flags de compatibilidade
+  # Configuração customizada de instalação
   CI = true
 
 [build.environment]
-  # Configurações de Node.js
-  NODE_VERSION = "18"
+  # Configurações de Node.js compatíveis com Netlify
+  NODE_VERSION = "18.17.0"
   NPM_VERSION = "9"
   NODE_OPTIONS = "--max-old-space-size=4096"
+  # Variáveis para resolver problema SWC
+  SWC_BINARY_PATH = ""
+  ESBUILD_BINARY_PATH = ""
+  # Força uso de versão compatível
+  npm_config_target_platform = "linux"
+  npm_config_target_arch = "x64"
+  npm_config_cache = "/opt/build/cache/npm"
+  # Configurações específicas para bindings nativos
+  npm_config_build_from_source = "true"
   
 # Configurações para SPA (Single Page Application)
 [[redirects]]
