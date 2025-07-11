@@ -7,18 +7,13 @@ import { isValidParticipationCode, formatParticipationCode, getParticipationInfo
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 /**
- * 🛡️ FILTRO DE INTERFACE: Função utilitária para garantir que anestesistas não apareçam na tela
+ * Filtra anestesistas na INTERFACE (camada 3 - exibição)
+ * ✅ ALTERAÇÃO: Removido filtro por CBO 225151 para permitir procedimentos pré-operatórios
+ * 🎯 MANTÉM: Filtro por texto na participação para casos reais de anestesia
  * Uso: procedimentos.filter(filterOutAnesthesia)
  */
 export const filterOutAnesthesia = (procedimento: ProcedureAIH): boolean => {
-  // 🎯 PRIORIDADE 1: CBO 225151 - CRITÉRIO OFICIAL CONFIRMADO PELO HOSPITAL
-  const cbo = (procedimento.cbo || '').trim();
-  if (cbo === '225151') {
-    console.log(`🚫 INTERFACE-FILTRO: Anestesista removido da tela - CBO 225151`);
-    return false; // Filtrar (não exibir)
-  }
-  
-  // 🎯 PRIORIDADE 2: Detecção por texto na participação (backup para casos edge)
+  // 🎯 ÚNICA VERIFICAÇÃO: Detecção por texto na participação
   const participacao = (procedimento.participacao || '').toLowerCase().trim();
   
   // Se não há participação definida, não é anestesista
@@ -26,7 +21,7 @@ export const filterOutAnesthesia = (procedimento: ProcedureAIH): boolean => {
     return true; // Não filtrar (exibir)
   }
   
-  // 📋 TERMOS DE ANESTESIA EM PORTUGUÊS - como backup
+  // 📋 TERMOS DE ANESTESIA EM PORTUGUÊS
   const anesthesiaTerms = [
     'anestesista', 'anestesiologista', 'anestesiol', 'anestes', 'anes', 'anest',
     'anestsista', 'anestesita', 'anestesis', 'anastesista', 'anastesiologista',
@@ -289,11 +284,10 @@ export class AIHCompleteProcessor {
         continue;
       }
       
-      // 🚫 PRIORIDADE ABSOLUTA: FILTRAR ANESTESIA ANTES DE QUALQUER COISA
+      // 🚫 FILTRAR ANESTESIA POR TEXTO NA PARTICIPAÇÃO APENAS
       const lowerLine = trimmedLine.toLowerCase();
-      const hasAnesthesiaCBO = trimmedLine.includes('225151');
       
-      // 📋 DETECÇÃO EXPANDIDA DE ANESTESIA - MÚLTIPLOS TERMOS
+      // 📋 DETECÇÃO DE ANESTESIA - APENAS POR TERMOS DE TEXTO
       const anesthesiaTerms = [
         'anestesista', 'anestesiologista', 'anestesiologia', 'anestesiologic',
         'anestesiol', 'anestes', 'anes', 'anest', 'anestesi',
@@ -305,9 +299,8 @@ export class AIHCompleteProcessor {
       
       const hasAnesthesiaText = anesthesiaTerms.some(term => lowerLine.includes(term));
       
-      if (hasAnesthesiaCBO || hasAnesthesiaText) {
-        const foundTerm = hasAnesthesiaCBO ? 'CBO 225151' : 
-                         anesthesiaTerms.find(term => lowerLine.includes(term)) || 'termo de anestesia';
+      if (hasAnesthesiaText) {
+        const foundTerm = anesthesiaTerms.find(term => lowerLine.includes(term)) || 'termo de anestesia';
         console.log(`🚫 ANESTESIA FILTRADA: ${trimmedLine.substring(0, 80)}...`);
         console.log(`   📋 Motivo: ${foundTerm}`);
         console.log(`   🎯 STATUS: REMOVIDO COMPLETAMENTE (MESMO SE FOR CABEÇALHO)`);
@@ -402,7 +395,7 @@ export class AIHCompleteProcessor {
       
       // 🔍 DEBUG: Verificar se há anestesia nos segmentos
       smartLines.forEach((segment, index) => {
-        if (segment.includes('225151') || segment.toLowerCase().includes('anestesista')) {
+        if (segment.toLowerCase().includes('anestesista')) {
           console.log(`⚠️ ANESTESIA DETECTADA no segmento ${index + 1}: ${segment.substring(0, 80)}...`);
         }
       });
@@ -412,7 +405,7 @@ export class AIHCompleteProcessor {
     
     // 🔍 DEBUG: Verificar se há anestesia nas linhas normais
     lines.forEach((line, index) => {
-      if (line.includes('225151') || line.toLowerCase().includes('anestesista')) {
+      if (line.toLowerCase().includes('anestesista')) {
         console.log(`⚠️ ANESTESIA DETECTADA na linha ${index + 1}: ${line.substring(0, 80)}...`);
       }
     });
@@ -453,7 +446,7 @@ export class AIHCompleteProcessor {
     const isProcedure = hasProcedureCode && hasStructuredData;
     
     // 🔍 DEBUG: Log detalhado para linhas suspeitas
-    if (line.includes('225151') || line.toLowerCase().includes('anestesista')) {
+    if (line.toLowerCase().includes('anestesista')) {
       console.log(`🔍 DEBUG LINHA ANESTESIA:`);
       console.log(`   📝 Linha: ${line.substring(0, 80)}...`);
       console.log(`   🏥 Tem código procedimento: ${hasProcedureCode}`);
@@ -466,20 +459,14 @@ export class AIHCompleteProcessor {
 
   /**
    * Verifica se um procedimento é de anestesista e deve ser filtrado
-   * PRIORIDADE 1: CBO 225151 (anestesiologista oficial)
-   * PRIORIDADE 2: Palavras na coluna "Participação" (backup)
+   * ✅ ALTERAÇÃO: Removido filtro por CBO 225151 para permitir procedimentos pré-operatórios
+   * 🎯 MANTÉM: Filtro por texto na participação para casos reais de anestesia
    */
   private isAnesthesiaProcedure(procedimento: ProcedureAIH): boolean {
-    // 🎯 PRIORIDADE 1: CBO 225151 - CRITÉRIO OFICIAL CONFIRMADO PELO HOSPITAL
-    const cbo = (procedimento.cbo || '').trim();
-    if (cbo === '225151') {
-      return true; // Anestesiologista confirmado por CBO oficial
-    }
-    
-    // 🎯 PRIORIDADE 2: Detecção por texto na participação (backup para casos edge)
+    // 🎯 ÚNICA VERIFICAÇÃO: Detecção por texto na participação
     const participacao = (procedimento.participacao || '').toLowerCase().trim();
     
-    // Se não há participação definida, não é anestesista (já foi filtrado por CBO)
+    // Se não há participação definida, não é anestesista
     if (!participacao) {
       return false;
     }
@@ -520,19 +507,14 @@ export class AIHCompleteProcessor {
 
   /**
    * Retorna detalhes sobre por que um procedimento foi filtrado (para debug)
+   * ✅ ALTERAÇÃO: Removido verificação por CBO 225151
    */
   private getFilterReason(procedimento: ProcedureAIH): string {
-    // 🎯 PRIORIDADE 1: Verificar se foi filtrado por CBO 225151
-    const cbo = (procedimento.cbo || '').trim();
-    if (cbo === '225151') {
-      return `CBO 225151 (Anestesiologista oficial) - Critério principal confirmado pelo hospital`;
-    }
-    
-    // 🎯 PRIORIDADE 2: Verificar se foi filtrado por texto na participação
+    // 🎯 ÚNICA VERIFICAÇÃO: Verificar se foi filtrado por texto na participação
     const participacao = (procedimento.participacao || '').toLowerCase().trim();
     
     if (!participacao) {
-      return 'Erro: Procedimento filtrado sem CBO 225151 nem participação - revisar lógica';
+      return 'Erro: Procedimento filtrado sem participação - revisar lógica';
     }
     
     const anesthesiaTerms = [
@@ -553,10 +535,10 @@ export class AIHCompleteProcessor {
     );
     
     if (foundTerm) {
-      return `Termo de anestesia '${foundTerm}' encontrado na Participação: "${procedimento.participacao}" (filtro backup)`;
+      return `Termo de anestesia '${foundTerm}' encontrado na Participação: "${procedimento.participacao}" (filtro por texto)`;
     }
     
-    return `Erro: Procedimento filtrado sem critério válido - CBO: "${cbo}", Participação: "${procedimento.participacao}"`;
+    return `Erro: Procedimento filtrado sem critério válido - Participação: "${procedimento.participacao}"`;
   }
 
   /**
@@ -705,10 +687,10 @@ export class AIHCompleteProcessor {
         console.log(`   🚫 Linhas de anestesia filtradas: ${removedLines.length}`);
         console.log(`   🎯 ECONOMIA: ${removedLines.length} linhas removidas antes da extração`);
         console.log(`   💾 BANCO: Apenas ${procedimentos.length} procedimentos válidos serão salvos`);
-        console.log(`   🔬 CRITÉRIO: Filtro por CBO 225151 e/ou texto "anestesista" aplicado no texto bruto`);
+        console.log(`   🔬 CRITÉRIO: Filtro por texto "anestesista" aplicado no texto bruto`);
       } else {
         console.log(`✅ NENHUMA LINHA DE ANESTESIA DETECTADA - Todos os ${procedimentos.length} procedimentos são válidos`);
-        console.log(`   🔍 VERIFICAÇÃO: Nenhum CBO 225151 ou termo de anestesia encontrado no texto bruto`);
+        console.log(`   🔍 VERIFICAÇÃO: Nenhum termo de anestesia encontrado no texto bruto`);
       }
       
       return procedimentos;
