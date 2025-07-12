@@ -28,6 +28,7 @@ import { AIHBillingService, type CompleteBillingStats } from '../services/aihBil
 import { supabase } from '../lib/supabase';
 import HospitalRevenueDashboard from './HospitalRevenueDashboard';
 import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
+import DoctorPatientsDropdown from './DoctorPatientsDropdown';
 
 // ✅ FUNÇÃO UTILITÁRIA PARA FORMATAR VALORES MONETÁRIOS
 const formatCurrency = (value: number | null | undefined): string => {
@@ -257,12 +258,28 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [specialtyStats, setSpecialtyStats] = useState<SpecialtyStats[]>([]);
   const [hospitalRevenueStats, setHospitalRevenueStats] = useState<HospitalRevenueStats[]>([]);
   const [billingStats, setBillingStats] = useState<CompleteBillingStats | null>(null);
+  
+  // Estado para controlar dropdowns expandidos
+  const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
 
   // Authentication
   const { user, isDirector, isAdmin, isCoordinator, isTI, hasPermission } = useAuth();
 
   // Access Control
   const hasExecutiveAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('generate_reports');
+  
+  // Função para controlar expansão de dropdowns de médicos
+  const toggleDoctorExpansion = (doctorId: string) => {
+    setExpandedDoctors(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(doctorId)) {
+        newSet.delete(doctorId);
+      } else {
+        newSet.add(doctorId);
+      }
+      return newSet;
+    });
+  };
 
   // Load Data
   const loadExecutiveData = async () => {
@@ -741,6 +758,15 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                           <div className="font-semibold">{doctor.unique_hospitals}</div>
                         </div>
                       </div>
+                      
+                      {/* ✅ NOVO: Dropdown de Pacientes e Procedimentos */}
+                      <DoctorPatientsDropdown
+                        doctorIdentifier={doctor.doctor_crm || doctor.doctor_name}
+                        doctorName={doctor.doctor_name}
+                        doctorCrm={doctor.doctor_crm}
+                        isExpanded={expandedDoctors.has(doctor.doctor_id)}
+                        onToggle={() => toggleDoctorExpansion(doctor.doctor_id)}
+                      />
                     </div>
                   ))}
                 </div>

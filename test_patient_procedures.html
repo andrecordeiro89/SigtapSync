@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Procedimentos por Paciente</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .test-section h3 {
+            color: #2563eb;
+            margin-top: 0;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .button {
+            background: #2563eb;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .button:hover {
+            background: #1d4ed8;
+        }
+        .success {
+            color: #16a34a;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc2626;
+            font-weight: bold;
+        }
+        .warning {
+            color: #d97706;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🩺 Teste de Procedimentos por Paciente</h1>
+            <p>Validação dos dados reais do sistema SIGTAP-Sync</p>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Teste 1: Validação de Dados Reais</h3>
+            <p>Verificar se os dados estão sendo carregados corretamente da view doctor_production</p>
+            <button class="button" onclick="testDataValidation()">Executar Teste</button>
+            <div id="test1-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔍 Teste 2: Análise de Médico Específico</h3>
+            <p>Analisar um médico específico para verificar contagem de AIH vs Pacientes</p>
+            <input type="text" id="doctor-identifier" placeholder="CNS ou CRM do médico" style="padding: 8px; margin-right: 10px; border: 1px solid #ddd; border-radius: 4px; width: 200px;">
+            <button class="button" onclick="testSpecificDoctor()">Analisar Médico</button>
+            <div id="test2-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Teste 3: Validação de Procedimentos Detalhados</h3>
+            <p>Verificar se os procedimentos estão sendo detalhados corretamente</p>
+            <button class="button" onclick="testDetailedProcedures()">Verificar Detalhes</button>
+            <div id="test3-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 Teste 4: Regra 1 AIH = 1 Paciente</h3>
+            <p>Validar se a regra de negócio está sendo respeitada</p>
+            <button class="button" onclick="testAIHPatientRule()">Validar Regra</button>
+            <div id="test4-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Instruções de Uso</h3>
+            <div class="result">
+<strong>Como usar este teste:</strong>
+
+1. Abra o Dashboard Executivo do SIGTAP-Sync
+2. Abra o Console do navegador (F12 → Console)
+3. Volte para esta página
+4. Execute os testes clicando nos botões
+
+<strong>Dados necessários:</strong>
+- CNS ou CRM de um médico que tenha discrepância (ex: 8 AIH vs 10 pacientes)
+- Acesso ao sistema SIGTAP-Sync em outra aba
+
+<strong>Logs esperados:</strong>
+✅ Dados reais sendo carregados
+✅ Separação correta por médico
+✅ Contagem correta de pacientes únicos
+✅ Procedimentos detalhados disponíveis
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Função para testar se os dados estão sendo carregados
+        async function testDataValidation() {
+            const resultDiv = document.getElementById('test1-result');
+            resultDiv.innerHTML = '🔍 Iniciando teste de validação de dados...\n';
+            
+            try {
+                // Verificar se existe acesso ao sistema
+                if (typeof window.MedicalProductionControlService === 'undefined') {
+                    resultDiv.innerHTML += '⚠️ AVISO: MedicalProductionControlService não encontrado.\n';
+                    resultDiv.innerHTML += '📋 INSTRUÇÕES:\n';
+                    resultDiv.innerHTML += '1. Abra o Dashboard Executivo do SIGTAP-Sync\n';
+                    resultDiv.innerHTML += '2. Aguarde o carregamento completo\n';
+                    resultDiv.innerHTML += '3. Execute este teste novamente\n';
+                    return;
+                }
+                
+                resultDiv.innerHTML += '✅ Serviço encontrado!\n';
+                resultDiv.innerHTML += '📊 Testando acesso aos dados...\n';
+                
+                // Teste básico de conectividade
+                const testResult = await window.MedicalProductionControlService.getDoctorProductionRecords('test', { limit: 1 });
+                
+                if (testResult.success) {
+                    resultDiv.innerHTML += `✅ Conexão com dados: OK\n`;
+                    resultDiv.innerHTML += `📋 Dados disponíveis: ${testResult.data.length > 0 ? 'SIM' : 'VAZIO'}\n`;
+                } else {
+                    resultDiv.innerHTML += `❌ Erro na conexão: ${testResult.error}\n`;
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML += `❌ Erro no teste: ${error.message}\n`;
+            }
+        }
+
+        // Função para testar médico específico
+        async function testSpecificDoctor() {
+            const doctorId = document.getElementById('doctor-identifier').value;
+            const resultDiv = document.getElementById('test2-result');
+            
+            if (!doctorId) {
+                resultDiv.innerHTML = '⚠️ Por favor, insira o CNS ou CRM do médico';
+                return;
+            }
+            
+            resultDiv.innerHTML = `🔍 Analisando médico: ${doctorId}\n`;
+            
+            try {
+                if (typeof window.MedicalProductionControlService === 'undefined') {
+                    resultDiv.innerHTML += '❌ Serviço não encontrado. Abra o Dashboard primeiro.\n';
+                    return;
+                }
+                
+                // Buscar dados brutos
+                const rawResult = await window.MedicalProductionControlService.getDoctorProductionRecords(doctorId, { limit: 1000 });
+                
+                if (rawResult.success) {
+                    const rawData = rawResult.data;
+                    resultDiv.innerHTML += `📋 Registros brutos encontrados: ${rawData.length}\n`;
+                    
+                    // Análise de agrupamento
+                    const patientsByCns = new Map();
+                    const patientsByName = new Map();
+                    
+                    rawData.forEach(record => {
+                        if (record.patient_cns) {
+                            patientsByCns.set(record.patient_cns, (patientsByCns.get(record.patient_cns) || 0) + 1);
+                        }
+                        if (record.patient_name) {
+                            patientsByName.set(record.patient_name, (patientsByName.get(record.patient_name) || 0) + 1);
+                        }
+                    });
+                    
+                    resultDiv.innerHTML += `👥 Pacientes únicos por CNS: ${patientsByCns.size}\n`;
+                    resultDiv.innerHTML += `👥 Pacientes únicos por Nome: ${patientsByName.size}\n`;
+                    
+                    // Buscar dados processados
+                    const processedResult = await window.MedicalProductionControlService.getDoctorPatientsAndProcedures(doctorId, { limit: 50 });
+                    
+                    if (processedResult.success) {
+                        resultDiv.innerHTML += `✅ Pacientes processados: ${processedResult.data.length}\n`;
+                        
+                        // Verificar integridade
+                        const totalProcedures = processedResult.data.reduce((sum, p) => sum + p.total_procedures_together, 0);
+                        resultDiv.innerHTML += `📊 Total de procedimentos agrupados: ${totalProcedures}\n`;
+                        
+                        if (totalProcedures === rawData.length) {
+                            resultDiv.innerHTML += '✅ INTEGRIDADE OK: Procedimentos = Registros\n';
+                        } else {
+                            resultDiv.innerHTML += `⚠️ POSSÍVEL PROBLEMA: ${totalProcedures} ≠ ${rawData.length}\n`;
+                        }
+                    } else {
+                        resultDiv.innerHTML += `❌ Erro nos dados processados: ${processedResult.error}\n`;
+                    }
+                } else {
+                    resultDiv.innerHTML += `❌ Erro nos dados brutos: ${rawResult.error}\n`;
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML += `❌ Erro no teste: ${error.message}\n`;
+            }
+        }
+
+        // Função para testar procedimentos detalhados
+        async function testDetailedProcedures() {
+            const resultDiv = document.getElementById('test3-result');
+            resultDiv.innerHTML = '🔍 Verificando procedimentos detalhados...\n';
+            
+            try {
+                if (typeof window.MedicalProductionControlService === 'undefined') {
+                    resultDiv.innerHTML += '❌ Serviço não encontrado. Abra o Dashboard primeiro.\n';
+                    return;
+                }
+                
+                // Buscar dados de um médico qualquer
+                const rawResult = await window.MedicalProductionControlService.getDoctorProductionRecords('test', { limit: 10 });
+                
+                if (rawResult.success && rawResult.data.length > 0) {
+                    const sample = rawResult.data[0];
+                    resultDiv.innerHTML += '✅ Dados encontrados\n';
+                    resultDiv.innerHTML += `📋 Campos disponíveis: ${Object.keys(sample).join(', ')}\n`;
+                    
+                    // Verificar campos essenciais
+                    const requiredFields = ['procedure_code', 'procedure_name', 'value_charged', 'total_value', 'quantity'];
+                    const missingFields = requiredFields.filter(field => !sample.hasOwnProperty(field));
+                    
+                    if (missingFields.length === 0) {
+                        resultDiv.innerHTML += '✅ Todos os campos necessários estão presentes\n';
+                    } else {
+                        resultDiv.innerHTML += `⚠️ Campos ausentes: ${missingFields.join(', ')}\n`;
+                    }
+                    
+                    // Amostra de dados
+                    resultDiv.innerHTML += '\n📊 AMOSTRA DE DADOS:\n';
+                    resultDiv.innerHTML += `Procedimento: ${sample.procedure_name}\n`;
+                    resultDiv.innerHTML += `Código: ${sample.procedure_code}\n`;
+                    resultDiv.innerHTML += `Valor: R$ ${(sample.total_value / 100).toFixed(2)}\n`;
+                    resultDiv.innerHTML += `Quantidade: ${sample.quantity}\n`;
+                    
+                } else {
+                    resultDiv.innerHTML += '❌ Nenhum dado encontrado\n';
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML += `❌ Erro no teste: ${error.message}\n`;
+            }
+        }
+
+        // Função para testar regra AIH = Paciente
+        async function testAIHPatientRule() {
+            const resultDiv = document.getElementById('test4-result');
+            resultDiv.innerHTML = '🎯 Testando regra 1 AIH = 1 Paciente...\n';
+            
+            try {
+                if (typeof window.MedicalProductionControlService === 'undefined') {
+                    resultDiv.innerHTML += '❌ Serviço não encontrado. Abra o Dashboard primeiro.\n';
+                    return;
+                }
+                
+                resultDiv.innerHTML += '📋 Esta regra é conceitual e deve ser validada manualmente:\n';
+                resultDiv.innerHTML += '\n🔍 COMO VALIDAR:\n';
+                resultDiv.innerHTML += '1. Cada AIH corresponde a um paciente específico\n';
+                resultDiv.innerHTML += '2. Um paciente pode ter múltiplos procedimentos na mesma AIH\n';
+                resultDiv.innerHTML += '3. Mas não pode ter múltiplas AIHs ativas simultaneamente\n';
+                resultDiv.innerHTML += '\n✅ VERIFICAÇÃO:\n';
+                resultDiv.innerHTML += '- Se médico tem 8 AIH, deve ter 8 pacientes únicos\n';
+                resultDiv.innerHTML += '- Se mostra 10 pacientes, há duplicação ou erro de agrupamento\n';
+                resultDiv.innerHTML += '\n🔧 CORREÇÃO APLICADA:\n';
+                resultDiv.innerHTML += '- Agrupamento por CNS prioritário\n';
+                resultDiv.innerHTML += '- Fallback para Nome + Data nascimento\n';
+                resultDiv.innerHTML += '- Validação de integridade nos logs\n';
+                
+            } catch (error) {
+                resultDiv.innerHTML += `❌ Erro no teste: ${error.message}\n`;
+            }
+        }
+
+        // Carregar automaticamente ao abrir a página
+        window.onload = function() {
+            console.log('🩺 Página de teste carregada');
+            console.log('💡 Use os botões para executar os testes');
+        };
+    </script>
+</body>
+</html> 
