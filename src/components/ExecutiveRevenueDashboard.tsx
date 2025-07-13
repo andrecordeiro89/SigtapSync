@@ -37,6 +37,8 @@ import { DoctorsRevenueService, type SpecialtyStats, type HospitalStats, type Do
 import { toast } from './ui/use-toast';
 import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
 import HospitalRevenueDashboard from './HospitalRevenueDashboard';
+import { DoctorPatientsDropdown } from './DoctorPatientsDropdown';
+import { getAllAvailableDoctors, getViewStatistics } from '../services/medicalProductionControlService';
 
 // ================================================================
 // INTERFACES
@@ -83,6 +85,8 @@ const ExecutiveRevenueDashboard: React.FC = () => {
   const [doctorsData, setDoctorsData] = useState<DoctorAggregated[]>([]);
   const [specialtyStats, setSpecialtyStats] = useState<SpecialtyStats[]>([]);
   const [hospitalStats, setHospitalStats] = useState<HospitalStats[]>([]);
+  const [availableDoctors, setAvailableDoctors] = useState<Array<{ name: string; cns: string; crm: string; specialty: string; }>>([]);
+  const [viewStats, setViewStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
@@ -98,17 +102,29 @@ const ExecutiveRevenueDashboard: React.FC = () => {
       console.log('🔄 Carregando dados executivos...');
       
       // Carregar dados em paralelo
-      const [doctorsResult, specialtiesData, hospitalsData] = await Promise.all([
+      const [doctorsResult, specialtiesData, hospitalsData, availableDoctorsResult, viewStatsResult] = await Promise.all([
         DoctorsRevenueService.getDoctorsAggregated({ pageSize: 1000 }), // Todos os médicos
         DoctorsRevenueService.getSpecialtyStats(),
-        DoctorsRevenueService.getHospitalStats()
+        DoctorsRevenueService.getHospitalStats(),
+        getAllAvailableDoctors(), // 🆕 Médicos da nova view
+        getViewStatistics() // 🆕 Estatísticas da view
       ]);
       
       setDoctorsData(doctorsResult.doctors);
       setSpecialtyStats(specialtiesData);
       setHospitalStats(hospitalsData);
       
+      // 🆕 Carregar dados da nova view
+      if (availableDoctorsResult.success) {
+        setAvailableDoctors(availableDoctorsResult.data || []);
+      }
+      
+      if (viewStatsResult.success) {
+        setViewStats(viewStatsResult.data);
+      }
+      
       console.log(`✅ Dados carregados: ${doctorsResult.doctors.length} médicos, ${specialtiesData.length} especialidades, ${hospitalsData.length} hospitais`);
+      console.log(`🆕 View médicos: ${availableDoctorsResult.data?.length || 0} médicos disponíveis`);
       
     } catch (error) {
       console.error('❌ Erro ao carregar dados executivos:', error);
@@ -454,33 +470,172 @@ const ExecutiveRevenueDashboard: React.FC = () => {
           </div>
         </TabsContent>
 
-        {/* Aba de Médicos */}
+        {/* 🆕 Aba de Médicos - Nova Implementação */}
         <TabsContent value="doctors">
-          <Card>
-            <CardHeader>
-              <CardTitle>Análise de Médicos</CardTitle>
-              <p className="text-gray-600">Dados agregados da view v_doctors_aggregated</p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{executiveMetrics.totalDoctors}</div>
-                  <p className="text-sm text-gray-600">Total de Médicos</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-green-600">{executiveMetrics.activeDoctors}</div>
-                  <p className="text-sm text-gray-600">Médicos Ativos</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-gray-600">{executiveMetrics.inactiveDoctors}</div>
-                  <p className="text-sm text-gray-600">Médicos Inativos</p>
-                </div>
+          <div className="space-y-6">
+            
+            {/* 📊 Estatísticas da View */}
+            {viewStats && (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Stethoscope className="h-6 w-6 text-blue-600" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Médicos na View</p>
+                        <p className="text-2xl font-bold text-blue-600">{viewStats.uniqueDoctors}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Users className="h-6 w-6 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Pacientes Atendidos</p>
+                        <p className="text-2xl font-bold text-green-600">{viewStats.uniquePatients}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <Activity className="h-6 w-6 text-purple-600" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Total Procedimentos</p>
+                        <p className="text-2xl font-bold text-purple-600">{formatNumber(viewStats.totalRecords)}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-2">
+                      <DollarSign className="h-6 w-6 text-emerald-600" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">Valor Total</p>
+                        <p className="text-2xl font-bold text-emerald-600">{formatCurrency(viewStats.totalValue)}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-              <p className="text-sm text-gray-500 text-center">
-                📊 Para análise detalhada, utilize a tela "Lista de Profissionais"
-              </p>
-            </CardContent>
-          </Card>
+            )}
+
+            {/* 🩺 Lista de Médicos com Dropdown Funcional */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Stethoscope className="h-5 w-5 text-blue-600" />
+                  Médicos e seus Pacientes
+                </CardTitle>
+                <p className="text-gray-600">
+                  Clique em qualquer médico para ver seus pacientes e procedimentos
+                </p>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map(i => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : availableDoctors.length > 0 ? (
+                  <div className="space-y-4">
+                    {availableDoctors.slice(0, 20).map((doctor, index) => (
+                      <div 
+                        key={`${doctor.cns}-${index}`} 
+                        className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="bg-blue-100 p-2 rounded-full">
+                              <Stethoscope className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-gray-900">{doctor.name}</h3>
+                              <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                <span>CRM: {doctor.crm}</span>
+                                <span>CNS: {doctor.cns}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {doctor.specialty}
+                                </Badge>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* 🔄 Dropdown Funcional */}
+                        <DoctorPatientsDropdown 
+                          doctorName={doctor.name}
+                          doctorCns={doctor.cns}
+                        />
+                      </div>
+                    ))}
+                    
+                    {availableDoctors.length > 20 && (
+                      <div className="text-center p-4 text-gray-500 border-t">
+                        <p>Mostrando 20 de {availableDoctors.length} médicos disponíveis</p>
+                        <p className="text-sm mt-1">
+                          Para ver todos os médicos, utilize a tela "Corpo Médico"
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Stethoscope className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      Nenhum médico encontrado
+                    </h3>
+                    <p className="text-gray-500">
+                      A view vw_doctor_patient_procedures está vazia ou não foi criada corretamente
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 📋 Informações da View (Para Debug) */}
+            {viewStats && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm text-gray-600">Informações da View</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Hospitais:</span>
+                      <span className="ml-2 font-medium">{viewStats.uniqueHospitals}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Período:</span>
+                      <span className="ml-2 font-medium">
+                        {viewStats.dateRange.earliest} a {viewStats.dateRange.latest}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Valor Médio/Proc:</span>
+                      <span className="ml-2 font-medium">
+                        {formatCurrency(viewStats.totalValue / viewStats.totalRecords)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Proc/Médico:</span>
+                      <span className="ml-2 font-medium">
+                        {Math.round(viewStats.totalRecords / viewStats.uniqueDoctors)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
 
         {/* Aba de Especialidades */}

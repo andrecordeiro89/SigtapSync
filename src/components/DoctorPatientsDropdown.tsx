@@ -8,448 +8,279 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Skeleton } from './ui/skeleton';
+import { ChevronDown, User, FileText, Calendar, DollarSign } from 'lucide-react';
 import { 
-  ChevronDown, 
-  ChevronUp, 
-  User, 
-  FileText, 
-  Calendar, 
-  DollarSign,
-  Activity,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Stethoscope,
-  Users,
-  TrendingUp,
-  Calculator
-} from 'lucide-react';
-import { 
-  MedicalProductionControlService, 
-  type DoctorPatientProcedure,
-  type DoctorProductivitySummary 
+  getDoctorPatientsAndProcedures, 
+  getDoctorProductivitySummary, 
+  getDoctorBasicInfo 
 } from '../services/medicalProductionControlService';
-import { toast } from './ui/use-toast';
-import PatientProceduresDropdown from './PatientProceduresDropdown';
 
-// ================================================================
-// TIPOS E INTERFACES
-// ================================================================
-
-interface DoctorPatientsDropdownProps {
-  doctorIdentifier: string; // CNS (prioritário), CRM ou nome
-  doctorName: string;
-  doctorCrm: string;
-  doctorCns?: string; // CNS do médico para referência
-  isExpanded: boolean;
-  onToggle: () => void;
+interface PatientData {
+  patient_name: string;
+  patient_cns: string;
+  procedures: Array<{
+    id: string;
+    procedure_code: string;
+    procedure_name: string;
+    procedure_date: string;
+    value_charged: number;
+    billing_status: string;
+    hospital_name: string;
+  }>;
 }
 
-// ================================================================
-// COMPONENTE PRINCIPAL
-// ================================================================
+interface ProductivitySummary {
+  totalProcedures: number;
+  totalValue: number;
+  approvedProcedures: number;
+  pendingProcedures: number;
+  averageValue: number;
+}
 
-const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
-  doctorIdentifier,
+interface DoctorBasicInfo {
+  name: string;
+  cns: string;
+  crm: string;
+  specialty: string;
+}
+
+interface DoctorPatientsDropdownProps {
+  doctorName: string;
+  doctorCns: string;
+}
+
+export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
   doctorName,
-  doctorCrm,
-  doctorCns,
-  isExpanded,
-  onToggle
+  doctorCns
 }) => {
-  
-  // Estados
+  const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [patients, setPatients] = useState<DoctorPatientProcedure[]>([]);
-  const [summary, setSummary] = useState<DoctorProductivitySummary | null>(null);
+  const [patients, setPatients] = useState<PatientData[]>([]);
+  const [summary, setSummary] = useState<ProductivitySummary | null>(null);
+  const [doctorInfo, setDoctorInfo] = useState<DoctorBasicInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | '3months'>('month');
-  const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set());
 
-  // Carregar dados quando expandir
-  useEffect(() => {
-    if (isExpanded && !hasLoaded) {
-      loadDoctorData();
-    }
-  }, [isExpanded, hasLoaded, doctorIdentifier]);
-
-  /**
-   * 📊 CARREGAR DADOS DO MÉDICO
-   */
+  // ✅ FUNÇÃO: Carregar dados do médico
   const loadDoctorData = async () => {
+    if (isLoading) return;
+    
     setIsLoading(true);
     setError(null);
     
     try {
       console.log('🔍 Carregando dados do médico:', doctorName);
-      console.log('🆔 Identificador (CNS prioritário):', doctorIdentifier);
       
-      // ✅ USAR MÉTODO APRIMORADO QUE GARANTE CNS
-      // Carregar pacientes e resumo em paralelo
-      const [patientsResult, summaryResult] = await Promise.all([
-        MedicalProductionControlService.getDoctorPatientsAndProceduresWithCns(doctorIdentifier, {
-          limit: 10,
-          status: 'ALL',
-          minProcedures: 1
-        }),
-        MedicalProductionControlService.getDoctorProductivitySummary(doctorIdentifier, selectedPeriod)
-      ]);
-      
+      // ✅ PRIORIZAR: Usar nome do médico para busca (mais confiável)
+      const searchIdentifier = doctorName || doctorCns;
+      console.log('🆔 Identificador usado para busca:', searchIdentifier);
+
+      // 📊 BUSCAR dados básicos do médico
+      const doctorResult = await getDoctorBasicInfo(searchIdentifier);
+      if (doctorResult.success && doctorResult.data) {
+        setDoctorInfo(doctorResult.data);
+        console.log('✅ Dados básicos carregados:', doctorResult.data);
+      }
+
+      // 👥 BUSCAR pacientes e procedimentos 
+      const patientsResult = await getDoctorPatientsAndProcedures(searchIdentifier);
       if (patientsResult.success) {
-        setPatients(patientsResult.data);
-        console.log(`✅ ${patientsResult.data.length} pacientes carregados para médico específico`);
+        setPatients(patientsResult.data as PatientData[]);
+        console.log('✅ Pacientes carregados:', patientsResult.data.length);
       } else {
         console.warn('⚠️ Erro ao carregar pacientes:', patientsResult.error);
+        setError(patientsResult.error || 'Erro ao carregar pacientes');
       }
-      
+
+      // 📈 BUSCAR resumo de produtividade
+      const summaryResult = await getDoctorProductivitySummary(searchIdentifier, 'month');
       if (summaryResult.success && summaryResult.data) {
         setSummary(summaryResult.data);
-        console.log('✅ Resumo de produtividade carregado');
+        console.log('✅ Resumo carregado:', summaryResult.data);
       } else {
         console.warn('⚠️ Erro ao carregar resumo:', summaryResult.error);
       }
-      
-      // Se nenhum dado foi encontrado, mostrar mensagem
-      if (!patientsResult.success && !summaryResult.success) {
-        setError('Nenhum dado encontrado para este médico');
-      }
-      
-      setHasLoaded(true);
-      
+
     } catch (error) {
-      console.error('❌ Erro ao carregar dados do médico:', error);
-      setError('Erro inesperado ao carregar dados');
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Erro ao carregar dados do médico"
-      });
+      console.error('❌ Erro ao carregar dados:', error);
+      setError('Erro interno ao carregar dados');
     } finally {
       setIsLoading(false);
     }
   };
 
-  /**
-   * 🔄 CONTROLAR EXPANSÃO DE PACIENTES INDIVIDUAIS
-   */
-  const togglePatientExpansion = (patientKey: string) => {
-    const newExpanded = new Set(expandedPatients);
-    if (newExpanded.has(patientKey)) {
-      newExpanded.delete(patientKey);
-    } else {
-      newExpanded.add(patientKey);
+  // ✅ CARREGAR dados quando o dropdown for aberto
+  useEffect(() => {
+    if (isOpen && patients.length === 0) {
+      loadDoctorData();
     }
-    setExpandedPatients(newExpanded);
-  };
+  }, [isOpen]);
 
-  /**
-   * 🔄 RECARREGAR DADOS COM NOVO PERÍODO
-   */
-  const handlePeriodChange = async (newPeriod: 'week' | 'month' | '3months') => {
-    setSelectedPeriod(newPeriod);
-    setIsLoading(true);
-    
-    try {
-      // ✅ USAR CNS DIRETO SE DISPONÍVEL, SENÃO BUSCAR
-      const finalCns = doctorCns || await MedicalProductionControlService.getDoctorCnsByIdentifier(doctorIdentifier);
-      
-      if (finalCns) {
-        const summaryResult = await MedicalProductionControlService.getDoctorProductivitySummary(finalCns, newPeriod);
-        
-        if (summaryResult.success && summaryResult.data) {
-          setSummary(summaryResult.data);
-          console.log(`✅ Resumo atualizado para período ${newPeriod} - CNS: ${finalCns}`);
-        }
-      } else {
-        console.warn('⚠️ CNS não encontrado para atualizar período');
-      }
-    } catch (error) {
-      console.error('❌ Erro ao recarregar dados:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  /**
-   * 🎨 FORMATADORES
-   */
-  const formatCurrency = (value: number) => {
-    return value.toLocaleString('pt-BR', {
+  // 💰 FORMATAR valores monetários
+  const formatValue = (value: number) => {
+    // Converter de centavos para reais se necessário
+    const realValue = value > 1000 ? value / 100 : value;
+    return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
-    });
+    }).format(realValue);
   };
 
+  // 📅 FORMATAR datas
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'Não informado';
     return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
-  const formatAge = (birthDate: string) => {
-    if (!birthDate) return 'N/A';
-    return `${MedicalProductionControlService.calculateAge(birthDate)} anos`;
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'ATIVO':
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'MODERADO':
-        return <AlertCircle className="h-4 w-4 text-yellow-600" />;
-      case 'INATIVO':
-        return <XCircle className="h-4 w-4 text-red-600" />;
-      default:
-        return <Activity className="h-4 w-4 text-gray-600" />;
-    }
-  };
-
+  // 🎨 DEFINIR cor do status
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'ATIVO':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'MODERADO':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'INATIVO':
-        return 'bg-red-100 text-red-800 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'approved': return 'text-green-600 bg-green-50';
+      case 'pending': return 'text-yellow-600 bg-yellow-50';
+      case 'rejected': return 'text-red-600 bg-red-50';
+      case 'paid': return 'text-blue-600 bg-blue-50';
+      default: return 'text-gray-600 bg-gray-50';
     }
   };
 
-  // ================================================================
-  // RENDER
-  // ================================================================
-
   return (
-    <div className="mt-4">
-      {/* Botão de Toggle */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onToggle}
-        className="w-full flex items-center justify-between hover:bg-blue-50 border-blue-200"
+    <div className="relative">
+      {/* ✅ BOTÃO PRINCIPAL */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center justify-between w-full px-3 py-2 text-sm border rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        disabled={isLoading}
       >
-        <span className="flex items-center gap-2">
-          <Users className="h-4 w-4" />
-          Ver Pacientes e Procedimentos
-        </span>
-        {isExpanded ? (
-          <ChevronUp className="h-4 w-4" />
-        ) : (
-          <ChevronDown className="h-4 w-4" />
-        )}
-      </Button>
-
-      {/* Conteúdo Expandível */}
-      {isExpanded && (
-        <div className="mt-4 border rounded-lg bg-gray-50 p-4 space-y-4">
-          
-          {/* Loading State */}
+        <div className="flex items-center gap-2">
+          <User className="h-4 w-4 text-gray-500" />
+          <span className="font-medium">{doctorName}</span>
           {isLoading && (
-            <div className="space-y-3">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          )}
+        </div>
+        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {/* ✅ DROPDOWN CONTENT */}
+      {isOpen && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-96 overflow-y-auto">
+          
+          {/* 📊 INFORMAÇÕES BÁSICAS DO MÉDICO */}
+          {doctorInfo && (
+            <div className="p-3 border-b bg-blue-50">
+              <div className="text-sm font-medium text-blue-900">
+                {doctorInfo.name}
+              </div>
+              <div className="text-xs text-blue-700 space-y-1">
+                <div>CNS: {doctorInfo.cns}</div>
+                <div>CRM: {doctorInfo.crm}</div>
+                <div>Especialidade: {doctorInfo.specialty}</div>
+              </div>
             </div>
           )}
 
-          {/* Error State */}
-          {error && !isLoading && (
-            <div className="text-center py-4">
-              <XCircle className="h-8 w-8 text-red-500 mx-auto mb-2" />
-              <p className="text-sm text-red-600">{error}</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadDoctorData}
-                className="mt-2"
-              >
-                Tentar novamente
-              </Button>
+          {/* 📈 RESUMO DE PRODUTIVIDADE */}
+          {summary && (
+            <div className="p-3 border-b bg-gray-50">
+              <div className="text-sm font-medium text-gray-900 mb-2">
+                Resumo do Último Mês
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-white p-2 rounded border">
+                  <div className="text-gray-500">Total Procedimentos</div>
+                  <div className="font-bold text-blue-600">{summary.totalProcedures}</div>
+                </div>
+                <div className="bg-white p-2 rounded border">
+                  <div className="text-gray-500">Valor Total</div>
+                  <div className="font-bold text-green-600">{formatValue(summary.totalValue)}</div>
+                </div>
+                <div className="bg-white p-2 rounded border">
+                  <div className="text-gray-500">Aprovados</div>
+                  <div className="font-bold text-green-600">{summary.approvedProcedures}</div>
+                </div>
+                <div className="bg-white p-2 rounded border">
+                  <div className="text-gray-500">Pendentes</div>
+                  <div className="font-bold text-yellow-600">{summary.pendingProcedures}</div>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Resumo de Produtividade */}
-          {summary && !isLoading && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Resumo de Produtividade
-                </CardTitle>
-                
-                {/* Seletor de Período */}
-                <div className="flex gap-2 mt-2">
-                  {(['week', 'month', '3months'] as const).map((period) => (
-                    <Button
-                      key={period}
-                      variant={selectedPeriod === period ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => handlePeriodChange(period)}
-                      className="text-xs"
-                    >
-                      {period === 'week' ? '7 dias' : period === 'month' ? '30 dias' : '90 dias'}
-                    </Button>
-                  ))}
-                </div>
-              </CardHeader>
-              
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{summary.unique_patients}</div>
-                    <div className="text-xs text-gray-600">Pacientes</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{summary.total_procedures}</div>
-                    <div className="text-xs text-gray-600">Procedimentos</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">{summary.total_quantity}</div>
-                    <div className="text-xs text-gray-600">Quantidade</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">{formatCurrency(summary.total_revenue)}</div>
-                    <div className="text-xs text-gray-600">Receita</div>
-                  </div>
-                </div>
-                
-                {/* Métricas Adicionais */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div className="bg-white p-3 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Calculator className="h-4 w-4 text-blue-500" />
-                      <span>Média por Paciente</span>
-                    </div>
-                    <div className="font-semibold">{summary.avg_procedures_per_patient.toFixed(1)} proc.</div>
-                  </div>
-                  <div className="bg-white p-3 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-green-500" />
-                      <span>Valor Médio</span>
-                    </div>
-                    <div className="font-semibold">{formatCurrency(summary.avg_value_per_procedure)}</div>
-                  </div>
-                  <div className="bg-white p-3 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Activity className="h-4 w-4 text-purple-500" />
-                      <span>Qtd. Média</span>
-                    </div>
-                    <div className="font-semibold">{summary.avg_quantity_per_procedure.toFixed(1)}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* ⚠️ ESTADO DE ERRO */}
+          {error && (
+            <div className="p-3 text-sm text-red-600 bg-red-50 border-b">
+              {error}
+            </div>
           )}
 
-          {/* Lista de Pacientes */}
-          {patients.length > 0 && !isLoading && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Pacientes Atendidos ({patients.length})
-                </CardTitle>
-              </CardHeader>
-              
-              <CardContent>
-                <div className="space-y-3">
-                  {patients.map((patient, index) => {
-                const patientKey = patient.patient_cns || patient.patient_name || `patient_${index}`;
-                return (
-                  <PatientProceduresDropdown
-                    key={patientKey}
-                    patientName={patient.patient_name}
-                    patientCns={patient.patient_cns}
-                    procedures={patient.procedures_detailed}
-                    isExpanded={expandedPatients.has(patientKey)}
-                    onToggle={() => togglePatientExpansion(patientKey)}
-                  />
-                );
-              })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Top Pacientes (do resumo) */}
-          {summary?.top_patients && summary.top_patients.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Top 5 Pacientes
-                </CardTitle>
-              </CardHeader>
-              
-              <CardContent>
-                <div className="space-y-2">
-                  {summary.top_patients.map((patient, index) => (
-                    <div key={index} className="flex justify-between items-center p-2 bg-white rounded-lg">
-                      <div className="flex-1">
-                        <div className="font-medium">{patient.patient_name}</div>
-                        <div className="text-sm text-gray-600">{patient.patient_cns}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold">{patient.procedures_count} proc.</div>
-                        <div className="text-sm text-gray-600">{formatCurrency(patient.total_value)}</div>
-                      </div>
+          {/* 📋 LISTA DE PACIENTES */}
+          {patients.length > 0 ? (
+            <div className="max-h-64 overflow-y-auto">
+              {patients.map((patient, patientIndex) => (
+                <div key={`${patient.patient_cns}-${patientIndex}`} className="border-b last:border-b-0">
+                  
+                  {/* 👤 CABEÇALHO DO PACIENTE */}
+                  <div className="p-3 bg-gray-50 border-b">
+                    <div className="text-sm font-medium text-gray-900">
+                      {patient.patient_name}
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Top Procedimentos (do resumo) */}
-          {summary?.top_procedures && summary.top_procedures.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Stethoscope className="h-5 w-5" />
-                  Top 5 Procedimentos
-                </CardTitle>
-              </CardHeader>
-              
-              <CardContent>
-                <div className="space-y-2">
-                  {summary.top_procedures.map((procedure, index) => (
-                    <div key={index} className="flex justify-between items-center p-2 bg-white rounded-lg">
-                      <div className="flex-1">
-                        <div className="font-medium">{procedure.procedure_name}</div>
-                        <div className="text-sm text-gray-600">{procedure.procedure_code}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold">{procedure.count}x</div>
-                        <div className="text-sm text-gray-600">{formatCurrency(procedure.total_value)}</div>
-                      </div>
+                    <div className="text-xs text-gray-500">
+                      CNS: {patient.patient_cns}
                     </div>
-                  ))}
+                    <div className="text-xs text-blue-600 mt-1">
+                      {patient.procedures.length} procedimento(s)
+                    </div>
+                  </div>
+
+                  {/* 🩺 PROCEDIMENTOS DO PACIENTE */}
+                  <div className="space-y-1">
+                    {patient.procedures.map((procedure, procIndex) => (
+                      <div 
+                        key={`${procedure.id}-${procIndex}`}
+                        className="p-3 hover:bg-gray-50 border-b last:border-b-0"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-900">
+                              {procedure.procedure_name}
+                            </div>
+                            <div className="text-xs text-gray-500 space-y-1">
+                              <div>Código: {procedure.procedure_code}</div>
+                              <div>Data: {formatDate(procedure.procedure_date)}</div>
+                              <div>Hospital: {procedure.hospital_name}</div>
+                            </div>
+                          </div>
+                          <div className="text-right space-y-1">
+                            <div className="text-sm font-bold text-green-600">
+                              {formatValue(procedure.value_charged)}
+                            </div>
+                            <div className={`text-xs px-2 py-1 rounded ${getStatusColor(procedure.billing_status)}`}>
+                              {procedure.billing_status}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              ))}
+            </div>
+          ) : (
+            !isLoading && !error && (
+              <div className="p-4 text-center text-gray-500">
+                <FileText className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                <div className="text-sm">Nenhum procedimento encontrado</div>
+              </div>
+            )
           )}
 
-          {/* Estado Vazio */}
-          {!isLoading && !error && patients.length === 0 && !summary && (
-            <div className="text-center py-8">
-              <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Nenhum dado de produção encontrado</p>
-              <p className="text-sm text-gray-500 mt-1">
-                Verifique se existem procedimentos registrados para este médico
-              </p>
+          {/* 🔄 ESTADO DE CARREGAMENTO */}
+          {isLoading && (
+            <div className="p-4 text-center">
+              <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+              <div className="text-sm text-gray-500">Carregando dados...</div>
             </div>
           )}
         </div>
       )}
     </div>
   );
-};
-
-export default DoctorPatientsDropdown; 
+}; 

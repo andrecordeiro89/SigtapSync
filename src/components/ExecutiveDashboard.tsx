@@ -28,7 +28,7 @@ import { AIHBillingService, type CompleteBillingStats } from '../services/aihBil
 import { supabase } from '../lib/supabase';
 import HospitalRevenueDashboard from './HospitalRevenueDashboard';
 import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
-import DoctorPatientsDropdown from './DoctorPatientsDropdown';
+import { DoctorPatientsDropdown } from './DoctorPatientsDropdown';
 
 // ✅ FUNÇÃO OTIMIZADA PARA FORMATAR VALORES MONETÁRIOS
 const formatCurrency = (value: number | null | undefined): string => {
@@ -260,8 +260,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [hospitalRevenueStats, setHospitalRevenueStats] = useState<HospitalRevenueStats[]>([]);
   const [billingStats, setBillingStats] = useState<CompleteBillingStats | null>(null);
   
-  // Estado para controlar dropdowns expandidos
-  const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
+
 
   // Authentication
   const { user, isDirector, isAdmin, isCoordinator, isTI, hasPermission } = useAuth();
@@ -269,18 +268,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   // Access Control
   const hasExecutiveAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('generate_reports');
   
-  // Função para controlar expansão de dropdowns de médicos
-  const toggleDoctorExpansion = (doctorId: string) => {
-    setExpandedDoctors(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(doctorId)) {
-        newSet.delete(doctorId);
-      } else {
-        newSet.add(doctorId);
-      }
-      return newSet;
-    });
-  };
+
 
   // Load Data
   const loadExecutiveData = async () => {
@@ -688,7 +676,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 Produção Médica
               </CardTitle>
               <CardDescription>
-                Ranking dos médicos baseado no total de procedimentos realizados
+                Todos os médicos que estão produzindo para a empresa
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -696,7 +684,6 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 <div className="space-y-4">
                   {billingStats.byDoctor
                     .filter(doctor => doctor.total_aihs > 0) // Apenas médicos com procedimentos
-                    .slice(0, 15)
                     .map((doctor, index) => (
                     <div key={doctor.doctor_id} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                       <div className="flex items-start justify-between mb-3">
@@ -741,12 +728,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       
                       {/* ✅ NOVO: Dropdown de Pacientes e Procedimentos */}
                       <DoctorPatientsDropdown
-                        doctorIdentifier={doctor.doctor_cns || doctor.doctor_crm || doctor.doctor_name}
                         doctorName={doctor.doctor_name}
-                        doctorCrm={doctor.doctor_crm}
-                        doctorCns={doctor.doctor_cns}
-                        isExpanded={expandedDoctors.has(doctor.doctor_id)}
-                        onToggle={() => toggleDoctorExpansion(doctor.doctor_id)}
+                        doctorCns={doctor.doctor_cns || doctor.doctor_crm || ''}
                       />
                     </div>
                   ))}
