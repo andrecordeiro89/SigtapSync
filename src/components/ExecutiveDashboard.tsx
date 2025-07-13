@@ -516,6 +516,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               {isLoading ? '...' : formatCurrency(kpiData.totalRevenue)}
             </div>
             <div className="text-blue-200 text-lg">Faturamento Total</div>
+            <div className="text-blue-300 text-sm mt-1">
+              {isLoading ? '...' : formatNumber(kpiData.totalAIHs)} AIHs Processadas
+            </div>
             {lastUpdate && (
               <div className="text-xs text-blue-300 mt-2 flex items-center gap-1">
                 <Clock className="h-3 w-3" />
@@ -526,60 +529,112 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         </div>
       </div>
 
-      {/* 4 CARDS PRINCIPAIS */}
+      {/* 4 CARDS PRINCIPAIS - TOPS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="border-green-200 shadow-lg hover:shadow-xl transition-shadow bg-gradient-to-br from-green-50 to-green-100">
-          <CardContent className="p-6 text-center">
-            <DollarSign className="h-12 w-12 mx-auto mb-3 text-green-600" />
-            <div className="text-3xl font-bold text-green-700">
-              {isLoading ? '...' : formatCurrency(kpiData.totalRevenue)}
-            </div>
-            <div className="text-sm text-green-600 font-medium">Faturamento Total</div>
-            <div className="text-xs text-gray-500 mt-1">
-              {kpiData.monthlyGrowth > 0 && (
-                <span className="text-green-600">
-                  ↗ +{kpiData.monthlyGrowth.toFixed(1)}% vs mês anterior
-                </span>
-              )}
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Hospital className="h-12 w-12 text-green-600" />
+                <div>
+                  <div className="text-sm text-green-600 font-medium">Hospital Top Faturamento</div>
+                  <div className="text-xl font-bold text-green-700">
+                    {isLoading ? '...' : (
+                      hospitalRevenueStats.length > 0 
+                        ? hospitalRevenueStats[0].hospital_name 
+                        : 'N/A'
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {hospitalRevenueStats.length > 0 && (
+                      <span className="text-green-600">
+                        {formatCurrency(normalizeValue(hospitalRevenueStats[0]?.total_hospital_revenue_reais || 0))}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-blue-200 shadow-lg hover:shadow-xl transition-shadow bg-gradient-to-br from-blue-50 to-blue-100">
-          <CardContent className="p-6 text-center">
-            <FileText className="h-12 w-12 mx-auto mb-3 text-blue-600" />
-            <div className="text-3xl font-bold text-blue-700">
-              {isLoading ? '...' : formatNumber(kpiData.totalAIHs)}
-            </div>
-            <div className="text-sm text-blue-600 font-medium">AIHs Processadas</div>
-            <div className="text-xs text-gray-500 mt-1">
-              Ticket médio: {formatCurrency(kpiData.averageTicket)}
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Users className="h-12 w-12 text-blue-600" />
+                <div>
+                  <div className="text-sm text-blue-600 font-medium">Médico Top Faturamento</div>
+                  <div className="text-xl font-bold text-blue-700">
+                    {isLoading ? '...' : (
+                      doctorsData.length > 0 
+                        ? doctorsData[0]?.doctor_name 
+                        : 'N/A'
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {doctorsData.length > 0 && (
+                      <span className="text-blue-600">
+                        {formatCurrency(normalizeValue(doctorsData[0]?.total_revenue_12months_reais || 0))}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-purple-200 shadow-lg hover:shadow-xl transition-shadow bg-gradient-to-br from-purple-50 to-purple-100">
-          <CardContent className="p-6 text-center">
-            <CheckCircle className="h-12 w-12 mx-auto mb-3 text-purple-600" />
-            <div className="text-3xl font-bold text-purple-700">
-              {isLoading ? '...' : kpiData.approvalRate.toFixed(1)}%
-            </div>
-            <div className="text-sm text-purple-600 font-medium">Taxa de Aprovação</div>
-            <div className="text-xs text-gray-500 mt-1">
-              Meta: 90% | {kpiData.approvalRate >= 90 ? '✓ Atingida' : '⚠ Abaixo da meta'}
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <FileText className="h-12 w-12 text-purple-600" />
+                <div>
+                  <div className="text-sm text-purple-600 font-medium">Procedimento Top Faturamento</div>
+                  <div className="text-xl font-bold text-purple-700">
+                    {isLoading ? '...' : (
+                      billingStats && billingStats.byProcedure.length > 0 
+                        ? billingStats.byProcedure[0]?.procedure_code 
+                        : 'N/A'
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {billingStats && billingStats.byProcedure.length > 0 && (
+                      <span className="text-purple-600">
+                        {formatCurrency(normalizeValue(billingStats.byProcedure[0]?.total_value || 0))}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-orange-200 shadow-lg hover:shadow-xl transition-shadow bg-gradient-to-br from-orange-50 to-orange-100">
-          <CardContent className="p-6 text-center">
-            <Activity className="h-12 w-12 mx-auto mb-3 text-orange-600" />
-            <div className="text-3xl font-bold text-orange-700">
-              {isLoading ? '...' : kpiData.processingTime.toFixed(1)}h
-            </div>
-            <div className="text-sm text-orange-600 font-medium">Tempo Médio</div>
-            <div className="text-xs text-gray-500 mt-1">
-              Processamento de AIH
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Stethoscope className="h-12 w-12 text-orange-600" />
+                <div>
+                  <div className="text-sm text-orange-600 font-medium">Especialidade Top Faturamento</div>
+                  <div className="text-xl font-bold text-orange-700">
+                    {isLoading ? '...' : (
+                      specialtyStats.length > 0 
+                        ? specialtyStats[0]?.doctor_specialty 
+                        : 'N/A'
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {specialtyStats.length > 0 && (
+                      <span className="text-orange-600">
+                        {formatCurrency(normalizeValue(specialtyStats[0]?.total_specialty_revenue_reais || 0))}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -620,85 +675,6 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
         {/* TAB: ESPECIALIDADES */}
         <TabsContent value="specialties" className="space-y-6">
-          {/* KPIs de Especialidades */}
-          {billingStats && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card className="border-gray-200 bg-gray-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <Stethoscope className="h-8 w-8 text-gray-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-700">Top Especialidade</p>
-                      <p className="text-xl font-bold text-gray-800">
-                        {billingStats.byDoctor.length > 0 
-                          ? billingStats.byDoctor[0]?.doctor_specialty || 'N/A'
-                          : 'N/A'
-                        }
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Maior faturamento
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-blue-200 bg-blue-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <Users className="h-8 w-8 text-blue-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-blue-700">Especialidades Ativas</p>
-                      <p className="text-2xl font-bold text-blue-800">
-                        {formatNumber(new Set(billingStats.byDoctor.map(d => d.doctor_specialty)).size)}
-                      </p>
-                      <p className="text-xs text-blue-600 mt-1">
-                        Diferentes especialidades
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-green-200 bg-green-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <DollarSign className="h-8 w-8 text-green-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-green-700">Valor por Especialidade</p>
-                      <p className="text-2xl font-bold text-green-800">
-                        {formatCurrency(normalizeValue(
-                          billingStats.metrics.totalRevenue / 
-                          Math.max(1, new Set(billingStats.byDoctor.map(d => d.doctor_specialty)).size)
-                        ))}
-                      </p>
-                      <p className="text-xs text-green-600 mt-1">
-                        Média por especialidade
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-purple-200 bg-purple-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <Award className="h-8 w-8 text-purple-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-purple-700">Performance Geral</p>
-                      <p className="text-2xl font-bold text-purple-800">
-                        {billingStats.metrics.approvalRate.toFixed(1)}%
-                      </p>
-                      <p className="text-xs text-purple-600 mt-1">
-                        Taxa de aprovação média
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
           <SpecialtyRevenueDashboard />
         </TabsContent>
 
@@ -708,16 +684,19 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-green-600" />
-                Top Médicos por Faturamento
+                Produção Médica
               </CardTitle>
               <CardDescription>
-                Ranking dos médicos baseado nos dados reais das AIHs processadas
+                Ranking dos médicos baseado no total de procedimentos realizados
               </CardDescription>
             </CardHeader>
             <CardContent>
               {billingStats && billingStats.byDoctor.length > 0 ? (
                 <div className="space-y-4">
-                  {billingStats.byDoctor.slice(0, 15).map((doctor, index) => (
+                  {billingStats.byDoctor
+                    .filter(doctor => doctor.total_aihs > 0) // Apenas médicos com procedimentos
+                    .slice(0, 15)
+                    .map((doctor, index) => (
                     <div key={doctor.doctor_id} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
@@ -727,7 +706,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                           <div>
                             <h4 className="font-semibold text-gray-900">{doctor.doctor_name}</h4>
                             <div className="text-sm text-gray-600">
-                              CRM: {doctor.doctor_crm} ({doctor.doctor_crm_state}) | {doctor.doctor_specialty}
+                              CNS: {doctor.doctor_cns || doctor.doctor_crm || 'Não informado'} | {doctor.doctor_specialty}
                             </div>
                           </div>
                         </div>
@@ -761,9 +740,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       
                       {/* ✅ NOVO: Dropdown de Pacientes e Procedimentos */}
                       <DoctorPatientsDropdown
-                        doctorIdentifier={doctor.doctor_crm || doctor.doctor_name}
+                        doctorIdentifier={doctor.doctor_cns || doctor.doctor_crm || doctor.doctor_name}
                         doctorName={doctor.doctor_name}
                         doctorCrm={doctor.doctor_crm}
+                        doctorCns={doctor.doctor_cns}
                         isExpanded={expandedDoctors.has(doctor.doctor_id)}
                         onToggle={() => toggleDoctorExpansion(doctor.doctor_id)}
                       />

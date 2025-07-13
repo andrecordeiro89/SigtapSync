@@ -56,6 +56,7 @@ export interface AIHBillingByMonth {
 export interface AIHBillingByDoctor {
   doctor_id: string;
   doctor_name: string;
+  doctor_cns: string;
   doctor_crm: string;
   doctor_crm_state: string;
   doctor_specialty: string;

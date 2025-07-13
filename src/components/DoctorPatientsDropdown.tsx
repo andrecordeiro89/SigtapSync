@@ -42,9 +42,10 @@ import PatientProceduresDropdown from './PatientProceduresDropdown';
 // ================================================================
 
 interface DoctorPatientsDropdownProps {
-  doctorIdentifier: string; // CNS, CRM ou nome
+  doctorIdentifier: string; // CNS (prioritário), CRM ou nome
   doctorName: string;
   doctorCrm: string;
+  doctorCns?: string; // CNS do médico para referência
   isExpanded: boolean;
   onToggle: () => void;
 }
@@ -57,6 +58,7 @@ const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
   doctorIdentifier,
   doctorName,
   doctorCrm,
+  doctorCns,
   isExpanded,
   onToggle
 }) => {
@@ -86,6 +88,7 @@ const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
     
     try {
       console.log('🔍 Carregando dados do médico:', doctorName);
+      console.log('🆔 Identificador (CNS prioritário):', doctorIdentifier);
       
       // ✅ USAR MÉTODO APRIMORADO QUE GARANTE CNS
       // Carregar pacientes e resumo em paralelo
@@ -153,15 +156,15 @@ const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
     setIsLoading(true);
     
     try {
-      // ✅ BUSCAR CNS PRIMEIRO PARA GARANTIR ESPECIFICIDADE
-      const doctorCns = await MedicalProductionControlService.getDoctorCnsByIdentifier(doctorIdentifier);
+      // ✅ USAR CNS DIRETO SE DISPONÍVEL, SENÃO BUSCAR
+      const finalCns = doctorCns || await MedicalProductionControlService.getDoctorCnsByIdentifier(doctorIdentifier);
       
-      if (doctorCns) {
-        const summaryResult = await MedicalProductionControlService.getDoctorProductivitySummary(doctorCns, newPeriod);
+      if (finalCns) {
+        const summaryResult = await MedicalProductionControlService.getDoctorProductivitySummary(finalCns, newPeriod);
         
         if (summaryResult.success && summaryResult.data) {
           setSummary(summaryResult.data);
-          console.log(`✅ Resumo atualizado para período ${newPeriod} - CNS: ${doctorCns}`);
+          console.log(`✅ Resumo atualizado para período ${newPeriod} - CNS: ${finalCns}`);
         }
       } else {
         console.warn('⚠️ CNS não encontrado para atualizar período');

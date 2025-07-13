@@ -2,7 +2,7 @@
  * ================================================================
  * SERVIÇO DE CONTROLE DE PRODUÇÃO MÉDICA
  * ================================================================
- * Utiliza a view doctor_production para obter dados consolidados
+ * Utiliza a view v_doctor_production_control para obter dados consolidados
  * de produção médica por paciente e procedimento
  * ================================================================
  */
@@ -17,19 +17,19 @@ export interface DoctorProductionRecord {
   doctor_name: string;
   doctor_cns: string;
   doctor_crm: string;
-  doctor_crm_state: string;
   doctor_specialty: string;
   patient_name: string;
   patient_cns: string;
-  patient_birth_date: string;
+  patient_birthdate: string;
   patient_gender: string;
   procedure_code: string;
   procedure_name: string;
   procedure_date: string;
-  value_charged: number;
-  quantity: number;
-  unit_value: number;
-  total_value: number;
+  procedure_quantity: number;
+  procedure_unit_value: number;
+  procedure_total_value: number;
+  hospital_name: string;
+  hospital_cnpj: string;
 }
 
 export interface DoctorPatientProcedure {
@@ -37,13 +37,12 @@ export interface DoctorPatientProcedure {
   doctor_name: string;
   doctor_cns: string;
   doctor_crm: string;
-  doctor_crm_state: string;
   doctor_specialty: string;
   
   // Paciente
   patient_name: string;
   patient_cns: string;
-  patient_birth_date: string;
+  patient_birthdate: string;
   patient_gender: string;
   
   // Relacionamento
@@ -86,7 +85,6 @@ export interface DoctorProductivitySummary {
   doctor_name: string;
   doctor_cns: string;
   doctor_crm: string;
-  doctor_crm_state: string;
   doctor_specialty: string;
   
   // Contadores do período
@@ -145,8 +143,8 @@ export class MedicalProductionControlService {
     try {
       console.log('🔍 Buscando pacientes e procedimentos do médico:', doctorIdentifier);
       
-      // Construir query na view doctor_production
-      let query = supabase.from('doctor_production').select('*');
+      // Construir query na view v_doctor_production_control
+      let query = supabase.from('v_doctor_production_control').select('*');
       
       // ✅ CORREÇÃO: Filtrar de forma mais específica priorizando CNS
       // Primeiro tenta por CNS (mais específico)
@@ -224,13 +222,12 @@ export class MedicalProductionControlService {
         doctor_name: string;
         doctor_cns: string;
         doctor_crm: string;
-        doctor_crm_state: string;
         doctor_specialty: string;
         
         // Paciente
         patient_name: string;
         patient_cns: string;
-        patient_birth_date: string;
+        patient_birthdate: string;
         patient_gender: string;
         
         // Contadores
@@ -272,8 +269,8 @@ export class MedicalProductionControlService {
           patientKey = `CNS:${record.patient_cns.trim()}`;
         }
         // ✅ PRIORIDADE 2: Nome + Data de nascimento (menos provável de duplicar)
-        else if (record.patient_name && record.patient_birth_date) {
-          patientKey = `NAME_BIRTH:${record.patient_name.trim()}_${record.patient_birth_date}`;
+        else if (record.patient_name && record.patient_birthdate) {
+          patientKey = `NAME_BIRTH:${record.patient_name.trim()}_${record.patient_birthdate}`;
         }
         // ✅ PRIORIDADE 3: Apenas nome (último recurso)
         else if (record.patient_name) {
@@ -291,13 +288,12 @@ export class MedicalProductionControlService {
             doctor_name: record.doctor_name || 'Não informado',
             doctor_cns: record.doctor_cns || '',
             doctor_crm: record.doctor_crm || '',
-            doctor_crm_state: record.doctor_crm_state || '',
             doctor_specialty: record.doctor_specialty || '',
             
             // Paciente
             patient_name: record.patient_name || 'Não informado',
             patient_cns: record.patient_cns || '',
-            patient_birth_date: record.patient_birth_date || '',
+            patient_birthdate: record.patient_birthdate || '',
             patient_gender: record.patient_gender || '',
             
             // Contadores
@@ -326,7 +322,7 @@ export class MedicalProductionControlService {
         
         // Atualizar contadores
         patient.total_procedures_together++;
-        patient.total_quantity += record.quantity || 0;
+        patient.total_quantity += record.procedure_quantity || 0;
         
         if (record.procedure_code) {
           patient.unique_procedures_performed.add(record.procedure_code);
@@ -342,15 +338,15 @@ export class MedicalProductionControlService {
           procedure_code: record.procedure_code || '',
           procedure_name: record.procedure_name || '',
           procedure_date: record.procedure_date || '',
-          value_charged: record.value_charged || 0,
-          value_total: record.total_value || 0,
-          quantity: record.quantity || 0,
-          unit_value: record.unit_value || 0
+          value_charged: record.procedure_unit_value || 0,
+          value_total: record.procedure_total_value || 0,
+          quantity: record.procedure_quantity || 0,
+          unit_value: record.procedure_unit_value || 0
         });
         
         // Valores
-        patient.total_value_charged += record.value_charged || 0;
-        patient.total_value_total += record.total_value || 0;
+        patient.total_value_charged += record.procedure_unit_value || 0;
+        patient.total_value_total += record.procedure_total_value || 0;
         
         // Datas
         if (record.procedure_date) {
@@ -419,13 +415,12 @@ export class MedicalProductionControlService {
           doctor_name: patient.doctor_name,
           doctor_cns: patient.doctor_cns,
           doctor_crm: patient.doctor_crm,
-          doctor_crm_state: patient.doctor_crm_state,
           doctor_specialty: patient.doctor_specialty,
           
           // Paciente
           patient_name: patient.patient_name,
           patient_cns: patient.patient_cns,
-          patient_birth_date: patient.patient_birth_date,
+          patient_birthdate: patient.patient_birthdate,
           patient_gender: patient.patient_gender,
           
           // Relacionamento
@@ -537,7 +532,7 @@ export class MedicalProductionControlService {
       console.log('🔍 Buscando registros de produção:', doctorIdentifier);
       
       // Construir query
-      let query = supabase.from('doctor_production').select('*');
+      let query = supabase.from('v_doctor_production_control').select('*');
       
       // ✅ CORREÇÃO: Filtrar de forma mais específica priorizando CNS
       if (doctorIdentifier && doctorIdentifier.length === 15 && /^\d+$/.test(doctorIdentifier)) {
@@ -630,7 +625,7 @@ export class MedicalProductionControlService {
         .toISOString().split('T')[0];
       
       // Buscar dados da view
-      let query = supabase.from('doctor_production').select('*');
+      let query = supabase.from('v_doctor_production_control').select('*');
       
       // ✅ CORREÇÃO: Filtrar de forma mais específica priorizando CNS
       if (doctorIdentifier && doctorIdentifier.length === 15 && /^\d+$/.test(doctorIdentifier)) {
@@ -679,8 +674,8 @@ export class MedicalProductionControlService {
       // Calcular métricas
       const uniquePatients = new Set(productionData.map(r => r.patient_cns)).size;
       const totalProcedures = productionData.length;
-      const totalQuantity = productionData.reduce((sum, r) => sum + (r.quantity || 0), 0);
-      const totalRevenue = productionData.reduce((sum, r) => sum + (r.total_value || 0), 0);
+      const totalQuantity = productionData.reduce((sum, r) => sum + (r.procedure_quantity || 0), 0);
+      const totalRevenue = productionData.reduce((sum, r) => sum + (r.procedure_total_value || 0), 0);
       
       // Top pacientes
       const topPatients = this.getTopPatients(productionData);
@@ -692,7 +687,6 @@ export class MedicalProductionControlService {
         doctor_name: firstRecord.doctor_name || 'Não informado',
         doctor_cns: firstRecord.doctor_cns || '',
         doctor_crm: firstRecord.doctor_crm || '',
-        doctor_crm_state: firstRecord.doctor_crm_state || '',
         doctor_specialty: firstRecord.doctor_specialty || '',
         
         // Contadores
@@ -746,7 +740,7 @@ export class MedicalProductionControlService {
       }
       
       // Buscar na view por CRM ou nome para encontrar o CNS
-      let query = supabase.from('doctor_production').select('doctor_cns, doctor_crm, doctor_name').limit(1);
+      let query = supabase.from('v_doctor_production_control').select('doctor_cns, doctor_crm, doctor_name').limit(1);
       
       if (identifier && /^[A-Z]{2}-\d+$/.test(identifier)) {
         // CRM formato padrão
@@ -839,7 +833,7 @@ export class MedicalProductionControlService {
       
       const patient = patientMap.get(key)!;
       patient.procedures_count++;
-      patient.total_value += record.total_value || 0;
+      patient.total_value += record.procedure_total_value || 0;
     });
     
     return Array.from(patientMap.values())
@@ -870,8 +864,8 @@ export class MedicalProductionControlService {
       
       const procedure = procedureMap.get(key)!;
       procedure.count++;
-      procedure.total_quantity += record.quantity || 0;
-      procedure.total_value += record.total_value || 0;
+      procedure.total_quantity += record.procedure_quantity || 0;
+      procedure.total_value += record.procedure_total_value || 0;
     });
     
     return Array.from(procedureMap.values())
