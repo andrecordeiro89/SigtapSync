@@ -30,14 +30,13 @@ import HospitalRevenueDashboard from './HospitalRevenueDashboard';
 import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
 import DoctorPatientsDropdown from './DoctorPatientsDropdown';
 
-// ✅ FUNÇÃO UTILITÁRIA PARA FORMATAR VALORES MONETÁRIOS
+// ✅ FUNÇÃO OTIMIZADA PARA FORMATAR VALORES MONETÁRIOS
 const formatCurrency = (value: number | null | undefined): string => {
   if (value == null || isNaN(value)) return 'R$ 0,00';
   
-  // Se o valor for muito grande (provavelmente em centavos), converter para reais
-  const normalizedValue = value > 100000 ? value / 100 : value;
-  
-  return normalizedValue.toLocaleString('pt-BR', {
+  // ⚠️ IMPORTANTE: Agora as views já retornam valores em reais
+  // Não fazer mais conversão aqui!
+  return value.toLocaleString('pt-BR', {
     style: 'currency',
     currency: 'BRL',
     minimumFractionDigits: 2,
@@ -51,13 +50,15 @@ const formatNumber = (value: number | null | undefined): string => {
   return Math.round(value).toLocaleString('pt-BR');
 };
 
-// ✅ FUNÇÃO PARA VALIDAR E NORMALIZAR VALORES
-const normalizeValue = (value: number | null | undefined): number => {
+// ✅ FUNÇÃO PARA VALIDAR E TRATAR VALORES SEGUROS
+const safeValue = (value: number | null | undefined): number => {
   if (value == null || isNaN(value)) return 0;
   
-  // Se o valor for muito grande (provavelmente em centavos), converter para reais
-  if (value > 100000) {
-    console.warn(`⚠️ Valor muito alto detectado: ${value}. Convertendo de centavos para reais.`);
+  // 🔧 DETECÇÃO INTELIGENTE: Se valor for suspeito de estar em centavos
+  // Critério ajustado: valores > 10.000 (R$ 100,00) provavelmente estão em centavos
+  // Pois procedimentos médicos raramente custam mais de R$ 100.000,00
+  if (value > 10000) {
+    console.warn(`⚠️ Valor suspeito detectado: ${value}. Está em centavos. Convertendo para reais...`);
     return value / 100;
   }
   
@@ -328,10 +329,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           averageTicket: billingStatsData.metrics.averageTicket
         });
         
-        totalRevenue = normalizeValue(billingStatsData.metrics.totalRevenue);
+        totalRevenue = safeValue(billingStatsData.metrics.totalRevenue);
         totalAIHs = billingStatsData.metrics.totalAIHs || 0;
         totalProcedures = billingStatsData.summary?.total_aihs || totalAIHs;
-        averageTicket = normalizeValue(billingStatsData.metrics.averageTicket);
+        averageTicket = safeValue(billingStatsData.metrics.averageTicket);
         approvalRate = calculatePercentage(
           billingStatsData.summary?.approved_aihs || 0,
           totalAIHs
@@ -349,7 +350,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         
         // Normalizar valores dos médicos
         const normalizedDoctorRevenues = doctorsResult.doctors.map(d => 
-          normalizeValue(d.total_revenue_12months_reais || 0)
+          safeValue(d.total_revenue_12months_reais || 0)
         );
         
         totalRevenue = normalizedDoctorRevenues.reduce((sum, revenue) => sum + revenue, 0);
@@ -394,7 +395,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         id: hospital.hospital_id || '',
         name: hospital.hospital_name || 'Nome não informado',
         aihCount: hospital.total_procedures || 0,
-        revenue: normalizeValue(hospital.total_hospital_revenue_reais || 0),
+        revenue: safeValue(hospital.total_hospital_revenue_reais || 0),
         approvalRate: hospital.avg_payment_rate || 0,
         doctorCount: hospital.active_doctors_count || 0,
         avgProcessingTime: 2.1 // Mock por enquanto
@@ -404,7 +405,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       // Converter top 5 médicos para o formato atual com valores normalizados
       const topDoctors = doctorsResult.doctors
         .filter(d => d.total_revenue_12months_reais != null && d.total_revenue_12months_reais > 0)
-        .sort((a, b) => normalizeValue(b.total_revenue_12months_reais || 0) - normalizeValue(a.total_revenue_12months_reais || 0))
+        .sort((a, b) => safeValue(b.total_revenue_12months_reais || 0) - safeValue(a.total_revenue_12months_reais || 0))
         .slice(0, 5);
         
       const doctorStatsConverted: DoctorStats[] = topDoctors.map(doctor => ({
@@ -416,7 +417,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         hospitalName: doctor.primary_hospital_name || (doctor.hospitals_list || '').split(' | ')[0] || 'Hospital não informado',
         aihCount: Math.round((doctor.total_procedures_12months || 0) / 3), // Estimativa de AIHs
         procedureCount: doctor.total_procedures_12months || 0,
-        revenue: normalizeValue(doctor.total_revenue_12months_reais || 0),
+        revenue: safeValue(doctor.total_revenue_12months_reais || 0),
         avgConfidence: doctor.avg_payment_rate_12months || 0
       }));
       setDoctorStats(doctorStatsConverted);
@@ -548,7 +549,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <div className="text-xs text-gray-500 mt-1">
                     {hospitalRevenueStats.length > 0 && (
                       <span className="text-green-600">
-                        {formatCurrency(normalizeValue(hospitalRevenueStats[0]?.total_hospital_revenue_reais || 0))}
+                        {formatCurrency(safeValue(hospitalRevenueStats[0]?.total_hospital_revenue_reais || 0))}
                       </span>
                     )}
                   </div>
@@ -575,7 +576,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <div className="text-xs text-gray-500 mt-1">
                     {doctorsData.length > 0 && (
                       <span className="text-blue-600">
-                        {formatCurrency(normalizeValue(doctorsData[0]?.total_revenue_12months_reais || 0))}
+                        {formatCurrency(safeValue(doctorsData[0]?.total_revenue_12months_reais || 0))}
                       </span>
                     )}
                   </div>
@@ -602,7 +603,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <div className="text-xs text-gray-500 mt-1">
                     {billingStats && billingStats.byProcedure.length > 0 && (
                       <span className="text-purple-600">
-                        {formatCurrency(normalizeValue(billingStats.byProcedure[0]?.total_value || 0))}
+                        {formatCurrency(safeValue(billingStats.byProcedure[0]?.total_value || 0))}
                       </span>
                     )}
                   </div>
@@ -629,7 +630,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <div className="text-xs text-gray-500 mt-1">
                     {specialtyStats.length > 0 && (
                       <span className="text-orange-600">
-                        {formatCurrency(normalizeValue(specialtyStats[0]?.total_specialty_revenue_reais || 0))}
+                        {formatCurrency(safeValue(specialtyStats[0]?.total_specialty_revenue_reais || 0))}
                       </span>
                     )}
                   </div>
@@ -712,7 +713,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                         </div>
                         <div className="text-right">
                           <div className="text-xl font-bold text-green-700">
-                            {formatCurrency(normalizeValue(doctor.total_value))}
+                            {formatCurrency(safeValue(doctor.total_value))}
                           </div>
                           <div className="text-xs text-gray-600">
                             {((doctor.approved_aihs / doctor.total_aihs) * 100).toFixed(1)}% aprovação
@@ -730,7 +731,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                         </div>
                         <div>
                           <span className="text-gray-600">Ticket Médio:</span>
-                          <div className="font-semibold">{formatCurrency(normalizeValue(doctor.avg_value_per_aih))}</div>
+                          <div className="font-semibold">{formatCurrency(safeValue(doctor.avg_value_per_aih))}</div>
                         </div>
                         <div>
                           <span className="text-gray-600">Hospitais:</span>
@@ -763,82 +764,6 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
         {/* TAB: PROCEDIMENTOS */}
         <TabsContent value="procedures" className="space-y-6">
-          {/* KPIs de Procedimentos */}
-          {billingStats && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card className="border-purple-200 bg-purple-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <FileText className="h-8 w-8 text-purple-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-purple-700">Total de Procedimentos</p>
-                      <p className="text-2xl font-bold text-purple-800">
-                        {formatNumber(billingStats.byProcedure.reduce((sum, p) => sum + p.total_aihs, 0))}
-                      </p>
-                      <p className="text-xs text-purple-600 mt-1">
-                        Procedimentos realizados
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-blue-200 bg-blue-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <Activity className="h-8 w-8 text-blue-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-blue-700">Tipos Únicos</p>
-                      <p className="text-2xl font-bold text-blue-800">
-                        {formatNumber(billingStats.byProcedure.length)}
-                      </p>
-                      <p className="text-xs text-blue-600 mt-1">
-                        Códigos diferentes
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-green-200 bg-green-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <DollarSign className="h-8 w-8 text-green-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-green-700">Valor Total</p>
-                      <p className="text-2xl font-bold text-green-800">
-                        {formatCurrency(normalizeValue(billingStats.byProcedure.reduce((sum, p) => sum + p.total_value, 0)))}
-                      </p>
-                      <p className="text-xs text-green-600 mt-1">
-                        Faturamento dos procedimentos
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-orange-200 bg-orange-50">
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <TrendingUp className="h-8 w-8 text-orange-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-orange-700">Ticket Médio</p>
-                      <p className="text-2xl font-bold text-orange-800">
-                        {formatCurrency(normalizeValue(
-                          billingStats.byProcedure.reduce((sum, p) => sum + p.total_value, 0) /
-                          billingStats.byProcedure.reduce((sum, p) => sum + p.total_aihs, 0)
-                        ))}
-                      </p>
-                      <p className="text-xs text-orange-600 mt-1">
-                        Valor médio por procedimento
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -868,7 +793,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                         </div>
                         <div className="text-right">
                           <div className="text-xl font-bold text-purple-700">
-                            {formatCurrency(normalizeValue(procedure.total_value))}
+                            {formatCurrency(safeValue(procedure.total_aihs * procedure.avg_value_per_aih))}
                           </div>
                           <div className="text-xs text-gray-600">
                             {((procedure.approved_aihs / procedure.total_aihs) * 100).toFixed(1)}% aprovação
@@ -881,8 +806,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                           <div className="font-semibold">{procedure.total_aihs}</div>
                         </div>
                         <div>
-                          <span className="text-gray-600">Valor Médio:</span>
-                          <div className="font-semibold">{formatCurrency(normalizeValue(procedure.avg_value_per_aih))}</div>
+                          <span className="text-gray-600">Valor do Procedimento:</span>
+                          <div className="font-semibold">{formatCurrency(safeValue(procedure.avg_value_per_aih))}</div>
                         </div>
                         <div>
                           <span className="text-gray-600">Hospitais:</span>
