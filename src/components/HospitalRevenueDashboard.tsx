@@ -32,9 +32,32 @@ const debugLog = (message: string, ...args: any[]) => {
   }
 };
 
+// ✅ FUNÇÃO PARA ALTERNAR DEBUG GLOBALMENTE
 const toggleDebug = () => {
   DEBUG_ENABLED = !DEBUG_ENABLED;
   console.log(`🔧 DEBUG ${DEBUG_ENABLED ? 'HABILITADO' : 'DESABILITADO'}`);
+  
+  // Forçar re-render do componente
+  window.dispatchEvent(new Event('debug-toggled'));
+};
+
+// ✅ FUNÇÃO PARA LIMPAR DADOS E FORÇAR RECARGA
+const clearAndReload = () => {
+  console.log('🧹 Limpando dados e recarregando...');
+  
+  // Limpar localStorage se houver cache
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('hospital-revenue-cache');
+    localStorage.removeItem('hospital-procedures-cache');
+  }
+  
+  // Forçar garbage collection se disponível
+  if (typeof window !== 'undefined' && window.gc) {
+    window.gc();
+  }
+  
+  // Recarregar a página
+  window.location.reload();
 };
 
 // ✅ FUNÇÃO PARA FORMATAÇÃO DE MOEDA COM CORREÇÃO AUTOMÁTICA
@@ -70,49 +93,41 @@ const detectAndFixDecimalIssues = (value: number): number => {
   
   debugLog(`🔍 detectAndFixDecimalIssues - Valor: ${value}, Parte inteira: ${integerPart}, Parte decimal: ${decimalPart}`);
   
-  // CENÁRIO 1: Valor alto com casas decimais (provável em centavos)
-  // Ex: 123456.78 → 1234.56, 176095.00 → 1760.95
-  if (value > 50000 && decimalPart > 0) {
+  // ✅ CONSERVADOR: Só aplicar correções em valores MUITO altos (suspeitos de centavos)
+  // Valor válido para hospital: R$ 5.000 até R$ 100.000 é normal
+  // Só corrigir se valor > 200.000 (claramente em centavos)
+  
+  // CENÁRIO 1: Valores extremamente altos (quase certamente em centavos)
+  // Ex: 1234567.89 → 12345.67 (só se for > 200k)
+  if (value > 200000) {
     const candidate = value / 100;
-    debugLog(`🔍 detectAndFixDecimalIssues - Candidato para correção (÷100): ${candidate}`);
+    debugLog(`🔍 detectAndFixDecimalIssues - Valor muito alto detectado: ${value}, candidato: ${candidate}`);
     
-    // Se o candidato está numa faixa mais razoável para contexto hospitalar
-    if (candidate >= 500 && candidate <= 50000) {
-      debugLog(`✅ detectAndFixDecimalIssues - Correção aplicada (÷100): ${value} → ${candidate}`);
+    // Se o candidato está numa faixa razoável para contexto hospitalar (R$ 500 - R$ 100.000)
+    if (candidate >= 500 && candidate <= 100000) {
+      debugLog(`✅ detectAndFixDecimalIssues - Correção aplicada (valor muito alto): ${value} → ${candidate}`);
       return candidate;
     }
   }
   
-  // CENÁRIO 2: Valor inteiro muito alto (provável em centavos)
-  // Ex: 123456 → 1234.56, 176095 → 1760.95, 91485 → 914.85
-  if (value > 50000 && decimalPart === 0) {
+  // CENÁRIO 2: Detectar padrões específicos suspeitos (6+ dígitos sem decimais)
+  // Ex: 1234567 → 12345.67 (mas 19155 fica como está)
+  if (value > 100000 && decimalPart === 0 && String(value).length >= 6) {
     const candidate = value / 100;
-    debugLog(`🔍 detectAndFixDecimalIssues - Candidato para correção inteiro (÷100): ${candidate}`);
+    debugLog(`🔍 detectAndFixDecimalIssues - Padrão suspeito detectado: ${value} (${String(value).length} dígitos), candidato: ${candidate}`);
     
-    // Se o candidato está numa faixa mais razoável para contexto hospitalar
+    // Se o candidato está numa faixa razoável
     if (candidate >= 500 && candidate <= 50000) {
-      debugLog(`✅ detectAndFixDecimalIssues - Correção aplicada inteiro (÷100): ${value} → ${candidate}`);
+      debugLog(`✅ detectAndFixDecimalIssues - Correção aplicada (padrão suspeito): ${value} → ${candidate}`);
       return candidate;
     }
   }
   
-  // CENÁRIO 3: Detectar padrões específicos de centavos (mais conservador)
-  // Ex: 12345.67 pode ser 123.45 se for uma faixa suspeita
-  if (value > 10000 && value < 50000 && decimalPart > 0) {
-    const candidate = value / 100;
-    // Verificar se o candidato faz mais sentido baseado em contexto hospitalar
-    if (candidate >= 100 && candidate <= 5000) {
-      debugLog(`🔍 detectAndFixDecimalIssues - Candidato contextual: ${candidate}`);
-      // Aplicar correção apenas se o valor original parece suspeito (mais de 5 dígitos)
-      if (String(value).length > 5) {
-        debugLog(`✅ detectAndFixDecimalIssues - Correção contextual aplicada: ${value} → ${candidate}`);
-        return candidate;
-      }
-    }
-  }
+  // ✅ IMPORTANTE: Valores como 19155.09, 25000.50, etc. SÃO VÁLIDOS
+  // Não aplicar correção automática em valores entre R$ 1.000 - R$ 200.000
   
   // Se não precisa de correção, retornar o valor original
-  debugLog(`🔍 detectAndFixDecimalIssues - Valor mantido: ${value}`);
+  debugLog(`🔍 detectAndFixDecimalIssues - Valor mantido (válido): ${value}`);
   return value;
 };
 
@@ -139,85 +154,151 @@ const normalizeValue = (value: number | null | undefined): number => {
   return fixedValue;
 };
 
-// ✅ FUNÇÃO PARA BUSCAR FATURAMENTO REAL POR HOSPITAL USANDO VIEW
+// ✅ FUNÇÃO SIMPLIFICADA PARA BUSCAR FATURAMENTO USANDO VIEW OTIMIZADA
 const getRealHospitalRevenue = async (hospitalId: string): Promise<number> => {
   try {
-    console.log(`🔍 Buscando faturamento real para hospital: ${hospitalId}`);
+    console.log(`🔍 Buscando faturamento otimizado para hospital: ${hospitalId}`);
     
-    // Buscar dados da view de resumo hospitalar
-    const { data: summary, error } = await supabase
-      .from('v_hospital_procedure_summary')
-      .select('total_value, approved_value, rejected_value, pending_value')
+    // ✅ ESTRATÉGIA ÚNICA: Usar view otimizada v_hospital_revenue_optimized
+    const { data: optimizedData, error: optimizedError } = await supabase
+      .from('v_hospital_revenue_optimized')
+      .select(`
+        total_hospital_revenue_reais,
+        revenue_from_procedure_records,
+        revenue_from_total_value,
+        revenue_from_aihs,
+        revenue_from_doctors,
+        activity_status
+      `)
       .eq('hospital_id', hospitalId)
       .single();
 
-    if (error) {
-      console.error(`❌ Erro ao buscar dados da view para hospital ${hospitalId}:`, error);
-      // Fallback para busca direta nas AIHs
-      return await getFallbackHospitalRevenue(hospitalId);
+    if (!optimizedError && optimizedData) {
+      const revenueReais = Number(optimizedData.total_hospital_revenue_reais || 0);
+      
+      debugLog(`✅ View Otimizada - Hospital ${hospitalId}:`);
+      debugLog(`  - Total Consolidado: R$ ${revenueReais.toFixed(2)}`);
+      debugLog(`  - Procedure Records: R$ ${Number(optimizedData.revenue_from_procedure_records || 0).toFixed(2)}`);
+      debugLog(`  - Total Value: R$ ${Number(optimizedData.revenue_from_total_value || 0).toFixed(2)}`);
+      debugLog(`  - AIHs: R$ ${Number(optimizedData.revenue_from_aihs || 0).toFixed(2)}`);
+      debugLog(`  - Doctors: R$ ${Number(optimizedData.revenue_from_doctors || 0).toFixed(2)}`);
+      debugLog(`  - Status: ${optimizedData.activity_status}`);
+      
+      if (revenueReais > 0) {
+        return revenueReais;
+      }
     }
+    
+    // ✅ FALLBACK: Se view otimizada não funcionar, usar v_hospital_financial_summary
+    const { data: summaryData, error: summaryError } = await supabase
+      .from('v_hospital_financial_summary')
+      .select('total_hospital_revenue_reais, avg_revenue_per_doctor, total_procedures')
+      .eq('hospital_id', hospitalId)
+      .single();
 
-    if (!summary) {
-      console.log(`ℹ️ Nenhum dado encontrado na view para hospital ${hospitalId}`);
-      return await getFallbackHospitalRevenue(hospitalId);
+    if (!summaryError && summaryData) {
+      const fallbackRevenue = Number(summaryData.total_hospital_revenue_reais || 0);
+      
+      debugLog(`✅ Fallback Summary - Hospital ${hospitalId}: R$ ${fallbackRevenue.toFixed(2)}`);
+      
+      if (fallbackRevenue > 0) {
+        return fallbackRevenue;
+      }
     }
+    
+    // ✅ ÚLTIMO RECURSO: Buscar dados da view padrão v_hospital_revenue_stats
+    const { data: defaultData, error: defaultError } = await supabase
+      .from('v_hospital_revenue_stats')
+      .select('total_hospital_revenue_reais, total_hospital_revenue_cents')
+      .eq('hospital_id', hospitalId)
+      .single();
 
-    // Usar valor total da view (já processado e normalizado)
-    const rawTotalValue = Number(summary.total_value || 0);
-    const rawApprovedValue = Number(summary.approved_value || 0);
+    if (!defaultError && defaultData) {
+      const defaultRevenueReais = Number(defaultData.total_hospital_revenue_reais || 0);
+      const defaultRevenueCents = Number(defaultData.total_hospital_revenue_cents || 0);
+      
+      // ✅ CONFIANÇA NA VIEW: Se vem de total_hospital_revenue_reais, já está correto
+      // Só aplicar normalização se for dos centavos (campo legado)
+      const finalRevenue = defaultRevenueReais > 0 ? defaultRevenueReais : normalizeValue(defaultRevenueCents);
+      
+      debugLog(`✅ Default View - Hospital ${hospitalId}: R$ ${finalRevenue.toFixed(2)}`);
+      
+      if (finalRevenue > 0) {
+        return finalRevenue;
+      }
+    }
     
-    // 🔍 DEBUG: Log valores antes da normalização
-    debugLog(`🔍 Hospital ${hospitalId} - Valores RAW da view: total=${rawTotalValue}, approved=${rawApprovedValue}`);
-    
-    const totalValue = normalizeValue(rawTotalValue);
-    const approvedValue = normalizeValue(rawApprovedValue);
-
-    debugLog(`✅ Hospital ${hospitalId}: Total: R$ ${totalValue.toFixed(2)} | Aprovado: R$ ${approvedValue.toFixed(2)}`);
-    
-    // Retornar valor aprovado (mais confiável) ou total se não houver aprovado
-    const finalValue = approvedValue > 0 ? approvedValue : totalValue;
-    debugLog(`🔍 Hospital ${hospitalId} - Valor final retornado: ${finalValue}`);
-    return finalValue;
+    // ✅ FALLBACK FINAL: Busca direta nas tabelas
+    debugLog(`🔄 Fallback Final - Hospital ${hospitalId}: Buscando dados diretos`);
+    return await getFallbackHospitalRevenue(hospitalId);
     
   } catch (error) {
-    console.error(`❌ Erro ao buscar faturamento via view do hospital ${hospitalId}:`, error);
+    console.error(`❌ Erro ao buscar faturamento otimizado do hospital ${hospitalId}:`, error);
     return await getFallbackHospitalRevenue(hospitalId);
   }
 };
 
-// ✅ FUNÇÃO FALLBACK PARA BUSCAR DIRETAMENTE DAS AIHS
+// ✅ FUNÇÃO FALLBACK APRIMORADA PARA BUSCAR DIRETAMENTE DAS AIHS
 const getFallbackHospitalRevenue = async (hospitalId: string): Promise<number> => {
   try {
-    const { data: aihs, error } = await supabase
+    debugLog(`🔄 Fallback - Buscando faturamento direto das AIHs para hospital: ${hospitalId}`);
+    
+    // Buscar primeiro nas AIHs
+    const { data: aihs, error: aihError } = await supabase
       .from('aihs')
-      .select('calculated_total_value, original_value')
-      .eq('hospital_id', hospitalId);
+      .select('calculated_total_value, original_value, approved_value')
+      .eq('hospital_id', hospitalId)
+      .limit(1000); // Limitar para evitar consultas muito grandes
 
-    if (error || !aihs || aihs.length === 0) {
-      return 0;
+    if (!aihError && aihs && aihs.length > 0) {
+      const totalRevenue = aihs.reduce((sum, aih) => {
+        // Priorizar: approved_value > calculated_total_value > original_value
+        const rawValue = Number(aih.approved_value || aih.calculated_total_value || aih.original_value || 0);
+        const normalizedValue = normalizeValue(rawValue);
+        return sum + normalizedValue;
+      }, 0);
+
+      debugLog(`✅ Fallback AIHs - Hospital ${hospitalId}: ${aihs.length} AIHs = R$ ${totalRevenue.toFixed(2)}`);
+      
+      if (totalRevenue > 0) {
+        return totalRevenue;
+      }
+    }
+    
+    // Buscar nos procedure_records como último recurso
+    const { data: procedures, error: procError } = await supabase
+      .from('procedure_records')
+      .select('total_value_cents, value_charged, approved_value')
+      .eq('hospital_id', hospitalId)
+      .limit(1000);
+
+    if (!procError && procedures && procedures.length > 0) {
+      const totalRevenue = procedures.reduce((sum, proc) => {
+        const rawValue = Number(proc.approved_value || proc.value_charged || proc.total_value_cents || 0);
+        const normalizedValue = normalizeValue(rawValue);
+        return sum + normalizedValue;
+      }, 0);
+
+      debugLog(`✅ Fallback Procedures - Hospital ${hospitalId}: ${procedures.length} procedures = R$ ${totalRevenue.toFixed(2)}`);
+      return totalRevenue;
     }
 
-    const totalRevenue = aihs.reduce((sum, aih) => {
-      const rawValue = Number(aih.calculated_total_value || aih.original_value || 0);
-      const normalizedValue = normalizeValue(rawValue);
-      return sum + normalizedValue;
-    }, 0);
-
-    console.log(`🔄 Fallback Hospital ${hospitalId}: ${aihs.length} AIHs = R$ ${totalRevenue.toFixed(2)}`);
-    return totalRevenue;
+    debugLog(`⚠️ Fallback - Hospital ${hospitalId}: Nenhum dado encontrado`);
+    return 0;
+    
   } catch (error) {
     console.error(`❌ Erro no fallback para hospital ${hospitalId}:`, error);
     return 0;
   }
 };
 
-// ✅ FUNÇÃO PARA BUSCAR PROCEDIMENTOS DETALHADOS POR HOSPITAL USANDO VIEWS
+// ✅ FUNÇÃO APRIMORADA PARA BUSCAR PROCEDIMENTOS DETALHADOS POR HOSPITAL
 const getHospitalProcedures = async (hospitalId: string) => {
   try {
     console.log(`🔍 Buscando procedimentos para hospital: ${hospitalId}`);
     
-    // Buscar dados agregados da view de procedimentos por hospital
-    const { data: procedures, error } = await supabase
+    // ✅ ESTRATÉGIA 1: Buscar dados agregados da view de procedimentos por hospital
+    const { data: procedures, error: viewError } = await supabase
       .from('v_procedures_by_hospital')
       .select(`
         procedure_code,
@@ -235,45 +316,204 @@ const getHospitalProcedures = async (hospitalId: string) => {
       .eq('hospital_id', hospitalId)
       .order('total_value_charged', { ascending: false });
 
-    if (error) {
-      console.error(`❌ Erro ao buscar procedimentos da view para hospital ${hospitalId}:`, error);
-      return await getFallbackHospitalProcedures(hospitalId);
+    if (!viewError && procedures && procedures.length > 0) {
+      // Processar dados da view (já agregados)
+      const procedureStats = procedures.map((proc: any) => ({
+        code: proc.procedure_code,
+        description: proc.procedure_description || 'Descrição não disponível',
+        complexity: proc.procedure_complexity,
+        count: Number(proc.total_occurrences || 0),
+        totalValue: normalizeValue(Number(proc.total_value_charged || 0)),
+        approvedValue: normalizeValue(Number(proc.approved_value || 0)),
+        avgValue: normalizeValue(Number(proc.avg_value_charged || 0)),
+        baseValue: normalizeValue(Number(proc.procedure_base_value || 0)),
+        totalAIHs: Number(proc.total_aihs || 0),
+        totalPatients: Number(proc.total_patients || 0)
+      }));
+
+      const totalCount = procedureStats.reduce((sum, p) => sum + p.count, 0);
+      const totalValue = procedureStats.reduce((sum, p) => sum + p.totalValue, 0);
+
+      debugLog(`✅ Estratégia 1 - Hospital ${hospitalId}: ${totalCount} procedimentos = ${procedureStats.length} tipos únicos = R$ ${totalValue.toFixed(2)}`);
+      
+      return {
+        procedures: procedureStats,
+        count: totalCount,
+        totalValue,
+        uniqueTypes: procedureStats.length
+      };
     }
 
-    if (!procedures || procedures.length === 0) {
-      console.log(`ℹ️ Nenhum procedimento encontrado na view para hospital ${hospitalId}`);
-      return await getFallbackHospitalProcedures(hospitalId);
+    // ✅ ESTRATÉGIA 2: Buscar dados da view v_hospital_procedure_summary
+    const { data: summary, error: summaryError } = await supabase
+      .from('v_hospital_procedure_summary')
+      .select(`
+        total_procedures,
+        unique_procedures,
+        total_value,
+        approved_value,
+        total_aihs,
+        total_patients
+      `)
+      .eq('hospital_id', hospitalId)
+      .single();
+
+    if (!summaryError && summary) {
+      const totalCount = Number(summary.total_procedures || 0);
+      const uniqueTypes = Number(summary.unique_procedures || 0);
+      const totalValue = normalizeValue(Number(summary.total_value || 0));
+      const approvedValue = normalizeValue(Number(summary.approved_value || 0));
+      
+      debugLog(`✅ Estratégia 2 - Hospital ${hospitalId}: ${totalCount} procedimentos = ${uniqueTypes} tipos únicos = R$ ${totalValue.toFixed(2)}`);
+      
+      // Gerar procedimentos genéricos baseados no resumo
+      const genericProcedures = [];
+      if (totalCount > 0) {
+        genericProcedures.push({
+          code: 'SUMMARY',
+          description: 'Resumo Geral de Procedimentos',
+          complexity: 'VARIADA',
+          count: totalCount,
+          totalValue: totalValue,
+          approvedValue: approvedValue,
+          avgValue: totalCount > 0 ? totalValue / totalCount : 0,
+          baseValue: 0,
+          totalAIHs: Number(summary.total_aihs || 0),
+          totalPatients: Number(summary.total_patients || 0)
+        });
+      }
+      
+      return {
+        procedures: genericProcedures,
+        count: totalCount,
+        totalValue,
+        uniqueTypes: uniqueTypes
+      };
     }
 
-    // Processar dados da view (já agregados)
-    const procedureStats = procedures.map((proc: any) => ({
-      code: proc.procedure_code,
-      description: proc.procedure_description || 'Descrição não disponível',
-      complexity: proc.procedure_complexity,
-      count: Number(proc.total_occurrences || 0),
-      totalValue: normalizeValue(Number(proc.total_value_charged || 0)),
-      approvedValue: normalizeValue(Number(proc.approved_value || 0)),
-      avgValue: normalizeValue(Number(proc.avg_value_charged || 0)),
-      baseValue: normalizeValue(Number(proc.procedure_base_value || 0)),
-      totalAIHs: Number(proc.total_aihs || 0),
-      totalPatients: Number(proc.total_patients || 0)
-    }));
+    // ✅ ESTRATÉGIA 3: Buscar dados direto dos procedure_records
+    const { data: procedureRecords, error: recordsError } = await supabase
+      .from('procedure_records')
+      .select(`
+        procedure_code,
+        procedure_description,
+        value_charged,
+        approved_value,
+        total_value_cents,
+        quantity,
+        approved
+      `)
+      .eq('hospital_id', hospitalId)
+      .limit(1000);
 
-    const totalCount = procedureStats.reduce((sum, p) => sum + p.count, 0);
-    const totalValue = procedureStats.reduce((sum, p) => sum + p.totalValue, 0);
+    if (!recordsError && procedureRecords && procedureRecords.length > 0) {
+      // Agrupar procedimentos por código
+      const procedureMap = new Map();
+      let totalValue = 0;
+      let totalCount = 0;
 
-    console.log(`✅ Hospital ${hospitalId}: ${totalCount} procedimentos = ${procedureStats.length} tipos únicos = R$ ${totalValue.toFixed(2)}`);
-    
-    return {
-      procedures: procedureStats,
-      count: totalCount,
-      totalValue,
-      uniqueTypes: procedureStats.length
-    };
+      procedureRecords.forEach((proc: any) => {
+        const code = proc.procedure_code;
+        const value = normalizeValue(Number(proc.approved_value || proc.value_charged || proc.total_value_cents || 0));
+        const quantity = Number(proc.quantity || 1);
+        const isApproved = proc.approved === true;
+        
+        totalValue += value * quantity;
+        totalCount += quantity;
+
+        if (!procedureMap.has(code)) {
+          procedureMap.set(code, {
+            code: code,
+            description: proc.procedure_description || 'Descrição não disponível',
+            count: 0,
+            totalValue: 0,
+            approvedValue: 0,
+            avgValue: 0,
+            approvedCount: 0
+          });
+        }
+
+        const stats = procedureMap.get(code);
+        stats.count += quantity;
+        stats.totalValue += value * quantity;
+        if (isApproved) {
+          stats.approvedValue += value * quantity;
+          stats.approvedCount += quantity;
+        }
+        stats.avgValue = stats.totalValue / stats.count;
+      });
+
+      const procedureStats = Array.from(procedureMap.values())
+        .sort((a, b) => b.totalValue - a.totalValue);
+
+      debugLog(`✅ Estratégia 3 - Hospital ${hospitalId}: ${totalCount} procedimentos = ${procedureStats.length} tipos únicos = R$ ${totalValue.toFixed(2)}`);
+      
+      return {
+        procedures: procedureStats,
+        count: totalCount,
+        totalValue,
+        uniqueTypes: procedureStats.length
+      };
+    }
+
+    // ✅ ESTRATÉGIA 4: Fallback para buscar dados das AIHs
+    const { data: aihProcedures, error: aihError } = await supabase
+      .from('aihs')
+      .select(`
+        procedure_code,
+        procedure_description,
+        calculated_total_value,
+        original_value,
+        approved_value
+      `)
+      .eq('hospital_id', hospitalId)
+      .limit(500);
+
+    if (!aihError && aihProcedures && aihProcedures.length > 0) {
+      const procedureMap = new Map();
+      let totalValue = 0;
+
+      aihProcedures.forEach((aih: any) => {
+        const code = aih.procedure_code;
+        const value = normalizeValue(Number(aih.approved_value || aih.calculated_total_value || aih.original_value || 0));
+        
+        totalValue += value;
+
+        if (!procedureMap.has(code)) {
+          procedureMap.set(code, {
+            code: code,
+            description: aih.procedure_description || 'Descrição não disponível',
+            count: 0,
+            totalValue: 0,
+            avgValue: 0
+          });
+        }
+
+        const stats = procedureMap.get(code);
+        stats.count += 1;
+        stats.totalValue += value;
+        stats.avgValue = stats.totalValue / stats.count;
+      });
+
+      const procedureStats = Array.from(procedureMap.values())
+        .sort((a, b) => b.totalValue - a.totalValue);
+
+      debugLog(`✅ Estratégia 4 - Hospital ${hospitalId}: ${aihProcedures.length} AIHs = ${procedureStats.length} tipos únicos = R$ ${totalValue.toFixed(2)}`);
+      
+      return {
+        procedures: procedureStats,
+        count: aihProcedures.length,
+        totalValue,
+        uniqueTypes: procedureStats.length
+      };
+    }
+
+    debugLog(`⚠️ Hospital ${hospitalId}: Nenhum procedimento encontrado em nenhuma fonte`);
+    return { procedures: [], count: 0, totalValue: 0, uniqueTypes: 0 };
     
   } catch (error) {
-    console.error(`❌ Erro ao buscar procedimentos via view do hospital ${hospitalId}:`, error);
-    return await getFallbackHospitalProcedures(hospitalId);
+    console.error(`❌ Erro ao buscar procedimentos do hospital ${hospitalId}:`, error);
+    return { procedures: [], count: 0, totalValue: 0, uniqueTypes: 0 };
   }
 };
 
@@ -394,6 +634,38 @@ const HospitalRevenueDashboard: React.FC = () => {
   const [hospitalsSummary, setHospitalsSummary] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isReloadingSpecific, setIsReloadingSpecific] = useState<string | null>(null);
+
+  // ✅ FUNÇÃO PARA RECARREGAR DADOS DE UM HOSPITAL ESPECÍFICO
+  const reloadSpecificHospital = async (hospitalId: string) => {
+    try {
+      setIsReloadingSpecific(hospitalId);
+      debugLog(`🔄 Recarregando dados específicos do hospital: ${hospitalId}`);
+      
+      const [realRev, procedures] = await Promise.all([
+        getRealHospitalRevenue(hospitalId),
+        getHospitalProcedures(hospitalId)
+      ]);
+      
+      // Atualizar apenas os dados deste hospital
+      setRealRevenue(prev => ({
+        ...prev,
+        [hospitalId]: realRev
+      }));
+      
+      setHospitalProcedures(prev => ({
+        ...prev,
+        [hospitalId]: procedures
+      }));
+      
+      debugLog(`✅ Dados do hospital ${hospitalId} recarregados: Revenue=${realRev}, Procedures=${procedures.count}`);
+      
+    } catch (error) {
+      console.error(`❌ Erro ao recarregar hospital ${hospitalId}:`, error);
+    } finally {
+      setIsReloadingSpecific(null);
+    }
+  };
 
   const loadHospitalStats = async () => {
     try {
@@ -475,16 +747,10 @@ const HospitalRevenueDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Carregando dados dos hospitais...</p>
         </div>
       </div>
     );
@@ -492,27 +758,21 @@ const HospitalRevenueDashboard: React.FC = () => {
 
   if (error) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-red-600 flex items-center">
-            <AlertTriangle className="w-5 h-5 mr-2" />
-            Erro ao Carregar Hospitais
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <AlertTriangle className="h-8 w-8 mx-auto mb-4 text-red-600" />
           <p className="text-red-600 mb-4">{error}</p>
           <Button onClick={loadHospitalStats} variant="outline">
-            <RefreshCw className="w-4 h-4 mr-2" />
             Tentar Novamente
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Cabeçalho atualizado */}
+      {/* ✅ CORREÇÃO: Cabeçalho com botões de debug */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">
@@ -527,11 +787,118 @@ const HospitalRevenueDashboard: React.FC = () => {
             )}
           </p>
         </div>
-        <Button onClick={loadHospitalStats} variant="outline" size="sm">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Atualizar
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            onClick={toggleDebug}
+            variant={DEBUG_ENABLED ? "default" : "outline"}
+            size="sm"
+            className={DEBUG_ENABLED ? "bg-yellow-500 hover:bg-yellow-600" : ""}
+          >
+            {DEBUG_ENABLED ? "🔍 Debug ON" : "🔍 Debug OFF"}
+          </Button>
+          <Button onClick={loadHospitalStats} variant="outline" size="sm">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Atualizar
+          </Button>
+          <Button onClick={clearAndReload} variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Limpar Cache
+          </Button>
+        </div>
       </div>
+
+      {/* ✅ CORREÇÃO: Seção de informações de debug */}
+      {DEBUG_ENABLED && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <h3 className="text-sm font-bold text-yellow-800 mb-2">🔍 INFORMAÇÕES DE DEBUG</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-yellow-700 mb-4">
+            <div>
+              <strong>Hospitais:</strong> {hospitalStats.length}
+            </div>
+            <div>
+              <strong>Médicos únicos:</strong> {uniqueDoctors.length}
+            </div>
+            <div>
+              <strong>Revenue carregado:</strong> {Object.keys(realRevenue).length}
+            </div>
+            <div>
+              <strong>Procedures carregado:</strong> {Object.keys(hospitalProcedures).length}
+            </div>
+          </div>
+          
+          {/* ✅ NOVO: Resumo detalhado dos dados */}
+          <div className="border-t border-yellow-300 pt-3">
+            <h4 className="text-xs font-bold text-yellow-800 mb-2">📊 RESUMO DETALHADO</h4>
+            <div className="space-y-2 text-xs text-yellow-700">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <strong>Faturamento Total:</strong> {formatCurrency(totalRealRevenue)}
+                </div>
+                <div>
+                  <strong>Média por Hospital:</strong> {formatCurrency(avgRevenuePerHospital)}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <strong>Procedimentos:</strong> {totalProceduresCount.toLocaleString('pt-BR')}
+                </div>
+                <div>
+                  <strong>AIHs:</strong> {totalAIHsCount.toLocaleString('pt-BR')}
+                </div>
+                <div>
+                  <strong>Pacientes:</strong> {totalPatientsCount.toLocaleString('pt-BR')}
+                </div>
+              </div>
+              
+              {/* ✅ NOVO: Validação de dados */}
+              <div className="border-t border-yellow-300 pt-2 mt-2">
+                <strong>Validação de Dados:</strong>
+                <div className="ml-2 space-y-1">
+                  <div className={hospitalStats.length > 0 ? "text-green-700" : "text-red-700"}>
+                    ✓ Hospitais: {hospitalStats.length > 0 ? "OK" : "ERRO - Nenhum hospital"}
+                  </div>
+                  <div className={uniqueDoctors.length > 0 ? "text-green-700" : "text-red-700"}>
+                    ✓ Médicos: {uniqueDoctors.length > 0 ? "OK" : "ERRO - Nenhum médico"}
+                  </div>
+                  <div className={Object.keys(realRevenue).length > 0 ? "text-green-700" : "text-red-700"}>
+                    ✓ Revenue: {Object.keys(realRevenue).length > 0 ? "OK" : "ERRO - Nenhuma receita"}
+                  </div>
+                  <div className={Object.keys(hospitalProcedures).length > 0 ? "text-green-700" : "text-red-700"}>
+                    ✓ Procedures: {Object.keys(hospitalProcedures).length > 0 ? "OK" : "ERRO - Nenhum procedimento"}
+                  </div>
+                </div>
+              </div>
+              
+              {/* ✅ NOVO: Problemas identificados */}
+              <div className="border-t border-yellow-300 pt-2 mt-2">
+                <strong>Problemas Identificados:</strong>
+                <div className="ml-2 space-y-1">
+                  {hospitalStats.filter(h => !realRevenue[h.hospital_id] || realRevenue[h.hospital_id] === 0).length > 0 && (
+                    <div className="text-red-700">
+                      ⚠️ {hospitalStats.filter(h => !realRevenue[h.hospital_id] || realRevenue[h.hospital_id] === 0).length} hospitais sem revenue
+                    </div>
+                  )}
+                  {hospitalStats.filter(h => !hospitalProcedures[h.hospital_id] || hospitalProcedures[h.hospital_id].count === 0).length > 0 && (
+                    <div className="text-red-700">
+                      ⚠️ {hospitalStats.filter(h => !hospitalProcedures[h.hospital_id] || hospitalProcedures[h.hospital_id].count === 0).length} hospitais sem procedures
+                    </div>
+                  )}
+                  {uniqueDoctors.filter(d => !d.hospital_ids || d.hospital_ids.length === 0).length > 0 && (
+                    <div className="text-red-700">
+                      ⚠️ {uniqueDoctors.filter(d => !d.hospital_ids || d.hospital_ids.length === 0).length} médicos sem hospital
+                    </div>
+                  )}
+                  {Object.values(realRevenue).filter(r => r > 1000000).length > 0 && (
+                    <div className="text-orange-700">
+                      ⚠️ {Object.values(realRevenue).filter(r => r > 1000000).length} hospitais com revenue suspeito ({'>'}1M)
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KPIs Corrigidos */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -597,13 +964,32 @@ const HospitalRevenueDashboard: React.FC = () => {
           ) : (
             <div className="space-y-6">
               {hospitalStats.map((hospital, index) => (
-                <HospitalCard 
-                  key={hospital.hospital_id || index} 
-                  hospital={hospital} 
-                  uniqueDoctors={uniqueDoctors}
-                  realRevenue={realRevenue[hospital.hospital_id] || 0}
-                  proceduresData={hospitalProcedures[hospital.hospital_id] || { procedures: [], count: 0, uniqueTypes: 0 }}
-                />
+                <div key={hospital.hospital_id || index} className="relative">
+                  <HospitalCard 
+                    hospital={hospital} 
+                    uniqueDoctors={uniqueDoctors}
+                    realRevenue={realRevenue[hospital.hospital_id] || 0}
+                    proceduresData={hospitalProcedures[hospital.hospital_id] || { procedures: [], count: 0, uniqueTypes: 0 }}
+                  />
+                  {/* ✅ NOVO: Botão de reload específico */}
+                  {DEBUG_ENABLED && (
+                    <div className="absolute top-2 right-2">
+                      <Button
+                        onClick={() => reloadSpecificHospital(hospital.hospital_id)}
+                        variant="ghost"
+                        size="sm"
+                        disabled={isReloadingSpecific === hospital.hospital_id}
+                        className="text-xs"
+                      >
+                        {isReloadingSpecific === hospital.hospital_id ? (
+                          <RefreshCw className="w-3 h-3 animate-spin" />
+                        ) : (
+                          "🔄"
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -639,13 +1025,101 @@ interface HospitalCardProps {
 
 const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, realRevenue, proceduresData }) => {
   
-  // Filtrar médicos deste hospital
-  const hospitalDoctors = uniqueDoctors.filter(doctor => 
-    doctor.hospital_ids && doctor.hospital_ids.split(',').includes(hospital.hospital_id)
-  );
+  // ✅ CORREÇÃO: Filtrar médicos deste hospital com validação mais robusta
+  const hospitalDoctors = uniqueDoctors.filter(doctor => {
+    if (!doctor.hospital_ids || !hospital.hospital_id) return false;
+    
+    // Buscar pelo ID do hospital na lista de IDs
+    const hospitalIds = doctor.hospital_ids.split(',').map(id => id.trim());
+    return hospitalIds.includes(hospital.hospital_id);
+  });
 
   const activeDoctors = hospitalDoctors.filter(d => d.activity_status === 'ATIVO');
   const doctorsWithMultipleHospitals = hospitalDoctors.filter(d => d.hospitals_count > 1);
+
+  // ✅ CORREÇÃO: Lógica para especialidade principal com fallback
+  const getTopSpecialty = (): string => {
+    // 1. Tentar usar especialidade da view
+    if (hospital.top_specialty_by_revenue && hospital.top_specialty_by_revenue !== 'N/A') {
+      return hospital.top_specialty_by_revenue;
+    }
+    
+    // 2. Calcular especialidade com maior faturamento dos médicos
+    const specialtyRevenue = hospitalDoctors.reduce((acc, doctor) => {
+      const specialty = doctor.doctor_specialty || 'Não informado';
+      const revenue = doctor.total_revenue_12months_reais || 0;
+      
+      if (!acc[specialty]) {
+        acc[specialty] = { total: 0, count: 0 };
+      }
+      acc[specialty].total += revenue;
+      acc[specialty].count += 1;
+      
+      return acc;
+    }, {} as Record<string, { total: number; count: number }>);
+    
+    // Encontrar especialidade com maior faturamento
+    const topSpecialty = Object.entries(specialtyRevenue)
+      .sort(([,a], [,b]) => b.total - a.total)[0];
+    
+    if (topSpecialty && topSpecialty[1].total > 0) {
+      return topSpecialty[0];
+    }
+    
+    // 3. Fallback para especialidade mais comum
+    const mostCommonSpecialty = hospitalDoctors
+      .map(d => d.doctor_specialty)
+      .filter(s => s && s !== 'Não informado')
+      .reduce((acc, specialty) => {
+        acc[specialty] = (acc[specialty] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+    
+    const commonSpecialty = Object.entries(mostCommonSpecialty)
+      .sort(([,a], [,b]) => b - a)[0];
+    
+    return commonSpecialty ? commonSpecialty[0] : 'Não informado';
+  };
+
+  // ✅ CORREÇÃO: Função para formatar números grandes
+  const formatNumber = (num: number): string => {
+    if (num === 0) return '0';
+    
+    // Para números grandes, usar formatação compacta
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M';
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    
+    return num.toLocaleString('pt-BR');
+  };
+
+  // ✅ CORREÇÃO: Validar e normalizar dados de procedimentos
+  const procedureCount = proceduresData?.count || 0;
+  const procedureTypes = proceduresData?.uniqueTypes || 0;
+  const procedureValue = proceduresData?.totalValue || 0;
+
+  // ✅ CORREÇÃO: Validar faturamento sem aplicar correções automáticas
+  // Como os dados vêm das views otimizadas do banco, eles já estão corretos
+  const validateRevenue = (revenue: number): number => {
+    if (revenue == null || isNaN(revenue)) return 0;
+    
+    // ✅ CONFIANÇA NO BANCO: Se o valor vem das views, está correto
+    // Só verificar se é um número válido
+    const cleanRevenue = Number(revenue);
+    
+    // Log para debug
+    debugLog(`🔍 HospitalCard [${hospital.hospital_name}] - Revenue (sem correção): ${cleanRevenue}`);
+    
+    return cleanRevenue;
+  };
+
+  const validatedRevenue = validateRevenue(realRevenue);
+  
+  // ✅ CORREÇÃO: Como não aplicamos correções automáticas, nunca há "correção"
+  // O valor sempre será exibido normalmente em verde
+  const revenueWasCorrected = false;
 
   return (
     <div className="p-6 border rounded-lg hover:bg-gray-50 transition-colors">
@@ -671,99 +1145,114 @@ const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, re
         </div>
       </div>
 
-      {/* Métricas do Hospital */}
+      {/* ✅ CORREÇÃO: Métricas do Hospital com formatação correta */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* 1. INDICADOR: MÉDICOS */}
         <div className="bg-blue-50 p-3 rounded-lg">
           <div className="flex items-center">
             <Users className="w-4 h-4 text-blue-600 mr-2" />
             <span className="text-xs text-blue-600 font-medium">Médicos</span>
           </div>
           <p className="text-lg font-bold text-blue-900 mt-1">
-            {hospitalDoctors.length}
+            {formatNumber(hospitalDoctors.length)}
           </p>
           <p className="text-xs text-blue-600">
             {activeDoctors.length} ativos
+            {doctorsWithMultipleHospitals.length > 0 && (
+              <span className="text-orange-600 ml-1">
+                • {doctorsWithMultipleHospitals.length} múltiplos
+              </span>
+            )}
           </p>
         </div>
 
+        {/* 2. INDICADOR: FATURAMENTO */}
         <div className="bg-green-50 p-3 rounded-lg">
           <div className="flex items-center">
             <DollarSign className="w-4 h-4 text-green-600 mr-2" />
             <span className="text-xs text-green-600 font-medium">Faturamento</span>
           </div>
           <p className="text-lg font-bold text-green-900 mt-1">
-            {(() => {
-              // 🔍 DEBUG: Log do valor no card de Faturamento
-              debugLog(`🔍 Card Faturamento [${hospital.hospital_name}] - realRevenue: ${realRevenue} (tipo: ${typeof realRevenue})`);
-              
-              // Verificar se o valor será corrigido
-              const originalValue = realRevenue;
-              const correctedValue = detectAndFixDecimalIssues(originalValue);
-              const wasCorrected = correctedValue !== originalValue;
-              
-              return (
-                <span className={wasCorrected ? 'text-orange-700' : ''}>
-                  {formatCurrency(realRevenue)}
-                  {wasCorrected && (
-                    <span className="text-xs text-orange-500 ml-1" title={`Valor original: ${originalValue}`}>
-                      *
-                    </span>
-                  )}
+            <span className={revenueWasCorrected ? 'text-orange-700' : ''}>
+              {formatCurrency(validatedRevenue)}
+              {revenueWasCorrected && (
+                <span className="text-xs text-orange-500 ml-1" title={`Valor original: ${realRevenue}`}>
+                  *
                 </span>
-              );
-            })()}
+              )}
+            </span>
           </p>
           <p className="text-xs text-green-600">
-            {(() => {
-              if (realRevenue === 0) return 'Sem dados';
-              
-              const originalValue = realRevenue;
-              const correctedValue = detectAndFixDecimalIssues(originalValue);
-              const wasCorrected = correctedValue !== originalValue;
-              
-                             if (wasCorrected) {
-                 return (
-                   <span className="text-orange-600">
-                     Valor corrigido (era R$ {originalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
-                   </span>
-                 );
-               }
-              
-              return 'Valor aprovado';
-            })()}
+            {validatedRevenue === 0 ? 'Sem dados' : (
+              revenueWasCorrected ? (
+                <span className="text-orange-600">
+                  Valor corrigido
+                </span>
+              ) : 'Valor aprovado'
+            )}
           </p>
         </div>
 
+        {/* 3. INDICADOR: PROCEDIMENTOS */}
         <div className="bg-purple-50 p-3 rounded-lg">
           <div className="flex items-center">
             <BarChart3 className="w-4 h-4 text-purple-600 mr-2" />
             <span className="text-xs text-purple-600 font-medium">Procedimentos</span>
           </div>
           <p className="text-lg font-bold text-purple-900 mt-1">
-            {proceduresData.count.toLocaleString('pt-BR')}
+            {formatNumber(procedureCount)}
           </p>
           <p className="text-xs text-purple-600">
-            {proceduresData.uniqueTypes} tipos únicos
+            {procedureTypes > 0 ? (
+              <>
+                {formatNumber(procedureTypes)} tipos únicos
+                {procedureValue > 0 && (
+                  <span className="block text-xs text-gray-600 mt-1">
+                    Valor: {formatCurrency(procedureValue)}
+                  </span>
+                )}
+              </>
+            ) : 'Sem dados'}
           </p>
         </div>
 
+        {/* 4. INDICADOR: ESPECIALIDADE */}
         <div className="bg-gray-50 p-3 rounded-lg">
           <div className="flex items-center">
             <TrendingUp className="w-4 h-4 text-gray-600 mr-2" />
             <span className="text-xs text-gray-600 font-medium">Especialidade</span>
           </div>
           <p className="text-sm font-bold text-gray-900 mt-1">
-            {hospital.top_specialty_by_revenue || 'N/A'}
+            {getTopSpecialty()}
           </p>
-          <p className="text-xs text-gray-600">top faturamento</p>
+          <p className="text-xs text-gray-600">
+            {hospitalDoctors.length > 0 ? (
+              <>
+                top faturamento
+                {hospitalDoctors.length > 1 && (
+                  <span className="block text-xs text-gray-500 mt-1">
+                    {hospitalDoctors.length} especialidades
+                  </span>
+                )}
+              </>
+            ) : 'Sem dados'}
+          </p>
         </div>
       </div>
 
-
-
-
-
-
+      {/* ✅ NOVO: Seção de debug (removível em produção) */}
+      {DEBUG_ENABLED && (
+        <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+          <h5 className="text-xs font-bold text-yellow-800 mb-2">🔍 DEBUG INFO</h5>
+          <div className="text-xs text-yellow-700 space-y-1">
+            <div>Médicos Filtrados: {hospitalDoctors.length} / {uniqueDoctors.length}</div>
+            <div>Revenue Original: {realRevenue}</div>
+            <div>Revenue Corrigido: {validatedRevenue}</div>
+            <div>Procedimentos: {procedureCount} ({procedureTypes} tipos)</div>
+            <div>Especialidade: {getTopSpecialty()}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
