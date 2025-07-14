@@ -28,7 +28,7 @@ import { AIHBillingService, type CompleteBillingStats } from '../services/aihBil
 import { supabase } from '../lib/supabase';
 import HospitalRevenueDashboard from './HospitalRevenueDashboard';
 import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
-import { DoctorPatientsDropdown } from './DoctorPatientsDropdown';
+import MedicalProductionDashboard from './MedicalProductionDashboard';
 
 // ✅ FUNÇÃO OTIMIZADA PARA FORMATAR VALORES MONETÁRIOS
 const formatCurrency = (value: number | null | undefined): string => {
@@ -669,80 +669,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
         {/* TAB: MÉDICOS */}
         <TabsContent value="doctors" className="space-y-6">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-green-600" />
-                Produção Médica
-              </CardTitle>
-              <CardDescription>
-                Todos os médicos que estão produzindo para a empresa
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {billingStats && billingStats.byDoctor.length > 0 ? (
-                <div className="space-y-4">
-                  {billingStats.byDoctor
-                    .filter(doctor => doctor.total_aihs > 0) // Apenas médicos com procedimentos
-                    .map((doctor, index) => (
-                    <div key={doctor.doctor_id} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
-                            {index + 1}
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900">{doctor.doctor_name}</h4>
-                            <div className="text-sm text-gray-600">
-                              CNS: {doctor.doctor_cns || doctor.doctor_crm || 'Não informado'} | {doctor.doctor_specialty}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xl font-bold text-green-700">
-                            {formatCurrency(safeValue(doctor.total_value))}
-                          </div>
-                          <div className="text-xs text-gray-600">
-                            {((doctor.approved_aihs / doctor.total_aihs) * 100).toFixed(1)}% aprovação
-                          </div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-600">AIHs Total:</span>
-                          <div className="font-semibold">{doctor.total_aihs}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">AIHs Aprovadas:</span>
-                          <div className="font-semibold text-green-700">{doctor.approved_aihs}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Ticket Médio:</span>
-                          <div className="font-semibold">{formatCurrency(safeValue(doctor.avg_value_per_aih))}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Hospitais:</span>
-                          <div className="font-semibold">{doctor.unique_hospitals}</div>
-                        </div>
-                      </div>
-                      
-                      {/* ✅ NOVO: Dropdown de Pacientes e Procedimentos */}
-                      <DoctorPatientsDropdown
-                        doctorName={doctor.doctor_name}
-                        doctorCns={doctor.doctor_cns || doctor.doctor_crm || ''}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <div className="text-lg">Aguardando dados dos médicos</div>
-                  <div className="text-sm">Processe algumas AIHs para ver o ranking</div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <MedicalProductionDashboard />
         </TabsContent>
 
         {/* TAB: PROCEDIMENTOS */}
