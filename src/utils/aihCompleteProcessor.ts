@@ -603,7 +603,10 @@ export class AIHCompleteProcessor {
           
           // Status inicial - APROVADO por padrão
           matchStatus: 'approved',
-          aprovado: true
+          aprovado: true,
+          
+          // 🆕 CAMPO QUANTIDADE - PADRÃO 1
+          quantity: 1
         };
 
         if (procedimento.procedimento) {
@@ -845,7 +848,10 @@ export class AIHCompleteProcessor {
           data: this.findDateField(parts) || '',
           descricao: this.findDescriptionField(parts, line) || '',
           matchStatus: 'approved',
-          aprovado: true
+          aprovado: true,
+          
+          // 🆕 CAMPO QUANTIDADE - PADRÃO 1
+          quantity: 1
         };
         
         // ✅ PROCEDIMENTO JÁ FILTRADO pelo pré-filtro - adicionar diretamente

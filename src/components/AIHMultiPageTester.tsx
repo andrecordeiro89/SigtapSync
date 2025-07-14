@@ -225,8 +225,58 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       variant: "destructive"
     });
   };
-  
 
+  // 🆕 FUNÇÃO CORRIGIDA: Gerenciar alteração de quantidade
+  const handleQuantityChange = (sequencia: number, newQuantity: number) => {
+    if (newQuantity < 1 || newQuantity > 99 || isNaN(newQuantity)) return;
+    
+    const updatedAIH = {
+      ...aihCompleta,
+      procedimentos: aihCompleta.procedimentos.map(proc => {
+        if (proc.sequencia === sequencia) {
+          // ✅ USAR SEMPRE O VALOR UNITÁRIO JÁ ARMAZENADO (SH + SP de 1 unidade)
+          const valorUnitario = proc.valorUnitario || 0;
+          const valorUnitarioSH = proc.valorCalculadoSH ? proc.valorCalculadoSH / (proc.quantity || 1) : 0;
+          const valorUnitarioSP = proc.valorCalculadoSP ? proc.valorCalculadoSP / (proc.quantity || 1) : 0;
+          
+          return {
+            ...proc,
+            quantity: newQuantity,
+            valorUnitario: valorUnitario,
+            valorCalculado: valorUnitario * newQuantity,
+            // ✅ RECALCULAR SH E SP SEPARADAMENTE
+            valorCalculadoSH: valorUnitarioSH * newQuantity,
+            valorCalculadoSP: valorUnitarioSP * newQuantity
+          };
+        }
+        return proc;
+      })
+    };
+    
+    // Recalcular valores totais da AIH
+    const recalculatedAIH = calculateTotalsWithQuantity(updatedAIH);
+    onUpdateAIH(recalculatedAIH);
+    
+    toast({
+      title: "📊 Quantidade alterada",
+      description: `Procedimento ${sequencia}: ${newQuantity}x = ${(updatedAIH.procedimentos.find(p => p.sequencia === sequencia)?.valorCalculado || 0).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})}`,
+    });
+  };
+
+  // 🆕 FUNÇÃO SIMPLIFICADA: Calcular totais considerando quantidade (valores já corretos)
+  const calculateTotalsWithQuantity = (aih: AIHComplete): AIHComplete => {
+    // ✅ Os valores já estão corretos, só preciso recalcular o total geral
+    const valorTotal = aih.procedimentos
+      .filter(p => p.aceitar !== false) // Incluir apenas procedimentos aceitos
+      .reduce((sum, proc) => sum + (proc.valorCalculado || 0), 0);
+    
+    return {
+      ...aih,
+      valorTotalCalculado: valorTotal,
+      procedimentosAprovados: aih.procedimentos.filter(p => p.aceitar !== false).length,
+      procedimentosRejeitados: aih.procedimentos.filter(p => p.aceitar === false).length
+    };
+  };
 
   // ✅ FUNÇÃO ATUALIZADA: Calcular totais aplicando lógica SUS (incluindo Instrumento 04)
   const calculateTotalsWithPercentage = (procedimentos: ProcedureAIH[]): AIHComplete => {
@@ -294,13 +344,14 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
         return {
           ...proc,
           porcentagemSUS: 100, // Sempre 100% para Instrumento 04
-          valorCalculado: valorSH + valorSP, // ✅ CORREÇÃO: SH + SP apenas (sem SA)
+          valorCalculado: (valorSH + valorSP) * (proc.quantity || 1), // ✅ CORREÇÃO: SH + SP × quantidade
           valorOriginal: valorSH + valorSP,  // ✅ CORREÇÃO: SH + SP apenas (sem SA)
+          valorUnitario: valorSH + valorSP,  // 🆕 VALOR UNITÁRIO (SH + SP de 1 unidade)
           // Campos específicos para Instrumento 04
           isInstrument04: true,
           instrument04Rule: 'Instrumento 04 - AIH (Proc. Especial) - Sempre 100%',
-          valorCalculadoSH: valorSH,
-          valorCalculadoSP: valorSP,
+          valorCalculadoSH: valorSH * (proc.quantity || 1),
+          valorCalculadoSP: valorSP * (proc.quantity || 1),
           valorCalculadoSA: valorSA, // Mantido para exibição informativa
           isSpecialRule: true, // Marcar como regra especial para interface
           regraEspecial: 'Instrumento 04 - AIH (Proc. Especial)'
@@ -337,11 +388,12 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
         return {
           ...proc,
           porcentagemSUS: hospPercentage, // Para compatibilidade com interface
-          valorCalculado: valorTotalCalculado,        // ✅ CORREÇÃO: SH + SP apenas
+          valorCalculado: valorTotalCalculado * (proc.quantity || 1), // ✅ CORREÇÃO: SH + SP × quantidade
           valorOriginal: valorSH + valorSP,           // ✅ CORREÇÃO: SH + SP apenas
+          valorUnitario: valorTotalCalculado,         // 🆕 VALOR UNITÁRIO (SH + SP de 1 unidade)
           // Campos adicionais para cirurgias especiais
-          valorCalculadoSH: valorSHCalculado,
-          valorCalculadoSP: valorSPCalculado,
+          valorCalculadoSH: valorSHCalculado * (proc.quantity || 1),
+          valorCalculadoSP: valorSPCalculado * (proc.quantity || 1),
           valorCalculadoSA: valorSACalculado, // Mantido para exibição informativa
           regraEspecial: `${regraEspecialPrincipal.rule.type} - ${regraEspecialPrincipal.procedureName}`,
           isSpecialRule: true,
@@ -379,11 +431,12 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       return {
         ...proc,
         porcentagemSUS: porcentagem,
-        valorCalculado: valorTotalCalculado,        // ✅ CORREÇÃO: SH + SP apenas
+        valorCalculado: valorTotalCalculado * (proc.quantity || 1), // ✅ CORREÇÃO: SH + SP × quantidade
         valorOriginal: valorSH + valorSP,           // ✅ CORREÇÃO: SH + SP apenas
+        valorUnitario: valorTotalCalculado,         // 🆕 VALOR UNITÁRIO (SH + SP de 1 unidade)
         // ✅ ADICIONAR CAMPOS SP E SH PARA PROCEDIMENTOS NORMAIS
-        valorCalculadoSH: valorSHCalculado,
-        valorCalculadoSP: valorSPCalculado,
+        valorCalculadoSH: valorSHCalculado * (proc.quantity || 1),
+        valorCalculadoSP: valorSPCalculado * (proc.quantity || 1),
         valorCalculadoSA: valorSACalculado, // Mantido para exibição informativa
         isSpecialRule: false,
         isInstrument04: false,
@@ -1097,6 +1150,14 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                   <TableHead className="w-12 text-center">Seq</TableHead>
                   <TableHead className="w-28">Código</TableHead>
                   <TableHead>Procedimento</TableHead>
+                  <TableHead className="w-20 text-center">
+                    <div className="flex items-center justify-center space-x-1">
+                      <span className="text-sm font-semibold">Qtd</span>
+                      <div className="w-3 h-3 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-[8px] text-blue-600 font-bold">#</span>
+                      </div>
+                    </div>
+                  </TableHead>
                   <TableHead className="w-80 text-center">Valores</TableHead>
                   <TableHead className="w-12 text-center">+</TableHead>
                   <TableHead className="w-8 text-center"></TableHead>
@@ -1127,6 +1188,84 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                           )}
                         </div>
                       </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center w-full min-w-[60px]">
+                          <div className="relative inline-flex items-center">
+                            {/* Container do input com controles */}
+                            <div className="relative flex items-center bg-white rounded-lg border-2 border-gray-200 
+                                          hover:border-blue-300 shadow-sm hover:shadow-md transition-all duration-200
+                                          focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 focus-within:shadow-lg">
+                              
+                              {/* Botão decrementar */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentQty = procedure.quantity || 1;
+                                  if (currentQty > 1) {
+                                    handleQuantityChange(procedure.sequencia, currentQty - 1);
+                                  }
+                                }}
+                                className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-600 
+                                         hover:bg-blue-50 rounded-l-md transition-colors duration-150
+                                         disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={(procedure.quantity || 1) <= 1}
+                                title="Diminuir quantidade"
+                              >
+                                <span className="text-sm font-bold">−</span>
+                              </button>
+
+                              {/* Input central */}
+                              <input
+                                type="number"
+                                min="1"
+                                max="99"
+                                value={procedure.quantity || 1}
+                                onChange={(e) => handleQuantityChange(procedure.sequencia, Number(e.target.value))}
+                                className="w-10 h-6 px-1 text-sm font-semibold text-center border-0 bg-transparent
+                                         focus:outline-none focus:ring-0 appearance-none"
+                                title={`Quantidade do procedimento (atual: ${procedure.quantity || 1})`}
+                                onBlur={(e) => {
+                                  const value = Number(e.target.value);
+                                  if (value < 1) {
+                                    e.target.value = "1";
+                                    handleQuantityChange(procedure.sequencia, 1);
+                                  }
+                                  if (value > 99) {
+                                    e.target.value = "99";
+                                    handleQuantityChange(procedure.sequencia, 99);
+                                  }
+                                }}
+                              />
+
+                              {/* Botão incrementar */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentQty = procedure.quantity || 1;
+                                  if (currentQty < 99) {
+                                    handleQuantityChange(procedure.sequencia, currentQty + 1);
+                                  }
+                                }}
+                                className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-600 
+                                         hover:bg-blue-50 rounded-r-md transition-colors duration-150
+                                         disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={(procedure.quantity || 1) >= 99}
+                                title="Aumentar quantidade"
+                              >
+                                <span className="text-sm font-bold">+</span>
+                              </button>
+
+                              {/* Indicador visual para quantidade > 1 */}
+                              {procedure.quantity && procedure.quantity > 1 && (
+                                <div className="absolute -top-2 -right-2 w-4 h-4 bg-gradient-to-r from-blue-500 to-blue-600 
+                                               rounded-full flex items-center justify-center shadow-lg">
+                                  <span className="text-[10px] font-bold text-white">×</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         {/* COLUNA VALORES - EXIBINDO AUTOMATICAMENTE SP + SH */}
                         {procedure.sigtapProcedure && (procedure.valorCalculadoSH !== undefined || procedure.valorCalculadoSP !== undefined) ? (
@@ -1136,7 +1275,11 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                             </div>
                             <div className="flex flex-col items-center gap-1">
                               <div className="text-xs text-gray-500">
-                                SP + SH
+                                SP + SH {procedure.quantity && procedure.quantity > 1 && (
+                                  <span className="text-blue-600 font-medium">
+                                    ({formatCurrency(((procedure.valorCalculadoSH || 0) + (procedure.valorCalculadoSP || 0)) / procedure.quantity)} × {procedure.quantity})
+                                  </span>
+                                )}
                               </div>
                               <div className="flex justify-center">
                                 {procedure.isInstrument04 ? (
@@ -1162,7 +1305,11 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                             </div>
                             <div className="flex flex-col items-center gap-1">
                               <div className="text-xs text-gray-500">
-                                Valor Total
+                                Valor Total {procedure.quantity && procedure.quantity > 1 && (
+                                  <span className="text-blue-600 font-medium">
+                                    ({formatCurrency(procedure.valorCalculado / procedure.quantity)} × {procedure.quantity})
+                                  </span>
+                                )}
                               </div>
                               <div className="flex justify-center">
                                 {procedure.isInstrument04 ? (
@@ -1228,6 +1375,16 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                               <div className="bg-white p-3 rounded border text-sm space-y-1">
                                 <p><span className="font-medium">CBO:</span> {procedure.cbo}</p>
                                 <p><span className="font-medium">Data:</span> {procedure.data}</p>
+                                <p><span className="font-medium">Quantidade:</span> 
+                                  <span className="ml-1 px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                                    {procedure.quantity || 1}x
+                                  </span>
+                                  {procedure.quantity && procedure.quantity > 1 && procedure.valorUnitario && (
+                                    <span className="ml-2 text-xs text-gray-500">
+                                      (Unit: {formatCurrency(procedure.valorUnitario)})
+                                    </span>
+                                  )}
+                                </p>
                                 <div className="flex items-start gap-2">
                           <span className="font-medium min-w-[80px]">Participação:</span>
                           <ParticipationDisplay code={procedure.participacao} />

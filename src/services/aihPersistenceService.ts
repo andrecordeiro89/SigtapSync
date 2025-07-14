@@ -1247,7 +1247,8 @@ export class AIHPersistenceService {
               notes: procedure.observacoes || '',
               aih_number: aihCompleta.numeroAIH,
               care_modality: aihCompleta.modalidade,
-              care_character: aihCompleta.caracterAtendimento
+              care_character: aihCompleta.caracterAtendimento,
+              quantity: procedure.quantity || 1 // 🆕 NOVO: Campo quantidade
             });
 
             proceduresSaved++;
@@ -1367,8 +1368,8 @@ export class AIHPersistenceService {
       professional_cns: data.professional_document || 'N/A',
       
       // Valores financeiros (em centavos)
-      quantity: 1,
-      unit_value: Math.round((data.calculated_value || 0) * 100),
+      quantity: data.quantity || 1, // 🆕 USAR QUANTIDADE DO PROCEDIMENTO
+      unit_value: Math.round(((data.calculated_value || 0) / (data.quantity || 1)) * 100), // Valor unitário
       total_value: Math.round((data.calculated_value || 0) * 100),
       value_charged: Math.round((data.calculated_value || 0) * 100), // Campo obrigatório!
       

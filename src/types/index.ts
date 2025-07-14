@@ -362,6 +362,10 @@ export interface ProcedureAIH {
   valorOriginal?: number;
   observacoes?: string;
   
+  // 🆕 NOVO: Campo quantidade para multiplicação de valores
+  quantity?: number; // Quantidade do procedimento (padrão: 1)
+  valorUnitario?: number; // Valor unitário para referência
+  
   // Lógica de porcentagem SUS
   porcentagemSUS?: number; // Porcentagem a ser aplicada no valor (padrão: 100% para principal, 70% para secundários)
   
