@@ -778,123 +778,116 @@ const PatientManagement = () => {
           ) : (
             <div className="space-y-4">
               {paginatedData.map((item) => (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow bg-white">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4 flex-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleExpandAIH(item.id)}
-                        className="text-gray-500 hover:text-gray-700"
-                      >
-                        {expandedItems.has(item.id) ? 
-                          <ChevronUp className="w-5 h-5" /> : 
-                          <ChevronDown className="w-5 h-5" />
-                        }
-                      </Button>
+                <div key={item.id} className="border border-gray-200 rounded-xl bg-white hover:shadow-lg transition-all duration-300 hover:border-blue-300 overflow-hidden">
+                  {/* Header Compacto */}
+                  <div className="bg-gradient-to-r from-slate-50 to-gray-50 p-4 border-b border-gray-100">
+                    <div className="flex items-center justify-between">
+                      {/* Lado Esquerdo: Info Principal */}
+                      <div className="flex items-center space-x-4 flex-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleExpandAIH(item.id)}
+                          className="text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors p-2"
+                        >
+                          {expandedItems.has(item.id) ? 
+                            <ChevronUp className="w-4 h-4" /> : 
+                            <ChevronDown className="w-4 h-4" />
+                          }
+                        </Button>
 
-                      <div className="flex-1">
-                        {/* Nome do Paciente - Destaque Principal */}
-                        <div className="mb-2">
-                          <h2 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
-                            <User className="w-5 h-5 text-blue-600" />
-                            <span>{item.patients?.name || 'Paciente não identificado'}</span>
-                          </h2>
-                        </div>
-
-                        {/* Informações da AIH */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-                          <div className="flex items-center space-x-2">
-                            <FileText className="w-4 h-4 text-gray-500" />
-                            <div>
-                              <p className="text-xs text-gray-500 uppercase tracking-wide">AIH</p>
-                              <p className="font-semibold text-gray-900">{item.aih_number}</p>
+                        <div className="flex-1 min-w-0">
+                          {/* Nome do Paciente */}
+                          <div className="flex items-center space-x-2 mb-1">
+                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <User className="w-4 h-4 text-blue-600" />
                             </div>
+                            <h3 className="font-semibold text-gray-900 truncate text-lg">
+                              {item.patients?.name || 'Paciente não identificado'}
+                            </h3>
+                            <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700 text-xs">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Processada
+                            </Badge>
                           </div>
 
-                          <div className="flex items-center space-x-2">
-                            <Calendar className="w-4 h-4 text-gray-500" />
-                            <div>
-                              <p className="text-xs text-gray-500 uppercase tracking-wide">Admissão</p>
-                              <p className="font-medium text-gray-700">{formatDate(item.admission_date)}</p>
+                          {/* Info Row Compacta */}
+                          <div className="flex items-center space-x-6 text-sm text-gray-600">
+                            <div className="flex items-center space-x-1">
+                              <FileText className="w-3 h-3" />
+                              <span className="font-medium">{item.aih_number}</span>
                             </div>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <Activity className="w-4 h-4 text-gray-500" />
-                            <div>
-                              <p className="text-xs text-gray-500 uppercase tracking-wide">CID Principal</p>
-                              <p className="font-medium text-gray-700">{item.main_cid}</p>
+                            <div className="flex items-center space-x-1">
+                              <Calendar className="w-3 h-3" />
+                              <span>{formatDate(item.admission_date)}</span>
                             </div>
+                            <div className="flex items-center space-x-1">
+                              <Activity className="w-3 h-3" />
+                              <span>{item.main_cid}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <CreditCard className="w-3 h-3" />
+                              <span>CNS: {item.patients?.cns || 'N/A'}</span>
+                            </div>
+                            {item.specialty && (
+                              <div className="flex items-center space-x-1">
+                                <Stethoscope className="w-3 h-3" />
+                                <span className="truncate">{item.specialty}</span>
+                              </div>
+                            )}
                           </div>
-                        </div>
-
-                        {/* CNS e Informações Adicionais */}
-                        <div className="mt-3 flex items-center space-x-4 text-sm text-gray-600">
-                          <span className="flex items-center space-x-1">
-                            <CreditCard className="w-4 h-4" />
-                            <span>CNS: {item.patients?.cns || 'Não informado'}</span>
-                          </span>
-                          {item.specialty && (
-                            <span className="flex items-center space-x-1">
-                              <Stethoscope className="w-4 h-4" />
-                              <span>{item.specialty}</span>
-                            </span>
-                          )}
-                          <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Processada
-                          </Badge>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex flex-col items-end space-y-2">
-                      {/* Badge do Operador */}
-                      <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100">
-                        <User className="w-3 h-3 mr-1" />
-                        {item.processed_by_name || 'Sistema'}
-                      </Badge>
-                      
-                      {/* Badge da Data/Hora */}
-                      <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        {item.processed_at_formatted}
-                      </Badge>
-                      
-                      {/* Badge do Valor */}
-                      {(aihTotalValues[item.id] !== undefined || item.calculated_total_value) && (
-                        <Badge variant="outline" className="bg-green-50 border-green-200 text-green-800 hover:bg-green-100 font-semibold">
-                          <DollarSign className="w-3 h-3 mr-1" />
-                          {formatCurrency(aihTotalValues[item.id] !== undefined ? aihTotalValues[item.id] : item.calculated_total_value)}
-                          {aihTotalValues[item.id] !== undefined && (
-                            <span className="ml-1 text-xs text-green-600">●</span>
-                          )}
+                      {/* Lado Direito: Badges Organizados */}
+                      <div className="flex items-center space-x-3">
+                        {/* Badge do Valor Faturável */}
+                        {(aihTotalValues[item.id] !== undefined || item.calculated_total_value) && (
+                          <Badge variant="outline" className="bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-400 hover:from-green-600 hover:to-emerald-700 px-3 py-1 shadow-sm">
+                            <DollarSign className="w-3 h-3 mr-1" />
+                            <span className="font-semibold">
+                              {formatCurrency(aihTotalValues[item.id] !== undefined ? aihTotalValues[item.id] : item.calculated_total_value)}
+                            </span>
+                            {aihTotalValues[item.id] !== undefined && (
+                              <span className="ml-1 text-xs opacity-90">●</span>
+                            )}
+                          </Badge>
+                        )}
+
+                        {/* Badge do Operador */}
+                        <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100">
+                          <User className="w-3 h-3 mr-1" />
+                          <span>{item.processed_by_name || 'Sistema'}</span>
                         </Badge>
-                      )}
-                      
-                      {/* NOVO: Botão de Exclusão para Operadores */}
-                      {(() => {
-                        const userRole = user?.role as string;
-                        const hasPermission = (['operator', 'coordinator', 'director', 'admin'] as const).includes(userRole as any);
                         
-                        return hasPermission && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteRequest('aih', item.id, item.aih_number)}
-                            className="flex items-center space-x-1 text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 bg-red-50 hover:bg-red-100 transition-colors text-xs px-2 py-1"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            <span>Excluir</span>
-                          </Button>
-                        );
-                      })()}
+                        {/* Badge da Data de Processamento */}
+                        <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          <span>{item.processed_at_formatted}</span>
+                        </Badge>
+                        
+                        {/* Botão de Exclusão */}
+                        {(() => {
+                          const userRole = user?.role as string;
+                          const hasPermission = (['operator', 'coordinator', 'director', 'admin'] as const).includes(userRole as any);
+                          
+                          return hasPermission && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteRequest('aih', item.id, item.aih_number)}
+                              className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors p-2 ml-2"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
 
                   {expandedItems.has(item.id) && (
-                    <div className="mt-4 pt-4 border-t space-y-4">
+                    <div className="bg-gray-50/50 p-4 space-y-3">
                       {/* NOVO: Resumo Executivo */}
                       <AIHExecutiveSummary 
                         aih={{
@@ -911,55 +904,109 @@ const PatientManagement = () => {
                         onRefresh={() => loadAIHProcedures(item.id)}
                       />
 
-                      {/* Informações do Paciente */}
-                      {item.patient && (
-                        <div className="bg-blue-50 p-3 rounded-lg">
-                          <h4 className="font-semibold text-blue-900 mb-2">👤 Informações do Paciente</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                            <p><span className="font-medium">Nome:</span> {item.patient.name}</p>
-                            <p><span className="font-medium">CNS:</span> {item.patient.cns}</p>
-                            <p><span className="font-medium">Data Nascimento:</span> {formatDate(item.patient.birth_date)}</p>
-                            <p><span className="font-medium">Gênero:</span> {item.patient.gender === 'M' ? 'Masculino' : 'Feminino'}</p>
-                            {item.patient.medical_record && (
-                              <p><span className="font-medium">Prontuário:</span> {item.patient.medical_record}</p>
+                      {/* Grid Compacto de Informações */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        {/* Informações do Paciente */}
+                        {item.patient && (
+                          <div className="bg-white rounded-lg border border-blue-200 p-3">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <User className="w-3 h-3 text-blue-600" />
+                              </div>
+                              <h4 className="font-semibold text-blue-900 text-sm">Dados do Paciente</h4>
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                              <div>
+                                <span className="text-gray-500">Nome:</span>
+                                <p className="font-medium text-gray-900 truncate">{item.patient.name}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">CNS:</span>
+                                <p className="font-medium text-gray-900">{item.patient.cns}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Nascimento:</span>
+                                <p className="font-medium text-gray-900">{formatDate(item.patient.birth_date)}</p>
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Gênero:</span>
+                                <p className="font-medium text-gray-900">{item.patient.gender === 'M' ? 'Masculino' : 'Feminino'}</p>
+                              </div>
+                              {item.patient.medical_record && (
+                                <div className="col-span-2">
+                                  <span className="text-gray-500">Prontuário:</span>
+                                  <p className="font-medium text-gray-900">{item.patient.medical_record}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Informações da AIH */}
+                        <div className="bg-white rounded-lg border border-gray-200 p-3">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <div className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center">
+                              <FileText className="w-3 h-3 text-gray-600" />
+                            </div>
+                            <h4 className="font-semibold text-gray-900 text-sm">Detalhes da AIH</h4>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                            <div>
+                              <span className="text-gray-500">Código Proc:</span>
+                              <p className="font-medium text-gray-900">{item.procedure_code}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">CID Principal:</span>
+                              <p className="font-medium text-gray-900">{item.main_cid}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Admissão:</span>
+                              <p className="font-medium text-gray-900">{formatDate(item.admission_date)}</p>
+                            </div>
+                            {item.discharge_date && (
+                              <div>
+                                <span className="text-gray-500">Alta:</span>
+                                <p className="font-medium text-gray-900">{formatDate(item.discharge_date)}</p>
+                              </div>
+                            )}
+                            <div>
+                              <span className="text-gray-500">Situação:</span>
+                              <p className="font-medium text-gray-900">{item.aih_situation || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Caráter:</span>
+                              <p className="font-medium text-gray-900">{item.care_character || 'N/A'}</p>
+                            </div>
+                            {item.specialty && (
+                              <div className="col-span-2">
+                                <span className="text-gray-500">Especialidade:</span>
+                                <p className="font-medium text-gray-900">{item.specialty}</p>
+                              </div>
                             )}
                           </div>
                         </div>
-                      )}
-
-                      {/* Informações da AIH */}
-                      <div className="bg-gray-50 p-3 rounded-lg">
-                        <h4 className="font-semibold text-gray-900 mb-2">📋 Detalhes da AIH</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                          <p><span className="font-medium">Código Proc:</span> {item.procedure_code}</p>
-                          <p><span className="font-medium">CID Principal:</span> {item.main_cid}</p>
-                          <p><span className="font-medium">Admissão:</span> {formatDate(item.admission_date)}</p>
-                          {item.discharge_date && (
-                            <p><span className="font-medium">Alta:</span> {formatDate(item.discharge_date)}</p>
-                          )}
-                          <p><span className="font-medium">Situação:</span> {item.aih_situation || 'N/A'}</p>
-                          <p><span className="font-medium">Caráter:</span> {item.care_character || 'N/A'}</p>
-                          {item.specialty && (
-                            <p><span className="font-medium">Especialidade:</span> {item.specialty}</p>
-                          )}
-                        </div>
                       </div>
 
-                      {/* Matches Encontrados */}
+                      {/* Matches Encontrados - Compacto */}
                       {item.matches.length > 0 && (
-                        <div className="bg-green-50 p-3 rounded-lg">
-                          <h4 className="font-semibold text-green-900 mb-2">🎯 Matches Encontrados ({item.matches.length})</h4>
+                        <div className="bg-white rounded-lg border border-green-200 p-3">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <div className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center">
+                              <CheckCircle className="w-3 h-3 text-green-600" />
+                            </div>
+                            <h4 className="font-semibold text-green-900 text-sm">Matches SIGTAP ({item.matches.length})</h4>
+                          </div>
                           <div className="space-y-2">
                             {item.matches.map((match, index) => (
-                              <div key={match.id} className="flex items-center justify-between p-2 bg-white rounded border">
+                              <div key={match.id} className="flex items-center justify-between p-2 bg-green-50 rounded-lg border border-green-100">
                                 <div className="flex items-center space-x-2">
                                   {getScoreBadge(match.overall_score)}
-                                  <span className="text-sm">Match #{index + 1}</span>
+                                  <span className="text-xs font-medium text-green-800">Match #{index + 1}</span>
                                 </div>
-                                <div className="flex items-center space-x-2 text-sm">
-                                  <span>Confiança: {match.match_confidence}%</span>
+                                <div className="flex items-center space-x-3 text-xs">
+                                  <span className="text-green-700">Confiança: {match.match_confidence}%</span>
                                   {isDirector && (
-                                    <span>💰 {formatCurrency(match.calculated_total)}</span>
+                                    <span className="font-semibold text-green-800">{formatCurrency(match.calculated_total)}</span>
                                   )}
                                 </div>
                               </div>
@@ -968,43 +1015,45 @@ const PatientManagement = () => {
                         </div>
                       )}
 
-                      {/* NOVO: Gerenciamento Inline de Procedimentos */}
+                      {/* NOVO: Gerenciamento Inline de Procedimentos - Compacto */}
                       {proceduresData[item.id] && proceduresData[item.id].length > 0 && (
-                        <div className="bg-slate-50 p-4 rounded-lg">
+                        <div className="bg-white rounded-lg border border-slate-200 p-3">
                           <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-semibold text-slate-900 flex items-center space-x-2">
-                              <FileText className="w-4 h-4" />
-                              <span>Procedimentos ({proceduresData[item.id].length})</span>
-                            </h4>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-6 h-6 bg-slate-100 rounded-lg flex items-center justify-center">
+                                <FileText className="w-3 h-3 text-slate-600" />
+                              </div>
+                              <h4 className="font-semibold text-slate-900 text-sm">
+                                Procedimentos ({proceduresData[item.id].length})
+                              </h4>
+                            </div>
                             {loadingProcedures[item.id] && (
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
                             )}
                           </div>
                           
-                          {/* 🎯 NOVO: Resumo de Valores por Status */}
+                          {/* 🎯 Resumo Financeiro Compacto */}
                           {aihTotalValues[item.id] !== undefined && (
-                            <div className="mb-4 p-3 bg-white rounded-lg border border-slate-200">
-                              <h5 className="font-medium text-slate-800 mb-2 flex items-center">
-                                <DollarSign className="w-4 h-4 mr-1" />
-                                Resumo Financeiro da AIH
-                              </h5>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div className="mb-3 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                              <div className="flex items-center space-x-1 mb-1">
+                                <DollarSign className="w-3 h-3 text-slate-600" />
+                                <span className="text-xs font-medium text-slate-800">Resumo Financeiro</span>
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
                                 {(() => {
                                   const approved = proceduresData[item.id].filter(p => p.match_status === 'matched' || p.match_status === 'manual');
-                                  
                                   const approvedValue = approved.reduce((sum, p) => sum + (p.value_charged || p.sigtap_procedures?.value_hosp_total || 0), 0);
                                   
                                   return (
                                     <>
-                                      <div className="text-center p-2 bg-green-50 rounded border border-green-200">
-                                        <p className="font-medium text-green-800">{approved.length}</p>
-                                        <p className="text-xs text-green-600">Aprovados</p>
-                                        <p className="text-xs font-semibold text-green-700">{formatCurrency(approvedValue)}</p>
+                                      <div className="flex items-center space-x-2">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                        <span className="text-gray-600">{approved.length} aprovados</span>
+                                        <span className="font-semibold text-green-700">{formatCurrency(approvedValue)}</span>
                                       </div>
-                                      <div className="text-center p-2 bg-blue-50 rounded border border-blue-200">
-                                        <p className="font-semibold text-blue-800">{formatCurrency(aihTotalValues[item.id])}</p>
-                                        <p className="text-xs text-blue-600">TOTAL FATURÁVEL</p>
-                                        <p className="text-xs text-blue-500">({approved.length} proc.)</p>
+                                      <div className="flex items-center space-x-1">
+                                        <span className="text-gray-500">Total:</span>
+                                        <span className="font-bold text-blue-800">{formatCurrency(aihTotalValues[item.id])}</span>
                                       </div>
                                     </>
                                   );
@@ -1013,7 +1062,7 @@ const PatientManagement = () => {
                             </div>
                           )}
                           
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             {proceduresData[item.id].map((procedure) => (
                               <ProcedureInlineCard
                                 key={`${procedure.aih_id}_${procedure.procedure_sequence}`}
@@ -1032,18 +1081,23 @@ const PatientManagement = () => {
                         </div>
                       )}
 
-                      {/* Ações Rápidas da AIH */}
+                      {/* Ações Administrativas - Compactas */}
                       {(user?.role === 'admin' || user?.role === 'director' || user?.role === 'coordinator') && (
-                        <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-                          <h4 className="font-semibold text-red-900 mb-3">🗑️ Ações de Exclusão</h4>
+                        <div className="bg-white rounded-lg border border-red-200 p-3">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <div className="w-6 h-6 bg-red-100 rounded-lg flex items-center justify-center">
+                              <Trash2 className="w-3 h-3 text-red-600" />
+                            </div>
+                            <h4 className="font-semibold text-red-900 text-sm">Ações de Exclusão</h4>
+                          </div>
                           <div className="flex flex-wrap gap-2">
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => handleDeleteRequest('aih', item.id, item.aih_number)}
-                              className="flex items-center space-x-2 text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
+                              className="flex items-center space-x-1 text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50 text-xs px-3 py-1"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3 h-3" />
                               <span>Excluir AIH</span>
                             </Button>
                             
@@ -1055,9 +1109,9 @@ const PatientManagement = () => {
                                 item.aih_number, 
                                 item.patients?.name || 'Paciente não identificado'
                               )}
-                              className="flex items-center space-x-2 text-red-800 hover:text-red-900 border-red-400 hover:border-red-500 bg-red-100 hover:bg-red-200"
+                              className="flex items-center space-x-1 text-red-800 hover:text-red-900 border-red-300 hover:border-red-400 bg-red-100 hover:bg-red-200 text-xs px-3 py-1"
                             >
-                              <AlertTriangle className="w-4 h-4" />
+                              <AlertTriangle className="w-3 h-3" />
                               <span>Exclusão Completa</span>
                             </Button>
                           </div>

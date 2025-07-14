@@ -16,8 +16,6 @@ import {
   Building2, 
   Users, 
   DollarSign, 
-  TrendingUp,
-  BarChart3,
   AlertTriangle
 } from 'lucide-react';
 import { DoctorsRevenueService, type HospitalStats, type DoctorAggregated } from '../services/doctorsRevenueService';
@@ -212,359 +210,45 @@ const getFallbackHospitalRevenue = async (hospitalId: string): Promise<number> =
   }
 };
 
-// ✅ FUNÇÃO PARA BUSCAR PROCEDIMENTOS DO HOSPITAL (4 ESTRATÉGIAS)
-const getHospitalProcedures = async (hospitalId: string) => {
-  try {
-    // 💡 ESTRATÉGIA 1: Buscar da view v_procedure_summary_by_hospital (mais otimizada)
-    const { data: procedureSummary, error: summaryError } = await supabase
-      .from('v_procedure_summary_by_hospital')
-      .select(`
-        procedure_code,
-        procedure_description,
-        total_count,
-        total_value,
-        avg_value_per_procedure,
-        unique_aihs_count,
-        unique_patients_count
-      `)
-      .eq('hospital_id', hospitalId);
-
-    if (!summaryError && procedureSummary && procedureSummary.length > 0) {
-      const procedureStats = procedureSummary.map(p => ({
-        code: p.procedure_code || 'N/A',
-        description: p.procedure_description || 'Descrição não disponível',
-        count: Number(p.total_count || 0),
-        totalValue: normalizeValue(Number(p.total_value || 0)),
-        avgValue: normalizeValue(Number(p.avg_value_per_procedure || 0)),
-        totalAIHs: Number(p.unique_aihs_count || 0),
-        totalPatients: Number(p.unique_patients_count || 0)
-      }));
-
-      const totalCount = procedureStats.reduce((sum, p) => sum + p.count, 0);
-      const totalValue = procedureStats.reduce((sum, p) => sum + p.totalValue, 0);
-      const uniqueTypes = procedureStats.length;
-
-      if (totalCount > 0) {
-        return {
-          procedures: procedureStats,
-          count: totalCount,
-          totalValue,
-          uniqueTypes
-        };
-      }
-    }
-
-    // 💡 ESTRATÉGIA 2: Buscar diretamente de procedure_records
-    const { data: procedures, error: procError } = await supabase
-      .from('procedure_records')
-      .select(`
-        procedure_code,
-        procedure_description,
-        value_charged,
-        total_value,
-        quantity,
-        complexity,
-        patient_id,
-        aih_id
-      `)
-      .eq('hospital_id', hospitalId);
-
-    if (!procError && procedures && procedures.length > 0) {
-      // Agrupar procedimentos por código
-      const procedureMap = procedures.reduce((acc, proc) => {
-        const code = proc.procedure_code || 'N/A';
-        const quantity = Number(proc.quantity || 1);
-        const chargedValue = Number(proc.value_charged || 0);
-        const totalValue = Number(proc.total_value || 0);
-        const value = chargedValue > 0 ? chargedValue : totalValue;
-
-        if (!acc[code]) {
-          acc[code] = {
-            code,
-            description: proc.procedure_description || 'Descrição não disponível',
-            complexity: proc.complexity,
-            count: 0,
-            totalValue: 0,
-            aihIds: new Set(),
-            patientIds: new Set()
-          };
-        }
-
-        acc[code].count += quantity;
-        acc[code].totalValue += normalizeValue(value);
-        
-        if (proc.aih_id) acc[code].aihIds.add(proc.aih_id);
-        if (proc.patient_id) acc[code].patientIds.add(proc.patient_id);
-
-        return acc;
-      }, {} as Record<string, any>);
-
-      const procedureStats = Object.values(procedureMap).map((p: any) => ({
-        code: p.code,
-        description: p.description,
-        complexity: p.complexity,
-        count: p.count,
-        totalValue: p.totalValue,
-        avgValue: p.count > 0 ? p.totalValue / p.count : 0,
-        totalAIHs: p.aihIds.size,
-        totalPatients: p.patientIds.size
-      }));
-
-      const totalCount = procedureStats.reduce((sum, p) => sum + p.count, 0);
-      const totalValue = procedureStats.reduce((sum, p) => sum + p.totalValue, 0);
-      const uniqueTypes = procedureStats.length;
-
-      if (totalCount > 0) {
-        return {
-          procedures: procedureStats,
-          count: totalCount,
-          totalValue,
-          uniqueTypes
-        };
-      }
-    }
-
-    // 💡 ESTRATÉGIA 3: Buscar de aih_procedures via aihs
-    const { data: aihProcedures, error: aihProcError } = await supabase
-      .from('aihs')
-      .select(`
-        id,
-        aih_procedures (
-          procedure_code,
-          procedure_description,
-          quantity,
-          unit_value,
-          total_value
-        )
-      `)
-      .eq('hospital_id', hospitalId);
-
-    if (!aihProcError && aihProcedures && aihProcedures.length > 0) {
-      // Consolidar todos os procedimentos de todas as AIHs
-      const allProcedures = aihProcedures.flatMap(aih => 
-        (aih.aih_procedures || []).map(proc => ({
-          aih_id: aih.id,
-          ...proc
-        }))
-      );
-
-      if (allProcedures.length > 0) {
-        // Agrupar por código
-        const procedureMap = allProcedures.reduce((acc, proc) => {
-          const code = proc.procedure_code || 'N/A';
-          const quantity = Number(proc.quantity || 1);
-          const unitValue = Number(proc.unit_value || 0);
-          const totalValue = Number(proc.total_value || 0);
-          const value = totalValue > 0 ? totalValue : (unitValue * quantity);
-
-          if (!acc[code]) {
-            acc[code] = {
-              code,
-              description: proc.procedure_description || 'Descrição não disponível',
-              count: 0,
-              totalValue: 0,
-              aihIds: new Set()
-            };
-          }
-
-          acc[code].count += quantity;
-          acc[code].totalValue += normalizeValue(value);
-          acc[code].aihIds.add(proc.aih_id);
-
-          return acc;
-        }, {} as Record<string, any>);
-
-        const procedureStats = Object.values(procedureMap).map((p: any) => ({
-          code: p.code,
-          description: p.description,
-          count: p.count,
-          totalValue: p.totalValue,
-          avgValue: p.count > 0 ? p.totalValue / p.count : 0,
-          totalAIHs: p.aihIds.size
-        }));
-
-        const totalCount = procedureStats.reduce((sum, p) => sum + p.count, 0);
-        const totalValue = procedureStats.reduce((sum, p) => sum + p.totalValue, 0);
-        const uniqueTypes = procedureStats.length;
-
-        if (totalCount > 0) {
-          return {
-            procedures: procedureStats,
-            count: totalCount,
-            totalValue,
-            uniqueTypes
-          };
-        }
-      }
-    }
-
-    // 💡 ESTRATÉGIA 4: Buscar dados diretos de aih_procedures
-    return await getFallbackHospitalProcedures(hospitalId);
-    
-  } catch (error) {
-    console.error(`Erro ao buscar procedimentos para hospital ${hospitalId}:`, error);
-    return { procedures: [], count: 0, uniqueTypes: 0 };
-  }
-};
-
-// ✅ FUNÇÃO DE FALLBACK PARA PROCEDIMENTOS
-const getFallbackHospitalProcedures = async (hospitalId: string) => {
-  try {
-    // Estratégia final: buscar diretamente de aih_procedures
-    const { data: aihProcedures, error } = await supabase
-      .from('aih_procedures')
-      .select(`
-        procedure_code,
-        procedure_description,
-        quantity,
-        unit_value,
-        total_value,
-        aih_id,
-        aihs!inner (
-          hospital_id
-        )
-      `)
-      .eq('aihs.hospital_id', hospitalId);
-
-    if (!error && aihProcedures && aihProcedures.length > 0) {
-      // Agrupar por código de procedimento
-      const procedureMap = aihProcedures.reduce((acc, proc) => {
-        const code = proc.procedure_code || 'N/A';
-        const quantity = Number(proc.quantity || 1);
-        const unitValue = Number(proc.unit_value || 0);
-        const totalValue = Number(proc.total_value || 0);
-        const value = totalValue > 0 ? totalValue : (unitValue * quantity);
-
-        if (!acc[code]) {
-          acc[code] = {
-            code,
-            description: proc.procedure_description || 'Descrição não disponível',
-            count: 0,
-            totalValue: 0,
-            aihIds: new Set()
-          };
-        }
-
-        acc[code].count += quantity;
-        acc[code].totalValue += normalizeValue(value);
-        acc[code].aihIds.add(proc.aih_id);
-
-        return acc;
-      }, {} as Record<string, any>);
-
-      const procedureStats = Object.values(procedureMap).map((p: any) => ({
-        code: p.code,
-        description: p.description,
-        count: p.count,
-        totalValue: p.totalValue,
-        avgValue: p.count > 0 ? p.totalValue / p.count : 0,
-        totalAIHs: p.aihIds.size
-      }));
-
-      const totalCount = procedureStats.reduce((sum, p) => sum + p.count, 0);
-      const totalValue = procedureStats.reduce((sum, p) => sum + p.totalValue, 0);
-      const uniqueTypes = procedureStats.length;
-
-      return {
-        procedures: procedureStats,
-        count: totalCount,
-        totalValue,
-        uniqueTypes
-      };
-    }
-
-    return { procedures: [], count: 0, uniqueTypes: 0 };
-  } catch (error) {
-    console.error(`Erro no fallback de procedimentos para hospital ${hospitalId}:`, error);
-    return { procedures: [], count: 0, uniqueTypes: 0 };
-  }
-};
-
-// ✅ FUNÇÃO PRINCIPAL PARA BUSCAR DADOS DOS HOSPITAIS
-const getHospitalsSummary = async () => {
-  try {
-    console.log('🏥 Carregando estatísticas dos hospitais...');
-    
-    // Buscar dados dos hospitais
-    const hospitalData = await DoctorsRevenueService.getHospitalStats();
-    
-    if (!hospitalData || hospitalData.length === 0) {
-      console.warn('⚠️ Nenhum dado de hospital encontrado');
-      return { 
-        hospitalStats: [], 
-        uniqueDoctors: []
-      };
-    }
-
-         // Buscar médicos únicos
-     const uniqueDoctorsResult = await DoctorsRevenueService.getDoctorsAggregated({ pageSize: 1000 });
-     const uniqueDoctors = uniqueDoctorsResult.doctors;
-    
-    return {
-      hospitalStats: hospitalData,
-      uniqueDoctors: uniqueDoctors || []
-    };
-    
-  } catch (error) {
-    console.error('❌ Erro ao carregar dados dos hospitais:', error);
-    return { 
-      hospitalStats: [], 
-      uniqueDoctors: []
-    };
-  }
-};
-
 // ✅ COMPONENTE PRINCIPAL DO DASHBOARD
 const HospitalRevenueDashboard: React.FC = () => {
   const [hospitalStats, setHospitalStats] = useState<HospitalStats[]>([]);
-  const [uniqueDoctors, setUniqueDoctors] = useState<DoctorAggregated[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [realRevenue, setRealRevenue] = useState<Record<string, number>>({});
-  const [hospitalProcedures, setHospitalProcedures] = useState<Record<string, any>>({});
+  const [uniqueDoctors, setUniqueDoctors] = useState<DoctorAggregated[]>([]);
 
-  // ✅ FUNÇÃO PARA CARREGAR ESTATÍSTICAS DOS HOSPITAIS
+  // ✅ FUNÇÃO PRINCIPAL PARA CARREGAR TODOS OS DADOS DOS HOSPITAIS
   const loadHospitalStats = async () => {
     setIsLoading(true);
-    
     try {
-      const data = await getHospitalsSummary();
-      setHospitalStats(data.hospitalStats);
-      setUniqueDoctors(data.uniqueDoctors);
+      // 1. Buscar estatísticas básicas dos hospitais
+      const stats = await DoctorsRevenueService.getHospitalStats();
+      console.log('✅ Hospital stats carregados:', stats.length);
+      setHospitalStats(stats);
 
-      // Buscar revenue real para cada hospital
-      const revenuePromises = data.hospitalStats.map(hospital => 
-        getRealHospitalRevenue(hospital.hospital_id).then(revenue => ({
-          id: hospital.hospital_id,
-          revenue
-        }))
-      );
+      // 2. Buscar médicos únicos agregados
+      const doctorsResult = await DoctorsRevenueService.getDoctorsAggregated({ pageSize: 1000 });
+      const doctors = doctorsResult.doctors || [];
+      console.log('✅ Médicos únicos carregados:', doctors.length);
+      setUniqueDoctors(doctors);
+
+      // 3. Buscar faturamento real para cada hospital
+      const revenuePromises = stats.map(async (hospital) => {
+        const revenue = await getRealHospitalRevenue(hospital.hospital_id);
+        return { hospitalId: hospital.hospital_id, revenue };
+      });
 
       const revenueResults = await Promise.all(revenuePromises);
-      const revenueMap = revenueResults.reduce((acc, { id, revenue }) => {
-        acc[id] = revenue;
+      const revenueMap = revenueResults.reduce((acc, { hospitalId, revenue }) => {
+        acc[hospitalId] = revenue;
         return acc;
       }, {} as Record<string, number>);
-      
+
+      console.log('✅ Faturamento real carregado:', Object.keys(revenueMap).length, 'hospitais');
       setRealRevenue(revenueMap);
 
-      // Buscar procedimentos para cada hospital
-      const proceduresPromises = data.hospitalStats.map(hospital => 
-        getHospitalProcedures(hospital.hospital_id).then(procedures => ({
-          id: hospital.hospital_id,
-          procedures
-        }))
-      );
-
-      const proceduresResults = await Promise.all(proceduresPromises);
-      const proceduresMap = proceduresResults.reduce((acc, { id, procedures }) => {
-        acc[id] = procedures;
-        return acc;
-      }, {} as Record<string, any>);
-
-      setHospitalProcedures(proceduresMap);
-
     } catch (error) {
-      console.error('❌ Erro ao carregar estatísticas:', error);
+      console.error('❌ Erro ao carregar dados dos hospitais:', error);
     } finally {
       setIsLoading(false);
     }
@@ -574,31 +258,17 @@ const HospitalRevenueDashboard: React.FC = () => {
     loadHospitalStats();
   }, []);
 
-  // ✅ CÁLCULOS DOS KPIs
+  // ✅ ESTATÍSTICAS AGREGADAS
   const totalHospitals = hospitalStats.length;
-  const totalUniqueDoctors = uniqueDoctors.length;
-     const totalActiveDoctors = uniqueDoctors.filter(d => d.activity_status === 'ATIVO').length;
-   const doctorsWithMultipleHospitals = uniqueDoctors.filter(d => d.hospitals_count > 1).length;
+  const totalDoctors = uniqueDoctors.length;
+  const totalRevenue = Object.values(realRevenue).reduce((sum, revenue) => sum + revenue, 0);
 
-  // ✅ NOVOS CÁLCULOS: Faturamento e procedimentos
-  const totalRealRevenue = Object.values(realRevenue).reduce((sum, value) => sum + value, 0);
-  const avgRevenuePerHospital = totalHospitals > 0 ? totalRealRevenue / totalHospitals : 0;
-
-  // Calcular totais de procedimentos
-  const totalProceduresCount = Object.values(hospitalProcedures).reduce((sum, data) => sum + (data?.count || 0), 0);
-  const totalProceduresValue = Object.values(hospitalProcedures).reduce((sum, data) => sum + (data?.totalValue || 0), 0);
-  const totalUniqueTypes = Object.values(hospitalProcedures).reduce((sum, data) => sum + (data?.uniqueTypes || 0), 0);
-  
-  // Calcular estimativas de AIHs e pacientes
-  const totalAIHsCount = Object.values(hospitalProcedures).reduce((sum, data) => {
-    if (!data?.procedures) return sum;
-    return sum + data.procedures.reduce((aihSum: number, proc: any) => aihSum + (proc.totalAIHs || 0), 0);
-  }, 0);
-  
-  const totalPatientsCount = Object.values(hospitalProcedures).reduce((sum, data) => {
-    if (!data?.procedures) return sum;
-    return sum + data.procedures.reduce((patSum: number, proc: any) => patSum + (proc.totalPatients || 0), 0);
-  }, 0);
+  // ✅ ORDENAR HOSPITAIS POR FATURAMENTO (MAIOR PARA MENOR)
+  const hospitalsSortedByRevenue = [...hospitalStats].sort((a, b) => {
+    const revenueA = realRevenue[a.hospital_id] || 0;
+    const revenueB = realRevenue[b.hospital_id] || 0;
+    return revenueB - revenueA; // Decrescente (maior primeiro)
+  });
 
   if (isLoading) {
     return (
@@ -631,57 +301,18 @@ const HospitalRevenueDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* KPIs Corrigidos */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Building2 className="h-8 w-8 text-blue-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total de Hospitais</p>
-                <p className="text-2xl font-bold text-gray-900">{totalHospitals}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <Users className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Médicos Únicos</p>
-                <p className="text-2xl font-bold text-gray-900">{totalUniqueDoctors}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <BarChart3 className="h-8 w-8 text-purple-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Procedimentos Totais</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {totalProceduresCount.toLocaleString('pt-BR')}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Lista de Hospitais */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
             <Building2 className="w-5 h-5 mr-2" />
-            Hospitais Cadastrados ({hospitalStats.length})
+            Hospitais Cadastrados ({hospitalsSortedByRevenue.length}) - Ordenados por Faturamento
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {hospitalStats.length === 0 ? (
+          {hospitalsSortedByRevenue.length === 0 ? (
             <div className="text-center py-8">
               <Building2 className="w-12 h-12 mx-auto text-gray-400 mb-4" />
               <p className="text-gray-500">Nenhum hospital encontrado</p>
@@ -691,13 +322,24 @@ const HospitalRevenueDashboard: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {hospitalStats.map((hospital, index) => (
+              {hospitalsSortedByRevenue.map((hospital, index) => (
                 <div key={hospital.hospital_id || index} className="relative">
+                  {/* Badge de Ranking por Faturamento */}
+                  <div className="absolute top-4 right-4 z-10">
+                    <Badge variant="outline" className={`
+                      text-xs font-bold px-2 py-1 shadow-sm
+                      ${index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-white border-yellow-500' :
+                        index === 1 ? 'bg-gradient-to-r from-gray-300 to-gray-500 text-white border-gray-400' :
+                        index === 2 ? 'bg-gradient-to-r from-orange-400 to-orange-600 text-white border-orange-500' :
+                        'bg-blue-50 border-blue-200 text-blue-800'}
+                    `}>
+                      #{index + 1}
+                    </Badge>
+                  </div>
                   <HospitalCard 
                     hospital={hospital} 
                     uniqueDoctors={uniqueDoctors}
                     realRevenue={realRevenue[hospital.hospital_id] || 0}
-                    proceduresData={hospitalProcedures[hospital.hospital_id] || { procedures: [], count: 0, uniqueTypes: 0 }}
                   />
                 </div>
               ))}
@@ -709,32 +351,15 @@ const HospitalRevenueDashboard: React.FC = () => {
   );
 };
 
-// ✅ INTERFACE PARA O CARD DO HOSPITAL
+// ✅ INTERFACE SIMPLIFICADA PARA O CARD DO HOSPITAL
 interface HospitalCardProps {
   hospital: HospitalStats;
   uniqueDoctors: DoctorAggregated[];
   realRevenue: number;
-  proceduresData: {
-    procedures: Array<{
-      code: string;
-      description: string;
-      complexity?: string;
-      count: number;
-      totalValue: number;
-      approvedValue?: number;
-      avgValue: number;
-      baseValue?: number;
-      totalAIHs?: number;
-      totalPatients?: number;
-    }>;
-    count: number;
-    totalValue?: number;
-    uniqueTypes: number;
-  };
 }
 
 // ✅ COMPONENTE DO CARD DO HOSPITAL
-const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, realRevenue, proceduresData }) => {
+const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, realRevenue }) => {
      // ✅ CORREÇÃO: Filtrar médicos do hospital específico
    const hospitalDoctors = uniqueDoctors.filter(doctor => {
      if (!doctor.hospital_ids || doctor.hospital_ids.trim() === '') return false;
@@ -749,92 +374,7 @@ const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, re
    const activeDoctors = hospitalDoctors.filter(d => d.activity_status === 'ATIVO');
    const doctorsWithMultipleHospitals = hospitalDoctors.filter(d => d.hospitals_count > 1);
 
-  // ✅ CORREÇÃO: Especialidade principal usando dados corretos das views
-  const getTopSpecialty = (): string => {
-    // 1. PRIORIDADE: Usar valor já calculado pela view otimizada/stats
-    if (hospital.top_specialty_by_revenue && 
-        hospital.top_specialty_by_revenue !== 'N/A' && 
-        hospital.top_specialty_by_revenue.trim() !== '') {
-      
-      return hospital.top_specialty_by_revenue;
-    }
-    
-    // 2. FALLBACK: Calcular baseado nos médicos agregados com faturamento real
-    if (hospitalDoctors.length > 0) {
-      // Agregar faturamento por especialidade usando dados reais dos médicos
-      const specialtyRevenue = hospitalDoctors.reduce((acc, doctor) => {
-        const specialty = doctor.doctor_specialty || 'Não informado';
-        const revenue = doctor.total_revenue_12months_reais || 0;
-        
-        if (!acc[specialty]) {
-          acc[specialty] = { total: 0, count: 0 };
-        }
-        acc[specialty].total += revenue;
-        acc[specialty].count += 1;
-        
-        return acc;
-      }, {} as Record<string, { total: number; count: number }>);
-      
-      const topSpecialty = Object.entries(specialtyRevenue)
-        .sort(([,a], [,b]) => b.total - a.total)[0];
-      
-      if (topSpecialty && topSpecialty[1].total > 0) {
-        return topSpecialty[0];
-      }
-      
-      // 3. FALLBACK: Especialidade mais comum por contagem
-      const specialtyCount = hospitalDoctors.reduce((acc, doctor) => {
-        const specialty = doctor.doctor_specialty || 'Não informado';
-        acc[specialty] = (acc[specialty] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      
-      const commonSpecialty = Object.entries(specialtyCount)
-        .sort(([,a], [,b]) => b - a)[0];
-      
-      if (commonSpecialty) {
-        return commonSpecialty[0];
-      }
-    }
-    
-    return 'Não informado';
-  };
 
-  const getSpecialtyDetails = (): { source: string; revenue?: number } => {
-    // Se tem dados da view, usar como fonte
-    if (hospital.top_specialty_by_revenue && 
-        hospital.top_specialty_by_revenue !== 'N/A' && 
-        hospital.top_specialty_by_revenue.trim() !== '') {
-      return { source: 'view_otimizada' };
-    }
-    
-    // Se calculou baseado nos médicos agregados
-    if (hospitalDoctors.length > 0) {
-      const specialtyRevenue = hospitalDoctors.reduce((acc, doctor) => {
-        const specialty = doctor.doctor_specialty || 'Não informado';
-        const revenue = doctor.total_revenue_12months_reais || 0;
-        
-        if (!acc[specialty]) {
-          acc[specialty] = { total: 0, count: 0 };
-        }
-        acc[specialty].total += revenue;
-        acc[specialty].count += 1;
-        
-        return acc;
-      }, {} as Record<string, { total: number; count: number }>);
-      
-      const topSpecialty = Object.entries(specialtyRevenue)
-        .sort(([,a], [,b]) => b.total - a.total)[0];
-      
-      if (topSpecialty && topSpecialty[1].total > 0) {
-        return { source: 'medicos_agregados', revenue: topSpecialty[1].total };
-      }
-      
-      return { source: 'mais_comum' };
-    }
-    
-    return { source: 'sem_dados' };
-  };
 
   // ✅ CORREÇÃO: Função para formatar números grandes
   const formatNumber = (num: number): string => {
@@ -850,10 +390,7 @@ const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, re
     return num.toLocaleString('pt-BR');
   };
 
-  // ✅ CORREÇÃO: Validar e normalizar dados de procedimentos
-  const procedureCount = proceduresData?.count || 0;
-  const procedureTypes = proceduresData?.uniqueTypes || 0;
-  const procedureValue = proceduresData?.totalValue || 0;
+
 
   // ✅ CORREÇÃO: Validar faturamento sem aplicar correções automáticas
   // Como os dados vêm das views otimizadas do banco, eles já estão corretos
@@ -873,9 +410,7 @@ const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, re
   // O valor sempre será exibido normalmente em verde
   const revenueWasCorrected = false;
 
-  // ✅ NOVA: Obter dados da especialidade principal
-  const topSpecialty = getTopSpecialty();
-  const specialtyDetails = getSpecialtyDetails();
+
 
   return (
     <div className="p-6 border rounded-lg hover:bg-gray-50 transition-colors">
@@ -889,74 +424,62 @@ const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, re
         </p>
       </div>
 
-      {/* ✅ CORREÇÃO: Métricas do Hospital com formatação correta */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* 1. INDICADOR: MÉDICOS */}
-        <div className="bg-blue-50 p-3 rounded-lg">
-          <div className="flex items-center">
-            <Users className="w-4 h-4 text-blue-600 mr-2" />
-            <span className="text-xs text-blue-600 font-medium">Médicos</span>
+      {/* ✅ MÉTRICAS PRINCIPAIS: Médicos e Faturamento */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* 1. INDICADOR: MÉDICOS CADASTRADOS */}
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200 shadow-sm hover:shadow-md transition-all duration-200">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center">
+              <div className="bg-blue-500 p-2 rounded-lg mr-3">
+                <Users className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-sm text-blue-700 font-semibold">Corpo Médico</span>
+            </div>
+            <div className="bg-blue-200 px-2 py-1 rounded-full">
+              <span className="text-xs text-blue-800 font-medium">Ativos</span>
+            </div>
           </div>
-          <p className="text-lg font-bold text-blue-900 mt-1">
+          <p className="text-2xl font-bold text-blue-900 mb-1">
             {formatNumber(hospitalDoctors.length)}
           </p>
-          <p className="text-xs text-blue-600">
-            total cadastrados
+          <p className="text-sm text-blue-600">
+            médicos cadastrados no hospital
           </p>
         </div>
 
-        {/* 2. INDICADOR: FATURAMENTO */}
-        <div className="bg-green-50 p-3 rounded-lg">
-          <div className="flex items-center">
-            <DollarSign className="w-4 h-4 text-green-600 mr-2" />
-            <span className="text-xs text-green-600 font-medium">Faturamento</span>
+        {/* 2. INDICADOR: FATURAMENTO (DESTAQUE PRINCIPAL) */}
+        <div className="bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 p-6 rounded-xl border-2 border-green-300 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center">
+              <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-2 rounded-lg mr-3 shadow-sm">
+                <DollarSign className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-sm text-green-700 font-semibold">Faturamento Total</span>
+            </div>
+            <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+              validatedRevenue === 0 ? 'bg-gray-200 text-gray-700' :
+              revenueWasCorrected ? 'bg-orange-200 text-orange-800' :
+              'bg-green-200 text-green-800'
+            }`}>
+              {validatedRevenue === 0 ? 'Sem dados' : 
+               revenueWasCorrected ? 'Corrigido' : 'Validado'}
+            </div>
           </div>
-          <p className="text-lg font-bold text-green-900 mt-1">
-            <span className={revenueWasCorrected ? 'text-orange-700' : ''}>
-              {formatCurrency(validatedRevenue)}
-              {revenueWasCorrected && (
-                <span className="text-xs text-orange-500 ml-1" title={`Valor original: ${realRevenue}`}>
-                  *
-                </span>
-              )}
-            </span>
-          </p>
-          <p className="text-xs text-green-600">
-            {validatedRevenue === 0 ? 'Sem dados' : (
-              revenueWasCorrected ? (
-                <span className="text-orange-600">
-                  Valor corrigido
-                </span>
-              ) : 'Valor aprovado'
+          <p className={`text-3xl font-bold mb-2 ${
+            validatedRevenue === 0 ? 'text-gray-500' :
+            revenueWasCorrected ? 'text-orange-700' : 'text-green-900'
+          }`}>
+            {formatCurrency(validatedRevenue)}
+            {revenueWasCorrected && (
+              <span className="text-sm text-orange-500 ml-2" title={`Valor original: ${formatCurrency(realRevenue)}`}>
+                ⚠️
+              </span>
             )}
           </p>
-        </div>
-
-        {/* 3. INDICADOR: PROCEDIMENTOS */}
-        <div className="bg-purple-50 p-3 rounded-lg">
-          <div className="flex items-center">
-            <BarChart3 className="w-4 h-4 text-purple-600 mr-2" />
-            <span className="text-xs text-purple-600 font-medium">Procedimentos</span>
-          </div>
-          <p className="text-lg font-bold text-purple-900 mt-1">
-            {formatNumber(procedureCount)}
-          </p>
-          <p className="text-xs text-purple-600">
-            {procedureTypes > 0 ? `${formatNumber(procedureTypes)} tipos únicos` : 'Sem dados'}
-          </p>
-        </div>
-
-        {/* 4. INDICADOR: ESPECIALIDADE */}
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <div className="flex items-center">
-            <TrendingUp className="w-4 h-4 text-gray-600 mr-2" />
-            <span className="text-xs text-gray-600 font-medium">Especialidade</span>
-          </div>
-          <p className="text-sm font-bold text-gray-900 mt-1">
-            {topSpecialty}
-          </p>
-          <p className="text-xs text-gray-600">
-            {hospitalDoctors.length > 0 ? 'principal especialidade' : 'Sem dados'}
+          <p className="text-sm text-green-600">
+            {validatedRevenue === 0 ? 'Aguardando dados de faturamento' : 
+             revenueWasCorrected ? 'Valor corrigido automaticamente' :
+             'Faturamento total do hospital'}
           </p>
         </div>
       </div>

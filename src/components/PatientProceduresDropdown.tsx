@@ -29,7 +29,7 @@ import {
 
 interface ProcedureDetail {
   procedure_code: string;
-  procedure_name: string;
+  procedure_description: string;
   procedure_date: string;
   value_charged: number;
   value_total: number;
@@ -206,7 +206,7 @@ const PatientProceduresDropdown: React.FC<PatientProceduresDropdownProps> = ({
                         </div>
                         
                         <h5 className="font-medium text-gray-900 mb-2 leading-tight">
-                          {procedure.procedure_name || 'Procedimento sem nome'}
+                          {procedure.procedure_description || 'Procedimento sem nome'}
                         </h5>
                         
                         {/* Detalhes Financeiros */}

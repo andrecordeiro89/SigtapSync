@@ -141,7 +141,16 @@ export class DoctorPatientService {
             id,
             aih_id,
             patient_id,
-            procedure_code
+            procedure_code,
+            procedure_description,
+            procedure_date,
+            value_charged,
+            total_value,
+            professional_name,
+            professional_cbo,
+            sequencia,
+            status,
+            match_status
           `)
           .in('patient_id', patientIds); // SEM limitação de quantidade
 
@@ -246,7 +255,7 @@ export class DoctorPatientService {
             patient.procedures.push({
               procedure_id: proc.id || `${proc.procedure_code}_${Date.now()}`,
               procedure_code: proc.procedure_code || 'N/A',
-              procedure_description: proc.procedure_description || proc.procedure_name || `Procedimento: ${proc.procedure_code || 'N/A'}`,
+              procedure_description: proc.procedure_description || `Procedimento: ${proc.procedure_code || 'N/A'}`,
               procedure_date: proc.procedure_date || new Date().toISOString(),
               value_reais: 0, // Será definido quando soubermos os campos corretos
               value_cents: 0,
@@ -608,7 +617,16 @@ export class DoctorPatientService {
             id,
             aih_id,
             patient_id,
-            procedure_code
+            procedure_code,
+            procedure_description,
+            procedure_date,
+            value_charged,
+            total_value,
+            professional_name,
+            professional_cbo,
+            sequencia,
+            status,
+            match_status
           `)
           .in('patient_id', patientIds); // TODOS os pacientes, sem limitação
           
@@ -768,7 +786,7 @@ export class DoctorPatientService {
                 patient.procedures.push({
                   procedure_id: procId || `proc_${proceduresAssociated}_${Date.now()}`,
                   procedure_code: proc.procedure_code || 'N/A',
-                  procedure_description: proc.procedure_description || proc.procedure_name || `Procedimento: ${proc.procedure_code || 'N/A'}`,
+                  procedure_description: proc.procedure_description || `Procedimento: ${proc.procedure_code || 'N/A'}`,
                   procedure_date: proc.procedure_date || new Date().toISOString(),
                   value_reais: 0, // Será calculado quando tivermos acesso aos campos de valor
                   value_cents: 0,

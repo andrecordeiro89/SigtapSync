@@ -1359,7 +1359,7 @@ export class AIHPersistenceService {
       
       // ✅ CAMPOS USANDO NOMES CORRETOS DO SCHEMA
       procedure_code: data.procedure_code,
-      procedure_name: data.procedure_description || `Procedimento ${data.procedure_code}`,
+      procedure_description: data.procedure_description || `Procedimento ${data.procedure_code}`,
       procedure_date: data.procedure_date || new Date().toISOString(),  // Nome correto!
       
       // Profissional responsável  
@@ -1482,7 +1482,7 @@ export class AIHPersistenceService {
             patient_id: basicRecord.patient_id,
             aih_id: basicRecord.aih_id,
             procedure_code: basicRecord.procedure_code,
-            procedure_name: basicRecord.procedure_name,
+            procedure_description: basicRecord.procedure_description,
             procedure_date: basicRecord.procedure_date,  // Campo obrigatório!
             value_charged: basicRecord.value_charged,    // Campo obrigatório!
             total_value: basicRecord.total_value,
@@ -2496,7 +2496,7 @@ export class AIHPersistenceService {
       aih_id: proc.aih_id,
       procedure_sequence: proc.sequencia || index + 1,
       procedure_code: proc.procedure_code || proc.codigo_procedimento_original,
-      procedure_description: proc.procedure_name || `Procedimento ${proc.procedure_code}`,
+      procedure_description: proc.procedure_description || `Procedimento ${proc.procedure_code}`,
       procedure_date: proc.procedure_date,
       
       // Valores financeiros

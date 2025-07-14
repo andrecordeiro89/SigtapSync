@@ -24,7 +24,7 @@ interface ViewDoctorPatientProcedures {
   patient_birth_date: string;
   patient_gender: string;
   procedure_code: string;
-  procedure_name: string;
+  procedure_description: string;
   procedure_date: string;
   value_charged: number;
   quantity: number;
@@ -42,7 +42,7 @@ interface SimplifiedProductionData {
   billing_status: string;
   patient_name: string;
   patient_cns: string;
-  procedure_name: string;
+  procedure_description: string;
   procedure_code: string;
   hospital_name: string;
 }
@@ -61,7 +61,7 @@ interface PatientData {
   procedures: Array<{
     id: string;
     procedure_code: string;
-    procedure_name: string;
+    procedure_description: string;
     procedure_date: string;
     value_charged: number;
     billing_status: string;
@@ -119,7 +119,7 @@ export async function getDoctorPatientsAndProcedures(doctorIdentifier: string) {
       patient.procedures.push({
         id: `${record.procedure_code}_${record.procedure_date}`,
         procedure_code: record.procedure_code,
-        procedure_name: record.procedure_name,
+        procedure_description: record.procedure_description,
         procedure_date: record.procedure_date,
         value_charged: record.value_charged,
         billing_status: 'approved', // Assumindo aprovado por estar na view

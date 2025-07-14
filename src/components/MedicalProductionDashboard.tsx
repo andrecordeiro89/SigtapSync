@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Alert, AlertDescription } from './ui/alert';
 import { toast } from 'sonner';
+import { supabase } from '../lib/supabase';
 import {
   Users,
   ChevronDown,
@@ -81,6 +82,7 @@ interface DataDiagnostic {
     patient_id: string;
     procedure_count: number;
     sample_procedure_codes: string[];
+    sample_procedure_descriptions?: string[];
   }>;
 }
 
@@ -90,6 +92,28 @@ const DataDiagnostics: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Função para buscar descrições dos procedimentos no SIGTAP
+  const fetchProcedureDescriptions = async (codes: string[]): Promise<string[]> => {
+    if (!codes || codes.length === 0) return [];
+    
+    try {
+      const { data: sigtapData } = await supabase
+        .from('sigtap_procedimentos_oficial')
+        .select('codigo, nome')
+        .in('codigo', codes);
+
+      if (sigtapData && sigtapData.length > 0) {
+        const descriptionMap = new Map(sigtapData.map(item => [item.codigo, item.nome]));
+        return codes.map(code => descriptionMap.get(code) || `Procedimento ${code}`);
+      }
+      
+      return codes.map(code => `Procedimento ${code}`);
+    } catch (error) {
+      console.warn('Erro ao buscar descrições SIGTAP:', error);
+      return codes.map(code => `Procedimento ${code}`);
+    }
+  };
+
   const runDiagnostic = async () => {
     setLoading(true);
     setError(null);
@@ -97,7 +121,14 @@ const DataDiagnostics: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     try {
       const result = await DoctorPatientService.diagnoseDatabaseStructure();
       if (result.success && result.data) {
-        setDiagnostic(result.data);
+        const diagnosticData = result.data;
+        
+        // Buscar descrições para cada amostra
+        for (const sample of diagnosticData.sample_associations) {
+          (sample as any).sample_procedure_descriptions = await fetchProcedureDescriptions(sample.sample_procedure_codes);
+        }
+        
+        setDiagnostic(diagnosticData);
       } else {
         setError(result.error || 'Erro ao executar diagnóstico');
       }
@@ -224,9 +255,18 @@ const DataDiagnostics: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                     <Badge variant="outline" className="mr-2">
                       {sample.procedure_count} procedimentos
                     </Badge>
-                    <span className="text-gray-600">
-                      [{sample.sample_procedure_codes.join(', ')}]
-                    </span>
+                    <div className="text-gray-600 text-sm">
+                      {sample.sample_procedure_codes.map((code, codeIndex) => (
+                        <div key={codeIndex} className="mt-1">
+                          <span className="font-mono text-xs font-medium">{code}</span>
+                          {(sample as any).sample_procedure_descriptions?.[codeIndex] && (
+                            <span className="ml-2 text-xs text-gray-500">
+                              {(sample as any).sample_procedure_descriptions[codeIndex]}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -426,116 +466,9 @@ const MedicalProductionDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ✅ ESTATÍSTICAS GLOBAIS EXPANDIDAS */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-8 w-8 text-blue-600" />
-              <div>
-                <div className="text-sm text-blue-600 font-medium">Total de Médicos</div>
-                <div className="text-2xl font-bold text-blue-700">{formatNumber(globalStats.totalDoctors)}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <User className="h-8 w-8 text-green-600" />
-              <div>
-                <div className="text-sm text-green-600 font-medium">Total de Pacientes</div>
-                <div className="text-2xl font-bold text-green-700">{formatNumber(globalStats.totalPatients)}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <FileText className="h-8 w-8 text-purple-600" />
-              <div>
-                <div className="text-sm text-purple-600 font-medium">Total de Procedimentos</div>
-                <div className="text-2xl font-bold text-purple-700">{formatNumber(globalStats.totalProcedures)}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-8 w-8 text-orange-600" />
-              <div>
-                <div className="text-sm text-orange-600 font-medium">Faturamento Total</div>
-                <div className="text-2xl font-bold text-orange-700">{formatCurrency(globalStats.totalRevenue)}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-indigo-200 bg-gradient-to-br from-indigo-50 to-indigo-100">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-8 w-8 text-indigo-600" />
-              <div>
-                <div className="text-sm text-indigo-600 font-medium">Ticket Médio</div>
-                <div className="text-2xl font-bold text-indigo-700">{formatCurrency(globalStats.avgTicket)}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-8 w-8 text-emerald-600" />
-              <div>
-                <div className="text-sm text-emerald-600 font-medium">Taxa de Aprovação</div>
-                <div className="text-2xl font-bold text-emerald-700">{globalStats.approvalRate.toFixed(1)}%</div>
-                <div className="text-xs text-emerald-600 mt-1">
-                  ✓{globalStats.approvedProcedures} ⏳{globalStats.pendingProcedures} ✗{globalStats.rejectedProcedures}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ✅ PROCEDIMENTOS MAIS REALIZADOS */}
-      {globalStats.mostCommonProcedures.length > 0 && (
-        <Card className="border-l-4 border-l-blue-500">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Activity className="h-5 w-5 text-blue-600" />
-              Procedimentos Mais Realizados
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {globalStats.mostCommonProcedures.map((proc, index) => (
-                <div key={proc.code} className="bg-gray-50 p-3 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium text-gray-900">{proc.code}</div>
-                      <div className="text-sm text-gray-600">
-                        {proc.count} realizações
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant={index === 0 ? "default" : "secondary"} className="text-xs">
-                        #{index + 1}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       
 
