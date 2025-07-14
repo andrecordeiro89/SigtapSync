@@ -134,7 +134,7 @@ export class DoctorPatientService {
 
       let proceduresData: any[] = [];
       if (patientIds.length > 0) {
-        console.log('🔍 Executando consulta simplificada de procedimentos...');
+        console.log('🔍 Executando consulta completa de procedimentos...');
         const { data: patientProcedures, error: proceduresError } = await supabase
           .from('procedure_records')
           .select(`
@@ -143,26 +143,50 @@ export class DoctorPatientService {
             patient_id,
             procedure_code
           `)
-          .in('patient_id', patientIds)
-          .limit(50);
+          .in('patient_id', patientIds); // SEM limitação de quantidade
 
         if (proceduresError) {
           console.warn('❌ Erro na consulta básica, tentando fallback...', proceduresError.message);
           
-          // Fallback: consulta ainda mais básica
-          const { data: basicProcedures, error: basicError } = await supabase
-            .from('procedure_records')
-            .select('*')
-            .limit(30);
-            
-          if (!basicError && basicProcedures) {
-            // Filtrar apenas os procedimentos dos pacientes relevantes
-            proceduresData = basicProcedures.filter(proc => patientIds.includes(proc.patient_id));
-            console.log(`✅ Fallback funcionou! ${proceduresData.length} procedimentos encontrados`);
+          // 🔍 FALLBACK ESTRATÉGICO: Buscar por AIH_ID das AIHs deste médico
+          const relevantAihIds = aihsData
+            .filter(aih => aih.cns_responsavel === doctorCns)
+            .map(aih => aih.id)
+            .filter(Boolean);
+          
+          if (relevantAihIds.length > 0) {
+            console.log(`🔍 Tentando fallback por AIH_ID (${relevantAihIds.length} AIHs)...`);
+            const { data: aihProcedures, error: aihError } = await supabase
+              .from('procedure_records')
+              .select('*')
+              .in('aih_id', relevantAihIds);
+              
+            if (!aihError && aihProcedures) {
+              proceduresData = aihProcedures;
+              console.log(`✅ Fallback por AIH_ID encontrou ${proceduresData.length} procedimentos!`);
+            }
+          }
+          
+          // Se ainda não encontrou, busca geral
+          if (proceduresData.length === 0) {
+            console.log('🔍 Último fallback - busca geral...');
+            const { data: basicProcedures, error: basicError } = await supabase
+              .from('procedure_records')
+              .select('*')
+              .limit(100);
+              
+            if (!basicError && basicProcedures) {
+              // Filtrar por critérios relevantes
+              proceduresData = basicProcedures.filter(proc => 
+                patientIds.includes(proc.patient_id) || 
+                relevantAihIds.includes(proc.aih_id)
+              );
+              console.log(`✅ Fallback geral encontrou ${proceduresData.length} procedimentos relevantes`);
+            }
           }
         } else if (patientProcedures) {
           proceduresData = patientProcedures;
-          console.log(`✅ ${patientProcedures.length} procedimentos encontrados`);
+          console.log(`✅ ${patientProcedures.length} procedimentos encontrados diretamente`);
         }
       }
 
@@ -576,8 +600,8 @@ export class DoctorPatientService {
       let proceduresData: any[] = [];
       
       if (patientIds.length > 0) {
-        // 2.2. ✅ CONSULTA SIMPLIFICADA COM APENAS CAMPOS BÁSICOS
-        console.log('🔍 Executando consulta simplificada de procedimentos...');
+        // 2.2. ✅ CONSULTA COMPLETA SEM LIMITAÇÕES ARTIFICIAIS
+        console.log('🔍 Executando consulta completa de procedimentos...');
         const { data: patientProcedures, error: proceduresError } = await supabase
           .from('procedure_records')
           .select(`
@@ -586,26 +610,51 @@ export class DoctorPatientService {
             patient_id,
             procedure_code
           `)
-          .in('patient_id', patientIds.slice(0, 10)) // Limitar para teste
-          .limit(50);
+          .in('patient_id', patientIds); // TODOS os pacientes, sem limitação
           
         if (proceduresError) {
           console.error('❌ Erro ao buscar procedimentos (consulta básica):', proceduresError);
           
-          // 2.3. ✅ FALLBACK: TENTAR CONSULTA AINDA MAIS BÁSICA
-          console.log('🔍 Tentando consulta ainda mais básica...');
-          const { data: basicProcedures, error: basicError } = await supabase
-            .from('procedure_records')
-            .select('*')
-            .limit(30);
-            
-          if (basicError) {
-            console.error('❌ Erro mesmo na consulta básica:', basicError);
-            console.log('⚠️ Problema confirmado na tabela procedure_records');
-          } else if (basicProcedures) {
-            proceduresData = basicProcedures;
-            console.log(`✅ SUCESSO! Encontrados ${basicProcedures.length} procedimentos com consulta básica`);
-            console.log('📋 Estrutura do primeiro procedimento:', Object.keys(basicProcedures[0] || {}));
+          // 2.3. ✅ FALLBACK ESTRATÉGICO MÚLTIPLO
+          console.log('🔍 Tentando fallback por AIH_ID...');
+          
+          // Estratégia 1: Buscar por AIH_ID das AIHs com médicos responsáveis
+          const allAihIds = [...new Set(aihsData.map(aih => aih.id).filter(Boolean))];
+          
+          if (allAihIds.length > 0) {
+            const { data: aihProcedures, error: aihError } = await supabase
+              .from('procedure_records')
+              .select('*')
+              .in('aih_id', allAihIds);
+              
+            if (!aihError && aihProcedures) {
+              proceduresData = aihProcedures;
+              console.log(`✅ SUCESSO por AIH_ID! Encontrados ${aihProcedures.length} procedimentos`);
+              console.log('📋 Estrutura do primeiro procedimento:', Object.keys(aihProcedures[0] || {}));
+            }
+          }
+          
+          // Estratégia 2: Se ainda não encontrou, busca geral mais ampla
+          if (proceduresData.length === 0) {
+            console.log('🔍 Tentando busca geral ampliada...');
+            const { data: basicProcedures, error: basicError } = await supabase
+              .from('procedure_records')
+              .select('*')
+              .limit(100); // Aumentar limite para capturar mais dados
+              
+            if (basicError) {
+              console.error('❌ Erro mesmo na consulta geral:', basicError);
+              console.log('⚠️ Problema confirmado na tabela procedure_records');
+            } else if (basicProcedures) {
+              // Filtrar para manter apenas os relevantes
+              proceduresData = basicProcedures.filter(proc => 
+                patientIds.includes(proc.patient_id) || allAihIds.includes(proc.aih_id)
+              );
+              console.log(`✅ SUCESSO geral! Encontrados ${proceduresData.length} procedimentos relevantes de ${basicProcedures.length} totais`);
+              if (proceduresData.length > 0) {
+                console.log('📋 Estrutura do primeiro procedimento:', Object.keys(proceduresData[0] || {}));
+              }
+            }
           }
         } else if (patientProcedures) {
           proceduresData = patientProcedures;
@@ -636,60 +685,88 @@ export class DoctorPatientService {
         });
       });
 
-      // 4. PROCESSAR DADOS DOS PACIENTES PARA CADA MÉDICO COM PROCEDIMENTOS CORRETOS
+      // 4. 🎯 PROCESSAR DADOS GARANTINDO RELAÇÃO 1:1 ENTRE AIH-PACIENTE
       const processedProcedureIds = new Set<string>();
+      const globalPatientsProcessed = new Set<string>(); // Evitar duplicatas globais
+      
+      console.log('\n🔍 === PROCESSAMENTO POR MÉDICO ===');
       
       Array.from(doctorsMap.keys()).forEach(doctorCns => {
         const doctor = doctorsMap.get(doctorCns)!;
         const patientsMap = new Map<string, PatientWithProcedures>();
 
-        // 4.1. ENCONTRAR PACIENTES ONDE ESTE MÉDICO É RESPONSÁVEL (VIA AIH)
-        aihsData.forEach(aih => {
-          if (aih.cns_responsavel === doctorCns) {
-            const patientId = aih.patient_id;
-            const patient = aih.patients as any;
-            
-            if (patient && !patientsMap.has(patientId)) {
-              patientsMap.set(patientId, {
-                patient_info: {
-                  name: patient.name,
-                  cns: patient.cns,
-                  birth_date: patient.birth_date,
-                  gender: patient.gender,
-                  medical_record: patient.medical_record
-                },
-                procedures: []
-              });
-            }
+        // 4.1. ✅ ENCONTRAR AIHs ONDE ESTE MÉDICO É RESPONSÁVEL (1 AIH = 1 PACIENTE)
+        console.log(`\n👨‍⚕️ Processando médico: ${doctor.doctor_info.name} (CNS: ${doctorCns})`);
+        
+        const aihsForThisDoctor = aihsData.filter(aih => aih.cns_responsavel === doctorCns);
+        console.log(`   📋 ${aihsForThisDoctor.length} AIHs onde este médico é RESPONSÁVEL`);
+        
+        aihsForThisDoctor.forEach((aih, index) => {
+          const patientId = aih.patient_id;
+          const patient = aih.patients as any;
+          
+          console.log(`     AIH ${index + 1}: ${aih.id} → Paciente: ${patientId}`);
+          console.log(`       Nome: ${patient?.name || 'Nome não disponível'}`);
+          
+          // ✅ GARANTIR 1 AIH = 1 PACIENTE (sem duplicatas)
+          if (patient && patientId && !patientsMap.has(patientId) && !globalPatientsProcessed.has(patientId)) {
+            patientsMap.set(patientId, {
+              patient_info: {
+                name: patient.name,
+                cns: patient.cns,
+                birth_date: patient.birth_date,
+                gender: patient.gender,
+                medical_record: patient.medical_record
+              },
+              procedures: []
+            });
+            globalPatientsProcessed.add(patientId);
+            console.log(`       ✅ Paciente adicionado (único)`);
+          } else if (patientsMap.has(patientId)) {
+            console.log(`       ⚠️  Paciente já existe para este médico`);
+          } else if (globalPatientsProcessed.has(patientId)) {
+            console.log(`       ⚠️  Paciente já processado por outro médico`);
+          } else {
+            console.log(`       ❌ Dados do paciente inválidos`);
           }
         });
+        
+        console.log(`   👥 Resultado: ${patientsMap.size} pacientes únicos para este médico`);
 
-        // 4.2. ✅ ASSOCIAR PROCEDIMENTOS COM CAMPOS BÁSICOS DISPONÍVEIS
+        // 4.2. ✅ ASSOCIAR PROCEDIMENTOS SEM DUPLICATAS
         if (proceduresData && proceduresData.length > 0) {
-          console.log(`🔍 Processando ${proceduresData.length} procedimentos para médico ${doctor.doctor_info.name}...`);
+          console.log(`\n🩺 Associando procedimentos para ${doctor.doctor_info.name}...`);
            
           // Coletar IDs dos pacientes deste médico
           const patientIds = Array.from(patientsMap.keys());
-          console.log(`   👥 Pacientes do médico: [${patientIds.join(', ')}]`);
+          console.log(`   👥 Pacientes do médico: ${patientIds.length} pacientes`);
+          console.log(`   🔍 IDs: [${patientIds.join(', ')}]`);
            
           let proceduresAssociated = 0;
+          let proceduresSkippedDuplicate = 0;
+          let proceduresSkippedNotRelevant = 0;
            
           proceduresData.forEach((proc, index) => {
-            // 🎯 CRITÉRIO ÚNICO: Procedimento pertence a um paciente deste médico responsável
-            const isProcedureFromPatient = patientIds.includes(proc.patient_id);
+            const procId = proc.id;
+            const patientId = proc.patient_id;
             
-            console.log(`     Proc ${index + 1}: ${proc.procedure_code || 'N/A'} (Patient: ${proc.patient_id})`);
-            console.log(`       - Paciente do médico: ${isProcedureFromPatient ? '✅' : '❌'}`);
+            // ✅ VERIFICAÇÕES DE INTEGRIDADE
+            const isAlreadyProcessed = processedProcedureIds.has(procId);
+            const belongsToThisDoctor = patientIds.includes(patientId);
             
-            // 📝 ASSOCIAR PROCEDIMENTO SE PERTENCER AO PACIENTE
-            if (isProcedureFromPatient) {
-              const patientId = proc.patient_id;
+            console.log(`     Proc ${index + 1}: ${proc.procedure_code || 'N/A'}`);
+            console.log(`       ID: ${procId} | Paciente: ${patientId}`);
+            console.log(`       Já processado: ${isAlreadyProcessed ? '❌' : '✅'}`);
+            console.log(`       Pertence ao médico: ${belongsToThisDoctor ? '✅' : '❌'}`);
+            
+            // 🎯 ASSOCIAR APENAS SE: Não processado + Pertence aos pacientes do médico
+            if (!isAlreadyProcessed && belongsToThisDoctor) {
               const patient = patientsMap.get(patientId);
               
               if (patient) {
-                // ✅ USAR APENAS CAMPOS QUE SABEMOS QUE EXISTEM
+                // ✅ CRIAR PROCEDIMENTO ÚNICO
                 patient.procedures.push({
-                  procedure_id: proc.id || `unknown_${index}`,
+                  procedure_id: procId || `proc_${proceduresAssociated}_${Date.now()}`,
                   procedure_code: proc.procedure_code || 'N/A',
                   procedure_description: proc.procedure_description || proc.procedure_name || `Procedimento: ${proc.procedure_code || 'N/A'}`,
                   procedure_date: proc.procedure_date || new Date().toISOString(),
@@ -706,26 +783,55 @@ export class DoctorPatientService {
                   participation: 'Responsável'
                 });
                 
+                // ✅ MARCAR COMO PROCESSADO GLOBALMENTE
+                processedProcedureIds.add(procId);
                 proceduresAssociated++;
-                processedProcedureIds.add(proc.id);
-                console.log(`       ✅ Procedimento associado ao paciente!`);
+                console.log(`       ✅ Procedimento associado com sucesso!`);
               } else {
-                console.log(`       ❌ Paciente não encontrado para associação`);
+                console.log(`       ❌ Paciente não encontrado no mapa`);
               }
-            } else {
-              console.log(`       ⏭️ Procedimento não pertence aos pacientes deste médico`);
+            } else if (isAlreadyProcessed) {
+              proceduresSkippedDuplicate++;
+              console.log(`       ⏭️ Pulado: já processado por outro médico`);
+            } else if (!belongsToThisDoctor) {
+              proceduresSkippedNotRelevant++;
+              console.log(`       ⏭️ Pulado: não pertence aos pacientes deste médico`);
             }
           });
            
-          console.log(`   📊 Total de procedimentos associados: ${proceduresAssociated}`);
+          console.log(`   📊 Resultado da associação:`);
+          console.log(`      ✅ Associados: ${proceduresAssociated}`);
+          console.log(`      ⏭️ Duplicatas: ${proceduresSkippedDuplicate}`);
+          console.log(`      ⏭️ Não relevantes: ${proceduresSkippedNotRelevant}`);
         }
 
         // 4.3. ✅ FINALIZAR DADOS DO MÉDICO
-        doctor.patients = Array.from(patientsMap.values()).filter(patient => 
+        const allPatients = Array.from(patientsMap.values());
+        const patientsWithProcedures = allPatients.filter(patient => 
           patient.procedures && patient.procedures.length > 0
         );
+        const patientsWithoutProcedures = allPatients.filter(patient => 
+          !patient.procedures || patient.procedures.length === 0
+        );
+        
+        doctor.patients = patientsWithProcedures;
 
         console.log(`👨‍⚕️ Médico ${doctor.doctor_info.name}: ${doctor.patients.length} pacientes com procedimentos`);
+        
+        if (patientsWithoutProcedures.length > 0) {
+          console.log(`   ⚠️  ${patientsWithoutProcedures.length} pacientes SEM procedimentos:`);
+          patientsWithoutProcedures.forEach(patient => {
+            // Encontrar o ID do paciente no mapa
+            let patientId = 'ID não encontrado';
+            for (const [id, p] of patientsMap.entries()) {
+              if (p === patient) {
+                patientId = id;
+                break;
+              }
+            }
+            console.log(`      - ${patient.patient_info?.name || 'Nome não disponível'} (ID: ${patientId})`);
+          });
+        }
       });
 
       // 5. ✅ RETORNAR APENAS MÉDICOS COM PACIENTES
@@ -733,9 +839,50 @@ export class DoctorPatientService {
         doctor.patients && doctor.patients.length > 0
       );
 
-      console.log(`\n📊 === RESUMO FINAL ===`);
-      console.log(`👨‍⚕️ Médicos com pacientes: ${doctorsWithPatients.length}`);
-      console.log(`📋 Total de procedimentos processados: ${processedProcedureIds.size}`);
+      // 6. ✅ RESUMO FINAL E VALIDAÇÃO DE INTEGRIDADE
+      console.log(`\n📊 === RESUMO FINAL E VALIDAÇÃO ===`);
+      
+      const totalPatientsUnique = globalPatientsProcessed.size;
+      const totalProceduresUnique = processedProcedureIds.size;
+      const totalMedicosWithPatients = doctorsWithPatients.length;
+      
+      // Contagem detalhada por médico
+      let totalPatientsInResults = 0;
+      let totalProceduresInResults = 0;
+      
+      doctorsWithPatients.forEach(doctor => {
+        const patientsCount = doctor.patients.length;
+        const proceduresCount = doctor.patients.reduce((sum, p) => sum + p.procedures.length, 0);
+        
+        totalPatientsInResults += patientsCount;
+        totalProceduresInResults += proceduresCount;
+        
+        console.log(`👨‍⚕️ ${doctor.doctor_info.name}: ${patientsCount} pacientes, ${proceduresCount} procedimentos`);
+      });
+      
+      console.log(`\n🎯 VALIDAÇÃO DE INTEGRIDADE:`);
+      console.log(`   📋 AIHs processadas: ${aihsData.length}`);
+      console.log(`   👥 Pacientes únicos processados: ${totalPatientsUnique}`);
+      console.log(`   👥 Pacientes nos resultados: ${totalPatientsInResults}`);
+      console.log(`   🩺 Procedimentos únicos processados: ${totalProceduresUnique}`);
+      console.log(`   🩺 Procedimentos nos resultados: ${totalProceduresInResults}`);
+      console.log(`   👨‍⚕️ Médicos com pacientes: ${totalMedicosWithPatients}`);
+      
+      // ✅ VALIDAÇÕES ESPERADAS
+      const expectedPatients = 12;
+      const expectedProcedures = 30;
+      
+      console.log(`\n🔍 COMPARAÇÃO COM VALORES ESPERADOS:`);
+      console.log(`   Pacientes: ${totalPatientsUnique}/${expectedPatients} ${totalPatientsUnique === expectedPatients ? '✅' : '❌'}`);
+      console.log(`   Procedimentos: ${totalProceduresUnique}/${expectedProcedures} ${totalProceduresUnique === expectedProcedures ? '✅' : '❌'}`);
+      
+      if (totalPatientsUnique !== expectedPatients) {
+        console.log(`   ⚠️ DISCREPÂNCIA DE PACIENTES: Esperado ${expectedPatients}, encontrado ${totalPatientsUnique}`);
+      }
+      
+      if (totalProceduresUnique !== expectedProcedures) {
+        console.log(`   ⚠️ DISCREPÂNCIA DE PROCEDIMENTOS: Esperado ${expectedProcedures}, encontrado ${totalProceduresUnique}`);
+      }
       
       if (doctorsWithPatients.length === 0) {
         console.log('⚠️ Nenhum médico com pacientes encontrado, retornando dados de teste...');
