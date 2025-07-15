@@ -13,24 +13,41 @@ export interface DoctorPatientData {
   patients: PatientWithProcedures[];
 }
 
+// 🆕 NOVA INTERFACE PARA HOSPITAL ASSOCIADO AO MÉDICO
+export interface DoctorHospital {
+  hospital_id: string;
+  hospital_name: string;
+  hospital_cnpj?: string;
+  role?: string;
+  department?: string;
+  is_primary_hospital: boolean;
+  is_active: boolean;
+}
+
 export interface PatientWithProcedures {
-  patient_id?: string;
-  patient_name?: string;
-  patient_cns?: string;
-  patient_birth_date?: string;
-  patient_gender?: string;
-  total_procedures?: number;
-  approved_procedures?: number;
-  total_value_reais?: number;
-  aihs?: AIHSummary[];
-  procedures: ProcedureDetail[];  // 🆕 NOVA PROPRIEDADE
-  patient_info?: {
+  patient_info: {
     name: string;
     cns: string;
     birth_date: string;
     gender: string;
-    medical_record?: string;
+    medical_record: string;
   };
+  total_value_reais: number;
+  procedures: ProcedureDetail[];
+  total_procedures: number;
+  approved_procedures: number;
+}
+
+// 🆕 INTERFACE ATUALIZADA COM HOSPITAIS
+export interface DoctorWithPatients {
+  doctor_info: {
+    name: string;
+    cns: string;
+    crm: string;
+    specialty: string;
+  };
+  hospitals: DoctorHospital[]; // 🆕 Array de hospitais onde o médico atende
+  patients: PatientWithProcedures[];
 }
 
 export interface AIHSummary {
@@ -49,12 +66,12 @@ export interface ProcedureDetail {
   procedure_id?: string;
   procedure_code: string;
   procedure_description: string;
-  procedure_date: string;
-  value_reais: number;
+  procedure_date: string; // ✅ Campo obrigatório do banco (procedure_records.procedure_date)
+  value_reais: number; // ✅ Calculado de total_value em centavos
   value_cents: number;
   approved?: boolean;
-  approval_status?: string;
-  billing_status?: string;
+  approval_status?: string; // ✅ Mantido para compatibilidade interna (não exibido na UI)
+  billing_status?: string; // ⚠️ Mantido para compatibilidade, mas não será exibido
   sequence?: number;
   aih_number?: string;
   aih_id?: string;
@@ -72,16 +89,6 @@ export interface DoctorSearchFilters {
   searchTerm?: string;
   dateFrom?: string;
   dateTo?: string;
-}
-
-export interface DoctorWithPatients {
-  doctor_info: {
-    name: string;
-    cns: string;
-    crm: string;
-    specialty: string;
-  };
-  patients: PatientWithProcedures[];
 }
 
 export class DoctorPatientService {
@@ -209,29 +216,48 @@ export class DoctorPatientService {
           
           if (!patientsMap.has(patientKey)) {
             patientsMap.set(patientKey, {
-              patient_id: aih.patient_id,
-              patient_name: aih.patient_name,
-              patient_cns: aih.patient_cns,
-              patient_birth_date: aih.patient_birth_date,
-              patient_gender: aih.patient_gender,
-              total_procedures: 0,
-              approved_procedures: 0,
+              patient_info: {
+                name: aih.patient_name,
+                cns: aih.patient_cns,
+                birth_date: aih.patient_birth_date,
+                gender: aih.patient_gender,
+                medical_record: aih.medical_record
+              },
               total_value_reais: 0,
-              aihs: [],
-              procedures: []  // 🆕 INICIALIZAR ARRAY DE PROCEDIMENTOS
+              procedures: [],
+              total_procedures: 0,
+              approved_procedures: 0
             });
           }
 
           const patient = patientsMap.get(patientKey)!;
-          patient.aihs.push({
-            aih_id: aih.id,
-            aih_number: aih.aih_number,
-            admission_date: aih.admission_date,
-            discharge_date: aih.discharge_date,
-            main_cid: aih.main_cid,
-            procedures_count: aih.total_procedures || 0,
-            total_value_reais: aih.total_value_reais || 0,
-            status: aih.processing_status || 'pending'
+          patient.total_procedures++;
+          if (aih.aprovado) {
+            patient.approved_procedures++;
+          }
+          patient.total_value_reais += (aih.total_value_reais || 0) / 100;
+
+          // ✅ ADICIONAR PROCEDIMENTO COM DADOS REAIS DO BANCO
+          const totalValueCents = aih.total_value_reais || aih.value_charged || 0;
+          const valueReais = totalValueCents / 100; // Converter centavos para reais
+          
+          patient.procedures.push({
+            procedure_id: aih.id || `${aih.procedure_code}_${Date.now()}`,
+            procedure_code: aih.procedure_code || 'N/A',
+            procedure_description: aih.procedure_description || `Procedimento: ${aih.procedure_code || 'N/A'}`,
+            procedure_date: aih.admission_date || new Date().toISOString(), // ✅ DADOS REAIS
+            value_reais: valueReais, // ✅ DADOS REAIS convertidos de total_value
+            value_cents: totalValueCents, // ✅ DADOS REAIS em centavos
+            approved: aih.status === 'approved' || false,
+            approval_status: aih.status || 'pending',
+            sequence: aih.sequencia || 0,
+            aih_number: 'N/A',
+            match_confidence: 0,
+            sigtap_description: '',
+            complexity: 'N/A',
+            professional_name: aih.professional_name || 'N/A',
+            cbo: aih.professional_cbo || '',
+            participation: 'Responsável'
           });
         });
       }
@@ -251,21 +277,27 @@ export class DoctorPatientService {
             }
             patient.total_value_reais += (proc.total_value || 0) / 100;
 
-            // ✅ ADICIONAR PROCEDIMENTO COM CAMPOS BÁSICOS DISPONÍVEIS
+            // ✅ ADICIONAR PROCEDIMENTO COM DADOS REAIS DO BANCO
+            const totalValueCents = proc.total_value || proc.value_charged || 0;
+            const valueReais = totalValueCents / 100; // Converter centavos para reais
+            
             patient.procedures.push({
               procedure_id: proc.id || `${proc.procedure_code}_${Date.now()}`,
               procedure_code: proc.procedure_code || 'N/A',
               procedure_description: proc.procedure_description || `Procedimento: ${proc.procedure_code || 'N/A'}`,
-              procedure_date: proc.procedure_date || new Date().toISOString(),
-              value_reais: 0, // Será definido quando soubermos os campos corretos
-              value_cents: 0,
-              approved: false, // Padrão até sabermos o campo correto
-              billing_status: 'pending',
+              procedure_date: proc.procedure_date || new Date().toISOString(), // ✅ DADOS REAIS
+              value_reais: valueReais, // ✅ DADOS REAIS convertidos de total_value
+              value_cents: totalValueCents, // ✅ DADOS REAIS em centavos
+              approved: proc.status === 'approved' || false,
+              approval_status: proc.status || 'pending',
               sequence: proc.sequencia || 0,
               aih_number: 'N/A',
               match_confidence: 0,
               sigtap_description: '',
-              complexity: 'N/A'
+              complexity: 'N/A',
+              professional_name: proc.professional_name || 'N/A',
+              cbo: proc.professional_cbo || '',
+              participation: 'Responsável'
             });
           }
         });
@@ -390,11 +422,13 @@ export class DoctorPatientService {
         avg_procedures_per_patient: patients.length > 0 ? 
           patients.reduce((sum, p) => sum + p.total_procedures, 0) / patients.length : 0,
         most_common_procedures: [], // TODO: Implementar análise de procedimentos mais comuns
-        last_activity_date: patients.reduce((latest, p) => {
-          const patientLatest = p.aihs.reduce((max, aih) => 
-            aih.admission_date > max ? aih.admission_date : max, '');
-          return patientLatest > latest ? patientLatest : latest;
-        }, '')
+                  last_activity_date: patients.reduce((latest, p) => {
+            const patientLatest = p.procedures.reduce((max, proc) => {
+              const procDate = new Date(proc.procedure_date).toISOString();
+              return procDate > max ? procDate : max;
+            }, '');
+            return patientLatest > latest ? patientLatest : latest;
+          }, '')
       };
 
       return {
@@ -699,6 +733,7 @@ export class DoctorPatientService {
             crm: realData?.crm || '',
             specialty: realData?.specialty || 'Especialidade não informada'
           },
+          hospitals: realData?.hospitals || [],
           patients: []
         });
       });
@@ -736,7 +771,10 @@ export class DoctorPatientService {
                 gender: patient.gender,
                 medical_record: patient.medical_record
               },
-              procedures: []
+              total_value_reais: 0,
+              procedures: [],
+              total_procedures: 0,
+              approved_procedures: 0
             });
             globalPatientsProcessed.add(patientId);
             console.log(`       ✅ Paciente adicionado (único)`);
@@ -782,22 +820,24 @@ export class DoctorPatientService {
               const patient = patientsMap.get(patientId);
               
               if (patient) {
-                // ✅ CRIAR PROCEDIMENTO ÚNICO
+                // ✅ CRIAR PROCEDIMENTO COM DADOS REAIS
+                const totalValueCents = proc.total_value || proc.value_charged || 0;
+                const valueReais = totalValueCents / 100; // Converter centavos para reais
+                
                 patient.procedures.push({
                   procedure_id: procId || `proc_${proceduresAssociated}_${Date.now()}`,
                   procedure_code: proc.procedure_code || 'N/A',
                   procedure_description: proc.procedure_description || `Procedimento: ${proc.procedure_code || 'N/A'}`,
-                  procedure_date: proc.procedure_date || new Date().toISOString(),
-                  value_reais: 0, // Será calculado quando tivermos acesso aos campos de valor
-                  value_cents: 0,
-                  approved: false, // Padrão até sabermos o campo correto
-                  approval_status: 'pending',
+                  procedure_date: proc.procedure_date || new Date().toISOString(), // ✅ DADOS REAIS
+                  value_reais: valueReais, // ✅ DADOS REAIS convertidos de total_value
+                  value_cents: totalValueCents, // ✅ DADOS REAIS em centavos
+                  approved: proc.status === 'approved' || false,
+                  approval_status: proc.status || 'pending',
                   sequence: proc.sequencia || 0,
                   aih_id: proc.aih_id || '',
                   match_confidence: 0,
-                  billing_status: 'pending',
-                  professional_name: doctor.doctor_info.name,
-                  cbo: '',
+                  professional_name: proc.professional_name || doctor.doctor_info.name,
+                  cbo: proc.professional_cbo || '',
                   participation: 'Responsável'
                 });
                 
@@ -1060,6 +1100,26 @@ export class DoctorPatientService {
           crm: '54321-SP',
           specialty: 'Cirurgia Geral'
         },
+        hospitals: [
+          {
+            hospital_id: 'hosp-001',
+            hospital_name: 'Hospital São Lucas',
+            hospital_cnpj: '12.345.678/0001-90',
+            role: 'Cirurgião Titular',
+            department: 'Centro Cirúrgico',
+            is_primary_hospital: true,
+            is_active: true
+          },
+          {
+            hospital_id: 'hosp-002',
+            hospital_name: 'Hospital Central',
+            hospital_cnpj: '98.765.432/0001-10',
+            role: 'Plantonista',
+            department: 'Cirurgia Geral',
+            is_primary_hospital: false,
+            is_active: true
+          }
+        ],
         patients: [
           {
             patient_info: {
@@ -1069,6 +1129,7 @@ export class DoctorPatientService {
               gender: 'F',
               medical_record: 'MR001'
             },
+            total_value_reais: 185000,
             procedures: [
               {
                 procedure_code: '03.03.14.008-9',
@@ -1085,7 +1146,9 @@ export class DoctorPatientService {
                 cbo: '225125',
                 participation: 'Responsável'
               }
-            ]
+            ],
+            total_procedures: 1,
+            approved_procedures: 1
           },
           {
             patient_info: {
@@ -1095,6 +1158,7 @@ export class DoctorPatientService {
               gender: 'M',
               medical_record: 'MR002'
             },
+            total_value_reais: 120000,
             procedures: [
               {
                 procedure_code: '03.03.01.017-8',
@@ -1111,7 +1175,9 @@ export class DoctorPatientService {
                 cbo: '225125',
                 participation: 'Responsável'
               }
-            ]
+            ],
+            total_procedures: 1,
+            approved_procedures: 1
           },
           {
             patient_info: {
@@ -1121,6 +1187,7 @@ export class DoctorPatientService {
               gender: 'F',
               medical_record: 'MR003'
             },
+            total_value_reais: 98000,
             procedures: [
               {
                 procedure_code: '03.03.03.012-0',
@@ -1137,7 +1204,9 @@ export class DoctorPatientService {
                 cbo: '225125',
                 participation: 'Responsável'
               }
-            ]
+            ],
+            total_procedures: 1,
+            approved_procedures: 1
           },
           {
             patient_info: {
@@ -1147,6 +1216,7 @@ export class DoctorPatientService {
               gender: 'M',
               medical_record: 'MR004'
             },
+            total_value_reais: 210000,
             procedures: [
               {
                 procedure_code: '03.03.02.008-4',
@@ -1163,7 +1233,9 @@ export class DoctorPatientService {
                 cbo: '225125',
                 participation: 'Responsável'
               }
-            ]
+            ],
+            total_procedures: 1,
+            approved_procedures: 1
           }
         ]
       },
@@ -1174,6 +1246,17 @@ export class DoctorPatientService {
           crm: '67890-SP',
           specialty: 'Ginecologia e Obstetrícia'
         },
+        hospitals: [
+          {
+            hospital_id: 'hosp-003',
+            hospital_name: 'Maternidade Santa Clara',
+            hospital_cnpj: '55.666.777/0001-88',
+            role: 'Obstetra',
+            department: 'Ginecologia',
+            is_primary_hospital: true,
+            is_active: true
+          }
+        ],
         patients: [
           {
             patient_info: {
@@ -1183,6 +1266,7 @@ export class DoctorPatientService {
               gender: 'F',
               medical_record: 'MR005'
             },
+            total_value_reais: 165000,
             procedures: [
               {
                 procedure_code: '03.11.07.010-2',
@@ -1199,7 +1283,9 @@ export class DoctorPatientService {
                 cbo: '225165',
                 participation: 'Responsável'
               }
-            ]
+            ],
+            total_procedures: 1,
+            approved_procedures: 1
           },
           {
             patient_info: {
@@ -1209,6 +1295,7 @@ export class DoctorPatientService {
               gender: 'F',
               medical_record: 'MR006'
             },
+            total_value_reais: 98000,
             procedures: [
               {
                 procedure_code: '03.11.01.004-0',
@@ -1225,7 +1312,9 @@ export class DoctorPatientService {
                 cbo: '225165',
                 participation: 'Responsável'
               }
-            ]
+            ],
+            total_procedures: 1,
+            approved_procedures: 1
           },
           {
             patient_info: {
@@ -1235,6 +1324,7 @@ export class DoctorPatientService {
               gender: 'F',
               medical_record: 'MR007'
             },
+            total_value_reais: 125000,
             procedures: [
               {
                 procedure_code: '03.11.05.002-1',
@@ -1251,7 +1341,9 @@ export class DoctorPatientService {
                 cbo: '225165',
                 participation: 'Responsável'
               }
-            ]
+            ],
+            total_procedures: 1,
+            approved_procedures: 1
           },
           {
             patient_info: {
@@ -1261,6 +1353,7 @@ export class DoctorPatientService {
               gender: 'F',
               medical_record: 'MR008'
             },
+            total_value_reais: 142000,
             procedures: [
               {
                 procedure_code: '03.11.02.009-4',
@@ -1277,7 +1370,9 @@ export class DoctorPatientService {
                 cbo: '225165',
                 participation: 'Responsável'
               }
-            ]
+            ],
+            total_procedures: 1,
+            approved_procedures: 1
           }
         ]
       },
@@ -1288,6 +1383,7 @@ export class DoctorPatientService {
           crm: '98765-SP',
           specialty: 'Cardiologia'
         },
+        hospitals: [],
         patients: [
           {
             patient_info: {
@@ -1297,6 +1393,7 @@ export class DoctorPatientService {
               gender: 'M',
               medical_record: 'MR009'
             },
+            total_value_reais: 245000,
             procedures: [
               {
                 procedure_code: '02.05.01.004-8',
@@ -1313,7 +1410,9 @@ export class DoctorPatientService {
                 cbo: '225133',
                 participation: 'Responsável'
               }
-            ]
+            ],
+            total_procedures: 1,
+            approved_procedures: 1
           },
           {
             patient_info: {
@@ -1323,13 +1422,14 @@ export class DoctorPatientService {
               gender: 'F',
               medical_record: 'MR010'
             },
+            total_value_reais: 180000,
             procedures: [
               {
                 procedure_code: '02.05.01.009-9',
                 procedure_description: 'Ecocardiograma',
                 procedure_date: '2024-01-23',
                 value_reais: 180.00,
-                value_cents: 18000,
+                value_cents: 180000,
                 approval_status: 'approved',
                 sequence: 1,
                 aih_id: 'mock-aih-010',
@@ -1339,7 +1439,9 @@ export class DoctorPatientService {
                 cbo: '225133',
                 participation: 'Responsável'
               }
-            ]
+            ],
+            total_procedures: 1,
+            approved_procedures: 1
           },
           {
             patient_info: {
@@ -1349,6 +1451,7 @@ export class DoctorPatientService {
               gender: 'M',
               medical_record: 'MR011'
             },
+            total_value_reais: 320000,
             procedures: [
               {
                 procedure_code: '02.05.01.005-6',
@@ -1365,7 +1468,9 @@ export class DoctorPatientService {
                 cbo: '225133',
                 participation: 'Responsável'
               }
-            ]
+            ],
+            total_procedures: 1,
+            approved_procedures: 1
           },
           {
             patient_info: {
@@ -1375,13 +1480,14 @@ export class DoctorPatientService {
               gender: 'F',
               medical_record: 'MR012'
             },
+            total_value_reais: 120000,
             procedures: [
               {
                 procedure_code: '02.05.01.012-9',
                 procedure_description: 'Holter 24 horas',
                 procedure_date: '2024-02-02',
                 value_reais: 120.00,
-                value_cents: 12000,
+                value_cents: 120000,
                 approval_status: 'approved',
                 sequence: 1,
                 aih_id: 'mock-aih-012',
@@ -1391,7 +1497,9 @@ export class DoctorPatientService {
                 cbo: '225133',
                 participation: 'Responsável'
               }
-            ]
+            ],
+            total_procedures: 1,
+            approved_procedures: 1
           }
         ]
       }
@@ -1403,52 +1511,88 @@ export class DoctorPatientService {
    */
   
   /**
-   * 👨‍⚕️ BUSCAR DADOS REAIS DOS MÉDICOS POR CNS
-   * Integra com as tabelas reais do banco para obter informações dos médicos
+   * 👨‍⚕️ BUSCAR DADOS REAIS DOS MÉDICOS POR CNS COM HOSPITAIS
+   * Integra com as tabelas reais do banco para obter informações dos médicos e hospitais
    */
-  private static async getRealDoctorsData(cnsList: string[]): Promise<Map<string, { name: string; crm: string; specialty: string }>> {
-    const doctorsMap = new Map<string, { name: string; crm: string; specialty: string }>();
+  private static async getRealDoctorsData(cnsList: string[]): Promise<Map<string, { name: string; crm: string; specialty: string; hospitals: DoctorHospital[] }>> {
+    const doctorsMap = new Map<string, { name: string; crm: string; specialty: string; hospitals: DoctorHospital[] }>();
     
     if (cnsList.length === 0) {
       return doctorsMap;
     }
 
     try {
-      console.log(`🔍 Buscando dados reais de ${cnsList.length} médicos...`);
+      console.log(`🔍 Buscando dados reais de ${cnsList.length} médicos com hospitais...`);
 
-      // Tentar buscar da view doctor_hospital_info primeiro
-      const { data: doctorData, error: doctorError } = await supabase
-        .from('doctor_hospital_info')
-        .select('doctor_cns, doctor_name, doctor_crm, doctor_specialty')
-        .in('doctor_cns', cnsList);
-
-      if (!doctorError && doctorData && doctorData.length > 0) {
-        console.log(`✅ Encontrados ${doctorData.length} médicos na view doctor_hospital_info`);
-        doctorData.forEach(doc => {
-          doctorsMap.set(doc.doctor_cns, {
-            name: doc.doctor_name,
-            crm: doc.doctor_crm || '',
-            specialty: doc.doctor_specialty || 'Especialidade não informada'
-          });
-        });
-        return doctorsMap;
-      }
-
-      // Fallback: tentar buscar da tabela doctors
+      // 1. Buscar médicos da tabela doctors
       const { data: doctorsTableData, error: doctorsTableError } = await supabase
         .from('doctors')
         .select('cns, name, crm, specialty')
         .in('cns', cnsList);
 
-      if (!doctorsTableError && doctorsTableData && doctorsTableData.length > 0) {
+      if (doctorsTableError) {
+        console.error('❌ Erro ao buscar médicos:', doctorsTableError);
+        return doctorsMap;
+      }
+
+      // 2. Para cada médico, buscar seus hospitais
+      if (doctorsTableData && doctorsTableData.length > 0) {
         console.log(`✅ Encontrados ${doctorsTableData.length} médicos na tabela doctors`);
-        doctorsTableData.forEach(doc => {
-          doctorsMap.set(doc.cns, {
-            name: doc.name,
-            crm: doc.crm || '',
-            specialty: doc.specialty || 'Especialidade não informada'
+        
+        for (const doctor of doctorsTableData) {
+          // Buscar hospitais associados ao médico
+          const { data: hospitalData, error: hospitalError } = await supabase
+            .from('doctor_hospital')
+            .select(`
+              hospital_id,
+              role,
+              department,
+              is_primary_hospital,
+              is_active,
+              hospitals (
+                id,
+                name,
+                cnpj
+              )
+            `)
+            .eq('doctor_cns', doctor.cns)
+            .eq('is_active', true);
+
+          const hospitals: DoctorHospital[] = [];
+          
+          if (!hospitalError && hospitalData) {
+            hospitals.push(...hospitalData.map(h => ({
+              hospital_id: h.hospital_id,
+              hospital_name: (h.hospitals as any)?.name || 'Hospital não identificado',
+              hospital_cnpj: (h.hospitals as any)?.cnpj,
+              role: h.role,
+              department: h.department,
+              is_primary_hospital: h.is_primary_hospital,
+              is_active: h.is_active
+            })));
+          }
+
+          // Se não tem hospitais cadastrados, adicionar um placeholder
+          if (hospitals.length === 0) {
+            hospitals.push({
+              hospital_id: '',
+              hospital_name: 'Hospital não definido',
+              hospital_cnpj: '',
+              role: '',
+              department: '',
+              is_primary_hospital: true,
+              is_active: true
+            });
+          }
+
+          doctorsMap.set(doctor.cns, {
+            name: doctor.name,
+            crm: doctor.crm || '',
+            specialty: doctor.specialty || 'Especialidade não informada',
+            hospitals: hospitals
           });
-        });
+        }
+        
         return doctorsMap;
       }
 
@@ -1459,7 +1603,8 @@ export class DoctorPatientService {
         doctorsMap.set(cns, {
           name: this.generateDoctorName(cns),
           crm: this.generateCRM(cns),
-          specialty: this.generateSpecialty(cns)
+          specialty: this.generateSpecialty(cns),
+          hospitals: []
         });
       });
 
@@ -1473,7 +1618,8 @@ export class DoctorPatientService {
         doctorsMap.set(cns, {
           name: this.generateDoctorName(cns),
           crm: this.generateCRM(cns),
-          specialty: this.generateSpecialty(cns)
+          specialty: this.generateSpecialty(cns),
+          hospitals: []
         });
       });
 

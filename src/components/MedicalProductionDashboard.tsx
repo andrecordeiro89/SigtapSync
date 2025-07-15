@@ -545,7 +545,7 @@ const MedicalProductionDashboard: React.FC = () => {
                                 </div>
                               </div>
                               <div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <h3 className="font-semibold text-lg text-gray-900">
                                     {doctor.doctor_info.name}
                                   </h3>
@@ -554,6 +554,27 @@ const MedicalProductionDashboard: React.FC = () => {
                                       🔗 Agrupamento
                                     </Badge>
                                   )}
+                                  {/* 🆕 BADGES DOS HOSPITAIS */}
+                                  {(doctor as any).hospitals && (doctor as any).hospitals.length > 0 ? (
+                                    (doctor as any).hospitals.map((hospital: any, idx: number) => (
+                                      <Badge 
+                                        key={hospital.hospital_id || idx}
+                                        variant={hospital.is_primary_hospital ? "default" : "secondary"}
+                                        className={`text-xs ${
+                                          hospital.is_primary_hospital 
+                                            ? 'bg-blue-100 text-blue-700 border-blue-200' 
+                                            : 'bg-gray-100 text-gray-700 border-gray-200'
+                                        }`}
+                                      >
+                                        🏥 {hospital.hospital_name}
+                                        {hospital.is_primary_hospital && ' (Principal)'}
+                                      </Badge>
+                                    ))
+                                  ) : doctor.doctor_info.cns !== 'VIRTUAL_ORPHAN_DOCTOR' ? (
+                                    <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200">
+                                      🏥 Hospital não definido
+                                    </Badge>
+                                  ) : null}
                                 </div>
                                 <div className="flex items-center gap-4 text-sm text-gray-600">
                                   {doctor.doctor_info.cns !== 'VIRTUAL_ORPHAN_DOCTOR' ? (
@@ -566,6 +587,12 @@ const MedicalProductionDashboard: React.FC = () => {
                                   )}
                                   {doctor.doctor_info.specialty && (
                                     <Badge variant="outline">{doctor.doctor_info.specialty}</Badge>
+                                  )}
+                                  {/* 🆕 INFORMAÇÃO ADICIONAL DOS HOSPITAIS */}
+                                  {(doctor as any).hospitals && (doctor as any).hospitals.length > 1 && (
+                                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600">
+                                      📍 Atende em {(doctor as any).hospitals.length} hospitais
+                                    </Badge>
                                   )}
                                 </div>
                               </div>
@@ -732,26 +759,12 @@ const MedicalProductionDashboard: React.FC = () => {
                                                         <div className="flex items-center gap-1">
                                                           <Calendar className="h-3 w-3 text-blue-500" />
                                                           <span className="font-medium">Data:</span>
-                                                          {procedure.procedure_date ? new Date(procedure.procedure_date).toLocaleDateString('pt-BR') : 'Não informada'}
+                                                          <span className="text-gray-800">
+                                                            {procedure.procedure_date ? new Date(procedure.procedure_date).toLocaleDateString('pt-BR') : 'Não informada'}
+                                                          </span>
                                                         </div>
                                                         
-                                                        <div className="flex items-center gap-1">
-                                                          <Activity className="h-3 w-3 text-purple-500" />
-                                                          <span className="font-medium">Status:</span>
-                                                          {procedure.approval_status === 'approved' ? (
-                                                            <Badge variant="default" className="bg-green-100 text-green-700 text-xs">
-                                                              <CheckCircle className="h-3 w-3 mr-1" />Aprovado
-                                                            </Badge>
-                                                          ) : procedure.approval_status === 'rejected' ? (
-                                                            <Badge variant="destructive" className="text-xs">
-                                                              <XCircle className="h-3 w-3 mr-1" />Rejeitado
-                                                            </Badge>
-                                                          ) : (
-                                                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 text-xs">
-                                                              <AlertCircle className="h-3 w-3 mr-1" />Pendente
-                                                            </Badge>
-                                                          )}
-                                                        </div>
+
                                                         
                                                         {procedure.professional_name && (
                                                           <div className="flex items-center gap-1">
@@ -788,14 +801,9 @@ const MedicalProductionDashboard: React.FC = () => {
                                                     </div>
                                                     
                                                     <div className="text-right ml-4">
-                                                      <div className="text-xl font-bold text-green-600 mb-1">
+                                                      <div className="text-xl font-bold text-green-600">
                                                         {formatCurrency(procedure.value_reais)}
                                                       </div>
-                                                      {procedure.billing_status && (
-                                                        <div className="text-xs text-gray-500">
-                                                          Status Faturamento: {procedure.billing_status}
-                                                        </div>
-                                                      )}
                                                     </div>
                                                   </div>
                                                 </div>
