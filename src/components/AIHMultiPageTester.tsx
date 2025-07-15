@@ -1174,7 +1174,9 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                       <TableCell>
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
-                            <p className="font-medium text-sm leading-tight">{procedure.descricao || `Procedimento ${procedure.procedimento}`}</p>
+                            <p className="font-medium text-sm leading-tight">
+                              {(procedure as any).procedure_description || procedure.descricao || procedure.sigtapProcedure?.description || `Procedimento ${procedure.procedimento}`}
+                            </p>
                             {procedure.sequencia === 1 && (
                               <Badge variant="default" className="text-xs bg-green-600 text-white px-2 py-0.5">
                                 Principal

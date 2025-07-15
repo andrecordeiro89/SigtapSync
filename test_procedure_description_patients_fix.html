@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Teste Visual - Correção Procedure Description Pacientes</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f8fafc; 
+        }
+        .success { color: #16a34a; font-weight: bold; }
+        .error { color: #dc2626; font-weight: bold; }
+        .comparison-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .before-section, .after-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .before-section {
+            border-left: 4px solid #dc2626;
+        }
+        .after-section {
+            border-left: 4px solid #16a34a;
+        }
+        .patient-card {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 12px 0;
+        }
+        .aih-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            padding: 12px;
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            border-radius: 6px;
+            margin: 8px 0;
+            cursor: pointer;
+        }
+        .aih-expanded {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 8px 0;
+        }
+        .procedure-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin: 8px 0;
+            background: #f9fafb;
+        }
+        .procedure-card.before {
+            border-left: 4px solid #dc2626;
+        }
+        .procedure-card.after {
+            border-left: 4px solid #16a34a;
+        }
+        .badge {
+            background: #3b82f6;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .code-badge {
+            background: #1e40af;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+        }
+        .description {
+            flex: 1;
+            font-weight: 600;
+            color: #374151;
+        }
+        .description.before {
+            color: #dc2626;
+        }
+        .description.after {
+            color: #16a34a;
+        }
+        .professional {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .value {
+            font-weight: bold;
+            color: #059669;
+        }
+        .icon {
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+        }
+        .expand-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .expand-btn:hover {
+            background: #e5e7eb;
+        }
+    </style>
+</head>
+<body>
+    <div style="text-align: center; margin-bottom: 30px;">
+        <h1>🔧 Correção Aplicada - Procedure Description</h1>
+        <h2 style="color: #6b7280;">Tela de Pacientes - Seção "AIHs Processadas"</h2>
+    </div>
+
+    <div class="comparison-container">
+        <!-- ANTES DA CORREÇÃO -->
+        <div class="before-section">
+            <h3 style="color: #dc2626;">❌ ANTES (Problema)</h3>
+            
+            <div class="patient-card">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                    <span class="icon">👤</span>
+                    <strong>GUILHERME BRUSTULIN</strong>
+                    <span style="font-size: 12px; color: #6b7280;">CNS: 705000432447852</span>
+                </div>
+                
+                <div class="aih-header" onclick="toggleExpand('before-aih-1')">
+                    <div>
+                        <span class="badge">#412511059519-9</span>
+                        <span style="margin-left: 8px; font-size: 14px;">12/07/2025</span>
+                    </div>
+                    <button class="expand-btn">▼</button>
+                </div>
+                
+                <div class="aih-expanded" id="before-aih-1">
+                    <h4 style="margin: 0 0 12px 0; font-size: 14px;">📋 Procedimentos (1)</h4>
+                    
+                    <div class="procedure-card before">
+                        <span class="badge">#1</span>
+                        <span class="code-badge">04.07.04.012-9</span>
+                        <div style="flex: 1;">
+                            <div class="description before">Procedimento 04.07.04.012-9</div>
+                            <div class="professional">👤 Dr. João Silva (2251)</div>
+                        </div>
+                        <div class="value">R$ 434,99</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DEPOIS DA CORREÇÃO -->
+        <div class="after-section">
+            <h3 style="color: #16a34a;">✅ DEPOIS (Corrigido)</h3>
+            
+            <div class="patient-card">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                    <span class="icon">👤</span>
+                    <strong>GUILHERME BRUSTULIN</strong>
+                    <span style="font-size: 12px; color: #6b7280;">CNS: 705000432447852</span>
+                </div>
+                
+                <div class="aih-header" onclick="toggleExpand('after-aih-1')">
+                    <div>
+                        <span class="badge">#412511059519-9</span>
+                        <span style="margin-left: 8px; font-size: 14px;">12/07/2025</span>
+                    </div>
+                    <button class="expand-btn">▼</button>
+                </div>
+                
+                <div class="aih-expanded" id="after-aih-1">
+                    <h4 style="margin: 0 0 12px 0; font-size: 14px;">📋 Procedimentos (1)</h4>
+                    
+                    <div class="procedure-card after">
+                        <span class="badge">#1</span>
+                        <span class="code-badge">04.07.04.012-9</span>
+                        <div style="flex: 1;">
+                            <div class="description after">HERNIOPLASTIA UMBILICAL</div>
+                            <div class="professional">👤 Dr. João Silva (2251)</div>
+                        </div>
+                        <div class="value">R$ 434,99</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+        <h3>🔧 Lógica de Correção Implementada</h3>
+        
+        <div style="background: #f1f5f9; padding: 15px; border-radius: 6px; margin: 10px 0;">
+            <h4>Prioridade de Exibição de Descrições:</h4>
+            <ol style="margin: 8px 0;">
+                <li><strong>procedure_description</strong> - Se existe e não é fallback genérico</li>
+                <li><strong>sigtap_procedures.description</strong> - Descrição oficial do SIGTAP</li>
+                <li><strong>displayName</strong> - Se existe e não é fallback genérico</li>
+                <li><strong>Fallback</strong> - "Procedimento {código}"</li>
+            </ol>
+        </div>
+
+        <div style="background: #f0fdf4; padding: 15px; border-radius: 6px; margin: 10px 0;">
+            <h4>Casos de Teste:</h4>
+            <ul style="margin: 8px 0;">
+                <li>✅ <strong>Com procedure_description:</strong> "HERNIOPLASTIA UMBILICAL"</li>
+                <li>✅ <strong>Com SIGTAP apenas:</strong> "Colecistectomia por videolaparoscopia"</li>
+                <li>✅ <strong>Sem descrição:</strong> "Procedimento 04.07.04.012-9"</li>
+            </ul>
+        </div>
+    </div>
+
+    <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0;">
+        <h3>📋 Como Testar no Sistema Real</h3>
+        
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 15px; align-items: center;">
+            <span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">1</span>
+            <div>Acesse <strong>👥 Pacientes</strong> no menu lateral</div>
+            
+            <span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">2</span>
+            <div>Localize a seção <strong>"AIHs Processadas"</strong></div>
+            
+            <span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">3</span>
+            <div>Clique no botão de <strong>expansão (▼)</strong> de qualquer paciente</div>
+            
+            <span style="background: #16a34a; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">✓</span>
+            <div><strong>Verificar:</strong> Descrições reais aparecem em vez de "Procedimento {código}"</div>
+        </div>
+    </div>
+
+    <script>
+        function toggleExpand(id) {
+            const element = document.getElementById(id);
+            if (element.style.display === 'none') {
+                element.style.display = 'block';
+            } else {
+                element.style.display = 'none';
+            }
+        }
+
+        // Simular expansão automática para demonstração
+        document.addEventListener('DOMContentLoaded', function() {
+            // Manter expandido por padrão para demonstração
+            console.log('🔧 Teste Visual - Correção Procedure Description carregado');
+            console.log('✅ Compare o ANTES vs DEPOIS da correção');
+        });
+    </script>
+</body>
+</html> 

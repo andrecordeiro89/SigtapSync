@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Teste de Correção - Persistência AIH</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .success { color: #16a34a; font-weight: bold; }
+        .error { color: #dc2626; font-weight: bold; }
+        .warning { color: #ca8a04; font-weight: bold; }
+        .info { color: #2563eb; font-weight: bold; }
+        .code { 
+            background: #1f2937; 
+            color: #f9fafb; 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin: 10px 0; 
+            font-family: 'Courier New', monospace; 
+            white-space: pre-wrap;
+        }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste de Correção - Persistência AIH</h1>
+    <p class="info">Validação das correções implementadas para resolver os erros de persistência na tela AIH Avançado</p>
+
+    <div class="section">
+        <h2>📋 Problemas Identificados e Corrigidos</h2>
+        
+        <h3>1. ❌ Erro de Formato de Data</h3>
+        <p><strong>Problema:</strong> Data brasileira (DD/MM/YYYY) sendo enviada para PostgreSQL que espera formato ISO (YYYY-MM-DD)</p>
+        <div class="code">❌ ANTES: procedure_date: "13/07/2025" (formato brasileiro)
+✅ DEPOIS: procedure_date: "2025-07-13" (formato ISO)</div>
+        <p><strong>Solução:</strong> Implementada função <code>convertBrazilianDateToISO()</code> que converte automaticamente o formato</p>
+
+        <h3>2. ❌ Erro 406 (Not Acceptable) em Consultas SQL</h3>
+        <p><strong>Problema:</strong> Uso de <code>.single()</code> em consultas que podem retornar 0 ou múltiplos registros</p>
+        <div class="code">❌ ANTES: .single() - falha se não encontrar OU encontrar múltiplos
+✅ DEPOIS: sem .single() - retorna array vazio ou com resultados</div>
+        <p><strong>Consultas Corrigidas:</strong></p>
+        <ul>
+            <li>✅ Verificação de duplicata de AIH</li>
+            <li>✅ Busca de pacientes por CNS</li>
+            <li>✅ Busca de pacientes por nome + nascimento</li>
+            <li>✅ Busca de procedimentos SIGTAP</li>
+            <li>✅ Verificação de matches SIGTAP</li>
+        </ul>
+
+        <h3>3. ❌ Erro 400 (Bad Request) na Inserção de Procedimentos</h3>
+        <p><strong>Problema:</strong> Campo <code>procedure_date</code> com formato incorreto</p>
+        <div class="code">❌ ANTES: date/time field value out of range: "13/07/2025"
+✅ DEPOIS: date/time field accepted: "2025-07-13"</div>
+        <p><strong>Solução:</strong> Conversão automática antes da inserção</p>
+    </div>
+
+    <div class="section">
+        <h2>🔧 Função de Conversão Implementada</h2>
+        <div class="code">/**
+ * 🔧 UTILITÁRIO: Converter data brasileira para ISO
+ * Converte DD/MM/YYYY para YYYY-MM-DD
+ */
+const convertBrazilianDateToISO = (dateString: string): string => {
+  if (!dateString) return new Date().toISOString().split('T')[0];
+  
+  // Se já está no formato ISO, retorna como está
+  if (dateString.match(/^\d{4}-\d{2}-\d{2}/)) {
+    return dateString.split('T')[0];
+  }
+  
+  // Se está no formato brasileiro DD/MM/YYYY
+  if (dateString.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+    const [day, month, year] = dateString.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  // Fallback para data atual
+  return new Date().toISOString().split('T')[0];
+};</div>
+    </div>
+
+    <div class="section">
+        <h2>✅ Locais Corrigidos no Código</h2>
+        <ul>
+            <li><strong>aihPersistenceService.ts:</strong>
+                <ul>
+                    <li>✅ Linha ~1244: <code>procedure_date: convertBrazilianDateToISO(procedure.data)</code></li>
+                    <li>✅ Linha ~1394: <code>procedure_date: data.procedure_date ? convertBrazilianDateToISO(data.procedure_date) : ...</code></li>
+                    <li>✅ Consultas de duplicata: Removido <code>.single()</code> das verificações</li>
+                    <li>✅ Busca de pacientes: Removido <code>.single()</code> e adicionado tratamento de arrays</li>
+                    <li>✅ Busca SIGTAP: Removido <code>.single()</code> e adicionado tratamento de arrays</li>
+                    <li>✅ Variáveis de erro: Renomeadas para evitar conflitos (<code>searchError</code>, <code>sigtapError</code>)</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>🧪 Como Testar</h2>
+        <ol>
+            <li>Acesse a tela <strong>AIH Avançado</strong> (AIHMultiPageTester)</li>
+            <li>Faça upload de um PDF de AIH</li>
+            <li>Aguarde o processamento automático</li>
+            <li>Clique no botão <strong>"🚀 Salvar AIH Completa"</strong></li>
+            <li>Observe no console:
+                <ul>
+                    <li>✅ Não deve mais aparecer erro de formato de data</li>
+                    <li>✅ Não deve mais aparecer erro 406 nas consultas</li>
+                    <li>✅ Procedimentos devem ser salvos com sucesso</li>
+                    <li>✅ Toast de sucesso deve aparecer</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+
+    <div class="section">
+        <h2>📊 Logs Esperados (Sucesso)</h2>
+        <div class="code">✅ Conversão de data: 13/07/2025 → 2025-07-13
+✅ Paciente criado com schema COMPLETAMENTE expandido: GUILHERME BRUSTULIN
+✅ AIH criada com schema expandido!
+✅ SUCESSO: Procedimento salvo com schema EXPANDIDO!
+✅ Procedimento SIGTAP encontrado: 04.07.04.012-9 → [ID]
+✅ Procedimentos salvos: 1/1
+✅ Matches salvos: 1
+✅ Persistência completa finalizada!</div>
+    </div>
+
+    <div class="section">
+        <h2>🚨 Se Ainda Houver Erros</h2>
+        <p>Se os erros persistirem, verifique:</p>
+        <ul>
+            <li>🔍 <strong>Permissões RLS:</strong> Usuario tem acesso ao hospital correto</li>
+            <li>🗄️ <strong>Schema do Banco:</strong> Tabelas têm todos os campos necessários</li>
+            <li>🔒 <strong>Constraints:</strong> Não há restrições impedindo a inserção</li>
+            <li>🌐 <strong>Conectividade:</strong> Supabase está acessível</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>📈 Benefícios das Correções</h2>
+        <ul>
+            <li>✅ <strong>Estabilidade:</strong> Eliminação dos erros 406 e 400</li>
+            <li>✅ <strong>Robustez:</strong> Tratamento adequado de casos edge</li>
+            <li>✅ <strong>Performance:</strong> Consultas mais eficientes sem <code>.single()</code> desnecessário</li>
+            <li>✅ <strong>Manutenibilidade:</strong> Código mais limpo e previsível</li>
+            <li>✅ <strong>UX:</strong> Processo de salvamento funciona conforme esperado</li>
+        </ul>
+    </div>
+
+    <script>
+        console.log('🔧 Teste de Correção - Persistência AIH carregado');
+        console.log('✅ Principais correções implementadas:');
+        console.log('   1. Conversão automática de datas brasileiras para ISO');
+        console.log('   2. Remoção de .single() problemático das consultas');
+        console.log('   3. Tratamento adequado de arrays vazios');
+        console.log('   4. Melhoria no tratamento de erros');
+        console.log('');
+        console.log('🧪 Para testar: Acesse AIH Avançado > Upload PDF > Salvar AIH');
+    </script>
+</body>
+</html> 

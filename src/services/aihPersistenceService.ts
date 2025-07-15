@@ -2,6 +2,43 @@ import { supabase, AIHDB, PatientDB } from '../lib/supabase';
 import { AIH } from '../types';
 import { PatientService, AIHService } from './supabaseService';
 
+// ================================================================
+// UTILIDADES DE CONVERSÃO
+// ================================================================
+
+/**
+ * 🔧 UTILITÁRIO: Converter data brasileira para ISO
+ * Converte DD/MM/YYYY para YYYY-MM-DD
+ */
+const convertBrazilianDateToISO = (dateString: string): string => {
+  if (!dateString) return new Date().toISOString().split('T')[0];
+  
+  // Se já está no formato ISO, retorna como está
+  if (dateString.match(/^\d{4}-\d{2}-\d{2}/)) {
+    return dateString.split('T')[0]; // Remove a parte de tempo se existir
+  }
+  
+  // Se está no formato brasileiro DD/MM/YYYY
+  if (dateString.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+    const [day, month, year] = dateString.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  // Se está no formato americano MM/DD/YYYY
+  if (dateString.match(/^\d{1,2}\/\d{1,2}\/\d{4}/)) {
+    try {
+      const date = new Date(dateString);
+      return date.toISOString().split('T')[0];
+    } catch {
+      return new Date().toISOString().split('T')[0];
+    }
+  }
+  
+  // Fallback para data atual
+  console.warn(`⚠️ Formato de data não reconhecido: ${dateString}. Usando data atual.`);
+  return new Date().toISOString().split('T')[0];
+};
+
 export interface AIHPersistenceResult {
   success: boolean;
   aihId?: string;
@@ -281,14 +318,13 @@ export class AIHPersistenceService {
           .from('patients')
           .select('*')
           .eq('hospital_id', hospitalId)
-          .eq('cns', aih.cns)
-          .single();
+          .eq('cns', aih.cns);
         
         console.log('📊 Resposta busca por CNS:', { data, error });
         
-        if (!error && data) {
-          existingPatient = data;
-          console.log(`👤 Paciente encontrado por CNS: ${data.name}`);
+        if (!error && data && data.length > 0) {
+          existingPatient = data[0];
+          console.log(`👤 Paciente encontrado por CNS: ${data[0].name}`);
         } else if (error) {
           console.log('⚠️ Erro na busca por CNS:', error.message);
         }
@@ -302,12 +338,13 @@ export class AIHPersistenceService {
           .select('*')
           .eq('hospital_id', hospitalId)
           .eq('name', aih.nomePaciente)
-          .eq('birth_date', aih.nascimento)
-          .single();
+          .eq('birth_date', aih.nascimento);
         
-        if (!error && data) {
-          existingPatient = data;
-          console.log(`👤 Paciente encontrado por nome+nascimento: ${data.name}`);
+        if (!error && data && data.length > 0) {
+          existingPatient = data[0];
+          console.log(`👤 Paciente encontrado por nome+nascimento: ${data[0].name}`);
+        } else if (error) {
+          console.log('⚠️ Erro na busca por nome+nascimento:', error.message);
         }
       }
 
@@ -506,14 +543,17 @@ export class AIHPersistenceService {
       } else {
         // 🔄 LÓGICA NORMAL PARA AIHs COM NÚMERO
         console.log('🔍 Verificando duplicata por número de AIH...');
-        const { data: existingAIH } = await supabase
+        const { data: existingAIHs, error: checkError } = await supabase
           .from('aihs')
           .select('id')
           .eq('hospital_id', hospitalId)
-          .eq('aih_number', aih.numeroAIH)
-          .single();
+          .eq('aih_number', aih.numeroAIH);
 
-        if (existingAIH) {
+        if (checkError) {
+          console.warn('⚠️ Erro na verificação de duplicatas:', checkError);
+        }
+
+        if (existingAIHs && existingAIHs.length > 0) {
           return {
             success: false,
             message: `AIH ${aih.numeroAIH} já existe no sistema`,
@@ -1187,14 +1227,19 @@ export class AIHPersistenceService {
       } else {
         // 🔄 LÓGICA NORMAL PARA AIHs COM NÚMERO
         console.log('🔍 Verificando duplicata por número de AIH...');
-        const { data: existingAIH, error: checkError } = await supabase
+        const { data: existingAIHs, error: checkError } = await supabase
           .from('aihs')
           .select('id, aih_number, created_at')
           .eq('hospital_id', hospitalId)
-          .eq('aih_number', aihCompleta.numeroAIH)
-          .single();
+          .eq('aih_number', aihCompleta.numeroAIH);
 
-        if (existingAIH) {
+        if (checkError) {
+          console.warn('⚠️ Erro na verificação de duplicatas:', checkError);
+          // Continue mesmo com erro na verificação
+        }
+
+        if (existingAIHs && existingAIHs.length > 0) {
+          const existingAIH = existingAIHs[0];
           console.warn(`⚠️ AIH ${aihCompleta.numeroAIH} já existe no sistema (ID: ${existingAIH.id})`);
           return {
             success: false,
@@ -1236,7 +1281,7 @@ export class AIHPersistenceService {
               cbo: procedure.cbo,
               participation: procedure.participacao,
               cnes: procedure.cnes,
-              procedure_date: procedure.data,
+              procedure_date: convertBrazilianDateToISO(procedure.data),
               accepted: procedure.aceitar,
               calculated_value: procedure.valorCalculado || 0,
               original_value: procedure.valorOriginal || 0,
@@ -1316,15 +1361,16 @@ export class AIHPersistenceService {
     let procedureId = null;
     if (data.procedure_code) {
       try {
-        const { data: sigtapProc } = await supabase
+        const { data: sigtapProcs, error: searchError } = await supabase
           .from('sigtap_procedures')
           .select('id')
-          .eq('code', data.procedure_code)
-          .single();
+          .eq('code', data.procedure_code);
         
-        if (sigtapProc) {
-          procedureId = sigtapProc.id;
+        if (!searchError && sigtapProcs && sigtapProcs.length > 0) {
+          procedureId = sigtapProcs[0].id;
           console.log(`✅ Procedimento SIGTAP encontrado: ${data.procedure_code} -> ${procedureId}`);
+        } else if (searchError) {
+          console.warn(`⚠️ Erro na busca SIGTAP para ${data.procedure_code}:`, searchError.message);
         }
       } catch (error) {
         console.warn(`⚠️ SIGTAP não disponível para ${data.procedure_code}, continuando sem referência`);
@@ -1360,7 +1406,7 @@ export class AIHPersistenceService {
       // ✅ CAMPOS USANDO NOMES CORRETOS DO SCHEMA
       procedure_code: data.procedure_code,
       procedure_description: data.procedure_description || `Procedimento ${data.procedure_code}`,
-      procedure_date: data.procedure_date || new Date().toISOString(),  // Nome correto!
+      procedure_date: data.procedure_date ? convertBrazilianDateToISO(data.procedure_date) : new Date().toISOString().split('T')[0],  // Nome correto!
       
       // Profissional responsável  
       professional_name: data.professional_name || 'PROFISSIONAL NÃO INFORMADO',
@@ -1560,16 +1606,17 @@ export class AIHPersistenceService {
     console.log(`🔧 SALVANDO MATCH SIGTAP CORRIGIDO: ${data.sigtap_procedure.code}`);
     
     // Buscar o ID do procedimento SIGTAP
-    const { data: sigtapProc } = await supabase
+    const { data: sigtapProcs, error: sigtapError } = await supabase
       .from('sigtap_procedures')
       .select('id')
-      .eq('code', data.sigtap_procedure.code)
-      .single();
+      .eq('code', data.sigtap_procedure.code);
 
-    if (!sigtapProc) {
+    if (sigtapError || !sigtapProcs || sigtapProcs.length === 0) {
       console.warn(`⚠️ Procedimento SIGTAP não encontrado: ${data.sigtap_procedure.code}`);
       return null;
     }
+
+    const sigtapProc = sigtapProcs[0];
 
     // 🎯 MAPEAMENTO CORRETO PARA TABELA aih_matches
     const match = {
@@ -2315,6 +2362,8 @@ export class AIHPersistenceService {
 
       // Strategy 1: Optimized query with known schema fields INCLUDING DESCRIPTION AND SEQUENCIA
       try {
+        console.log('🔍 getAIHProcedures - Buscando procedimentos para AIH:', aihId);
+        
         const { data: procedures, error } = await supabase
         .from('procedure_records')
           .select(`
@@ -2347,12 +2396,25 @@ export class AIHPersistenceService {
         if (procedures && procedures.length > 0) {
           console.log(`Strategy 1: Found ${procedures.length} procedures with sequencia and descriptions`);
           
+          // 🔍 DEBUG: Mostrar dados brutos do banco
+          procedures.forEach((proc, index) => {
+            console.log(`📋 Procedimento ${index + 1}:`, {
+              code: proc.procedure_code,
+              description: proc.procedure_description,
+              sequencia: proc.sequencia,
+              id: proc.id
+            });
+          });
+          
           // Normalizar dados com sequencia correto
           const normalizedProcedures = procedures.map((proc, index) => ({
             ...proc,
             procedure_sequence: proc.sequencia || (index + 1),
             match_status: proc.match_status || 'matched', // ✅ USAR VALOR PERMITIDO
-            displayName: proc.procedure_description || `Procedimento: ${proc.codigo_procedimento_original || proc.procedure_code}`,
+            // ✅ Não criar displayName fallback - deixar que o componente decida
+            displayName: proc.procedure_description && 
+                        !proc.procedure_description.startsWith('Procedimento') ? 
+                        proc.procedure_description : undefined,
             fullDescription: `${proc.codigo_procedimento_original || proc.procedure_code} - ${
               proc.procedure_description || 'Descrição não disponível'
             }`

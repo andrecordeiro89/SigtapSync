@@ -353,6 +353,7 @@ export interface ProcedureAIH {
   aceitar: boolean;
   data: string;
   descricao?: string;
+  procedure_description?: string; // ✅ Campo usado quando dados vem do banco de dados
   
   // Campos do matching
   matchStatus: 'pending' | 'matched' | 'manual' | 'rejected' | 'approved';

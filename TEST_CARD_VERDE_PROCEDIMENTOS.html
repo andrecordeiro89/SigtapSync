@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Teste - Card Verde Procedimentos</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 900px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f8fafc; 
+        }
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .card-verde {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin: 8px 0;
+            background: #f0fdf4;
+            border-left: 4px solid #16a34a;
+        }
+        .badge {
+            background: #3b82f6;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .code-badge {
+            background: #1e40af;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+        }
+        .description {
+            flex: 1;
+            font-weight: 600;
+            color: #374151;
+        }
+        .description.correto {
+            color: #16a34a;
+            background: #dcfce7;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .description.erro {
+            color: #dc2626;
+            background: #fee2e2;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .buttons {
+            display: flex;
+            gap: 4px;
+        }
+        .btn {
+            padding: 4px 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .professional {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .value {
+            font-weight: bold;
+            color: #059669;
+        }
+        .log-output {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Teste - Correção Card Verde Procedimentos</h1>
+        <p><strong>Localização:</strong> Tela Pacientes → AIHs Processadas → Expandir → Card Verde</p>
+    </div>
+
+    <div class="test-container">
+        <h2>❌ ANTES DA CORREÇÃO</h2>
+        <div class="card-verde">
+            <span class="badge">#1</span>
+            <span class="code-badge">04.07.04.012-9</span>
+            <div style="flex: 1;">
+                <div class="description erro">Procedimento 04.07.04.012-9</div>
+                <div class="professional">👤 Dr. João Silva (2251)</div>
+            </div>
+            <div class="value">R$ 434,99</div>
+            <div class="buttons">
+                <button class="btn">❌</button>
+                <button class="btn">🗑️</button>
+                <button class="btn">ℹ️</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>✅ DEPOIS DA CORREÇÃO</h2>
+        <div class="card-verde">
+            <span class="badge">#1</span>
+            <span class="code-badge">04.07.04.012-9</span>
+            <div style="flex: 1;">
+                <div class="description correto">HERNIOPLASTIA UMBILICAL</div>
+                <div class="professional">👤 Dr. João Silva (2251)</div>
+            </div>
+            <div class="value">R$ 434,99</div>
+            <div class="buttons">
+                <button class="btn">❌</button>
+                <button class="btn">🗑️</button>
+                <button class="btn">ℹ️</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>🔧 Correções Aplicadas</h2>
+        
+        <h3>1. ProcedureInlineCard.tsx</h3>
+        <ul>
+            <li>✅ Prioridade máxima para <code>procedure_description</code></li>
+            <li>✅ Filtros para evitar fallbacks genéricos</li>
+            <li>✅ Logs de debug adicionados</li>
+        </ul>
+
+        <h3>2. aihPersistenceService.ts</h3>
+        <ul>
+            <li>✅ Query garante seleção de <code>procedure_description</code></li>
+            <li>✅ Logs de debug para dados do banco</li>
+            <li>✅ Normalização preserva dados originais</li>
+        </ul>
+    </div>
+
+    <div class="test-container">
+        <h2>🔍 Logs de Debug Esperados</h2>
+        <p>Com as correções, você deve ver estes logs no console (F12):</p>
+        
+        <div class="log-output" id="expected-logs">
+            <div>🔍 getAIHProcedures - Buscando procedimentos para AIH: 123-456-789</div>
+            <div>Strategy 1: Found 1 procedures with sequencia and descriptions</div>
+            <div>📋 Procedimento 1: {</div>
+            <div>&nbsp;&nbsp;code: "04.07.04.012-9",</div>
+            <div>&nbsp;&nbsp;description: "HERNIOPLASTIA UMBILICAL",</div>
+            <div>&nbsp;&nbsp;sequencia: 1,</div>
+            <div>&nbsp;&nbsp;id: "abc-123"</div>
+            <div>}</div>
+            <div>🔍 ProcedureInlineCard - Dados recebidos: {</div>
+            <div>&nbsp;&nbsp;procedure_description: "HERNIOPLASTIA UMBILICAL",</div>
+            <div>&nbsp;&nbsp;displayName: undefined,</div>
+            <div>&nbsp;&nbsp;sigtap_description: "Hernioplastia umbilical",</div>
+            <div>&nbsp;&nbsp;procedure_code: "04.07.04.012-9"</div>
+            <div>}</div>
+            <div>✅ Usando procedure_description: HERNIOPLASTIA UMBILICAL</div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>🚀 Como Testar</h2>
+        
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 15px; align-items: center;">
+            <span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">1</span>
+            <div>Acesse <strong>👥 Pacientes</strong> no menu lateral</div>
+            
+            <span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">2</span>
+            <div>Encontre <strong>GUILHERME BRUSTULIN</strong> na lista</div>
+            
+            <span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">3</span>
+            <div>Clique no <strong>botão de expansão (▼)</strong> à esquerda do nome</div>
+            
+            <span style="background: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">4</span>
+            <div>Vá até a seção <strong>"Procedimentos"</strong></div>
+            
+            <span style="background: #16a34a; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">✓</span>
+            <div><strong>Verificar:</strong> Card verde deve mostrar "HERNIOPLASTIA UMBILICAL"</div>
+            
+            <span style="background: #6b7280; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">F12</span>
+            <div><strong>Console:</strong> Abrir DevTools para ver logs de debug</div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🧪 Teste Card Verde - Procedimentos');
+        console.log('🎯 Objetivo: Mostrar "HERNIOPLASTIA UMBILICAL" em vez de "Procedimento 04.07.04.012-9"');
+        console.log('✅ Correções aplicadas nos arquivos:');
+        console.log('   - src/components/ProcedureInlineCard.tsx');
+        console.log('   - src/services/aihPersistenceService.ts');
+    </script>
+</body>
+</html> 

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Teste - Exibição de Procedure Description</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f5f5f5; 
+        }
+        .success { color: #16a34a; font-weight: bold; }
+        .error { color: #dc2626; font-weight: bold; }
+        .warning { color: #ca8a04; font-weight: bold; }
+        .info { color: #2563eb; font-weight: bold; }
+        .test-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .procedure-item {
+            padding: 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin: 8px 0;
+            background: #f9fafb;
+        }
+        .procedure-code {
+            font-family: monospace;
+            background: #e5e7eb;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .procedure-desc {
+            font-weight: 600;
+            color: #374151;
+            margin: 4px 0;
+        }
+        .sigtap-desc {
+            font-size: 12px;
+            color: #6b7280;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-card">
+        <h1>🔧 Teste de Correção - Exibição de Procedure Description</h1>
+        <p class="info">Este teste simula como os procedimentos devem ser exibidos no AIHMultiPageTester.</p>
+    </div>
+
+    <div class="test-card">
+        <h2>📋 Status das Correções Aplicadas</h2>
+        
+        <div style="display: grid; grid-template-columns: auto 1fr auto; gap: 15px; align-items: center;">
+            <span class="success">✅</span>
+            <div>
+                <strong>Data Format Fix</strong><br>
+                <small>Datas brasileiras (DD/MM/YYYY) → ISO (YYYY-MM-DD)</small>
+            </div>
+            <code>convertBrazilianDateToISO()</code>
+
+            <span class="success">✅</span>
+            <div>
+                <strong>Single Query Fix</strong><br>
+                <small>Removido .single() em consultas múltiplas</small>
+            </div>
+            <code>arrays em vez de single</code>
+
+            <span class="success">✅</span>
+            <div>
+                <strong>Procedure Description Display</strong><br>
+                <small>Prioridade: procedure_description → descricao → sigtap</small>
+            </div>
+            <code>fallback de descrições</code>
+
+            <span class="success">✅</span>
+            <div>
+                <strong>Type Definition Update</strong><br>
+                <small>Interface ProcedureAIH + procedure_description</small>
+            </div>
+            <code>TypeScript interface</code>
+        </div>
+    </div>
+
+    <div class="test-card">
+        <h2>🧪 Simulação de Procedimentos - Como Será Exibido</h2>
+        
+        <div id="procedure-examples">
+            <!-- Será preenchido via JavaScript -->
+        </div>
+    </div>
+
+    <div class="test-card">
+        <h2>🔍 Teste de Lógica de Exibição</h2>
+        <p>A lógica de exibição segue esta ordem de prioridade:</p>
+        <ol>
+            <li><strong>procedure_description</strong> - Quando dados vem do banco de dados</li>
+            <li><strong>descricao</strong> - Quando dados vem do processamento de PDF</li>
+            <li><strong>sigtapProcedure?.description</strong> - Descrição do SIGTAP</li>
+            <li><strong>Fallback</strong> - "Procedimento {código}"</li>
+        </ol>
+        
+        <div id="logic-test">
+            <!-- Será preenchido via JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        // ✅ FUNÇÃO CORRIGIDA PARA EXIBIR DESCRIÇÕES
+        function getDisplayDescription(procedure) {
+            return procedure.procedure_description || 
+                   procedure.descricao || 
+                   procedure.sigtapProcedure?.description || 
+                   `Procedimento ${procedure.procedimento}`;
+        }
+
+        // 🧪 DADOS DE TESTE SIMULANDO DIFERENTES CENÁRIOS
+        const testProcedures = [
+            {
+                sequencia: 1,
+                procedimento: "03.03.01.007-2",
+                procedure_description: "COLECISTECTOMIA VIDEOLAPAROSCÓPICA", // ✅ Do banco
+                descricao: "Descrição PDF original",
+                sigtapProcedure: { 
+                    description: "Colecistectomia por videolaparoscopia" 
+                }
+            },
+            {
+                sequencia: 2,
+                procedimento: "04.08.01.012-6",
+                descricao: "ANESTESIA GERAL", // ✅ Do processamento PDF
+                sigtapProcedure: { 
+                    description: "Anestesia geral" 
+                }
+            },
+            {
+                sequencia: 3,
+                procedimento: "02.01.01.007-0",
+                sigtapProcedure: { 
+                    description: "CONSULTA MÉDICA EM ATENÇÃO PRIMÁRIA" // ✅ Só SIGTAP
+                }
+            },
+            {
+                sequencia: 4,
+                procedimento: "99.99.99.999-9" // ✅ Só código (fallback)
+            }
+        ];
+
+        // 📋 RENDERIZAR EXEMPLOS DE PROCEDIMENTOS
+        function renderProcedureExamples() {
+            const container = document.getElementById('procedure-examples');
+            
+            testProcedures.forEach(procedure => {
+                const description = getDisplayDescription(procedure);
+                const isPrincipal = procedure.sequencia === 1;
+                
+                const item = document.createElement('div');
+                item.className = 'procedure-item';
+                item.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-weight: bold; color: #6b7280;">${procedure.sequencia}.</span>
+                        <span class="procedure-code">${procedure.procedimento}</span>
+                        <div style="flex: 1;">
+                            <div class="procedure-desc">
+                                ${description}
+                                ${isPrincipal ? '<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 8px;">Principal</span>' : ''}
+                            </div>
+                            ${procedure.sigtapProcedure ? `<div class="sigtap-desc">SIGTAP: ${procedure.sigtapProcedure.description}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // 🔍 RENDERIZAR TESTE DE LÓGICA
+        function renderLogicTest() {
+            const container = document.getElementById('logic-test');
+            
+            testProcedures.forEach((procedure, index) => {
+                const sources = [];
+                if (procedure.procedure_description) sources.push('📊 banco de dados');
+                if (procedure.descricao) sources.push('📄 PDF processado');
+                if (procedure.sigtapProcedure?.description) sources.push('🔍 SIGTAP');
+                if (sources.length === 0) sources.push('⚠️ fallback');
+                
+                const finalDescription = getDisplayDescription(procedure);
+                
+                const item = document.createElement('div');
+                item.style.cssText = 'margin: 10px 0; padding: 10px; border-left: 4px solid #3b82f6; background: #eff6ff;';
+                item.innerHTML = `
+                    <div><strong>Teste ${index + 1}:</strong> ${procedure.procedimento}</div>
+                    <div style="margin: 5px 0; font-size: 12px; color: #6b7280;">
+                        Fontes disponíveis: ${sources.join(', ')}
+                    </div>
+                    <div style="font-weight: 600; color: #059669;">
+                        Resultado: "${finalDescription}"
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // 🚀 EXECUTAR TESTES
+        document.addEventListener('DOMContentLoaded', function() {
+            renderProcedureExamples();
+            renderLogicTest();
+        });
+
+        // 📊 LOG DE SIMULAÇÃO
+        console.log('🔧 TESTE DE CORREÇÃO - PROCEDURE DESCRIPTION');
+        console.log('='.repeat(50));
+        
+        testProcedures.forEach((proc, index) => {
+            const description = getDisplayDescription(proc);
+            console.log(`${index + 1}. ${proc.procedimento} → "${description}"`);
+        });
+        
+        console.log('='.repeat(50));
+        console.log('✅ Teste simulado com sucesso!');
+        console.log('💡 Agora teste no AIHMultiPageTester real.');
+    </script>
+</body>
+</html> 

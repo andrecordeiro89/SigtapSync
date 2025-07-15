@@ -122,11 +122,43 @@ const ProcedureInlineCard = ({
   const StatusIcon = config.icon;
   const isRejected = procedure.match_status === 'rejected';
 
-  // Obter descrição do procedimento
-  const procedureDescription = procedure.procedure_description || 
-    procedure.displayName || 
-    procedure.sigtap_procedures?.description || 
-    'Descrição não disponível';
+  // 🎯 CORREÇÃO DIRETA: Priorizar procedure_description do banco de dados
+  const procedureDescription = (() => {
+    console.log('🔍 ProcedureInlineCard - Dados recebidos:', {
+      procedure_description: procedure.procedure_description,
+      displayName: procedure.displayName,
+      sigtap_description: procedure.sigtap_procedures?.description,
+      procedure_code: procedure.procedure_code
+    });
+
+    // 1. PRIORIDADE MÁXIMA: procedure_description do banco (desde que não seja fallback)
+    if (procedure.procedure_description && 
+        procedure.procedure_description.trim() !== '' &&
+        !procedure.procedure_description.startsWith('Procedimento:') &&
+        !procedure.procedure_description.startsWith('Procedimento ')) {
+      console.log('✅ Usando procedure_description:', procedure.procedure_description);
+      return procedure.procedure_description;
+    }
+    
+    // 2. SIGTAP como segunda opção
+    if (procedure.sigtap_procedures?.description) {
+      console.log('✅ Usando SIGTAP description:', procedure.sigtap_procedures.description);
+      return procedure.sigtap_procedures.description;
+    }
+    
+    // 3. displayName como terceira opção (se não for fallback)
+    if (procedure.displayName && 
+        !procedure.displayName.startsWith('Procedimento:') &&
+        !procedure.displayName.startsWith('Procedimento ')) {
+      console.log('✅ Usando displayName:', procedure.displayName);
+      return procedure.displayName;
+    }
+    
+    // 4. Fallback final
+    const fallback = `Procedimento ${procedure.procedure_code}`;
+    console.log('⚠️ Usando fallback:', fallback);
+    return fallback;
+  })();
 
   return (
     <Card className={`transition-all duration-300 hover:shadow-md ${config.bgColor} ${isRejected ? 'opacity-75' : ''}`}>
