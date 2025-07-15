@@ -542,6 +542,50 @@ export class AIHCompleteProcessor {
   }
 
   /**
+   * Método de debug avançado para análise detalhada da extração
+   */
+  private debugProcedureExtraction(text: string): void {
+    console.log(`🔬 DEBUG AVANÇADO: Analisando texto para extração...`);
+    console.log(`📏 Tamanho do texto: ${text.length} caracteres`);
+    
+    // Dividir texto em seções para análise
+    const lines = text.split(/[\n\r]+/);
+    console.log(`📄 Número de linhas: ${lines.length}`);
+    
+    // Procurar por códigos de procedimento
+    const codigosEncontrados = text.match(/[0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9]/g) || [];
+    console.log(`🔍 Códigos de procedimento encontrados: ${codigosEncontrados.length}`);
+    codigosEncontrados.forEach((codigo, index) => {
+      console.log(`   ${index + 1}. ${codigo}`);
+    });
+    
+    // Procurar por descrições em maiúsculas
+    const descricoesMaiusculas = text.match(/[A-ZÁÊÇÕÚÍÂ]{3,}[A-ZÁÊÇÕÚÍÂ\s]{5,}/g) || [];
+    console.log(`📝 Possíveis descrições em maiúsculas: ${descricoesMaiusculas.length}`);
+    descricoesMaiusculas.slice(0, 5).forEach((desc, index) => {
+      console.log(`   ${index + 1}. "${desc.trim().substring(0, 50)}..."`);
+    });
+    
+    // Procurar por padrões específicos CÓDIGO - DESCRIÇÃO
+    const padroesCodigo = text.match(/([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9])\s*-\s*([A-ZÁÊÇÕÚÍÂ][A-ZÁÊÇÕÚÍÂ\s]+)/g) || [];
+    console.log(`🎯 Padrões CÓDIGO-DESCRIÇÃO encontrados: ${padroesCodigo.length}`);
+    padroesCodigo.forEach((padrao, index) => {
+      console.log(`   ${index + 1}. "${padrao.substring(0, 80)}..."`);
+    });
+    
+    // Mostrar uma amostra do texto ao redor de cada código
+    codigosEncontrados.slice(0, 3).forEach((codigo, index) => {
+      const codigoIndex = text.indexOf(codigo);
+      const contexto = text.substring(
+        Math.max(0, codigoIndex - 50),
+        Math.min(text.length, codigoIndex + 150)
+      );
+      console.log(`📍 Contexto do código ${codigo}:`);
+      console.log(`   "${contexto}"`);
+    });
+  }
+
+  /**
    * Extrai procedimentos da página e aplica filtros SUS
    */
   private extractProcedures(text: string, sequenciaInicial: number = 1): ProcedureAIH[] {
@@ -549,6 +593,9 @@ export class AIHCompleteProcessor {
       console.log(`📋 Extraindo procedimentos (sequência inicial: ${sequenciaInicial})...`);
       console.log(`🔍 DEBUGGING: Texto da página (primeiros 500 chars):`);
       console.log(text.substring(0, 500));
+      
+      // 🔬 DEBUG AVANÇADO da extração
+      this.debugProcedureExtraction(text);
       
       // 🚫 ETAPA 1: PRÉ-FILTRO DE ANESTESIA (ANTES DA EXTRAÇÃO COMPLEXA)
       const { filteredText, removedLines } = this.preFilterAnesthesiaLines(text);
@@ -561,147 +608,207 @@ export class AIHCompleteProcessor {
       
       let procedimentos: ProcedureAIH[] = [];
       
-      // Patterns para extrair dados da tabela de procedimentos - REFINADOS
-      const patterns = {
-        // Pattern FLEXÍVEL para linhas da tabela
-        // Captura: Seq Código CRM CBO Participação CNES Aceita Data Descrição
-        linhaTabela: /(\d+)\s+([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9])\s+([A-Z0-9\-\/]+)\s+(\d{4,6})\s+([^0-9\s][^\s]*|[0-9]+[^\s]*|\d+)\s+(\d+)\s+([01])\s+(\d{2}\/\d{2}\/\d{4})\s+(.+?)(?=\n\d+\s+[0-9]{2}\.[0-9]{2}|\n\s*$|$)/gm,
+      // 🆕 LÓGICA NOVA: Extrair especificamente da coluna procedimento da segunda página
+      console.log(`🎯 NOVA LÓGICA: Extraindo da coluna procedimento da segunda página...`);
+      
+      // Buscar por padrões de procedimentos com descrições na coluna procedimento
+      const procedurePatterns = [
+        // Pattern 1: CÓDIGO - DESCRIÇÃO MAIÚSCULA (mais específico)
+        /([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9])\s*-\s*([A-ZÁÊÇÕÚÍÂ\s]+?)(?=\s+\d|\s*$|[\n\r])/g,
         
-        // Pattern para participação FLEXÍVEL - captura "1º", "1°", "1", etc.
-        participacaoFlexivel: /([0-9]+)[°º]?|([IVX]+)[°º]?|([A-Za-z]+)/g,
+        // Pattern 2: CÓDIGO seguido de descrição em maiúsculas (sem hífen)
+        /([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9])\s+([A-ZÁÊÇÕÚÍÂ][A-ZÁÊÇÕÚÍÂ\s]{3,50}?)(?=\s+\d|\s*$|[\n\r])/g,
         
-        // Patterns alternativos
-        procedimentoCodigo: /([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9])/g,
-        cbo: /(\d{4,6})/g,
-        data: /(\d{2}\/\d{2}\/\d{4})/g
-      };
-
-      // 📄 PROCESSAR TEXTO FILTRADO (sem linhas de anestesia)
-      // Tentar extrair usando pattern FLEXÍVEL da tabela
-      let match;
+        // Pattern 3: CÓDIGO DESCRIÇÃO em uma linha contínua
+        /([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9])\s*([A-ZÁÊÇÕÚÍÂ][A-ZÁÊÇÕÚÍÂ\s]+?)(?=\s*[0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9]|\s*$)/g
+      ];
+      
       let sequenciaAtual = sequenciaInicial;
+      let totalExtraidos = 0;
       
-      console.log(`🔍 TENTANDO EXTRAIR com pattern flexível no texto filtrado...`);
-      
-      while ((match = patterns.linhaTabela.exec(filteredText)) !== null) {
-        console.log(`📋 MATCH ENCONTRADO:`, match);
+      // Tentar cada pattern até encontrar resultados
+      for (let patternIndex = 0; patternIndex < procedurePatterns.length; patternIndex++) {
+        const pattern = procedurePatterns[patternIndex];
+        pattern.lastIndex = 0; // Reset regex
         
-        // Extrair e processar código de participação com lógica APRIMORADA
-        const rawParticipacao = match[5]?.trim() || '';
-        const participacaoValidada = this.parseParticipationField(rawParticipacao);
+        console.log(`🔍 Tentando Pattern ${patternIndex + 1}...`);
         
-        const procedimento: ProcedureAIH = {
-          sequencia: parseInt(match[1]) || sequenciaAtual,
-          procedimento: match[2]?.trim() || '',
-          documentoProfissional: match[3]?.trim() || '',
-          cbo: match[4]?.trim() || '',
-          participacao: participacaoValidada,
-          cnes: match[6]?.trim() || '',
-          aceitar: match[7] === '1',
-          data: match[8]?.trim() || '',
-          descricao: match[9]?.trim() || '',
+        let match;
+        let extraidosNessePadrao = 0;
+        
+        while ((match = pattern.exec(filteredText)) !== null) {
+          console.log(`📋 MATCH Pattern ${patternIndex + 1} encontrado:`, match);
           
-          // Status inicial - APROVADO por padrão
-          matchStatus: 'approved',
-          aprovado: true,
+          const codigo = match[1]?.trim() || '';
+          let descricao = match[2]?.trim() || '';
           
-          // 🆕 CAMPO QUANTIDADE - PADRÃO 1
-          quantity: 1
-        };
-
-        if (procedimento.procedimento) {
-          // ✅ PROCEDIMENTO JÁ FILTRADO pelo pré-filtro - adicionar diretamente
-          procedimentos.push(procedimento);
-          console.log(`✅ Procedimento ${sequenciaAtual}: ${procedimento.procedimento} - ${procedimento.descricao}`);
-          console.log(`   👨‍⚕️ Participação: "${rawParticipacao}" → "${participacaoValidada}" (${isValidParticipationCode(participacaoValidada) ? 'VÁLIDO' : 'INVÁLIDO'})`);
-        }
-        
-        sequenciaAtual++;
-      }
-      
-      // Se pattern principal não funcionou, tentar EXTRAÇÃO LINHA POR LINHA
-      if (procedimentos.length === 0) {
-        console.warn('⚠️ Pattern principal falhou, tentando extração linha por linha no texto filtrado...');
-        const extractedByLines = this.extractProceduresByLines(filteredText, sequenciaInicial);
-        procedimentos.push(...extractedByLines);
-      }
-
-      // Se não encontrou procedimentos com o pattern principal, tentar método alternativo
-      if (procedimentos.length === 0) {
-        console.warn('⚠️ Nenhum procedimento encontrado com pattern principal, tentando extração alternativa no texto filtrado...');
-        
-        // Buscar códigos de procedimento e tentar montar estrutura básica
-        const codigosMatch = filteredText.match(patterns.procedimentoCodigo);
-        const datasMatch = filteredText.match(patterns.data);
-        
-        if (codigosMatch) {
-          codigosMatch.forEach((codigo, index) => {
-            const procedimento: ProcedureAIH = {
-              sequencia: sequenciaInicial + index,
-              procedimento: codigo,
-              documentoProfissional: '',
-              cbo: '',
-              participacao: '',
-              cnes: '',
-              aceitar: true,
-              data: datasMatch?.[index] || '',
-              descricao: `Procedimento ${codigo}`,
-              matchStatus: 'approved',
-              aprovado: true
-            };
+          // Limpar a descrição removendo números extras e caracteres desnecessários
+          descricao = this.cleanProcedureDescription(descricao);
+          
+          // Validar se temos dados mínimos válidos
+          if (codigo && descricao.length >= 3) {
+            // Extrair dados contextuais da linha completa
+            const contextData = this.extractContextualData(filteredText, codigo);
             
-            // ✅ PROCEDIMENTO JÁ FILTRADO pelo pré-filtro - adicionar diretamente
+            const procedimento: ProcedureAIH = {
+              sequencia: sequenciaAtual,
+              procedimento: codigo,
+              documentoProfissional: contextData.documento || '',
+              cbo: contextData.cbo || '',
+              participacao: contextData.participacao || '1',
+              cnes: contextData.cnes || '',
+              aceitar: true,
+              data: contextData.data || '',
+              descricao: descricao,
+              
+              // Status inicial - APROVADO por padrão
+              matchStatus: 'approved',
+              aprovado: true,
+              
+              // Campo quantidade - padrão 1
+              quantity: 1
+            };
+
             procedimentos.push(procedimento);
-            console.log(`✅ Procedimento alternativo ${sequenciaInicial + index}: ${codigo}`);
-          });
+            console.log(`✅ Procedimento ${sequenciaAtual}: ${codigo} - ${descricao}`);
+            sequenciaAtual++;
+            extraidosNessePadrao++;
+            totalExtraidos++;
+          }
+        }
+        
+        console.log(`📊 Pattern ${patternIndex + 1} extraiu ${extraidosNessePadrao} procedimentos`);
+        
+        // Se encontrou procedimentos com este pattern, parar de tentar outros
+        if (extraidosNessePadrao > 0) {
+          console.log(`✅ Usando Pattern ${patternIndex + 1} como método principal`);
+          break;
         }
       }
-
-      console.log(`📊 Total de procedimentos extraídos: ${procedimentos.length}`);
       
-      // 🛡️ FILTRO PÓS-EXTRAÇÃO: Segunda camada de proteção SUS
-      const procedimentosAntes = procedimentos.length;
-      procedimentos = procedimentos.filter(proc => {
-        const isAnesthesia = this.isAnesthesiaProcedure(proc);
-        if (isAnesthesia) {
-          const reason = this.getFilterReason(proc);
-          console.log(`🚫 PÓS-FILTRO: Anestesista removido - ${reason}`);
-          console.log(`   📋 Procedimento: ${proc.procedimento} - ${proc.descricao || 'Sem descrição'}`);
-          console.log(`   👨‍⚕️ CBO: "${proc.cbo}" | Participação: "${proc.participacao}"`);
-        }
-        return !isAnesthesia;
+      console.log(`🎯 TOTAL EXTRAÍDO pela nova lógica: ${totalExtraidos} procedimentos`);
+      
+      // Se a nova lógica não funcionou, tentar métodos de fallback
+      if (procedimentos.length === 0) {
+        console.warn('⚠️ Nova lógica falhou, tentando métodos de fallback...');
+        procedimentos = this.fallbackExtractionMethods(filteredText, sequenciaInicial);
+      }
+
+      // Aplicar melhorias na descrição para todos os procedimentos extraídos
+      procedimentos.forEach(proc => {
+        proc.descricao = this.improveProcedureDescription(proc.descricao, proc.procedimento);
       });
-      
-      const procedimentosRemovidos = procedimentosAntes - procedimentos.length;
-      if (procedimentosRemovidos > 0) {
-        console.log(`🛡️ PÓS-FILTRO APLICADO:`);
-        console.log(`   📊 Procedimentos antes: ${procedimentosAntes}`);
-        console.log(`   ✅ Procedimentos após: ${procedimentos.length}`);
-        console.log(`   🚫 Anestesistas removidos: ${procedimentosRemovidos}`);
-        console.log(`   🎯 GARANTIA: Nenhum anestesista passará para a interface`);
-      } else {
-        console.log(`✅ PÓS-FILTRO: Nenhum anestesista detectado após extração`);
-      }
-      
-      // 📊 ESTATÍSTICAS DO PRÉ-FILTRO SUS
-      if (removedLines.length > 0) {
-        console.log(`🚫 PRÉ-FILTRO SUS APLICADO:`);
-        console.log(`   ✅ Procedimentos extraídos: ${procedimentos.length}`);
-        console.log(`   🚫 Linhas de anestesia filtradas: ${removedLines.length}`);
-        console.log(`   🎯 ECONOMIA: ${removedLines.length} linhas removidas antes da extração`);
-        console.log(`   💾 BANCO: Apenas ${procedimentos.length} procedimentos válidos serão salvos`);
-        console.log(`   🔬 CRITÉRIO: Filtro por texto "anestesista" aplicado no texto bruto`);
-      } else {
-        console.log(`✅ NENHUMA LINHA DE ANESTESIA DETECTADA - Todos os ${procedimentos.length} procedimentos são válidos`);
-        console.log(`   🔍 VERIFICAÇÃO: Nenhum termo de anestesia encontrado no texto bruto`);
-      }
-      
-      return procedimentos;
 
+      console.log(`📊 RESUMO FINAL: ${procedimentos.length} procedimentos extraídos`);
+      return procedimentos;
+      
     } catch (error) {
       console.error('❌ Erro ao extrair procedimentos:', error);
       return [];
     }
+  }
+
+  /**
+   * Limpa e normaliza a descrição do procedimento
+   */
+  private cleanProcedureDescription(descricao: string): string {
+    if (!descricao) return '';
+    
+    return descricao
+      .trim()
+      .replace(/\s+/g, ' ') // Normalizar espaços
+      .replace(/[0-9]+$/, '') // Remover números no final
+      .replace(/^\-\s*/, '') // Remover hífen inicial
+      .replace(/\s*-\s*$/, '') // Remover hífen final
+      .trim();
+  }
+
+  /**
+   * Extrai dados contextuais da linha completa onde está o código do procedimento
+   */
+  private extractContextualData(text: string, codigo: string): {
+    documento: string;
+    cbo: string;
+    participacao: string;
+    cnes: string;
+    data: string;
+  } {
+    // Encontrar a posição do código no texto
+    const codigoIndex = text.indexOf(codigo);
+    if (codigoIndex === -1) {
+      return { documento: '', cbo: '', participacao: '1', cnes: '', data: '' };
+    }
+    
+    // Pegar um contexto de 200 caracteres ao redor do código
+    const start = Math.max(0, codigoIndex - 100);
+    const end = Math.min(text.length, codigoIndex + 200);
+    const context = text.substring(start, end);
+    
+    // Extrair dados usando patterns específicos
+    const documentoMatch = context.match(/(\d{3}\.\d{3}\.\d{3}-\d{2})/);
+    const cboMatch = context.match(/\b(\d{4,6})\b/);
+    const dataMatch = context.match(/(\d{2}\/\d{2}\/\d{4})/);
+    const cnesMatch = context.match(/\b(\d{7,8})\b/);
+    
+    return {
+      documento: documentoMatch ? documentoMatch[1] : '',
+      cbo: cboMatch ? cboMatch[1] : '',
+      participacao: '1', // Padrão
+      cnes: cnesMatch ? cnesMatch[1] : '',
+      data: dataMatch ? dataMatch[1] : ''
+    };
+  }
+
+  /**
+   * Melhora a descrição do procedimento usando dados do SIGTAP se disponível
+   */
+  private improveProcedureDescription(descricao: string, codigo: string): string {
+    // Se a descrição é muito curta ou parece incorreta, tentar melhorar
+    if (!descricao || descricao.length < 5 || descricao.toLowerCase().includes('procedimento')) {
+      // Aqui poderia consultar base SIGTAP para descrição correta
+      // Por enquanto, manter o que foi extraído
+      return descricao || `Procedimento ${codigo}`;
+    }
+    
+    return descricao;
+  }
+
+  /**
+   * Métodos de fallback para extração quando a lógica principal falha
+   */
+  private fallbackExtractionMethods(text: string, sequenciaInicial: number): ProcedureAIH[] {
+    console.log('🔄 Executando métodos de fallback...');
+    
+    const procedimentos: ProcedureAIH[] = [];
+    
+    // Buscar todos os códigos de procedimento no texto
+    const codigosMatch = text.match(/[0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9]/g);
+    
+    if (codigosMatch) {
+      console.log(`📋 Encontrados ${codigosMatch.length} códigos de procedimento via fallback`);
+      
+      codigosMatch.forEach((codigo, index) => {
+        const procedimento: ProcedureAIH = {
+          sequencia: sequenciaInicial + index,
+          procedimento: codigo,
+          documentoProfissional: '',
+          cbo: '',
+          participacao: '1',
+          cnes: '',
+          aceitar: true,
+          data: '',
+          descricao: `Procedimento ${codigo}`, // Descrição fallback
+          matchStatus: 'approved',
+          aprovado: true,
+          quantity: 1
+        };
+        
+        procedimentos.push(procedimento);
+        console.log(`✅ Procedimento fallback ${sequenciaInicial + index}: ${codigo}`);
+      });
+    }
+    
+    return procedimentos;
   }
 
   /**
@@ -916,5 +1023,64 @@ export class AIHCompleteProcessor {
    */
   private validateAndCleanParticipationCode(rawCode: string): string {
     return this.parseParticipationField(rawCode);
+  }
+
+  /**
+   * Extrai o documento do contexto da página.
+   * Procura a linha que contém o código do procedimento e retorna o texto à esquerda.
+   */
+  private extractDocumentFromContext(text: string, codigo: string): string {
+    // Buscar padrão de documento no texto (CPF ou outro documento)
+    const documentMatch = text.match(/(\d{3}\.\d{3}\.\d{3}-\d{2})/);
+    return documentMatch ? documentMatch[1] : '';
+  }
+
+  /**
+   * Extrai o CBO do contexto da página.
+   * Procura números de 4-6 dígitos que podem ser CBO.
+   */
+  private extractCBOFromContext(text: string, codigo: string): string {
+    // Buscar CBO após o código do procedimento
+    const procedureIndex = text.indexOf(codigo);
+    if (procedureIndex >= 0) {
+      const afterCode = text.substring(procedureIndex + codigo.length);
+      const cboMatch = afterCode.match(/(\d{4,6})/);
+      return cboMatch ? cboMatch[1] : '';
+    }
+    return '';
+  }
+
+  /**
+   * Extrai a participação do contexto da página.
+   * Busca padrões de participação como "1", "1º", etc.
+   */
+  private extractParticipationFromContext(text: string, codigo: string): string {
+    // Buscar participação após o código
+    const procedureIndex = text.indexOf(codigo);
+    if (procedureIndex >= 0) {
+      const afterCode = text.substring(procedureIndex + codigo.length);
+      const participationMatch = afterCode.match(/([1-9])[°º]?/);
+      return participationMatch ? participationMatch[1] : '1';
+    }
+    return '1';
+  }
+
+  /**
+   * Extrai a data do contexto da página.
+   * Busca padrões de data DD/MM/AAAA.
+   */
+  private extractDateFromContext(text: string, codigo: string): string {
+    const dateMatch = text.match(/(\d{2}\/\d{2}\/\d{4})/);
+    return dateMatch ? dateMatch[1] : '';
+  }
+
+  /**
+   * Extrai o CNES do contexto da página.
+   * Busca números longos que podem ser CNES.
+   */
+  private extractCNESFromContext(text: string, codigo: string): string {
+    // Buscar CNES no texto (geralmente números de 7+ dígitos)
+    const cnesMatch = text.match(/(\d{7,})/);
+    return cnesMatch ? cnesMatch[1] : '';
   }
 } 
