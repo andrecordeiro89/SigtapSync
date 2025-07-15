@@ -1,8 +1,8 @@
 /**
  * ================================================================
- * DASHBOARD DE HOSPITAIS
+ * DASHBOARD DE HOSPITAIS - DESIGN PREMIUM v2.0
  * ================================================================
- * Visualização completa das estatísticas de faturamento por hospital
+ * Visualização executiva premium das estatísticas de faturamento por hospital
  * ================================================================
  */
 
@@ -16,7 +16,9 @@ import {
   Building2, 
   Users, 
   DollarSign, 
-  AlertTriangle
+  AlertTriangle,
+  TrendingUp,
+  Award
 } from 'lucide-react';
 import { DoctorsRevenueService, type HospitalStats, type DoctorAggregated } from '../services/doctorsRevenueService';
 import { supabase } from '../lib/supabase';
@@ -210,12 +212,13 @@ const getFallbackHospitalRevenue = async (hospitalId: string): Promise<number> =
   }
 };
 
-// ✅ COMPONENTE PRINCIPAL DO DASHBOARD
+// ✅ COMPONENTE PRINCIPAL DO DASHBOARD - DESIGN PREMIUM
 const HospitalRevenueDashboard: React.FC = () => {
   const [hospitalStats, setHospitalStats] = useState<HospitalStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [realRevenue, setRealRevenue] = useState<Record<string, number>>({});
   const [uniqueDoctors, setUniqueDoctors] = useState<DoctorAggregated[]>([]);
+  const [hospitalDetails, setHospitalDetails] = useState<Record<string, {city: string, state: string}>>({});
 
   // ✅ FUNÇÃO PRINCIPAL PARA CARREGAR TODOS OS DADOS DOS HOSPITAIS
   const loadHospitalStats = async () => {
@@ -225,6 +228,22 @@ const HospitalRevenueDashboard: React.FC = () => {
       const stats = await DoctorsRevenueService.getHospitalStats();
       console.log('✅ Hospital stats carregados:', stats.length);
       setHospitalStats(stats);
+
+      // 1.5. Buscar detalhes dos hospitais (cidade e estado)
+      const { data: hospitals, error: hospitalsError } = await supabase
+        .from('hospitals')
+        .select('id, city, state');
+      
+      if (!hospitalsError && hospitals) {
+        const detailsMap = hospitals.reduce((acc, h) => {
+          acc[h.id] = {
+            city: h.city || 'Cidade não informada',
+            state: h.state || 'Estado não informado'
+          };
+          return acc;
+        }, {} as Record<string, {city: string, state: string}>);
+        setHospitalDetails(detailsMap);
+      }
 
       // 2. Buscar médicos únicos agregados
       const doctorsResult = await DoctorsRevenueService.getDoctorsAggregated({ pageSize: 1000 });
@@ -262,6 +281,7 @@ const HospitalRevenueDashboard: React.FC = () => {
   const totalHospitals = hospitalStats.length;
   const totalDoctors = uniqueDoctors.length;
   const totalRevenue = Object.values(realRevenue).reduce((sum, revenue) => sum + revenue, 0);
+  const avgRevenuePerHospital = totalHospitals > 0 ? totalRevenue / totalHospitals : 0;
 
   // ✅ ORDENAR HOSPITAIS POR FATURAMENTO (MAIOR PARA MENOR)
   const hospitalsSortedByRevenue = [...hospitalStats].sort((a, b) => {
@@ -272,11 +292,15 @@ const HospitalRevenueDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
-            <p className="text-gray-600">Carregando dados dos hospitais...</p>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+            <Building2 className="w-6 h-6 text-blue-600 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Carregando Dashboard</h3>
+            <p className="text-gray-600">Processando dados dos hospitais...</p>
           </div>
         </div>
       </div>
@@ -284,103 +308,77 @@ const HospitalRevenueDashboard: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-        <div>
-                     <h2 className="text-3xl font-bold text-gray-900">Dashboard Hospitais</h2>
-           <p className="text-gray-600 mt-1">
-             Análise consolidada do faturamento por hospital
-           </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button onClick={loadHospitalStats} variant="outline" size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Atualizar
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6">
 
-
-
-      {/* Lista de Hospitais */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Building2 className="w-5 h-5 mr-2" />
-            Hospitais Cadastrados ({hospitalsSortedByRevenue.length}) - Ordenados por Faturamento
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {hospitalsSortedByRevenue.length === 0 ? (
-            <div className="text-center py-8">
-              <Building2 className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500">Nenhum hospital encontrado</p>
-              <p className="text-sm text-gray-400 mt-2">
-                Execute o script de correção da contagem de médicos
-              </p>
+      {/* 🎨 GRID PREMIUM DE HOSPITAIS */}
+      {hospitalsSortedByRevenue.length === 0 ? (
+        <Card className="border-0 shadow-xl bg-gradient-to-br from-gray-50 to-gray-100">
+          <CardContent className="py-16">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Building2 className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum hospital encontrado</h3>
+              <p className="text-gray-600">Execute o script de correção da contagem de médicos</p>
             </div>
-          ) : (
-            <div className="space-y-6">
-              {hospitalsSortedByRevenue.map((hospital, index) => (
-                <div key={hospital.hospital_id || index} className="relative">
-                  {/* Badge de Ranking por Faturamento */}
-                  <div className="absolute top-4 right-4 z-10">
-                    <Badge variant="outline" className={`
-                      text-xs font-bold px-2 py-1 shadow-sm
-                      ${index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-white border-yellow-500' :
-                        index === 1 ? 'bg-gradient-to-r from-gray-300 to-gray-500 text-white border-gray-400' :
-                        index === 2 ? 'bg-gradient-to-r from-orange-400 to-orange-600 text-white border-orange-500' :
-                        'bg-blue-50 border-blue-200 text-blue-800'}
-                    `}>
-                      #{index + 1}
-                    </Badge>
-                  </div>
-                  <HospitalCard 
-                    hospital={hospital} 
-                    uniqueDoctors={uniqueDoctors}
-                    realRevenue={realRevenue[hospital.hospital_id] || 0}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {hospitalsSortedByRevenue.map((hospital, index) => (
+            <PremiumHospitalCard 
+              key={hospital.hospital_id || index}
+              hospital={hospital} 
+              uniqueDoctors={uniqueDoctors}
+              realRevenue={realRevenue[hospital.hospital_id] || 0}
+              ranking={index + 1}
+              totalHospitals={totalHospitals}
+              hospitalDetails={hospitalDetails[hospital.hospital_id]}
+            />
+          ))}
+        </div>
+      )}
+
     </div>
   );
 };
 
-// ✅ INTERFACE SIMPLIFICADA PARA O CARD DO HOSPITAL
-interface HospitalCardProps {
+// 🎨 INTERFACE PARA O CARD PREMIUM
+interface PremiumHospitalCardProps {
   hospital: HospitalStats;
   uniqueDoctors: DoctorAggregated[];
   realRevenue: number;
+  ranking: number;
+  totalHospitals: number;
+  hospitalDetails?: {city: string, state: string};
 }
 
-// ✅ COMPONENTE DO CARD DO HOSPITAL
-const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, realRevenue }) => {
-     // ✅ CORREÇÃO: Filtrar médicos do hospital específico
-   const hospitalDoctors = uniqueDoctors.filter(doctor => {
-     if (!doctor.hospital_ids || doctor.hospital_ids.trim() === '') return false;
-     
-     // hospital_ids é uma string separada por vírgulas: "uuid1,uuid2"
-     const hospitalIdsList = doctor.hospital_ids.split(',').map(id => id.trim());
-     const targetHospitalId = String(hospital.hospital_id).trim();
-     
-     return hospitalIdsList.includes(targetHospitalId);
-   });
+// 🎨 COMPONENTE CARD PREMIUM DO HOSPITAL
+const PremiumHospitalCard: React.FC<PremiumHospitalCardProps> = ({ 
+  hospital, 
+  uniqueDoctors, 
+  realRevenue, 
+  ranking,
+  totalHospitals,
+  hospitalDetails 
+}) => {
+  // ✅ FILTRAR MÉDICOS DO HOSPITAL ESPECÍFICO
+  const hospitalDoctors = uniqueDoctors.filter(doctor => {
+    if (!doctor.hospital_ids || doctor.hospital_ids.trim() === '') return false;
+    
+    // hospital_ids é uma string separada por vírgulas: "uuid1,uuid2"
+    const hospitalIdsList = doctor.hospital_ids.split(',').map(id => id.trim());
+    const targetHospitalId = String(hospital.hospital_id).trim();
+    
+    return hospitalIdsList.includes(targetHospitalId);
+  });
 
-   const activeDoctors = hospitalDoctors.filter(d => d.activity_status === 'ATIVO');
-   const doctorsWithMultipleHospitals = hospitalDoctors.filter(d => d.hospitals_count > 1);
+  const activeDoctors = hospitalDoctors.filter(d => d.activity_status === 'ATIVO');
 
-
-
-  // ✅ CORREÇÃO: Função para formatar números grandes
-  const formatNumber = (num: number): string => {
+  // ✅ FUNÇÃO PARA FORMATAR NÚMEROS COMPACTOS
+  const formatCompactNumber = (num: number): string => {
     if (num === 0) return '0';
     
-    // Para números grandes, usar formatação compacta
     if (num >= 1000000) {
       return (num / 1000000).toFixed(1) + 'M';
     } else if (num >= 1000) {
@@ -390,100 +388,130 @@ const HospitalCard: React.FC<HospitalCardProps> = ({ hospital, uniqueDoctors, re
     return num.toLocaleString('pt-BR');
   };
 
-
-
-  // ✅ CORREÇÃO: Validar faturamento sem aplicar correções automáticas
-  // Como os dados vêm das views otimizadas do banco, eles já estão corretos
+  // ✅ VALIDAR FATURAMENTO
   const validateRevenue = (revenue: number): number => {
     if (revenue == null || isNaN(revenue)) return 0;
-    
-    // ✅ CONFIANÇA NO BANCO: Se o valor vem das views, está correto
-    // Só verificar se é um número válido
-    const cleanRevenue = Number(revenue);
-    
-    return cleanRevenue;
+    return Number(revenue);
   };
 
   const validatedRevenue = validateRevenue(realRevenue);
-  
-  // ✅ CORREÇÃO: Como não aplicamos correções automáticas, nunca há "correção"
-  // O valor sempre será exibido normalmente em verde
-  const revenueWasCorrected = false;
 
+  // ✅ DEFINIR ESTILO DO RANKING
+  const getRankingStyle = (rank: number) => {
+    switch (rank) {
+      case 1:
+        return {
+          badge: "bg-gradient-to-r from-yellow-400 to-amber-500 text-white shadow-lg",
+          border: "border-yellow-300",
+          gradient: "from-yellow-50 to-amber-50"
+        };
+      case 2:
+        return {
+          badge: "bg-gradient-to-r from-gray-400 to-gray-600 text-white shadow-lg",
+          border: "border-gray-300", 
+          gradient: "from-gray-50 to-slate-50"
+        };
+      case 3:
+        return {
+          badge: "bg-gradient-to-r from-orange-400 to-amber-600 text-white shadow-lg",
+          border: "border-orange-300",
+          gradient: "from-orange-50 to-amber-50"
+        };
+      default:
+        return {
+          badge: "bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-md",
+          border: "border-blue-200",
+          gradient: "from-blue-50 to-indigo-50"
+        };
+    }
+  };
 
+  const rankingStyle = getRankingStyle(ranking);
 
   return (
-    <div className="p-6 border rounded-lg hover:bg-gray-50 transition-colors">
-      {/* Header do Hospital */}
-            <div className="mb-4">
-        <h4 className="text-lg font-semibold text-gray-900 mb-1">
-          {hospital.hospital_name || 'Nome não informado'}
-        </h4>
-        <p className="text-sm text-gray-500">
-          CNPJ: {hospital.hospital_cnpj || 'N/A'}
-        </p>
+    <Card className={`group relative overflow-hidden border-2 ${rankingStyle.border} shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br ${rankingStyle.gradient}`}>
+      {/* Badge de Ranking */}
+      <div className="absolute top-4 right-4 z-10">
+        <Badge className={`${rankingStyle.badge} px-3 py-1 text-sm font-bold`}>
+          <Award className="w-3 h-3 mr-1" />
+          #{ranking}
+        </Badge>
       </div>
 
-      {/* ✅ MÉTRICAS PRINCIPAIS: Médicos e Faturamento */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* 1. INDICADOR: MÉDICOS CADASTRADOS */}
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-200 shadow-sm hover:shadow-md transition-all duration-200">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center">
-              <div className="bg-blue-500 p-2 rounded-lg mr-3">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-sm text-blue-700 font-semibold">Corpo Médico</span>
-            </div>
-            <div className="bg-blue-200 px-2 py-1 rounded-full">
-              <span className="text-xs text-blue-800 font-medium">Ativos</span>
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-blue-900 mb-1">
-            {formatNumber(hospitalDoctors.length)}
-          </p>
-          <p className="text-sm text-blue-600">
-            médicos cadastrados no hospital
+      <CardContent className="p-6">
+        {/* Header do Hospital - Altura Ajustável para Nomes Completos */}
+        <div className="mb-6 min-h-16 flex flex-col justify-center">
+          <h3 className="text-lg font-bold text-gray-900 pr-16 leading-tight mb-1" 
+              style={{
+                wordWrap: 'break-word',
+                hyphens: 'auto'
+              }}>
+            {hospital.hospital_name || 'Nome não informado'}
+          </h3>
+          <p className="text-sm text-gray-600">
+            {hospitalDetails?.city || 'Cidade não informada'}, {hospitalDetails?.state || 'Estado não informado'}
           </p>
         </div>
 
-        {/* 2. INDICADOR: FATURAMENTO (DESTAQUE PRINCIPAL) */}
-        <div className="bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 p-6 rounded-xl border-2 border-green-300 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center">
-              <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-2 rounded-lg mr-3 shadow-sm">
-                <DollarSign className="w-6 h-6 text-white" />
+        {/* Métricas Principais - Layout Compacto */}
+        <div className="space-y-4">
+          {/* 💰 Faturamento - Destaque Principal */}
+          <div className="relative overflow-hidden bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-4 text-white shadow-lg">
+            <div className="absolute inset-0 bg-white/10"></div>
+            <div className="relative">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center">
+                  <DollarSign className="w-5 h-5 mr-2" />
+                  <span className="text-sm font-medium opacity-90">Faturamento</span>
+                </div>
+                <div className="bg-white/20 px-2 py-1 rounded-full">
+                  <span className="text-xs font-medium">Total</span>
+                </div>
               </div>
-              <span className="text-sm text-green-700 font-semibold">Faturamento Total</span>
-            </div>
-            <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-              validatedRevenue === 0 ? 'bg-gray-200 text-gray-700' :
-              revenueWasCorrected ? 'bg-orange-200 text-orange-800' :
-              'bg-green-200 text-green-800'
-            }`}>
-              {validatedRevenue === 0 ? 'Sem dados' : 
-               revenueWasCorrected ? 'Corrigido' : 'Validado'}
+              <div className="text-2xl font-bold mb-1">
+                {formatCurrency(validatedRevenue)}
+              </div>
+              <div className="text-xs opacity-75">
+                {validatedRevenue === 0 ? 'Aguardando dados' : 'Receita total do hospital'}
+              </div>
             </div>
           </div>
-          <p className={`text-3xl font-bold mb-2 ${
-            validatedRevenue === 0 ? 'text-gray-500' :
-            revenueWasCorrected ? 'text-orange-700' : 'text-green-900'
-          }`}>
-            {formatCurrency(validatedRevenue)}
-            {revenueWasCorrected && (
-              <span className="text-sm text-orange-500 ml-2" title={`Valor original: ${formatCurrency(realRevenue)}`}>
-                ⚠️
-              </span>
-            )}
-          </p>
-          <p className="text-sm text-green-600">
-            {validatedRevenue === 0 ? 'Aguardando dados de faturamento' : 
-             revenueWasCorrected ? 'Valor corrigido automaticamente' :
-             'Faturamento total do hospital'}
-          </p>
+
+          {/* Grid de Métricas Secundárias */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* 👥 Médicos */}
+            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-white/20">
+              <div className="flex items-center mb-2">
+                <Users className="w-4 h-4 text-blue-600 mr-2" />
+                <span className="text-xs font-medium text-gray-700">Médicos</span>
+              </div>
+              <div className="text-lg font-bold text-blue-900">
+                {formatCompactNumber(hospitalDoctors.length)}
+              </div>
+              <div className="text-xs text-gray-600">
+                {activeDoctors.length} ativos
+              </div>
+            </div>
+
+            {/* 📊 Performance */}
+            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-white/20">
+              <div className="flex items-center mb-2">
+                <TrendingUp className="w-4 h-4 text-purple-600 mr-2" />
+                <span className="text-xs font-medium text-gray-700">Posição</span>
+              </div>
+              <div className="text-lg font-bold text-purple-900">
+                {ranking}º de {totalHospitals}
+              </div>
+              <div className="text-xs text-gray-600">
+                No ranking
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+
+
+      </CardContent>
+    </Card>
   );
 };
 
