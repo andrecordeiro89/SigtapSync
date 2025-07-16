@@ -132,18 +132,49 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
   // Verificar acesso
   const hasAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('medical_management');
 
+  // 🆕 Estados derivados para listas de filtros
+  const [availableHospitals, setAvailableHospitals] = useState<{id: string, name: string}[]>([]);
+  const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
+  
+  // 🆕 Estado para debounce da busca
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+  // 🔄 DEBOUNCE DA BUSCA - Aguarda 500ms após última digitação
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // 🔄 CARREGAMENTO INICIAL
+  useEffect(() => {
+    if (hasAccess) {
+      loadRealData();
+    }
+  }, []);
+
+  // 🔄 RECARREGAR DADOS APENAS QUANDO BUSCA TEXTUAL MUDAR (filtros dropdown são frontend)
+  useEffect(() => {
+    if (hasAccess && doctors.length > 0) {
+      loadRealData();
+    }
+  }, [debouncedSearchTerm]);
+
   // Carregar dados reais
   const loadRealData = async () => {
     setIsLoading(true);
     try {
-      console.log('🩺 Carregando dados médicos...');
+      console.log('🩺 Carregando dados médicos com filtros aplicados...');
       
+      // 🔍 APLICAR APENAS BUSCA TEXTUAL NO BACKEND (dropdowns filtram no frontend)
       const filters = {
-        hospitalIds: selectedHospital === 'all' ? undefined : [selectedHospital],
-        specialties: selectedSpecialty === 'all' ? undefined : [selectedSpecialty],
-        searchTerm: searchTerm || undefined,
+        searchTerm: debouncedSearchTerm.trim() || undefined,
         isActive: true
       };
+
+      console.log('🔍 Filtros aplicados:', filters);
 
       const [doctorsResult, specialtiesResult, hospitalStatsResult] = await Promise.all([
         DoctorsCrudService.getAllDoctors(filters),
@@ -154,16 +185,43 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
       if (doctorsResult.success) {
         setDoctors(doctorsResult.data || []);
         console.log('✅ Médicos carregados:', doctorsResult.data?.length);
+        
+        // 🔧 EXTRAIR HOSPITAIS E ESPECIALIDADES DOS DADOS REAIS
+        const uniqueHospitals = new Set<string>();
+        const uniqueSpecialties = new Set<string>();
+        
+        doctorsResult.data?.forEach(doctor => {
+          // Coletar hospitais únicos
+          if (doctor.hospitals && doctor.hospitals.length > 0) {
+            doctor.hospitals.forEach(hospital => uniqueHospitals.add(hospital));
+          } else if (doctor.hospitalName) {
+            uniqueHospitals.add(doctor.hospitalName);
+          }
+          
+          // Coletar especialidades únicas
+          if (doctor.speciality) {
+            uniqueSpecialties.add(doctor.speciality);
+          }
+        });
+        
+        // Atualizar listas de filtros
+        const hospitalsList = Array.from(uniqueHospitals).map(name => ({ id: name, name })).sort((a, b) => a.name.localeCompare(b.name));
+        const specialtiesList = Array.from(uniqueSpecialties).sort();
+        
+        setAvailableHospitals(hospitalsList);
+        setAvailableSpecialties(specialtiesList);
+        
+        console.log(`📋 Filtros disponíveis: ${uniqueHospitals.size} hospitais, ${uniqueSpecialties.size} especialidades`);
       }
 
       if (specialtiesResult.success) {
         setSpecialties(specialtiesResult.data || []);
-        console.log('✅ Especialidades carregadas:', specialtiesResult.data?.length);
+        console.log('✅ Especialidades do serviço carregadas:', specialtiesResult.data?.length);
       }
 
       if (hospitalStatsResult.success) {
         setHospitalStats(hospitalStatsResult.data || []);
-        console.log('✅ Hospitais carregados:', hospitalStatsResult.data?.length);
+        console.log('✅ Estatísticas de hospitais carregadas:', hospitalStatsResult.data?.length);
       }
 
       // Carregar contratos e anotações
@@ -211,6 +269,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
 
   // Agrupar médicos e filtrar com proteção contra erros
   const filteredDoctors = React.useMemo(() => {
+    
     try {
       if (!doctors || !Array.isArray(doctors)) {
         return [];
@@ -242,7 +301,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
       const groupedArray = Array.from(doctorsGrouped.values());
       console.log(`📋 Médicos agrupados: ${doctors.length} registros → ${groupedArray.length} médicos únicos`);
       
-      return groupedArray.filter(doctor => {
+      const filteredArray = groupedArray.filter(doctor => {
         try {
           // Proteção contra campos undefined/null
           const doctorName = doctor?.name || '';
@@ -254,21 +313,36 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             doctorCrm.toLowerCase().includes(searchTerm.toLowerCase()) ||
             doctorSpecialty.toLowerCase().includes(searchTerm.toLowerCase());
           
+          // 🏥 FILTRO DE HOSPITAL - Verifica se médico atende no hospital selecionado
           const matchesHospital = selectedHospital === 'all' || 
-            (doctor.hospitals && doctor.hospitals.some(hospital => hospital.toLowerCase().includes(selectedHospital.toLowerCase())));
+            (doctor.hospitals && doctor.hospitals.includes(selectedHospital)) ||
+            (doctor.hospitalName === selectedHospital);
           
+          // 🩺 FILTRO DE ESPECIALIDADE
           const matchesSpecialty = selectedSpecialty === 'all' || 
             doctorSpecialty === selectedSpecialty;
           
+          // 📄 FILTRO DE TIPO DE CONTRATO
           const matchesContractType = selectedContractType === 'all' || 
             getDoctorContract(doctor?.id)?.contractType === selectedContractType;
           
-          return matchesSearch && matchesHospital && matchesSpecialty && matchesContractType;
+          const passes = matchesSearch && matchesHospital && matchesSpecialty && matchesContractType;
+          
+          // Médico passou na filtragem
+          
+          return passes;
         } catch (filterError) {
           console.warn('⚠️ Erro ao filtrar médico:', doctor, filterError);
-          return false; // Excluir médicos que causem erro
+          return false;
         }
       });
+      
+      // Log apenas quando há filtros ativos
+      if (searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all' || selectedContractType !== 'all') {
+        console.log(`🔍 Filtragem: ${groupedArray.length} → ${filteredArray.length} médicos`);
+      }
+      
+      return filteredArray;
     } catch (error) {
       console.error('❌ Erro crítico na filtragem:', error);
       return []; // Retornar array vazio em caso de erro
@@ -292,6 +366,19 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
 
   const loadData = async () => {
     await loadRealData();
+  };
+
+  // 🆕 LIMPAR TODOS OS FILTROS
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setSelectedHospital('all');
+    setSelectedSpecialty('all');
+    setSelectedContractType('all');
+    
+    toast({
+      title: "Filtros limpos",
+      description: "Todos os filtros foram removidos"
+    });
   };
 
   const handleResetContract = async (doctor: MedicalDoctor) => {
@@ -449,6 +536,34 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     );
   };
 
+  const getHospitalBadgeColor = (hospitalName: string) => {
+    // Lista de cores vibrantes e bem contrastadas para hospitais
+    const colors = [
+      'bg-blue-100 border-blue-300 text-blue-800',
+      'bg-green-100 border-green-300 text-green-800', 
+      'bg-purple-100 border-purple-300 text-purple-800',
+      'bg-orange-100 border-orange-300 text-orange-800',
+      'bg-pink-100 border-pink-300 text-pink-800',
+      'bg-indigo-100 border-indigo-300 text-indigo-800',
+      'bg-red-100 border-red-300 text-red-800',
+      'bg-teal-100 border-teal-300 text-teal-800',
+      'bg-yellow-100 border-yellow-300 text-yellow-800',
+      'bg-cyan-100 border-cyan-300 text-cyan-800',
+      'bg-lime-100 border-lime-300 text-lime-800',
+      'bg-rose-100 border-rose-300 text-rose-800'
+    ];
+    
+    // Gera um índice baseado no hash do nome do hospital
+    let hash = 0;
+    for (let i = 0; i < hospitalName.length; i++) {
+      const char = hospitalName.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Converte para 32bit integer
+    }
+    
+    return colors[Math.abs(hash) % colors.length];
+  };
+
   // Controle de expansão
   const toggleRowExpansion = (doctorId: string) => {
     const newExpanded = new Set(expandedRows);
@@ -572,18 +687,15 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               <span>Corpo Médico</span>
             </h1>
             <p className="text-blue-100">
-              Dados reais agrupados por médico - Múltiplos hospitais unificados na visualização
+              Gestão Centralizada de Profissionais da Saúde
             </p>
           </div>
           <div className="text-right">
-            <div className="text-3xl font-bold flex items-center gap-2">
+            <div className="text-3xl font-bold flex items-center justify-end gap-2">
               {isLoading ? '...' : filteredDoctors.length}
               <Users className="h-6 w-6 text-blue-300" />
             </div>
             <div className="text-blue-100">Profissionais</div>
-            <div className="text-sm text-blue-200 mt-1">
-              {contracts.filter(c => c.isActive).length} contratos ativos
-            </div>
           </div>
         </div>
       </div>
@@ -599,7 +711,17 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Botões de ação */}
+          {/* 1º - Agrupamento Inteligente */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start space-x-2">
+              <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+              <div className="text-sm text-blue-800">
+                <strong>Agrupamento Inteligente:</strong> Médicos que atendem em múltiplos hospitais são exibidos em uma única linha com badges indicando todos os hospitais onde atuam.
+              </div>
+            </div>
+          </div>
+
+          {/* 2º - Botões de ação */}
           <div className="flex flex-wrap gap-3">
             <Button
               onClick={handleRefresh}
@@ -612,6 +734,16 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             </Button>
 
             <Button
+              onClick={handleClearFilters}
+              disabled={isLoading}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <X className="h-4 w-4" />
+              Limpar Filtros
+            </Button>
+
+            <Button
               onClick={handleExport}
               variant="outline"
               className="flex items-center gap-2"
@@ -619,23 +751,17 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               <Download className="h-4 w-4" />
               Exportar
             </Button>
-
-            <Badge variant="default" className="flex items-center gap-1">
-              <Database className="h-3 w-3" />
-              Dados Reais
-            </Badge>
-
-            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-start space-x-2">
-                <Info className="h-4 w-4 text-blue-600 mt-0.5" />
-                <div className="text-sm text-blue-800">
-                  <strong>Agrupamento Inteligente:</strong> Médicos que atendem em múltiplos hospitais são exibidos em uma única linha com badges indicando todos os hospitais onde atuam.
-                </div>
-              </div>
-            </div>
+            
+            {/* Indicador de filtros ativos */}
+            {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all' || selectedContractType !== 'all') && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Filter className="h-3 w-3" />
+                Filtros Ativos
+              </Badge>
+            )}
           </div>
 
-          {/* Filtros */}
+          {/* 3º - Filtros */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium flex items-center gap-2">
@@ -645,7 +771,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Nome ou especialidade..."
+                  placeholder="Nome, CRM, CNS ou especialidade..."
                   value={searchTerm}
                   onChange={(e) => {
                     try {
@@ -654,8 +780,25 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                       console.error('❌ Erro ao atualizar termo de busca:', error);
                     }
                   }}
-                  className="pl-10"
+                  className="pl-10 pr-10"
+                  disabled={isLoading}
                 />
+                {/* Indicador de busca ativa */}
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600"
+                    type="button"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+                {/* Indicador de debounce */}
+                {searchTerm !== debouncedSearchTerm && (
+                  <div className="absolute right-8 top-3">
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -664,15 +807,27 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 <Building2 className="h-4 w-4" />
                 Hospital
               </Label>
-              <Select value={selectedHospital} onValueChange={setSelectedHospital}>
+              <Select 
+                value={selectedHospital} 
+                onValueChange={setSelectedHospital} 
+                disabled={isLoading}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione hospital" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os Hospitais</SelectItem>
-                  {hospitalStats.map((hospital) => (
-                    <SelectItem key={hospital.hospitalId} value={hospital.hospitalId}>
-                      {hospital.hospitalName}
+                  <SelectItem value="all">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      Todos os Hospitais
+                    </div>
+                  </SelectItem>
+                  {availableHospitals.map((hospital) => (
+                    <SelectItem key={hospital.id} value={hospital.name}>
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-3 w-3" />
+                        {hospital.name}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -684,15 +839,27 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 <Stethoscope className="h-4 w-4" />
                 Especialidade
               </Label>
-              <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
+              <Select 
+                value={selectedSpecialty} 
+                onValueChange={setSelectedSpecialty} 
+                disabled={isLoading}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione especialidade" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas as Especialidades</SelectItem>
-                  {specialties.map((specialty) => (
-                    <SelectItem key={specialty.id} value={specialty.name}>
-                      {specialty.name}
+                  <SelectItem value="all">
+                    <div className="flex items-center gap-2">
+                      <Stethoscope className="h-4 w-4" />
+                      Todas as Especialidades
+                    </div>
+                  </SelectItem>
+                  {availableSpecialties.map((specialty) => (
+                    <SelectItem key={specialty} value={specialty}>
+                      <div className="flex items-center gap-2">
+                        <Stethoscope className="h-3 w-3" />
+                        {specialty}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -704,7 +871,11 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 <FileText className="h-4 w-4" />
                 Tipo de Contrato
               </Label>
-              <Select value={selectedContractType} onValueChange={setSelectedContractType}>
+              <Select 
+                value={selectedContractType} 
+                onValueChange={setSelectedContractType} 
+                disabled={isLoading}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Tipo de contrato" />
                 </SelectTrigger>
@@ -726,8 +897,15 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             <Users className="h-5 w-5" />
             <span>Lista de Profissionais</span>
             <Badge variant="secondary">
-              {filteredDoctors.length} profissionais
+              {isLoading ? '...' : `${filteredDoctors.length} profissionais`}
             </Badge>
+            {/* Mostrar filtros ativos */}
+            {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all' || selectedContractType !== 'all') && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                <Filter className="h-3 w-3 mr-1" />
+                Filtrado
+              </Badge>
+            )}
             <Badge variant="default" className="bg-green-600 text-white">
               <Database className="h-3 w-3 mr-1" />
               Dados Reais
@@ -767,9 +945,22 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                         <div className="flex flex-col items-center justify-center text-gray-500">
                           <Users className="h-12 w-12 mb-4 text-gray-300" />
                           <p className="text-lg font-medium mb-2">Nenhum médico encontrado</p>
-                          <p className="text-sm">
-                            {searchTerm ? 'Tente ajustar os filtros de busca' : 'Ainda não há médicos cadastrados no sistema'}
+                          <p className="text-sm mb-4">
+                            {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all' || selectedContractType !== 'all') 
+                              ? 'Nenhum médico corresponde aos filtros aplicados' 
+                              : 'Ainda não há médicos cadastrados no sistema'}
                           </p>
+                          {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all' || selectedContractType !== 'all') && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={handleClearFilters}
+                              className="flex items-center gap-2"
+                            >
+                              <X className="h-4 w-4" />
+                              Limpar Filtros
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -815,10 +1006,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                                       variant="outline"
                                       className={`
                                         text-xs px-2 py-1 
-                                        ${doctor.hospitals!.length > 1 
-                                          ? 'bg-blue-50 border-blue-200 text-blue-700' 
-                                          : 'bg-gray-50 border-gray-200 text-gray-700'
-                                        }
+                                        ${getHospitalBadgeColor(hospital)}
                                       `}
                                     >
                                       <Building2 className="h-3 w-3 mr-1" />

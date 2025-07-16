@@ -654,34 +654,34 @@ const PatientManagement = () => {
         </div>
       </div>
 
-      {/* Estatísticas Simplificadas */}
+      {/* Estatísticas Refinadas */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="hover:shadow-md transition-shadow">
+          <Card className="bg-gradient-to-br from-blue-50 via-white to-blue-50/30 border-blue-200/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center space-x-4">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <User className="w-6 h-6 text-blue-600" />
+                <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl shadow-sm">
+                  <User className="w-6 h-6 text-blue-700" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <p className="text-sm text-gray-600 font-medium">Total de Pacientes</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.total_patients}</p>
-                  <p className="text-xs text-blue-600 mt-1">Cadastrados no sistema</p>
+                  <p className="text-3xl font-bold text-blue-900 mb-1">{stats.total_patients}</p>
+                  <p className="text-xs text-blue-600 font-medium">Cadastrados no sistema</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card className="hover:shadow-md transition-shadow">
+          <Card className="bg-gradient-to-br from-green-50 via-white to-green-50/30 border-green-200/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
             <CardContent className="p-6">
               <div className="flex items-center space-x-4">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <FileText className="w-6 h-6 text-green-600" />
+                <div className="p-3 bg-gradient-to-br from-green-100 to-green-200 rounded-xl shadow-sm">
+                  <FileText className="w-6 h-6 text-green-700" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <p className="text-sm text-gray-600 font-medium">AIHs Processadas</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.total_aihs}</p>
-                  <p className="text-xs text-green-600 mt-1">Total no sistema</p>
+                  <p className="text-3xl font-bold text-green-900 mb-1">{stats.total_aihs}</p>
+                  <p className="text-xs text-green-600 font-medium">Total no sistema</p>
                 </div>
               </div>
             </CardContent>
@@ -691,66 +691,76 @@ const PatientManagement = () => {
 
 
 
-      {/* Filtros Modernos */}
-      <Card className="border-l-4 border-l-blue-500 shadow-sm">
+      {/* Filtros Refinados */}
+      <Card className="bg-gradient-to-r from-slate-50 via-white to-slate-50/50 border-slate-200/60 shadow-md hover:shadow-lg transition-all duration-300">
         <CardContent className="p-6">
-          <div className="flex items-center space-x-2 mb-4">
-            <Filter className="w-5 h-5 text-blue-600" />
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="p-2 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg shadow-sm">
+              <Filter className="w-5 h-5 text-blue-700" />
+            </div>
             <h3 className="text-lg font-semibold text-gray-900">Filtros de Pesquisa</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Campo de Busca */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 flex items-center space-x-1">
-                <Search className="w-4 h-4" />
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+                <div className="p-1 bg-blue-100 rounded">
+                  <Search className="w-3 h-3 text-blue-600" />
+                </div>
                 <span>Buscar</span>
               </label>
               <Input
                 placeholder="AIH, paciente ou CNS..."
                 value={globalSearch}
                 onChange={(e) => setGlobalSearch(e.target.value)}
-                className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white/80 hover:bg-white transition-colors"
               />
             </div>
 
             {/* Data Início */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 flex items-center space-x-1">
-                <Calendar className="w-4 h-4" />
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+                <div className="p-1 bg-green-100 rounded">
+                  <Calendar className="w-3 h-3 text-green-600" />
+                </div>
                 <span>Data Início</span>
               </label>
               <Input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                className="w-full border-gray-300 focus:border-green-500 focus:ring-green-500 bg-white/80 hover:bg-white transition-colors"
               />
             </div>
 
             {/* Data Fim */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 flex items-center space-x-1">
-                <Calendar className="w-4 h-4" />
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+                <div className="p-1 bg-purple-100 rounded">
+                  <Calendar className="w-3 h-3 text-purple-600" />
+                </div>
                 <span>Data Fim</span>
               </label>
               <Input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                className="w-full border-gray-300 focus:border-purple-500 focus:ring-purple-500 bg-white/80 hover:bg-white transition-colors"
               />
             </div>
           </div>
 
           {/* Botões de Ação dos Filtros */}
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200/60">
             <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <Info className="w-4 h-4" />
+              <div className="p-1 bg-gray-100 rounded">
+                <Info className="w-3 h-3 text-gray-600" />
+              </div>
               <span>Use os filtros para refinar sua pesquisa por período</span>
             </div>
             
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-3">
               <Button
                 variant="outline"
                 size="sm"
@@ -759,13 +769,13 @@ const PatientManagement = () => {
                   setStartDate('');
                   setEndDate('');
                 }}
-                className="text-gray-600 hover:text-gray-800"
+                className="text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-gray-300 transition-colors"
               >
-                <RotateCcw className="w-4 h-4 mr-1" />
+                <RotateCcw className="w-4 h-4 mr-2" />
                 Limpar
               </Button>
               
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
+              <Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-300 px-3 py-1.5 font-medium">
                 {filteredData.length} AIH{filteredData.length !== 1 ? 's' : ''} encontrada{filteredData.length !== 1 ? 's' : ''}
               </Badge>
             </div>

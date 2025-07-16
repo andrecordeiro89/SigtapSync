@@ -565,7 +565,7 @@ const MedicalProductionDashboard: React.FC = () => {
                               </div>
                                 <div className="space-y-1">
                                   <div className="flex items-center gap-3 flex-wrap">
-                                    <h3 className="font-bold text-xl text-gray-900 tracking-tight">
+                                    <h3 className="font-bold text-lg text-gray-900 tracking-tight">
                                     {doctor.doctor_info.name}
                                   </h3>
                                   {getRankingMedal(index) && (
@@ -608,7 +608,7 @@ const MedicalProductionDashboard: React.FC = () => {
                             
                             {/* ✅ ESTATÍSTICAS DO MÉDICO - DESIGN PREMIUM */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
+                              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-xl border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
                                 <div className="flex items-center gap-2 mb-2">
                                   <div className="w-8 h-8 bg-gradient-to-br from-blue-200 to-blue-300 rounded-lg flex items-center justify-center shadow-sm">
                                     <User className="h-4 w-4 text-blue-700" />
@@ -617,7 +617,7 @@ const MedicalProductionDashboard: React.FC = () => {
                                 </div>
                                 <div className="text-xl font-bold text-blue-800">{doctorStats.totalAIHs}</div>
                               </div>
-                              <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
+                              <div className="bg-gradient-to-br from-green-50 to-green-100 p-3 rounded-xl border border-green-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
                                 <div className="flex items-center gap-2 mb-2">
                                   <div className="w-8 h-8 bg-gradient-to-br from-green-200 to-green-300 rounded-lg flex items-center justify-center shadow-sm">
                                     <FileText className="h-4 w-4 text-green-700" />
@@ -626,7 +626,7 @@ const MedicalProductionDashboard: React.FC = () => {
                                 </div>
                                 <div className="text-xl font-bold text-green-800">{doctorStats.totalProcedures}</div>
                               </div>
-                              <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
+                              <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-3 rounded-xl border border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
                                 <div className="flex items-center gap-2 mb-2">
                                   <div className="w-8 h-8 bg-gradient-to-br from-purple-200 to-purple-300 rounded-lg flex items-center justify-center shadow-sm">
                                     <TrendingUp className="h-4 w-4 text-purple-700" />
@@ -635,7 +635,7 @@ const MedicalProductionDashboard: React.FC = () => {
                                 </div>
                                 <div className="text-xl font-bold text-purple-800">{formatCurrency(doctorStats.avgTicket)}</div>
                             </div>
-                              <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
+                              <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-3 rounded-xl border border-orange-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
                                 <div className="flex items-center gap-2 mb-2">
                                   <div className="w-8 h-8 bg-gradient-to-br from-orange-200 to-orange-300 rounded-lg flex items-center justify-center shadow-sm">
                                     <Building className="h-4 w-4 text-orange-700" />

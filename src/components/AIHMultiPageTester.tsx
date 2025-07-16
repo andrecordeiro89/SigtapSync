@@ -219,7 +219,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
 
     // 🎯 TOAST INFORMATIVO diferenciado para anestesistas vs procedimentos normais
     const isAnesthesia = procedureToDelete.isAnesthesiaProcedure;
-    
+
     toast({
       title: isAnesthesia ? "🚫 Anestesista removido" : "🗑️ Procedimento excluído",
       description: isAnesthesia 
@@ -674,24 +674,24 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           };
         } else {
           // 📊 APLICAR LÓGICA PADRÃO DO SISTEMA
-          const valorTotal = editedValues.valorHosp + editedValues.valorProf; // SH + SP = Total
-          
-          const updatedSigtapProcedure = {
-            ...proc.sigtapProcedure,
-            valueAmb: editedValues.valorAmb,        // SA correto
-            valueHosp: valorTotal,                  // 🔧 Total (será interpretado como total na exibição)
-            valueProf: editedValues.valorProf,      // SP correto
-            valueHospTotal: valorTotal              // Total hospitalar = SH + SP
-          };
+        const valorTotal = editedValues.valorHosp + editedValues.valorProf; // SH + SP = Total
+        
+        const updatedSigtapProcedure = {
+          ...proc.sigtapProcedure,
+          valueAmb: editedValues.valorAmb,        // SA correto
+          valueHosp: valorTotal,                  // 🔧 Total (será interpretado como total na exibição)
+          valueProf: editedValues.valorProf,      // SP correto
+          valueHospTotal: valorTotal              // Total hospitalar = SH + SP
+        };
 
           // Calcular valor com porcentagem aplicada ao total
-          const valorCalculado = (updatedSigtapProcedure.valueHospTotal * editedValues.porcentagem) / 100;
+        const valorCalculado = (updatedSigtapProcedure.valueHospTotal * editedValues.porcentagem) / 100;
 
-          return {
-            ...proc,
-            sigtapProcedure: updatedSigtapProcedure,
-            porcentagemSUS: editedValues.porcentagem,
-            valorCalculado,
+        return {
+          ...proc,
+          sigtapProcedure: updatedSigtapProcedure,
+          porcentagemSUS: editedValues.porcentagem,
+          valorCalculado,
             valorOriginal: updatedSigtapProcedure.valueHospTotal,
             // Limpar campos de regras especiais
             isSpecialRule: false,
@@ -2153,7 +2153,7 @@ const AIHMultiPageTester = () => {
     };
 
     console.log('📊 Gerando relatório executivo com dados:', reportData);
-    
+
     toast({
       title: "📊 Relatório gerado",
       description: "Dados do relatório executivo foram processados e estão no console.",
@@ -2415,27 +2415,33 @@ const AIHMultiPageTester = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header Refinado */}
+      <div className="bg-gradient-to-r from-blue-50 via-white to-purple-50 rounded-xl p-6 border border-blue-100/50 shadow-sm">
       <div className="text-center">
-        <h2 className="text-3xl font-bold text-gray-900 flex items-center justify-center space-x-2">
-          <Layers className="w-8 h-8 text-blue-600" />
+          <h2 className="text-3xl font-bold text-gray-900 flex items-center justify-center space-x-3 mb-3">
+            <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-200 rounded-xl shadow-sm">
+              <Layers className="w-8 h-8 text-blue-700" />
+            </div>
           <span>AIH Avançado</span>
         </h2>
-        <p className="text-gray-600 mt-2">
-          Processamento completo de PDFs AIH com múltiplas páginas de procedimentos
+          <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            Processamento inteligente de PDFs AIH com múltiplas páginas de procedimentos
         </p>
+        </div>
       </div>
 
-      {/* Upload Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Upload className="w-5 h-5 text-blue-600" />
-            <span>Upload PDF AIH</span>
+      {/* Upload Section Refinada */}
+      <Card className="border-slate-200/60 shadow-md hover:shadow-lg transition-all duration-300">
+        <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100">
+          <CardTitle className="flex items-center space-x-3">
+            <div className="p-2 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg shadow-sm">
+              <Upload className="w-5 h-5 text-blue-700" />
+            </div>
+            <span className="text-gray-900">Upload PDF AIH</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+        <CardContent className="space-y-6 p-6">
+          <div className="relative border-2 border-dashed border-blue-300/60 bg-gradient-to-br from-blue-50/30 via-white to-blue-50/20 rounded-xl p-8 text-center hover:border-blue-400/80 hover:bg-blue-50/40 transition-all duration-300 group">
             <input
               type="file"
               accept=".pdf"
@@ -2443,30 +2449,37 @@ const AIHMultiPageTester = () => {
               className="hidden"
               id="pdf-upload"
             />
-            <label htmlFor="pdf-upload" className="cursor-pointer">
-              <FileText className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-600">
+            <label htmlFor="pdf-upload" className="cursor-pointer block">
+              <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl shadow-sm w-fit mx-auto mb-4 group-hover:scale-105 transition-transform duration-200">
+                <FileText className="w-12 h-12 text-blue-700" />
+              </div>
+              <p className="text-gray-700 font-medium text-lg mb-2">
                 {selectedFile ? selectedFile.name : 'Clique para selecionar PDF AIH'}
               </p>
-              <p className="text-sm text-gray-400 mt-1">
-                Suporte para PDFs com 2+ páginas (dados + procedimentos)
+              <p className="text-sm text-gray-500">
+                Suporte para PDFs com múltiplas páginas (dados + procedimentos)
               </p>
             </label>
           </div>
 
-          {/* Status SIGTAP */}
-          <Alert className={
-            sigtapLoading ? "border-blue-500 bg-blue-50" :
-            sigtapProcedures.length > 0 ? "border-green-500 bg-green-50" : "border-yellow-500 bg-yellow-50"
-          }>
+          {/* Status SIGTAP Refinado */}
+          <Alert className={`shadow-sm border-2 transition-all duration-300 ${
+            sigtapLoading ? "border-blue-300/60 bg-gradient-to-r from-blue-50 to-blue-100/50" :
+            sigtapProcedures.length > 0 ? "border-green-300/60 bg-gradient-to-r from-green-50 to-green-100/50" : "border-yellow-300/60 bg-gradient-to-r from-yellow-50 to-yellow-100/50"
+          }`}>
+            <div className={`p-1 rounded-lg w-fit ${
+              sigtapLoading ? 'bg-blue-200' :
+              sigtapProcedures.length > 0 ? 'bg-green-200' : 'bg-yellow-200'
+            }`}>
             <CheckCircle className={`h-4 w-4 ${
-              sigtapLoading ? 'text-blue-600 animate-spin' :
-              sigtapProcedures.length > 0 ? 'text-green-600' : 'text-yellow-600'
+                sigtapLoading ? 'text-blue-700 animate-spin' :
+                sigtapProcedures.length > 0 ? 'text-green-700' : 'text-yellow-700'
             }`} />
-            <AlertDescription className={
+            </div>
+            <AlertDescription className={`font-medium ${
               sigtapLoading ? 'text-blue-800' :
               sigtapProcedures.length > 0 ? 'text-green-800' : 'text-yellow-800'
-            }>
+            }`}>
               {sigtapLoading
                 ? `⏳ Carregando SIGTAP do banco de dados...`
                 : sigtapProcedures.length > 0 
@@ -2476,20 +2489,20 @@ const AIHMultiPageTester = () => {
             </AlertDescription>
           </Alert>
 
-          <div className="flex space-x-2">
+          <div className="flex flex-col sm:flex-row gap-3">
             <Button
               onClick={handleProcessPDF}
               disabled={!selectedFile || isProcessing}
-              className="flex-1"
+              className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] py-3"
             >
               {isProcessing ? (
                 <>
-                  <Zap className="w-4 h-4 mr-2 animate-spin" />
+                  <Zap className="w-5 h-5 mr-2 animate-spin" />
                   Processando AIH...
                 </>
               ) : (
                 <>
-                  <Layers className="w-4 h-4 mr-2" />
+                  <Layers className="w-5 h-5 mr-2" />
                   Processar AIH Completa
                 </>
               )}
@@ -2501,15 +2514,16 @@ const AIHMultiPageTester = () => {
                   onClick={performManualMatching} 
                   variant="outline"
                   disabled={isMatching || sigtapProcedures.length === 0}
+                  className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-300 text-purple-700 hover:from-purple-100 hover:to-purple-200 hover:border-purple-400 shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] py-3"
                 >
                   {isMatching ? (
                     <>
-                      <Target className="w-4 h-4 mr-2 animate-spin" />
+                      <Target className="w-5 h-5 mr-2 animate-spin" />
                       Fazendo Matching...
                     </>
                   ) : (
                     <>
-                      <Target className="w-4 h-4 mr-2" />
+                      <Target className="w-5 h-5 mr-2" />
                       Refazer Matching
                     </>
                   )}

@@ -509,7 +509,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               {isLoading ? '...' : formatNumber(kpiData.totalAIHs)} AIHs Processadas
             </div>
             {lastUpdate && (
-              <div className="text-xs text-blue-300 mt-2 flex items-center gap-1">
+              <div className="text-xs text-blue-300 mt-2 flex items-center justify-end gap-1">
                 <Clock className="h-3 w-3" />
                 Atualizado: {lastUpdate.toLocaleTimeString('pt-BR')}
               </div>
