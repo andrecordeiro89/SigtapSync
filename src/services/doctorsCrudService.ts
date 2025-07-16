@@ -60,63 +60,140 @@ export class DoctorsCrudService {
   // ===== MÉTODOS DE LEITURA (READ) =====
 
   /**
-   * Busca todos os médicos com dados completos
+   * Busca todos os médicos com dados completos usando tabela doctor_hospital
+   * 🆕 AGRUPAMENTO: Médicos com múltiplos hospitais são agrupados corretamente
    */
   static async getAllDoctors(filters?: MedicalFilters): Promise<CrudResult<MedicalDoctor[]>> {
     try {
-      console.log('🩺 [REAL] Buscando médicos do banco de dados...');
+      console.log('🩺 [REAL] Buscando TODOS os médicos de TODOS os hospitais usando tabela doctor_hospital...');
       
-      let query = supabase
-        .from('doctor_hospital_info')
-        .select('*');
+      // 1. BUSCAR TODOS OS MÉDICOS COM SUAS ASSOCIAÇÕES HOSPITALARES
+      let mainQuery = supabase
+        .from('doctor_hospital')
+        .select(`
+          doctor_cns,
+          hospital_id,
+          role,
+          department,
+          is_primary_hospital,
+          is_active,
+          doctors (
+            id,
+            cns,
+            crm,
+            name,
+            specialty,
+            is_active,
+            created_at,
+            updated_at
+          ),
+          hospitals (
+            id,
+            name,
+            cnpj
+          )
+        `)
+        .eq('is_active', true); // Apenas associações ativas
 
-      // Aplicar filtros
-      if (filters?.hospitalIds && filters.hospitalIds.length > 0) {
-        query = query.in('hospital_id', filters.hospitalIds);
+      // Aplicar filtros se necessário
+      if (filters?.hospitalIds && filters.hospitalIds.length > 0 && !filters.hospitalIds.includes('ALL')) {
+        mainQuery = mainQuery.in('hospital_id', filters.hospitalIds);
       }
 
-      if (filters?.specialties && filters.specialties.length > 0) {
-        query = query.in('doctor_specialty', filters.specialties);
-      }
-
-      if (filters?.searchTerm) {
-        query = query.or(`doctor_name.ilike.%${filters.searchTerm}%,doctor_crm.ilike.%${filters.searchTerm}%,doctor_specialty.ilike.%${filters.searchTerm}%`);
-      }
-
-      // Campo doctor_is_active não disponível na view - removido temporariamente
-      if (filters?.isActive !== undefined) {
-        console.log('⚠️ Filtro isActive ignorado - campo doctor_is_active não disponível');
-        // query = query.eq('doctor_is_active', filters.isActive);
-      }
-
-      const { data, error } = await query.order('doctor_name');
+      const { data: doctorHospitalData, error } = await mainQuery.order('doctors(name)');
 
       if (error) {
-        console.error('Erro ao buscar médicos:', error);
+        console.error('❌ Erro ao buscar médicos da tabela doctor_hospital:', error);
         return {
           success: false,
           error: error.message
         };
       }
 
-      // Mapear dados para o formato esperado
-      const doctors: MedicalDoctor[] = (data || []).map(row => ({
-        id: row.doctor_id,
-        cns: row.doctor_cns,
-        crm: row.doctor_crm,
-        name: row.doctor_name,
-        speciality: row.doctor_specialty,
-        hospitalId: row.hospital_id || '',
-        hospitalName: row.hospital_name || 'Sem vínculo',
-        isActive: true, // Assumir ativo até campo estar disponível
-        createdAt: row.doctor_created_at || new Date().toISOString(),
-        updatedAt: row.doctor_updated_at || new Date().toISOString()
-      }));
+      if (!doctorHospitalData || doctorHospitalData.length === 0) {
+        console.log('⚠️ Nenhum médico encontrado na tabela doctor_hospital');
+        return {
+          success: true,
+          data: [],
+          message: 'Nenhum médico encontrado'
+        };
+      }
+
+      // 2. AGRUPAR MÉDICOS POR CNS (evitar duplicação)
+      const doctorsMap = new Map<string, MedicalDoctor & { hospitals: string[] }>();
+
+      doctorHospitalData.forEach(record => {
+        const doctor = record.doctors as any;
+        const hospital = record.hospitals as any;
+        
+        if (!doctor || !doctor.cns) return;
+
+        const existingDoctor = doctorsMap.get(doctor.cns);
+        const hospitalName = hospital?.name || 'Hospital não identificado';
+
+        if (existingDoctor) {
+          // Médico já existe, adicionar hospital se não estiver na lista
+          if (!existingDoctor.hospitals.includes(hospitalName)) {
+            existingDoctor.hospitals.push(hospitalName);
+          }
+          // Usar hospital primário se disponível
+          if (record.is_primary_hospital) {
+            existingDoctor.hospitalId = hospital?.id || '';
+            existingDoctor.hospitalName = hospitalName;
+          }
+        } else {
+          // Primeiro registro do médico
+          doctorsMap.set(doctor.cns, {
+            id: doctor.id,
+            cns: doctor.cns,
+            crm: doctor.crm || '',
+            name: doctor.name || '',
+            speciality: doctor.specialty || '',
+            hospitalId: hospital?.id || '',
+            hospitalName: hospitalName,
+            hospitals: [hospitalName],
+            isActive: doctor.is_active !== false,
+            createdAt: doctor.created_at || new Date().toISOString(),
+            updatedAt: doctor.updated_at || new Date().toISOString()
+          });
+        }
+      });
+
+      // 3. CONVERTER PARA ARRAY E APLICAR FILTROS ADICIONAIS
+      let doctors = Array.from(doctorsMap.values());
+
+      // Aplicar filtros de especialidade
+      if (filters?.specialties && filters.specialties.length > 0) {
+        doctors = doctors.filter(doc => 
+          filters.specialties!.some(specialty => 
+            doc.speciality?.toLowerCase().includes(specialty.toLowerCase())
+          )
+        );
+      }
+
+      // Aplicar filtro de busca textual
+      if (filters?.searchTerm) {
+        const searchTerm = filters.searchTerm.toLowerCase();
+        doctors = doctors.filter(doc =>
+          doc.name?.toLowerCase().includes(searchTerm) ||
+          doc.crm?.toLowerCase().includes(searchTerm) ||
+          doc.speciality?.toLowerCase().includes(searchTerm) ||
+          doc.cns?.includes(searchTerm)
+        );
+      }
+
+      // Aplicar filtro de status ativo
+      if (filters?.isActive !== undefined) {
+        doctors = doctors.filter(doc => doc.isActive === filters.isActive);
+      }
+
+      console.log(`✅ AGRUPAMENTO COMPLETO: ${doctorHospitalData.length} registros → ${doctors.length} médicos únicos`);
+      console.log(`📋 Médicos com múltiplos hospitais: ${doctors.filter(d => d.hospitals && d.hospitals.length > 1).length}`);
 
       return {
         success: true,
         data: doctors,
-        message: `${doctors.length} médicos carregados com sucesso`
+        message: `${doctors.length} médicos únicos carregados de ${doctorHospitalData.length} associações hospitalares`
       };
 
     } catch (error) {

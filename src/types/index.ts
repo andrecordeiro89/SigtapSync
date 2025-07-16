@@ -434,6 +434,7 @@ export interface MedicalDoctor {
   speciality: string;
   hospitalId: string;
   hospitalName: string;
+  hospitals?: string[]; // 🆕 Lista de todos os hospitais onde o médico atua
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

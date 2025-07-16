@@ -45,7 +45,8 @@ import {
   Hash,
   BarChart2,
   RotateCcw,
-  Plus
+  Plus,
+  Info
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { DoctorsCrudService } from '../services/doctorsCrudService';
@@ -83,6 +84,8 @@ interface DoctorNote {
   updatedAt: string;
   createdBy: string;
 }
+
+// ✅ Tipo MedicalDoctor agora já inclui campo hospitals opcional
 
 interface MedicalStaffDashboardProps {
   className?: string;
@@ -206,24 +209,71 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     setDoctorNotes(mockNotes);
   };
 
-  // Filtrar médicos
-  const filteredDoctors = doctors.filter(doctor => {
-    const matchesSearch = !searchTerm || 
-      doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.crm.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.speciality?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesHospital = selectedHospital === 'all' || 
-      doctor.hospitalName?.toLowerCase().includes(selectedHospital.toLowerCase());
-    
-    const matchesSpecialty = selectedSpecialty === 'all' || 
-      doctor.speciality === selectedSpecialty;
-    
-    const matchesContractType = selectedContractType === 'all' || 
-      getDoctorContract(doctor.id)?.contractType === selectedContractType;
-    
-    return matchesSearch && matchesHospital && matchesSpecialty && matchesContractType;
-  });
+  // Agrupar médicos e filtrar com proteção contra erros
+  const filteredDoctors = React.useMemo(() => {
+    try {
+      if (!doctors || !Array.isArray(doctors)) {
+        return [];
+      }
+
+      // 📋 AGRUPAR MÉDICOS POR CNS (evitar duplicação por hospital)
+      const doctorsGrouped = new Map<string, MedicalDoctor>();
+
+      doctors.forEach(doctor => {
+        if (!doctor?.cns) return; // Pular médicos sem CNS
+
+        const existingDoctor = doctorsGrouped.get(doctor.cns);
+        
+        if (existingDoctor) {
+          // Médico já existe, adicionar hospital se não estiver na lista
+          if (doctor.hospitalName && existingDoctor.hospitals && !existingDoctor.hospitals.includes(doctor.hospitalName)) {
+            existingDoctor.hospitals.push(doctor.hospitalName);
+          }
+        } else {
+          // Primeiro registro do médico
+          doctorsGrouped.set(doctor.cns, {
+            ...doctor,
+            hospitals: doctor.hospitalName ? [doctor.hospitalName] : []
+          });
+        }
+      });
+
+      // 🔍 FILTRAR MÉDICOS AGRUPADOS
+      const groupedArray = Array.from(doctorsGrouped.values());
+      console.log(`📋 Médicos agrupados: ${doctors.length} registros → ${groupedArray.length} médicos únicos`);
+      
+      return groupedArray.filter(doctor => {
+        try {
+          // Proteção contra campos undefined/null
+          const doctorName = doctor?.name || '';
+          const doctorCrm = doctor?.crm || '';
+          const doctorSpecialty = doctor?.speciality || '';
+
+          const matchesSearch = !searchTerm || 
+            doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            doctorCrm.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            doctorSpecialty.toLowerCase().includes(searchTerm.toLowerCase());
+          
+          const matchesHospital = selectedHospital === 'all' || 
+            (doctor.hospitals && doctor.hospitals.some(hospital => hospital.toLowerCase().includes(selectedHospital.toLowerCase())));
+          
+          const matchesSpecialty = selectedSpecialty === 'all' || 
+            doctorSpecialty === selectedSpecialty;
+          
+          const matchesContractType = selectedContractType === 'all' || 
+            getDoctorContract(doctor?.id)?.contractType === selectedContractType;
+          
+          return matchesSearch && matchesHospital && matchesSpecialty && matchesContractType;
+        } catch (filterError) {
+          console.warn('⚠️ Erro ao filtrar médico:', doctor, filterError);
+          return false; // Excluir médicos que causem erro
+        }
+      });
+    } catch (error) {
+      console.error('❌ Erro crítico na filtragem:', error);
+      return []; // Retornar array vazio em caso de erro
+    }
+  }, [doctors, searchTerm, selectedHospital, selectedSpecialty, selectedContractType, contracts]);
 
   // Obter contrato do médico
   const getDoctorContract = (doctorId: string) => {
@@ -522,7 +572,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               <span>Corpo Médico</span>
             </h1>
             <p className="text-blue-100">
-              Gestão de profissionais com contratos por meta e produção
+              Dados reais agrupados por médico - Múltiplos hospitais unificados na visualização
             </p>
           </div>
           <div className="text-right">
@@ -538,60 +588,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
         </div>
       </div>
 
-      {/* RESUMO RÁPIDO */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600">Total Médicos</p>
-                <p className="text-2xl font-bold text-blue-800">{doctors.length}</p>
-              </div>
-              <Users className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600">Contratos Meta</p>
-                <p className="text-2xl font-bold text-green-800">
-                  {contracts.filter(c => c.isActive && c.contractType === 'meta').length}
-                </p>
-              </div>
-              <Target className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-purple-100">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-600">Contratos Produção</p>
-                <p className="text-2xl font-bold text-purple-800">
-                  {contracts.filter(c => c.isActive && c.contractType === 'producao').length}
-                </p>
-              </div>
-              <BarChart2 className="h-8 w-8 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-orange-600">Especialidades</p>
-                <p className="text-2xl font-bold text-orange-800">{specialties.length}</p>
-              </div>
-              <Award className="h-8 w-8 text-orange-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* CONTROLES E FILTROS */}
       <Card>
@@ -627,6 +624,15 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               <Database className="h-3 w-3" />
               Dados Reais
             </Badge>
+
+            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+                <div className="text-sm text-blue-800">
+                  <strong>Agrupamento Inteligente:</strong> Médicos que atendem em múltiplos hospitais são exibidos em uma única linha com badges indicando todos os hospitais onde atuam.
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Filtros */}
@@ -641,7 +647,13 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 <Input
                   placeholder="Nome ou especialidade..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    try {
+                      setSearchTerm(e.target.value);
+                    } catch (error) {
+                      console.error('❌ Erro ao atualizar termo de busca:', error);
+                    }
+                  }}
                   className="pl-10"
                 />
               </div>
@@ -716,6 +728,10 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             <Badge variant="secondary">
               {filteredDoctors.length} profissionais
             </Badge>
+            <Badge variant="default" className="bg-green-600 text-white">
+              <Database className="h-3 w-3 mr-1" />
+              Dados Reais
+            </Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -745,10 +761,30 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredDoctors.map((doctor) => {
-                    const contract = getDoctorContract(doctor.id);
-                    const isExpanded = expandedRows.has(doctor.id);
-                    const isCreating = creatingContract.has(doctor.id);
+                  {filteredDoctors.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        <div className="flex flex-col items-center justify-center text-gray-500">
+                          <Users className="h-12 w-12 mb-4 text-gray-300" />
+                          <p className="text-lg font-medium mb-2">Nenhum médico encontrado</p>
+                          <p className="text-sm">
+                            {searchTerm ? 'Tente ajustar os filtros de busca' : 'Ainda não há médicos cadastrados no sistema'}
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredDoctors.map((doctor) => {
+                      try {
+                        const contract = getDoctorContract(doctor?.id);
+                        const isExpanded = expandedRows.has(doctor?.id);
+                        const isCreating = creatingContract.has(doctor?.id);
+                        
+                        // Proteção adicional contra dados inválidos
+                        if (!doctor || !doctor.id) {
+                          console.warn('⚠️ Médico com dados inválidos:', doctor);
+                          return null;
+                        }
                     
                     return (
                       <React.Fragment key={doctor.id}>
@@ -770,8 +806,34 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="text-sm">
-                              {doctor.hospitalName || 'Não informado'}
+                            <div className="space-y-1">
+                              {doctor.hospitals && doctor.hospitals.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {doctor.hospitals.map((hospital: string, index: number) => (
+                                    <Badge
+                                      key={index}
+                                      variant="outline"
+                                      className={`
+                                        text-xs px-2 py-1 
+                                        ${doctor.hospitals!.length > 1 
+                                          ? 'bg-blue-50 border-blue-200 text-blue-700' 
+                                          : 'bg-gray-50 border-gray-200 text-gray-700'
+                                        }
+                                      `}
+                                    >
+                                      <Building2 className="h-3 w-3 mr-1" />
+                                      {hospital}
+                                    </Badge>
+                                  ))}
+                                  {doctor.hospitals.length > 1 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      +{doctor.hospitals.length} hospitais
+                                    </Badge>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-gray-500">Não informado</div>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1089,7 +1151,12 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                         )}
                       </React.Fragment>
                     );
-                  })}
+                      } catch (renderError) {
+                        console.error('❌ Erro ao renderizar médico:', doctor, renderError);
+                        return null;
+                      }
+                    })
+                  )}
                 </TableBody>
               </Table>
             </div>
