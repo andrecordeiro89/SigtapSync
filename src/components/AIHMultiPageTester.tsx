@@ -58,7 +58,7 @@ import {
   requiresPayment, 
   isValidParticipationCode 
 } from '../config/participationCodes';
-import { filterOutAnesthesia } from '../utils/aihCompleteProcessor';
+// ✅ REMOVIDO: import { filterOutAnesthesia } from '../utils/aihCompleteProcessor';
 
 // Declaração de tipo para jsPDF com autoTable
 declare module 'jspdf' {
@@ -197,16 +197,14 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     });
   };
   
-  // Função para excluir procedimento (permanentemente)
+  // Função para excluir procedimento (permanentemente) - SEM CONFIRMAÇÃO
   const handleDeleteProcedure = (sequencia: number) => {
     const procedureToDelete = aihCompleta.procedimentos.find(p => p.sequencia === sequencia);
     
     if (!procedureToDelete) return;
     
-    // Confirmar exclusão
-    if (!confirm(`Tem certeza que deseja EXCLUIR PERMANENTEMENTE o procedimento ${procedureToDelete.procedimento}?\n\nEsta ação não pode ser desfeita!`)) {
-      return;
-    }
+    // ✅ MUDANÇA: Exclusão imediata sem pop-up de confirmação
+    // Especialmente útil para anestesistas que devem ser removidos rapidamente
     
     const updatedProcedimentos = aihCompleta.procedimentos.filter(proc => proc.sequencia !== sequencia);
     
@@ -219,9 +217,14 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     const updatedAIH = calculateTotalsWithPercentage(resequencedProcedimentos);
     onUpdateAIH(updatedAIH);
 
+    // 🎯 TOAST INFORMATIVO diferenciado para anestesistas vs procedimentos normais
+    const isAnesthesia = procedureToDelete.isAnesthesiaProcedure;
+    
     toast({
-      title: "🗑️ Procedimento excluído",
-      description: `Procedimento ${procedureToDelete.procedimento} foi excluído permanentemente`,
+      title: isAnesthesia ? "🚫 Anestesista removido" : "🗑️ Procedimento excluído",
+      description: isAnesthesia 
+        ? `Anestesista ${procedureToDelete.procedimento} removido da tela`
+        : `Procedimento ${procedureToDelete.procedimento} foi excluído permanentemente`,
       variant: "destructive"
     });
   };
@@ -290,12 +293,36 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     console.log('🏥 Regra Especial Detectada:', regraEspecialPrincipal ? regraEspecialPrincipal.procedureName : 'Nenhuma');
     console.log('⚠️  IMPORTANTE: SA (Serviços Ambulatoriais) NÃO É FATURADO EM AIH');
     
-    // ✅ SEPARAR PROCEDIMENTOS POR TIPO
+    // 🚫 PRIMEIRO: SEPARAR ANESTESISTAS (NÃO RECEBEM NENHUMA REGRA)
+    const anestesistas: ProcedureAIH[] = [];
+    const procedimentosParaRegras: ProcedureAIH[] = [];
+    
+    procedimentos.forEach(proc => {
+      if (proc.isAnesthesiaProcedure) {
+        // 🚫 ANESTESISTAS: NENHUMA REGRA APLICADA
+        anestesistas.push({
+          ...proc,
+          porcentagemSUS: 0, // Zero pois não há cobrança
+          valorCalculado: 0, // Zero pois será removido
+          valorOriginal: 0,  // Zero pois não é faturado
+          isAnesthesiaProcedure: true, // Manter marcação
+          regraEspecial: 'Anestesista - Não faturado (será removido)'
+        });
+      } else {
+        // ✅ PROCEDIMENTOS NORMAIS: APLICAR REGRAS
+        procedimentosParaRegras.push(proc);
+      }
+    });
+    
+    console.log(`🚫 ANESTESISTAS EXCLUÍDOS: ${anestesistas.length} procedimentos`);
+    console.log(`✅ PROCEDIMENTOS PARA REGRAS: ${procedimentosParaRegras.length} procedimentos`);
+    
+    // ✅ SEPARAR PROCEDIMENTOS NORMAIS POR TIPO (SEM ANESTESISTAS)
     const procedimentosInstrumento04: ProcedureAIH[] = [];
     const procedimentosNormais: ProcedureAIH[] = [];
     const procedimentosComRegrasEspeciais: ProcedureAIH[] = [];
 
-    procedimentos.forEach(proc => {
+    procedimentosParaRegras.forEach(proc => {
       if (proc.sigtapProcedure) {
         // 🎯 VERIFICAR INSTRUMENTO 04 - PRIORIDADE MÁXIMA
         if (isInstrument04Procedure(proc.sigtapProcedure.registrationInstrument)) {
@@ -319,13 +346,13 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       }
     });
 
-    console.log('🔄 CLASSIFICAÇÃO DOS PROCEDIMENTOS:');
+    console.log('🔄 CLASSIFICAÇÃO DOS PROCEDIMENTOS (SEM ANESTESISTAS):');
     console.log('🎯 Instrumento 04:', procedimentosInstrumento04.map(p => `${p.sequencia}º - ${p.procedimento}`));
     console.log('🏥 Regras Especiais:', procedimentosComRegrasEspeciais.map(p => `${p.sequencia}º - ${p.procedimento}`));
     console.log('📊 Procedimentos Normais:', procedimentosNormais.map(p => `${p.sequencia}º - ${p.procedimento}`));
 
-    // ✅ PROCESSAR CADA TIPO DE PROCEDIMENTO
-    const procedimentosComPercentagem = procedimentos.map((proc, index) => {
+    // ✅ PROCESSAR CADA TIPO DE PROCEDIMENTO (EXCETO ANESTESISTAS)
+    const procedimentosComPercentagem = procedimentosParaRegras.map((proc, index) => {
       if (!proc.sigtapProcedure) return proc;
 
       // 🎯 INSTRUMENTO 04 - SEMPRE 100%
@@ -444,16 +471,22 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       };
     });
 
+    // 🔄 COMBINAR PROCEDIMENTOS PROCESSADOS COM ANESTESISTAS (SEM REGRAS)
+    const todosProcedimentos = [...procedimentosComPercentagem, ...anestesistas];
+    todosProcedimentos.sort((a, b) => a.sequencia - b.sequencia); // Reordenar por sequência
+
+    // ✅ CALCULAR TOTAIS APENAS DOS PROCEDIMENTOS APROVADOS (EXCLUINDO ANESTESISTAS)
     const valorTotalCalculado = procedimentosComPercentagem
       .filter(p => p.aprovado)
       .reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
 
     console.log(`💰 VALOR TOTAL FATURADO (SH + SP): R$ ${valorTotalCalculado.toFixed(2)}`);
+    console.log(`🚫 ANESTESISTAS EXCLUÍDOS DOS CÁLCULOS: ${anestesistas.length} procedimentos`);
 
     return {
       ...aihCompleta,
-      procedimentos: procedimentosComPercentagem,
-      procedimentosAprovados: procedimentosComPercentagem.filter(p => p.aprovado).length,
+      procedimentos: todosProcedimentos,
+      procedimentosAprovados: procedimentosComPercentagem.filter(p => p.aprovado).length, // Só contar não-anestesistas
       procedimentosRejeitados: procedimentosComPercentagem.filter(p => p.matchStatus === 'rejected').length,
       valorTotalCalculado
     };
@@ -461,6 +494,16 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
 
   // Iniciar edição de valores - INTEGRADO COM REGRAS ESPECIAIS CORRIGIDAS
   const startEditingValues = (sequencia: number, procedure: ProcedureAIH) => {
+    // 🚫 BLOQUEAR EDIÇÃO DE ANESTESISTAS
+    if (procedure.isAnesthesiaProcedure) {
+      toast({
+        title: "Edição bloqueada",
+        description: "Anestesistas não podem ser editados. Use o botão lixeira para remover.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setEditingValues(prev => new Set([...prev, sequencia]));
     
     if (procedure.sigtapProcedure) {
@@ -484,21 +527,23 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
         // Instrumento 04 sempre 100%
         porcentagemParaAplicar = 100;
       } else if (temRegraEspecialGeral && regraEspecialPrincipal) {
-        // ✅ CALCULAR POSIÇÃO ENTRE TODOS OS PROCEDIMENTOS (exceto Instrumento 04)
+        // ✅ CALCULAR POSIÇÃO ENTRE TODOS OS PROCEDIMENTOS (exceto Instrumento 04 e anestesistas)
         const procedimentosParaRegra = aihCompleta.procedimentos
           .filter(p => p.sigtapProcedure && 
-                      !isInstrument04Procedure(p.sigtapProcedure.registrationInstrument))
+                      !isInstrument04Procedure(p.sigtapProcedure.registrationInstrument) &&
+                      !p.isAnesthesiaProcedure) // 🚫 EXCLUIR ANESTESISTAS
           .sort((a, b) => a.sequencia - b.sequencia);
         
         const posicaoNaRegra = procedimentosParaRegra.findIndex(p => p.sequencia === sequencia);
         porcentagemParaAplicar = regraEspecialPrincipal.rule.hospitalPercentages[posicaoNaRegra] || 
                                 regraEspecialPrincipal.rule.hospitalPercentages[regraEspecialPrincipal.rule.hospitalPercentages.length - 1];
       } else {
-        // ✅ PROCEDIMENTO NORMAL - CALCULAR POSIÇÃO ENTRE PROCEDIMENTOS NORMAIS
+        // ✅ PROCEDIMENTO NORMAL - CALCULAR POSIÇÃO ENTRE PROCEDIMENTOS NORMAIS (excluindo anestesistas)
         const procedimentosNormais = aihCompleta.procedimentos
           .filter(p => p.sigtapProcedure && 
                       !isInstrument04Procedure(p.sigtapProcedure.registrationInstrument) &&
-                      !hasSpecialRule(p.procedimento))
+                      !hasSpecialRule(p.procedimento) &&
+                      !p.isAnesthesiaProcedure) // 🚫 EXCLUIR ANESTESISTAS
           .sort((a, b) => a.sequencia - b.sequencia);
         
         const posicaoEntreNormais = procedimentosNormais.findIndex(p => p.sequencia === sequencia) + 1;
@@ -526,6 +571,17 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
 
     // 🎯 DETECTAR INSTRUMENTO 04 OU REGRA ESPECIAL
     const procedureToEdit = aihCompleta.procedimentos.find(p => p.sequencia === sequencia);
+    
+    // 🚫 BLOQUEAR EDIÇÃO DE ANESTESISTAS (dupla proteção)
+    if (procedureToEdit?.isAnesthesiaProcedure) {
+      toast({
+        title: "Edição bloqueada",
+        description: "Anestesistas não podem ser editados.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const isInstrument04 = procedureToEdit && isInstrument04Procedure(procedureToEdit.sigtapProcedure?.registrationInstrument);
     const procedimentoPrincipal = aihCompleta.procedimentoPrincipal || '';
     const regraEspecialPrincipal = getSpecialRule(procedimentoPrincipal);
@@ -576,10 +632,11 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           const valorSH = editedValues.valorHosp;
           const valorSP = editedValues.valorProf; // SP sempre mantém valor original nas regras especiais
           
-          // Calcular porcentagem baseada na posição sequencial
+          // Calcular porcentagem baseada na posição sequencial (EXCLUINDO ANESTESISTAS)
           const procedimentosParaRegra = aihCompleta.procedimentos
             .filter(p => p.sigtapProcedure && 
-                        !isInstrument04Procedure(p.sigtapProcedure.registrationInstrument))
+                        !isInstrument04Procedure(p.sigtapProcedure.registrationInstrument) &&
+                        !p.isAnesthesiaProcedure) // 🚫 EXCLUIR ANESTESISTAS
             .sort((a, b) => a.sequencia - b.sequencia);
           
           const posicaoNaRegra = procedimentosParaRegra.findIndex(p => p.sequencia === sequencia);
@@ -617,24 +674,24 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           };
         } else {
           // 📊 APLICAR LÓGICA PADRÃO DO SISTEMA
-        const valorTotal = editedValues.valorHosp + editedValues.valorProf; // SH + SP = Total
-        
-        const updatedSigtapProcedure = {
-          ...proc.sigtapProcedure,
-          valueAmb: editedValues.valorAmb,        // SA correto
-          valueHosp: valorTotal,                  // 🔧 Total (será interpretado como total na exibição)
-          valueProf: editedValues.valorProf,      // SP correto
-          valueHospTotal: valorTotal              // Total hospitalar = SH + SP
-        };
+          const valorTotal = editedValues.valorHosp + editedValues.valorProf; // SH + SP = Total
+          
+          const updatedSigtapProcedure = {
+            ...proc.sigtapProcedure,
+            valueAmb: editedValues.valorAmb,        // SA correto
+            valueHosp: valorTotal,                  // 🔧 Total (será interpretado como total na exibição)
+            valueProf: editedValues.valorProf,      // SP correto
+            valueHospTotal: valorTotal              // Total hospitalar = SH + SP
+          };
 
           // Calcular valor com porcentagem aplicada ao total
-        const valorCalculado = (updatedSigtapProcedure.valueHospTotal * editedValues.porcentagem) / 100;
+          const valorCalculado = (updatedSigtapProcedure.valueHospTotal * editedValues.porcentagem) / 100;
 
-        return {
-          ...proc,
-          sigtapProcedure: updatedSigtapProcedure,
-          porcentagemSUS: editedValues.porcentagem,
-          valorCalculado,
+          return {
+            ...proc,
+            sigtapProcedure: updatedSigtapProcedure,
+            porcentagemSUS: editedValues.porcentagem,
+            valorCalculado,
             valorOriginal: updatedSigtapProcedure.valueHospTotal,
             // Limpar campos de regras especiais
             isSpecialRule: false,
@@ -1073,25 +1130,52 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-              <p className="text-sm text-gray-600">Total Procedimentos</p>
+              <p className="text-sm text-gray-600">Total Extraído</p>
               <p className="text-2xl font-bold text-blue-700">{aihCompleta.totalProcedimentos}</p>
+              <p className="text-xs text-gray-500">Todos os procedimentos</p>
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
               <p className="text-sm text-gray-600">Aprovados</p>
               <p className="text-2xl font-bold text-green-700">{aihCompleta.procedimentosAprovados}</p>
+              <p className="text-xs text-gray-500">Incluindo anestesistas</p>
+            </div>
+            {/* ✅ NOVO: Card específico para anestesistas */}
+            <div className="text-center p-4 bg-red-50 rounded-lg border-l-4 border-red-500">
+              <p className="text-sm text-gray-600">Anestesistas</p>
+              <p className="text-2xl font-bold text-red-700">
+                {aihCompleta.procedimentos.filter(p => p.isAnesthesiaProcedure).length}
+              </p>
+              <p className="text-xs text-gray-500">Marcados para remoção</p>
             </div>
             <div className="text-center p-4 bg-green-100 rounded-lg border-l-4 border-green-600 relative">
-              <p className="text-sm text-gray-600">Valor Final</p>
+              <p className="text-sm text-gray-600">Valor Total</p>
               <p className="text-2xl font-bold text-green-800">
                 {formatCurrency(aihCompleta.valorTotalCalculado || 0)}
               </p>
+              <p className="text-xs text-gray-500">Incluindo anestesistas</p>
               <div className="absolute top-1 right-1">
-                <Badge variant="default" className="text-xs bg-green-600">Final</Badge>
+                <Badge variant="default" className="text-xs bg-green-600">Total</Badge>
               </div>
             </div>
           </div>
+          
+          {/* ✅ NOVO: Informativo sobre anestesistas */}
+          {aihCompleta.procedimentos.filter(p => p.isAnesthesiaProcedure).length > 0 && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center space-x-2 mb-2">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                <h4 className="text-sm font-medium text-red-800">Procedimentos de Anestesia Detectados</h4>
+              </div>
+              <p className="text-sm text-red-700">
+                ✅ <strong>Todos os procedimentos foram extraídos</strong> - incluindo {aihCompleta.procedimentos.filter(p => p.isAnesthesiaProcedure).length} procedimento(s) de anestesia.
+              </p>
+              <p className="text-xs text-red-600 mt-1">
+                💡 Os procedimentos de anestesia estão marcados com margem vermelha. Use o botão 🗑️ para removê-los conforme necessário.
+              </p>
+            </div>
+          )}
           
           {/* RESUMO DE PORCENTAGENS */}
           <div className="mt-4 p-3 bg-white rounded-lg border">
@@ -1165,10 +1249,16 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
               </TableHeader>
               <TableBody>
                 {aihCompleta.procedimentos
-                  .filter(filterOutAnesthesia) // 🛡️ FILTRO SUS: Remove anestesistas da tela
+                  // ✅ REMOVIDO: .filter(filterOutAnesthesia) - Agora mostra TODOS os procedimentos
                   .map((procedure) => (
                   <React.Fragment key={procedure.sequencia}>
-                    <TableRow className="hover:bg-gray-50">
+                    <TableRow 
+                      className={`hover:bg-gray-50 ${
+                        procedure.isAnesthesiaProcedure 
+                          ? 'border-l-4 border-red-500 bg-red-50' // 🚫 Margem vermelha para anestesistas
+                          : ''
+                      }`}
+                    >
                       <TableCell className="font-medium text-center">{procedure.sequencia}</TableCell>
                       <TableCell className="font-mono text-sm">{procedure.procedimento}</TableCell>
                       <TableCell>
@@ -1180,6 +1270,12 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                             {procedure.sequencia === 1 && (
                               <Badge variant="default" className="text-xs bg-green-600 text-white px-2 py-0.5">
                                 Principal
+                              </Badge>
+                            )}
+                            {/* ✅ NOVO: Badge para anestesistas */}
+                            {procedure.isAnesthesiaProcedure && (
+                              <Badge variant="destructive" className="text-xs px-2 py-0.5 animate-pulse">
+                                🚫 Anestesista
                               </Badge>
                             )}
                           </div>
@@ -2004,171 +2100,63 @@ const AIHMultiPageTester = () => {
       return;
     }
 
-    // Usar dados reais da AIH processada (com filtro de anestesistas)
+    // ✅ MUDANÇA: Usar dados reais da AIH processada (EXCLUINDO anestesistas dos cálculos)
     const procedimentosAprovados = aihCompleta.procedimentos
-      .filter(filterOutAnesthesia) // 🛡️ FILTRO SUS: Remove anestesistas
-      .filter(p => p.aprovado);
+      .filter(p => p.aprovado && !p.isAnesthesiaProcedure); // 🚫 EXCLUIR ANESTESISTAS
+    const procedimentosAnestesia = aihCompleta.procedimentos.filter(p => p.isAnesthesiaProcedure);
+    const procedimentosNormais = procedimentosAprovados.filter(p => !p.isInstrument04);
+    const procedimentosInstrumento04 = procedimentosAprovados.filter(p => p.isInstrument04);
+    
     const totalOriginal = procedimentosAprovados.reduce((sum, p) => sum + (p.valorOriginal || 0), 0);
-    const totalSigtap = procedimentosAprovados.reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
-    const totalDiferenca = totalOriginal - totalSigtap;
-    const dataAtual = new Date().toLocaleDateString('pt-BR');
-    const horaAtual = new Date().toLocaleTimeString('pt-BR');
+    const totalCalculado = procedimentosAprovados.reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
+    const economiaGerada = totalOriginal - totalCalculado;
+    
+    // 📊 CALCULAR MÉDIA DE CONFIDENCE EXCLUINDO ANESTESISTAS
+    const avgConfidence = procedimentosAprovados.length > 0 ? 
+      procedimentosAprovados.reduce((sum, p) => sum + (p.matchConfidence || 0), 0) / procedimentosAprovados.length : 0;
 
-    // Criar PDF
-    const pdf = new jsPDF();
-    
-    // Configurar fonte
-    pdf.setFont('helvetica');
-    
-    // CABEÇALHO
-    pdf.setFillColor(41, 128, 185); // Azul
-    pdf.rect(0, 0, 210, 40, 'F');
-    
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(20);
-    pdf.text('RELATÓRIO EXECUTIVO - PROCESSAMENTO AIH', 15, 20);
-    
-    pdf.setFontSize(12);
-    pdf.text(`Sistema SIGTAP Sync | ${dataAtual} ${horaAtual}`, 15, 30);
-    
-    // Reset cor do texto
-    pdf.setTextColor(0, 0, 0);
-    
-    let yPos = 50;
+    const reportData = {
+      aihNumber: aihCompleta.numeroAIH || 'N/A',
+      patientName: aihCompleta.nomePaciente || 'N/A',
+      admissionDate: aihCompleta.dataInicio || '',
+      dischargeDate: aihCompleta.dataFim || '',
+      mainProcedure: aihCompleta.procedimentoPrincipal || 'N/A',
+      
+      // ✅ ESTATÍSTICAS CORRIGIDAS (SEM ANESTESISTAS)
+      totalProcedures: aihCompleta.totalProcedimentos || 0,
+      approvedProcedures: procedimentosAprovados.length,
+      anesthesiaProcedures: procedimentosAnestesia.length, // 🚫 ANESTESISTAS SEPARADOS
+      rejectedProcedures: 0,
+      
+      // ✅ VALORES FINANCEIROS (SEM ANESTESISTAS) 
+      originalValue: totalOriginal,
+      calculatedValue: totalCalculado,
+      savings: economiaGerada,
+      avgMatchConfidence: avgConfidence,
+      
+      // Breakdown detalhado
+      instrument04Procedures: procedimentosInstrumento04.length,
+      normalProcedures: procedimentosNormais.length,
+      
+      // Dados da extração
+      extractionMethod: 'manual',
+      extractionConfidence: 0,
+      processingTime: result.processingTime || 0,
+      
+      // Dados do hospital (usar contexto atual)
+      hospitalName: 'Hospital não identificado',
+      hospitalCode: 'N/A',
+      
+      // Usuário responsável
+      processedBy: user?.email || 'Usuário não identificado',
+      processedAt: new Date().toISOString()
+    };
 
-    // INFORMAÇÕES DO PROCESSAMENTO
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('INFORMAÇÕES DO PROCESSAMENTO', 15, yPos);
+    console.log('📊 Gerando relatório executivo com dados:', reportData);
     
-    yPos += 10;
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    
-    pdf.text(`AIH: ${aihCompleta.numeroAIH}`, 15, yPos);
-    yPos += 6;
-    pdf.text(`Paciente: ${aihCompleta.nomePaciente}`, 15, yPos);
-    yPos += 6;
-    pdf.text(`Arquivo Processado: ${selectedFile?.name || 'arquivo.pdf'}`, 15, yPos);
-    yPos += 6;
-    pdf.text(`Tempo de Processamento: ${result.processingTime} ms`, 15, yPos);
-    
-    yPos += 15;
-
-    // RESUMO EXECUTIVO
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('RESUMO EXECUTIVO', 15, yPos);
-    
-    yPos += 15;
-    
-    // Criar tabela de resumo
-    const resumoData = [
-      ['Total Procedimentos', aihCompleta.totalProcedimentos.toString()],
-      ['Procedimentos Aprovados', aihCompleta.procedimentosAprovados.toString()],
-      ['Valor Total Original', `R$ ${totalOriginal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-      ['Valor Total SIGTAP', `R$ ${totalSigtap.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`],
-      ['Diferença', `R$ ${totalDiferenca.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} (${totalOriginal > 0 ? ((totalDiferenca/totalOriginal)*100).toFixed(2) : '0.00'}%)`]
-    ];
-
-    autoTable(pdf, {
-      startY: yPos,
-      head: [['Métrica', 'Valor']],
-      body: resumoData,
-      theme: 'grid',
-      headStyles: { fillColor: [52, 152, 219], textColor: 255, fontSize: 10 },
-      bodyStyles: { fontSize: 9 },
-      columnStyles: {
-        0: { cellWidth: 80, fontStyle: 'bold' },
-        1: { cellWidth: 80, halign: 'right' }
-      },
-      margin: { left: 15, right: 15 }
-    });
-
-    yPos = pdf.lastAutoTable.finalY + 20;
-
-    // DETALHAMENTO POR PROCEDIMENTO
-    pdf.setFontSize(14);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('DETALHAMENTO POR PROCEDIMENTO', 15, yPos);
-    
-    yPos += 10;
-    
-    // Preparar dados da tabela (já filtrados para remover anestesistas)
-    const tableData = procedimentosAprovados.map(proc => [
-      proc.sequencia.toString(),
-      proc.procedimento,
-      proc.descricao ? (proc.descricao.length > 30 ? proc.descricao.substring(0, 27) + '...' : proc.descricao) : 'N/A',
-      proc.data,
-      `R$ ${(proc.valorOriginal || 0).toFixed(2)}`,
-      `R$ ${(proc.valorCalculado || 0).toFixed(2)}`,
-      `R$ ${((proc.valorOriginal || 0) - (proc.valorCalculado || 0)).toFixed(2)}`,
-      `${proc.porcentagemSUS || 100}%`,
-      proc.matchStatus
-    ]);
-
-    // Adicionar linha de totais
-    tableData.push([
-      '', '', '', 'TOTAL GERAL:',
-      `R$ ${totalOriginal.toFixed(2)}`,
-      `R$ ${totalSigtap.toFixed(2)}`,
-      `R$ ${totalDiferenca.toFixed(2)}`,
-      '', ''
-    ]);
-
-    autoTable(pdf, {
-      startY: yPos,
-      head: [['Seq', 'Código', 'Descrição', 'Data', 'Original', 'SIGTAP', 'Diferença', '%SUS', 'Status']],
-      body: tableData,
-      theme: 'striped',
-      headStyles: { 
-        fillColor: [46, 204, 113], 
-        textColor: 255, 
-        fontSize: 8,
-        halign: 'center'
-      },
-      bodyStyles: { fontSize: 7 },
-      columnStyles: {
-        0: { cellWidth: 15 }, // Seq
-        1: { cellWidth: 25 }, // Código
-        2: { cellWidth: 35 }, // Descrição
-        3: { cellWidth: 20 }, // Data
-        4: { cellWidth: 20, halign: 'right' }, // Original
-        5: { cellWidth: 20, halign: 'right' }, // SIGTAP
-        6: { cellWidth: 20, halign: 'right' }, // Diferença
-        7: { cellWidth: 15, halign: 'center' }, // %SUS
-        8: { cellWidth: 20 }  // Status
-      },
-      margin: { left: 10, right: 10 },
-      // Destacar linha de totais
-      didParseCell: function (data: any) {
-        if (data.row.index === tableData.length - 1) {
-          data.cell.styles.fillColor = [231, 76, 60];
-          data.cell.styles.textColor = 255;
-          data.cell.styles.fontStyle = 'bold';
-        }
-      }
-    });
-
-    // RODAPÉ
-    const pageHeight = pdf.internal.pageSize.height;
-    
-    pdf.setFillColor(52, 73, 94);
-    pdf.rect(0, pageHeight - 25, 210, 25, 'F');
-    
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(8);
-    pdf.text('• Valores calculados conforme Tabela SIGTAP vigente com percentuais SUS', 15, pageHeight - 15);
-    pdf.text('• Relatório gerado automaticamente pelo Sistema SIGTAP Sync', 15, pageHeight - 10);
-    pdf.text('• Para dúvidas, entre em contato com o departamento de faturamento', 15, pageHeight - 5);
-
-    // Salvar PDF
-    const fileName = `relatorio-executivo-aih-${aihCompleta.numeroAIH}-${dataAtual.replace(/\//g, '-')}.pdf`;
-    pdf.save(fileName);
-
     toast({
-      title: "📊 Relatório PDF Gerado!",
-      description: `Relatório executivo premium gerado para AIH ${aihCompleta.numeroAIH} com ${procedimentosAprovados.length} procedimentos aprovados.`,
+      title: "📊 Relatório gerado",
+      description: "Dados do relatório executivo foram processados e estão no console.",
     });
   };
 

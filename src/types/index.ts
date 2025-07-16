@@ -381,6 +381,9 @@ export interface ProcedureAIH {
   isInstrument04?: boolean;          // Se é procedimento do Instrumento 04 - AIH (Proc. Especial)
   instrument04Rule?: string;         // Descrição da regra do Instrumento 04
   
+  // ✅ NOVO: Marcação visual para anestesistas
+  isAnesthesiaProcedure?: boolean;   // Se é procedimento de anestesia (marcação visual)
+  
   // Auditoria
   revisadoPor?: string;
   dataRevisao?: string;

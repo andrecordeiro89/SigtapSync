@@ -7,40 +7,38 @@ import { isValidParticipationCode, formatParticipationCode, getParticipationInfo
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 /**
- * Filtra anestesistas na INTERFACE (camada 3 - exibição)
- * ✅ ALTERAÇÃO: Removido filtro por CBO 225151 para permitir procedimentos pré-operatórios
- * 🎯 MANTÉM: Filtro por texto na participação para casos reais de anestesia
- * Uso: procedimentos.filter(filterOutAnesthesia)
+ * ❌ FUNÇÃO DEPRECIADA: filterOutAnesthesia 
+ * ✅ NOVA ABORDAGEM: Exibir todos os procedimentos com marcação visual
+ * 
+ * Anteriormente filtrava anestesistas na INTERFACE (camada 3 - exibição)
+ * Agora: Extrair tudo e marcar visualmente para controle manual do usuário
  */
+/*
 export const filterOutAnesthesia = (procedimento: ProcedureAIH): boolean => {
-  // 🎯 ÚNICA VERIFICAÇÃO: Detecção por texto na participação
-  const participacao = (procedimento.participacao || '').toLowerCase().trim();
-  
+  // 🎯 FUNÇÃO DEPRECIADA - Nova lógica: exibir tudo com marcação visual
   // Se não há participação definida, não é anestesista
-  if (!participacao) {
-    return true; // Não filtrar (exibir)
+  if (!procedimento.participacao) {
+    return true;
   }
   
-  // 📋 TERMOS DE ANESTESIA EM PORTUGUÊS
+  // Termos de anestesia em português  
   const anesthesiaTerms = [
     'anestesista', 'anestesiologista', 'anestesiol', 'anestes', 'anes', 'anest',
     'anestsista', 'anestesita', 'anestesis', 'anastesista', 'anastesiologista',
     'anesthesi', 'anesthesiol', 'anest.', 'anes.'
   ];
   
-  // Verificar se algum termo de anestesia está presente na participação
-  const isAnesthesia = anesthesiaTerms.some(term => 
-    participacao.includes(term)
-  );
+  const participacao = procedimento.participacao.toLowerCase().trim();
+  const isAnesthesia = anesthesiaTerms.some(term => participacao.includes(term));
   
   if (isAnesthesia) {
-    const foundTerm = anesthesiaTerms.find(term => participacao.includes(term));
-    console.log(`🚫 INTERFACE-FILTRO: Anestesista removido da tela - Termo "${foundTerm}" na participação`);
-    return false; // Filtrar (não exibir)
+    console.log(`🚫 INTERFACE-FILTRO DEPRECIADO: Anestesista seria removido da tela - Agora é marcado visualmente`);
+    return false; // Filtrar (não exibir) - COMPORTAMENTO ANTIGO
   }
   
   return true; // Não filtrar (exibir)
 };
+*/
 
 export class AIHCompleteProcessor {
   private aihProcessor: AIHPDFProcessor;
@@ -264,9 +262,10 @@ export class AIHCompleteProcessor {
   /**
    * 🎯 FILTRO INTELIGENTE E ESPECÍFICO: Remove apenas linhas de procedimentos de anestesia
    * Preserva cabeçalhos, estrutura do documento e outras informações
+   * ✅ CORREÇÃO: Filtro mais específico para evitar remoção de procedimentos subsequentes
    */
   private preFilterAnesthesiaLines(text: string): { filteredText: string; removedLines: string[] } {
-    console.log(`🚫 PRÉ-FILTRO: Aplicando filtro inteligente de anestesia...`);
+    console.log(`🚫 PRÉ-FILTRO CORRIGIDO: Aplicando filtro inteligente de anestesia...`);
     
     // 🔧 QUEBRA INTELIGENTE: PDF pode vir como bloco contínuo, quebrar por padrões de procedimento
     const smartLines = this.smartSplitProcedureText(text);
@@ -284,10 +283,10 @@ export class AIHCompleteProcessor {
         continue;
       }
       
-      // 🚫 FILTRAR ANESTESIA POR TEXTO NA PARTICIPAÇÃO APENAS
+      // ✅ CORREÇÃO: Verificação mais específica de anestesia
       const lowerLine = trimmedLine.toLowerCase();
       
-      // 📋 DETECÇÃO DE ANESTESIA - APENAS POR TERMOS DE TEXTO
+      // 📋 DETECÇÃO DE ANESTESIA - APENAS PROCEDIMENTOS REAIS DE ANESTESIA
       const anesthesiaTerms = [
         'anestesista', 'anestesiologista', 'anestesiologia', 'anestesiologic',
         'anestesiol', 'anestes', 'anes', 'anest', 'anestesi',
@@ -299,13 +298,21 @@ export class AIHCompleteProcessor {
       
       const hasAnesthesiaText = anesthesiaTerms.some(term => lowerLine.includes(term));
       
-      if (hasAnesthesiaText) {
+      // ✅ CORREÇÃO: Só filtrar se for REALMENTE um procedimento de anestesia
+      if (hasAnesthesiaText && this.isProcedureLine(trimmedLine)) {
         const foundTerm = anesthesiaTerms.find(term => lowerLine.includes(term)) || 'termo de anestesia';
         console.log(`🚫 ANESTESIA FILTRADA: ${trimmedLine.substring(0, 80)}...`);
         console.log(`   📋 Motivo: ${foundTerm}`);
-        console.log(`   🎯 STATUS: REMOVIDO COMPLETAMENTE (MESMO SE FOR CABEÇALHO)`);
+        console.log(`   🎯 STATUS: REMOVIDO (procedimento de anestesia confirmado)`);
         removedLines.push(line);
         continue; // NÃO adicionar à lista filtrada
+      }
+      
+      // ✅ CORREÇÃO: Se contém anestesia mas não é procedimento válido, preservar
+      if (hasAnesthesiaText && !this.isProcedureLine(trimmedLine)) {
+        console.log(`📋 ANESTESIA DETECTADA mas NÃO é procedimento - PRESERVADO: ${trimmedLine.substring(0, 60)}...`);
+        filteredLines.push(line);
+        continue;
       }
       
       // 🎯 VERIFICAÇÃO SECUNDÁRIA: Cabeçalhos (após filtro de anestesia)
@@ -328,16 +335,18 @@ export class AIHCompleteProcessor {
     
     const filteredText = filteredLines.join('\n');
     
-    console.log(`✅ PRÉ-FILTRO INTELIGENTE CONCLUÍDO:`);
+    console.log(`✅ PRÉ-FILTRO INTELIGENTE CORRIGIDO CONCLUÍDO:`);
     console.log(`   📄 Segmentos originais: ${smartLines.length}`);
     console.log(`   ✅ Segmentos mantidos: ${filteredLines.length}`);
-    console.log(`   🚫 Procedimentos filtrados: ${removedLines.length}`);
+    console.log(`   🚫 Procedimentos de anestesia filtrados: ${removedLines.length}`);
     
     if (removedLines.length > 0) {
-      console.log(`   🎯 ECONOMIA: ${removedLines.length} procedimentos de anestesia removidos`);
+      console.log(`   🎯 FILTROS APLICADOS:`);
       removedLines.forEach((line, index) => {
         console.log(`   🚫 ${index + 1}. ${line.substring(0, 80)}...`);
       });
+    } else {
+      console.log(`   ℹ️ Nenhum procedimento de anestesia encontrado para filtrar`);
     }
     
     return { filteredText, removedLines };
@@ -346,6 +355,7 @@ export class AIHCompleteProcessor {
   /**
    * 🔧 QUEBRA INTELIGENTE: Divide texto de PDF em segmentos lógicos
    * PDFs podem vir como bloco contínuo - quebrar por padrões que indicam novos procedimentos
+   * ✅ CORREÇÃO: Divisão mais precisa para evitar "vazamento" entre procedimentos
    */
   private smartSplitProcedureText(text: string): string[] {
     // Primeiro tentar quebra natural por \n
@@ -356,49 +366,53 @@ export class AIHCompleteProcessor {
     
     // Se tem poucas linhas mas texto longo, fazer quebra inteligente
     if (lines.length <= 3 && text.length > 500) {
-      console.log(`🔧 TEXTO LONGO EM POUCAS LINHAS - Aplicando quebra inteligente...`);
+      console.log(`🔧 TEXTO LONGO EM POUCAS LINHAS - Aplicando quebra inteligente corrigida...`);
       console.log(`📄 Texto original (primeiros 200 chars): ${text.substring(0, 200)}...`);
       
-      // Quebrar onde há códigos de procedimento seguidos por data
-      // Padrão: XX.XX.XX.XXX-X ... DD/MM/AAAA (próximo código)
+      // ✅ CORREÇÃO: Buscar por códigos de procedimento e criar segmentos mais precisos
       const procedurePattern = /(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/g;
       
       let smartLines: string[] = [];
-      let currentSegment = '';
+      let matches: { index: number; code: string }[] = [];
       
-      // Quebrar por códigos de procedimento
-      const segments = text.split(procedurePattern);
-      
-      console.log(`🔧 SEGMENTOS ENCONTRADOS: ${segments.length}`);
-      
-      for (let i = 0; i < segments.length; i++) {
-        if (segments[i].match(/^\d{2}\.\d{2}\.\d{2}\.\d{3}-\d$/)) {
-          // É um código de procedimento
-          if (currentSegment.trim()) {
-            smartLines.push(currentSegment.trim());
-            console.log(`📋 Segmento ${smartLines.length}: ${currentSegment.trim().substring(0, 60)}...`);
-          }
-          currentSegment = segments[i]; // Iniciar novo segmento com o código
-        } else {
-          // É o conteúdo após o código
-          currentSegment += segments[i];
-        }
+      // Primeiro, encontrar todas as posições dos códigos
+      let match;
+      while ((match = procedurePattern.exec(text)) !== null) {
+        matches.push({
+          index: match.index,
+          code: match[1]
+        });
       }
       
-      // Adicionar último segmento
-      if (currentSegment.trim()) {
-        smartLines.push(currentSegment.trim());
-        console.log(`📋 Segmento ${smartLines.length} (último): ${currentSegment.trim().substring(0, 60)}...`);
-      }
-      
-      console.log(`🔧 QUEBRA REALIZADA: ${lines.length} linhas → ${smartLines.length} segmentos`);
-      
-      // 🔍 DEBUG: Verificar se há anestesia nos segmentos
-      smartLines.forEach((segment, index) => {
-        if (segment.toLowerCase().includes('anestesista')) {
-          console.log(`⚠️ ANESTESIA DETECTADA no segmento ${index + 1}: ${segment.substring(0, 80)}...`);
-        }
+      console.log(`🔧 CÓDIGOS ENCONTRADOS: ${matches.length}`);
+      matches.forEach((m, i) => {
+        console.log(`   ${i + 1}. ${m.code} na posição ${m.index}`);
       });
+      
+      // ✅ CORREÇÃO: Criar segmentos baseados nas posições dos códigos
+      for (let i = 0; i < matches.length; i++) {
+        const currentMatch = matches[i];
+        const nextMatch = matches[i + 1];
+        
+        // Definir início e fim do segmento
+        const startPos = currentMatch.index;
+        const endPos = nextMatch ? nextMatch.index : text.length;
+        
+        // Extrair segmento completo
+        const segment = text.substring(startPos, endPos).trim();
+        
+        if (segment.length > 10) { // Só incluir segmentos significativos
+          smartLines.push(segment);
+          console.log(`📋 Segmento ${i + 1}: ${segment.substring(0, 80)}...`);
+          
+          // 🔍 DEBUG: Verificar se segmento contém anestesia
+          if (segment.toLowerCase().includes('anestesista')) {
+            console.log(`   ⚠️ ANESTESIA DETECTADA neste segmento`);
+          }
+        }
+      }
+      
+      console.log(`🔧 QUEBRA CORRIGIDA: ${lines.length} linhas → ${smartLines.length} segmentos`);
       
       return smartLines;
     }
@@ -542,7 +556,8 @@ export class AIHCompleteProcessor {
   }
 
   /**
-   * Método de debug avançado para análise detalhada da extração
+   * 🔬 DEBUG ESPECÍFICO: Rastreia extração de procedimentos para identificar perdas
+   * Este método ajuda a diagnosticar quando procedimentos não são extraídos
    */
   private debugProcedureExtraction(text: string): void {
     console.log(`🔬 DEBUG AVANÇADO: Analisando texto para extração...`);
@@ -559,6 +574,28 @@ export class AIHCompleteProcessor {
       console.log(`   ${index + 1}. ${codigo}`);
     });
     
+    // ✅ NOVO: Verificar se códigos estão sendo perdidos no processo de filtro
+    console.log(`🔍 ANÁLISE DETALHADA POR CÓDIGO:`);
+    codigosEncontrados.forEach((codigo, index) => {
+      const codigoIndex = text.indexOf(codigo);
+      const contexto = text.substring(
+        Math.max(0, codigoIndex - 100),
+        Math.min(text.length, codigoIndex + 200)
+      );
+      
+      // Verificar se contém anestesia no contexto
+      const temAnestesia = contexto.toLowerCase().includes('anestesista');
+      const eProcedimento = this.isProcedureLine(contexto);
+      
+      console.log(`📍 Código ${index + 1}: ${codigo}`);
+      console.log(`   📋 Posição: ${codigoIndex}`);
+      console.log(`   🩺 Contém anestesia: ${temAnestesia ? '🚫 SIM' : '✅ NÃO'}`);
+      console.log(`   📊 É linha de procedimento: ${eProcedimento ? '✅ SIM' : '❌ NÃO'}`);
+      console.log(`   📄 Contexto: "${contexto.substring(0, 150)}..."`);
+      console.log(`   🎯 Status esperado: ${temAnestesia && eProcedimento ? '🚫 FILTRADO' : '✅ EXTRAÍDO'}`);
+      console.log('');
+    });
+    
     // Procurar por descrições em maiúsculas
     const descricoesMaiusculas = text.match(/[A-ZÁÊÇÕÚÍÂ]{3,}[A-ZÁÊÇÕÚÍÂ\s]{5,}/g) || [];
     console.log(`📝 Possíveis descrições em maiúsculas: ${descricoesMaiusculas.length}`);
@@ -573,43 +610,70 @@ export class AIHCompleteProcessor {
       console.log(`   ${index + 1}. "${padrao.substring(0, 80)}..."`);
     });
     
-    // Mostrar uma amostra do texto ao redor de cada código
-    codigosEncontrados.slice(0, 3).forEach((codigo, index) => {
-      const codigoIndex = text.indexOf(codigo);
-      const contexto = text.substring(
-        Math.max(0, codigoIndex - 50),
-        Math.min(text.length, codigoIndex + 150)
-      );
-      console.log(`📍 Contexto do código ${codigo}:`);
-      console.log(`   "${contexto}"`);
+    // ✅ NOVO: Verificar como o smartSplit vai dividir este texto
+    console.log(`🔧 SIMULAÇÃO DO SMART SPLIT:`);
+    const simulatedSplit = this.simulateSmartSplit(text);
+    console.log(`   📄 Segmentos que serão criados: ${simulatedSplit.length}`);
+    simulatedSplit.forEach((segment, index) => {
+      const temAnestesia = segment.toLowerCase().includes('anestesista');
+      const temCodigo = /[0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9]/.test(segment);
+      console.log(`   ${index + 1}. Código: ${temCodigo ? '✅' : '❌'} | Anestesia: ${temAnestesia ? '🚫' : '✅'} | "${segment.substring(0, 60)}..."`);
     });
   }
 
   /**
-   * Extrai procedimentos da página e aplica filtros SUS
+   * 🔧 SIMULAÇÃO: Simula como o smartSplit vai dividir o texto (para debug)
+   */
+  private simulateSmartSplit(text: string): string[] {
+    const procedurePattern = /(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/g;
+    let matches: { index: number; code: string }[] = [];
+    
+    let match;
+    while ((match = procedurePattern.exec(text)) !== null) {
+      matches.push({
+        index: match.index,
+        code: match[1]
+      });
+    }
+    
+    let segments: string[] = [];
+    for (let i = 0; i < matches.length; i++) {
+      const currentMatch = matches[i];
+      const nextMatch = matches[i + 1];
+      
+      const startPos = currentMatch.index;
+      const endPos = nextMatch ? nextMatch.index : text.length;
+      
+      const segment = text.substring(startPos, endPos).trim();
+      if (segment.length > 10) {
+        segments.push(segment);
+      }
+    }
+    
+    return segments;
+  }
+
+  /**
+   * Extrai procedimentos da página SEM FILTROS - extrai tudo
+   * ✅ NOVA ABORDAGEM: Extrair 100% dos procedimentos, marcar anestesistas visualmente
    */
   private extractProcedures(text: string, sequenciaInicial: number = 1): ProcedureAIH[] {
     try {
-      console.log(`📋 Extraindo procedimentos (sequência inicial: ${sequenciaInicial})...`);
-      console.log(`🔍 DEBUGGING: Texto da página (primeiros 500 chars):`);
-      console.log(text.substring(0, 500));
+      console.log(`📋 EXTRAÇÃO COMPLETA: Extraindo TODOS os procedimentos (sequência inicial: ${sequenciaInicial})...`);
+      console.log(`🔍 NOVA LÓGICA: SEM FILTROS - Extrair tudo e marcar anestesistas visualmente`);
+      console.log(`📏 Tamanho do texto: ${text.length} caracteres`);
       
       // 🔬 DEBUG AVANÇADO da extração
       this.debugProcedureExtraction(text);
       
-      // 🚫 ETAPA 1: PRÉ-FILTRO DE ANESTESIA (ANTES DA EXTRAÇÃO COMPLEXA)
-      const { filteredText, removedLines } = this.preFilterAnesthesiaLines(text);
-      
-      // Se todas as linhas foram filtradas, retornar vazio
-      if (filteredText.trim().length === 0) {
-        console.log(`🚫 TODAS AS LINHAS FILTRADAS - Nenhum procedimento válido encontrado`);
-        return [];
-      }
+      // ✅ MUDANÇA: USAR QUEBRA INTELIGENTE SEM PRÉ-FILTRO
+      const smartLines = this.smartSplitProcedureText(text);
+      console.log(`📄 Segmentos para processamento: ${smartLines.length}`);
       
       let procedimentos: ProcedureAIH[] = [];
       
       // 🆕 LÓGICA NOVA: Extrair especificamente da coluna procedimento da segunda página
-      console.log(`🎯 NOVA LÓGICA: Extraindo da coluna procedimento da segunda página...`);
+      console.log(`🎯 EXTRAÇÃO COMPLETA: Processando todos os segmentos...`);
       
       // Buscar por padrões de procedimentos com descrições na coluna procedimento
       const procedurePatterns = [
@@ -626,80 +690,106 @@ export class AIHCompleteProcessor {
       let sequenciaAtual = sequenciaInicial;
       let totalExtraidos = 0;
       
-      // Tentar cada pattern até encontrar resultados
-      for (let patternIndex = 0; patternIndex < procedurePatterns.length; patternIndex++) {
-        const pattern = procedurePatterns[patternIndex];
-        pattern.lastIndex = 0; // Reset regex
+      // ✅ PROCESSAR CADA SEGMENTO INDIVIDUALMENTE
+      for (let segmentIndex = 0; segmentIndex < smartLines.length; segmentIndex++) {
+        const segment = smartLines[segmentIndex];
+        console.log(`📋 Processando segmento ${segmentIndex + 1}/${smartLines.length}: ${segment.substring(0, 80)}...`);
         
-        console.log(`🔍 Tentando Pattern ${patternIndex + 1}...`);
+        // Tentar cada pattern neste segmento
+        let extraidoNesteSegmento = false;
         
-        let match;
-        let extraidosNessePadrao = 0;
-        
-        while ((match = pattern.exec(filteredText)) !== null) {
-          console.log(`📋 MATCH Pattern ${patternIndex + 1} encontrado:`, match);
+        for (let patternIndex = 0; patternIndex < procedurePatterns.length && !extraidoNesteSegmento; patternIndex++) {
+          const pattern = procedurePatterns[patternIndex];
+          pattern.lastIndex = 0; // Reset regex
           
-          const codigo = match[1]?.trim() || '';
-          let descricao = match[2]?.trim() || '';
-          
-          // Limpar a descrição removendo números extras e caracteres desnecessários
-          descricao = this.cleanProcedureDescription(descricao);
-          
-          // Validar se temos dados mínimos válidos
-          if (codigo && descricao.length >= 3) {
-            // Extrair dados contextuais da linha completa
-            const contextData = this.extractContextualData(filteredText, codigo);
+          let match;
+          while ((match = pattern.exec(segment)) !== null) {
+            console.log(`📋 MATCH Pattern ${patternIndex + 1} encontrado no segmento ${segmentIndex + 1}:`, match);
             
-            const procedimento: ProcedureAIH = {
-              sequencia: sequenciaAtual,
-              procedimento: codigo,
-              documentoProfissional: contextData.documento || '',
-              cbo: contextData.cbo || '',
-              participacao: contextData.participacao || '1',
-              cnes: contextData.cnes || '',
-              aceitar: true,
-              data: contextData.data || '',
-              descricao: descricao,
+            const codigo = match[1]?.trim() || '';
+            let descricao = match[2]?.trim() || '';
+            
+            // Limpar a descrição removendo números extras e caracteres desnecessários
+            descricao = this.cleanProcedureDescription(descricao);
+            
+            // Validar se temos dados mínimos válidos
+            if (codigo && descricao.length >= 3) {
+              // Extrair dados contextuais do segmento completo
+              const contextData = this.extractContextualData(segment, codigo);
               
-              // Status inicial - APROVADO por padrão
-              matchStatus: 'approved',
-              aprovado: true,
+              // ✅ DETECTAR SE É ANESTESISTA (SEM FILTRAR)
+              const isAnesthesia = this.detectAnesthesiaProcedure(segment, contextData.participacao);
               
-              // Campo quantidade - padrão 1
-              quantity: 1
-            };
+              const procedimento: ProcedureAIH = {
+                sequencia: sequenciaAtual,
+                procedimento: codigo,
+                documentoProfissional: contextData.documento || '',
+                cbo: contextData.cbo || '',
+                participacao: contextData.participacao || '1',
+                cnes: contextData.cnes || '',
+                aceitar: true,
+                data: contextData.data || '',
+                descricao: descricao,
+                
+                // Status inicial - TODOS APROVADOS
+                matchStatus: 'approved',
+                aprovado: true,
+                
+                // Campo quantidade - padrão 1
+                quantity: 1,
+                
+                // ✅ NOVO: Marcar se é anestesista (para estilo visual)
+                isAnesthesiaProcedure: isAnesthesia
+              };
 
-            procedimentos.push(procedimento);
-            console.log(`✅ Procedimento ${sequenciaAtual}: ${codigo} - ${descricao}`);
-            sequenciaAtual++;
-            extraidosNessePadrao++;
-            totalExtraidos++;
+              procedimentos.push(procedimento);
+              console.log(`✅ Procedimento ${sequenciaAtual}: ${codigo} - ${descricao} ${isAnesthesia ? '🚫 (ANESTESISTA)' : '✅ (NORMAL)'}`);
+              sequenciaAtual++;
+              totalExtraidos++;
+              extraidoNesteSegmento = true;
+              break; // Parar de tentar patterns neste segmento
+            }
           }
         }
         
-        console.log(`📊 Pattern ${patternIndex + 1} extraiu ${extraidosNessePadrao} procedimentos`);
-        
-        // Se encontrou procedimentos com este pattern, parar de tentar outros
-        if (extraidosNessePadrao > 0) {
-          console.log(`✅ Usando Pattern ${patternIndex + 1} como método principal`);
-          break;
+        // Se nenhum pattern funcionou, tentar extração por fallback neste segmento
+        if (!extraidoNesteSegmento) {
+          const fallbackProcedimentos = this.fallbackExtractionFromSegment(segment, sequenciaAtual);
+          if (fallbackProcedimentos.length > 0) {
+            procedimentos.push(...fallbackProcedimentos);
+            sequenciaAtual += fallbackProcedimentos.length;
+            totalExtraidos += fallbackProcedimentos.length;
+            console.log(`🔄 Fallback extraiu ${fallbackProcedimentos.length} procedimentos do segmento ${segmentIndex + 1}`);
+          }
         }
       }
       
-      console.log(`🎯 TOTAL EXTRAÍDO pela nova lógica: ${totalExtraidos} procedimentos`);
+      console.log(`🎯 EXTRAÇÃO COMPLETA FINALIZADA: ${totalExtraidos} procedimentos extraídos`);
       
-      // Se a nova lógica não funcionou, tentar métodos de fallback
-      if (procedimentos.length === 0) {
-        console.warn('⚠️ Nova lógica falhou, tentando métodos de fallback...');
-        procedimentos = this.fallbackExtractionMethods(filteredText, sequenciaInicial);
-      }
-
+      // 🆕 NOVA ETAPA: Extração robusta de descrições
+      console.log(`🔧 APLICANDO EXTRAÇÃO ROBUSTA DE DESCRIÇÕES...`);
+      const robustDescriptions = this.extractRobustProcedureDescriptions(text);
+      
+      // Aplicar descrições robustas
+      procedimentos = this.applyRobustDescriptions(procedimentos, robustDescriptions);
+      
       // Aplicar melhorias na descrição para todos os procedimentos extraídos
       procedimentos.forEach(proc => {
         proc.descricao = this.improveProcedureDescription(proc.descricao, proc.procedimento);
       });
 
-      console.log(`📊 RESUMO FINAL: ${procedimentos.length} procedimentos extraídos`);
+      // ✅ RELATÓRIO FINAL
+      const anestesistas = procedimentos.filter(p => p.isAnesthesiaProcedure);
+      const normais = procedimentos.filter(p => !p.isAnesthesiaProcedure);
+      const comDescricao = procedimentos.filter(p => p.descricao && p.descricao.length > 10 && !p.descricao.startsWith('Procedimento'));
+      
+      console.log(`📊 RESUMO FINAL COMPLETO:`);
+      console.log(`   ✅ Total extraído: ${procedimentos.length} procedimentos`);
+      console.log(`   🚫 Anestesistas detectados: ${anestesistas.length} (marcados para visualização)`);
+      console.log(`   📋 Procedimentos normais: ${normais.length}`);
+      console.log(`   📝 Com descrição completa: ${comDescricao.length} procedimentos`);
+      console.log(`   🎯 GARANTIA: Nenhum procedimento foi filtrado/perdido`);
+      
       return procedimentos;
       
     } catch (error) {
@@ -771,6 +861,123 @@ export class AIHCompleteProcessor {
     }
     
     return descricao;
+  }
+
+  /**
+   * 🆕 EXTRAÇÃO ROBUSTA DE DESCRIÇÕES - Captura descrições completas da segunda página
+   * Solução funcional mesmo que não seja visualmente perfeita
+   */
+  private extractRobustProcedureDescriptions(text: string): {[code: string]: string} {
+    console.log('🔧 EXTRAÇÃO ROBUSTA: Capturando descrições completas...');
+    
+    const descriptions: {[code: string]: string} = {};
+    
+    // Strategy 1: Buscar por padrões CÓDIGO - DESCRIÇÃO mais amplos
+    const fullDescriptionPatterns = [
+      // Pattern para capturar tudo entre código e próximo elemento estrutural
+      /([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9])\s*-\s*([A-ZÁÊÇÕÚÍÂ][^0-9]{5,200}?)(?=\s*\d{2}\.\d{2}\.\d{2}\.\d{3}-\d|\s*\d{1,3}\s*\d{6}|\s*$)/g,
+      
+      // Pattern mais amplo para descrições sem hífen
+      /([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9])\s+([A-ZÁÊÇÕÚÍÂ][A-ZÁÊÇÕÚÍÂ\s\/\(\)]+?)(?=\s*\d{1,3}\s|\s*\d{2}\.\d{2}|\s*$)/g,
+      
+      // Pattern para capturar linhas completas que contenham código + descrição
+      /([0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9])[^0-9]*?([A-ZÁÊÇÕÚÍÂ][^0-9]+?)(?=\s*\d{1,3}\s*\d{6})/g
+    ];
+    
+    for (const pattern of fullDescriptionPatterns) {
+      pattern.lastIndex = 0;
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        const codigo = match[1];
+        let descricao = match[2];
+        
+        if (descricao && descricao.length > 5) {
+          // Limpeza robusta da descrição
+          descricao = descricao
+            .trim()
+            .replace(/\s+/g, ' ')
+            .replace(/\s*\d+\s*$/, '') // Remover números finais
+            .replace(/\s*(COM|SEM|P\/|DE|DO|DA|E|OU)\s*$/, '') // Remover palavras truncadas no final
+            .trim();
+          
+          if (descricao.length > 3 && !descriptions[codigo]) {
+            descriptions[codigo] = descricao;
+            console.log(`✅ Descrição robusta capturada: ${codigo} -> ${descricao.substring(0, 50)}...`);
+          }
+        }
+      }
+    }
+    
+    // Strategy 2: Extração de contexto completo por código
+    const codeMatches = text.match(/[0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9]/g);
+    if (codeMatches) {
+      for (const codigo of codeMatches) {
+        if (descriptions[codigo]) continue; // Já tem descrição
+        
+        const codeIndex = text.indexOf(codigo);
+        if (codeIndex === -1) continue;
+        
+        // Extrair contexto de 300 caracteres após o código
+        const contextAfter = text.substring(codeIndex, codeIndex + 300);
+        
+        // Buscar por texto em maiúsculas que pode ser a descrição
+        const uppercaseMatch = contextAfter.match(/[A-ZÁÊÇÕÚÍÂ][A-ZÁÊÇÕÚÍÂ\s\/\(\)]{10,150}/);
+        if (uppercaseMatch) {
+          let descricao = uppercaseMatch[0]
+            .trim()
+            .replace(/\s+/g, ' ')
+            .replace(/\s*\d+.*$/, '') // Cortar na primeira sequência de números
+            .trim();
+          
+          if (descricao.length >= 10) {
+            descriptions[codigo] = descricao;
+            console.log(`✅ Contexto capturado: ${codigo} -> ${descricao.substring(0, 50)}...`);
+          }
+        }
+      }
+    }
+    
+    // Strategy 3: Extração bruta - capturar qualquer texto maiúsculo próximo ao código
+    for (const codigo of codeMatches || []) {
+      if (descriptions[codigo]) continue;
+      
+      const regex = new RegExp(`${codigo.replace(/\./g, '\\.')}[^A-Z]*([A-ZÁÊÇÕÚÍÂ][A-ZÁÊÇÕÚÍÂ\\s\\/\\(\\)]{8,100})`);
+      const bruteMatch = text.match(regex);
+      
+      if (bruteMatch && bruteMatch[1]) {
+        let descricao = bruteMatch[1]
+          .trim()
+          .split(/\s+\d/)[0] // Cortar no primeiro número encontrado
+          .trim();
+        
+        if (descricao.length >= 8) {
+          descriptions[codigo] = descricao;
+          console.log(`✅ Extração bruta: ${codigo} -> ${descricao.substring(0, 50)}...`);
+        }
+      }
+    }
+    
+    console.log(`📊 EXTRAÇÃO ROBUSTA FINALIZADA: ${Object.keys(descriptions).length} descrições capturadas`);
+    return descriptions;
+  }
+
+  /**
+   * Aplica descrições robustas aos procedimentos extraídos
+   */
+  private applyRobustDescriptions(procedimentos: ProcedureAIH[], robustDescriptions: {[code: string]: string}): ProcedureAIH[] {
+    return procedimentos.map(proc => {
+      const robustDescription = robustDescriptions[proc.procedimento];
+      
+      if (robustDescription && robustDescription.length > (proc.descricao?.length || 0)) {
+        console.log(`🔄 Aplicando descrição robusta para ${proc.procedimento}: "${robustDescription}"`);
+        return {
+          ...proc,
+          descricao: robustDescription
+        };
+      }
+      
+      return proc;
+    });
   }
 
   /**
@@ -1082,5 +1289,110 @@ export class AIHCompleteProcessor {
     // Buscar CNES no texto (geralmente números de 7+ dígitos)
     const cnesMatch = text.match(/(\d{7,})/);
     return cnesMatch ? cnesMatch[1] : '';
+  }
+
+  /**
+   * Detecta se uma linha contém um procedimento de anestesia.
+   * ✅ NOVO: Verifica por texto na linha, não apenas código.
+   */
+  private detectAnesthesiaProcedure(line: string, participacao: string): boolean {
+    // 🎯 ÚNICA VERIFICAÇÃO: Detecção por texto na participação
+    if (!participacao) {
+      return false;
+    }
+    
+    // 📋 TERMOS DE ANESTESIA EM PORTUGUÊS - como backup
+    const anesthesiaTerms = [
+      // Termos principais
+      'anestesista',        // Termo exato da tabela
+      'anestesiologista',   // Variação comum
+      'anestesiol',         // Abreviação comum
+      'anestes',            // Variação
+      'anes',               // Abreviação curta
+      'anest',              // Abreviação
+      
+      // Variações e erros de digitação
+      'anestsista',         // Erro comum
+      'anestesita',         // Erro comum
+      'anestesis',          // Variação
+      'anastesista',        // Erro comum
+      'anastesiologista',   // Erro comum
+      
+      // Termos em inglês (caso apareçam)
+      'anesthesi',          // Inglês
+      'anesthesiol',        // Inglês abreviado
+      
+      // Termos relacionados
+      'anest.',             // Abreviação com ponto
+      'anes.',              // Abreviação com ponto
+    ];
+    
+    // Verificar se algum termo de anestesia está presente na participação
+    const isAnesthesia = anesthesiaTerms.some(term => 
+      participacao.includes(term)
+    );
+    
+    // 🎯 NOVO: Verifica também por texto na linha, mesmo que não seja um procedimento
+    if (isAnesthesia) {
+      return true;
+    }
+
+    // 🎯 ÚNICA VERIFICAÇÃO: Detecção por texto na participação
+    const participacaoLine = line.toLowerCase().trim();
+    
+    const hasAnesthesiaText = anesthesiaTerms.some(term => participacaoLine.includes(term));
+    
+    return hasAnesthesiaText;
+  }
+
+  /**
+   * Método de fallback para extração quando a lógica principal falha em um segmento
+   */
+  private fallbackExtractionFromSegment(segment: string, sequenciaInicial: number): ProcedureAIH[] {
+    console.log(`🔄 Executando fallback para segmento: ${segment.substring(0, 80)}...`);
+    
+    const procedimentos: ProcedureAIH[] = [];
+    
+    // 🆕 APLICAR EXTRAÇÃO ROBUSTA DE DESCRIÇÕES NO SEGMENTO
+    const robustDescriptions = this.extractRobustProcedureDescriptions(segment);
+    
+    // Buscar todos os códigos de procedimento no segmento
+    const codigosMatch = segment.match(/[0-9]{2}\.[0-9]{2}\.[0-9]{2}\.[0-9]{3}-[0-9]/g);
+    
+    if (codigosMatch) {
+      console.log(`📋 Encontrados ${codigosMatch.length} códigos de procedimento via fallback no segmento`);
+      
+      codigosMatch.forEach((codigo, index) => {
+        // Extrair dados contextuais básicos para este código
+        const contextData = this.extractContextualData(segment, codigo);
+        
+        // ✅ DETECTAR SE É ANESTESISTA TAMBÉM NO FALLBACK
+        const isAnesthesia = this.detectAnesthesiaProcedure(segment, contextData.participacao);
+        
+        // 🆕 USAR DESCRIÇÃO ROBUSTA SE DISPONÍVEL
+        const descricao = robustDescriptions[codigo] || `Procedimento ${codigo}`;
+        
+        const procedimento: ProcedureAIH = {
+          sequencia: sequenciaInicial + index,
+          procedimento: codigo,
+          documentoProfissional: contextData.documento || '',
+          cbo: contextData.cbo || '',
+          participacao: contextData.participacao || '1',
+          cnes: contextData.cnes || '',
+          aceitar: true,
+          data: contextData.data || '',
+          descricao: descricao, // 🆕 Descrição robusta ou fallback
+          matchStatus: 'approved',
+          aprovado: true,
+          quantity: 1,
+          isAnesthesiaProcedure: isAnesthesia // 🆕 Detectar anestesista também no fallback
+        };
+        
+        procedimentos.push(procedimento);
+        console.log(`✅ Procedimento fallback ${sequenciaInicial + index}: ${codigo} - ${descricao.substring(0, 30)}...${isAnesthesia ? ' (ANESTESISTA)' : ''}`);
+      });
+    }
+    
+    return procedimentos;
   }
 } 

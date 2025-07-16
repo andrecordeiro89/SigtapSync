@@ -264,15 +264,31 @@ const PatientManagement = () => {
       if (itemToDelete.type === 'patient') {
         await persistenceService.deletePatient(itemToDelete.id);
         setPatients(patients.filter(p => p.id !== itemToDelete.id));
+        
+        toast({
+          title: "Sucesso",
+          description: "Paciente removido com sucesso",
+        });
       } else {
-        await persistenceService.deleteAIH(itemToDelete.id);
+        // ✅ CORREÇÃO: Usar deleteCompleteAIH para deletar das 3 tabelas: aihs, patients, procedure_records
+        const result = await persistenceService.deleteCompleteAIH(
+          itemToDelete.id,
+          user?.id || 'system',
+          {
+            keepAuditTrail: true // Manter log de auditoria para compliance
+          }
+        );
+        
         setAIHs(aihs.filter(a => a.id !== itemToDelete.id));
+        
+        // 🎯 TOAST DETALHADO com informações do que foi excluído
+        toast({
+          title: "✅ Exclusão Completa Realizada",
+          description: result.message,
+        });
+        
+        console.log('🗑️ Resultado da exclusão completa:', result);
       }
-      
-      toast({
-        title: "Sucesso",
-        description: `${itemToDelete.type === 'patient' ? 'Paciente' : 'AIH'} removido com sucesso`,
-      });
       
       await loadStats();
     } catch (error) {
@@ -1156,20 +1172,52 @@ const PatientManagement = () => {
 
 
 
-      {/* Dialog de Confirmação de Deleção */}
+      {/* Dialog de Confirmação de Deleção - ATUALIZADO */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar Deleção</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja deletar {itemToDelete?.type === 'patient' ? 'o paciente' : 'a AIH'} "{itemToDelete?.name}"?
-              Esta ação não pode ser desfeita.
+            <AlertDialogTitle className="flex items-center space-x-2">
+              <Trash2 className="w-5 h-5 text-red-600" />
+              <span>Confirmar Exclusão</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              {itemToDelete?.type === 'patient' ? (
+                <div>
+                  <p>Tem certeza que deseja deletar o paciente <strong>"{itemToDelete?.name}"</strong>?</p>
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                    <p className="text-red-800 text-sm font-medium">⚠️ Esta ação irá excluir:</p>
+                    <ul className="text-red-700 text-sm mt-1 space-y-1">
+                      <li>• O paciente e seus dados pessoais</li>
+                      <li>• Todas as AIHs do paciente</li>
+                      <li>• Todos os procedimentos relacionados</li>
+                      <li>• Todos os matches encontrados</li>
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p>Tem certeza que deseja deletar a AIH <strong>"{itemToDelete?.name}"</strong>?</p>
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                    <p className="text-red-800 text-sm font-medium">🗑️ Esta ação irá excluir COMPLETAMENTE:</p>
+                    <ul className="text-red-700 text-sm mt-1 space-y-1">
+                      <li>• A AIH e seus dados</li>
+                      <li>• <strong>Todos os procedimentos</strong> da AIH (procedure_records)</li>
+                      <li>• Todos os matches encontrados (aih_matches)</li>
+                      <li>• O paciente (se não tiver outras AIHs)</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+              <p className="text-gray-600 text-sm font-medium">
+                Esta ação não pode ser desfeita.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteConfirm} className="bg-red-600 hover:bg-red-700">
-              Deletar
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir Completamente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
