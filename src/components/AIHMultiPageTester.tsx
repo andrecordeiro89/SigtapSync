@@ -233,6 +233,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
   const handleQuantityChange = (sequencia: number, newQuantity: number) => {
     if (newQuantity < 1 || newQuantity > 99 || isNaN(newQuantity)) return;
     
+    console.log(`🔄 ALTERANDO QUANTIDADE - Sequência: ${sequencia}, Nova Quantidade: ${newQuantity}`);
+    
     const updatedAIH = {
       ...aihCompleta,
       procedimentos: aihCompleta.procedimentos.map(proc => {
@@ -242,7 +244,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           const valorUnitarioSH = proc.valorCalculadoSH ? proc.valorCalculadoSH / (proc.quantity || 1) : 0;
           const valorUnitarioSP = proc.valorCalculadoSP ? proc.valorCalculadoSP / (proc.quantity || 1) : 0;
           
-          return {
+          const updatedProc = {
             ...proc,
             quantity: newQuantity,
             valorUnitario: valorUnitario,
@@ -251,6 +253,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
             valorCalculadoSH: valorUnitarioSH * newQuantity,
             valorCalculadoSP: valorUnitarioSP * newQuantity
           };
+          console.log(`✅ PROCEDIMENTO ATUALIZADO - Seq: ${sequencia}, Quantity: ${updatedProc.quantity}`);
+          return updatedProc;
         }
         return proc;
       })
@@ -2351,6 +2355,12 @@ const AIHMultiPageTester = () => {
       console.log(`🏥 Hospital: ${hospitalId}`);
       console.log(`📊 Procedimentos: ${aihCompleta.procedimentos?.length || 0}`);
       
+      // 🔍 DEBUG: Verificar quantidades antes de salvar
+      console.log('🔍 VERIFICANDO QUANTIDADES ANTES DE SALVAR:');
+      aihCompleta.procedimentos.forEach(proc => {
+        console.log(`   Seq ${proc.sequencia}: quantity=${proc.quantity} (${typeof proc.quantity})`);
+      });
+      
       // ✅ VERIFICAÇÃO DE DUPLICATAS ANTES DE SALVAR
       console.log('🔍 Verificando se AIH já existe no banco...');
       toast({
@@ -2673,4 +2683,4 @@ const AIHMultiPageTester = () => {
   );
 };
 
-export default AIHMultiPageTester; 
+export default AIHMultiPageTester;

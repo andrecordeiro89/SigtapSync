@@ -1268,6 +1268,7 @@ export class AIHPersistenceService {
         
         for (const procedure of aihCompleta.procedimentos) {
           try {
+            console.log(`🔍 PROCEDIMENTO ${procedure.sequencia}: quantity=${procedure.quantity} (tipo: ${typeof procedure.quantity})`);
             // Salvar procedimento na tabela procedure_records - MAPEAMENTO CORRIGIDO
             const procedureRecord = await this.saveProcedureRecordFixed({
               hospital_id: hospitalId,
@@ -1356,6 +1357,7 @@ export class AIHPersistenceService {
    */
   private static async saveProcedureRecordFixed(data: any): Promise<any> {
     console.log(`🔧 SALVANDO PROCEDIMENTO (MODO ROBUSTO): ${data.procedure_code}`);
+    console.log(`📊 QUANTIDADE RECEBIDA: ${data.quantity} (tipo: ${typeof data.quantity})`);
     
     // Buscar procedure_id do SIGTAP se existe match
     let procedureId = null;
