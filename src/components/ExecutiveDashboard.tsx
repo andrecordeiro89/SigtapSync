@@ -237,6 +237,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [selectedHospitals, setSelectedHospitals] = useState<string[]>(['all']);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState('hospitals');
   
   // Data States
   const [kpiData, setKpiData] = useState<KPIData>({
@@ -249,6 +250,14 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     processingTime: 0,
     monthlyGrowth: 0
   });
+  
+  // Estado para dados dos médicos da aba de Médicos
+  const [medicalProductionStats, setMedicalProductionStats] = useState<{
+    totalRevenue: number;
+    totalDoctors: number;
+    totalPatients: number;
+    totalProcedures: number;
+  } | null>(null);
   
   const [hospitalStats, setHospitalStats] = useState<HospitalStats[]>([]);
   const [doctorStats, setDoctorStats] = useState<DoctorStats[]>([]);
@@ -267,6 +276,47 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
   // Access Control
   const hasExecutiveAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('generate_reports');
+  
+  // Função para atualizar dados dos médicos da aba de Médicos
+  const updateMedicalProductionStats = (stats: {
+    totalRevenue: number;
+    totalDoctors: number;
+    totalPatients: number;
+    totalProcedures: number;
+  }) => {
+    setMedicalProductionStats(stats);
+    
+    // Se estamos na aba de médicos, atualizar o KPI do cabeçalho
+    if (activeTab === 'doctors') {
+      setKpiData(prev => ({
+        ...prev,
+        totalRevenue: stats.totalRevenue,
+        totalAIHs: stats.totalPatients, // Pacientes = AIHs na aba de médicos
+        averageTicket: stats.totalPatients > 0 ? stats.totalRevenue / stats.totalPatients : 0,
+        activeDoctors: stats.totalDoctors
+      }));
+      setLastUpdate(new Date());
+    }
+  };
+  
+  // Função para lidar com mudança de aba
+  const handleTabChange = (tabValue: string) => {
+    setActiveTab(tabValue);
+    
+    // Atualizar KPI baseado na aba ativa
+    if (tabValue === 'doctors' && medicalProductionStats) {
+      setKpiData(prev => ({
+        ...prev,
+        totalRevenue: medicalProductionStats.totalRevenue,
+        totalAIHs: medicalProductionStats.totalPatients,
+        averageTicket: medicalProductionStats.totalPatients > 0 ? medicalProductionStats.totalRevenue / medicalProductionStats.totalPatients : 0,
+        activeDoctors: medicalProductionStats.totalDoctors
+      }));
+    } else {
+      // Para outras abas, recarregar dados originais
+      loadExecutiveData();
+    }
+  };
   
 
 
@@ -522,7 +572,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
 
 
-      <Tabs defaultValue="hospitals" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5 bg-blue-100">
           <TabsTrigger value="hospitals" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <Hospital className="h-4 w-4 mr-2" />
@@ -560,7 +610,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
         {/* TAB: MÉDICOS */}
         <TabsContent value="doctors" className="space-y-6">
-          <MedicalProductionDashboard />
+          <MedicalProductionDashboard onStatsUpdate={updateMedicalProductionStats} />
         </TabsContent>
 
         {/* TAB: PROCEDIMENTOS */}
@@ -683,4 +733,4 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   );
 };
 
-export default ExecutiveDashboard; 
+export default ExecutiveDashboard;

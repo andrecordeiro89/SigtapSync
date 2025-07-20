@@ -287,8 +287,18 @@ const DataDiagnostics: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
+// ✅ INTERFACE PARA PROPS DO COMPONENTE
+interface MedicalProductionDashboardProps {
+  onStatsUpdate?: (stats: {
+    totalRevenue: number;
+    totalDoctors: number;
+    totalPatients: number;
+    totalProcedures: number;
+  }) => void;
+}
+
 // ✅ COMPONENTE PRINCIPAL
-const MedicalProductionDashboard: React.FC = () => {
+const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({ onStatsUpdate }) => {
   const { user, canAccessAllHospitals, hasFullAccess } = useAuth();
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
   const [filteredDoctors, setFilteredDoctors] = useState<DoctorWithPatients[]>([]);
@@ -494,6 +504,39 @@ const MedicalProductionDashboard: React.FC = () => {
       isDemoData
     };
   }, [doctors]);
+  
+  // ✅ CALCULAR ESTATÍSTICAS DOS MÉDICOS FILTRADOS
+  const filteredStats = React.useMemo(() => {
+    const totalDoctors = filteredDoctors.length;
+    const totalPatients = filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
+    
+    // Coletar todos os procedimentos dos médicos filtrados
+    const allProcedures = filteredDoctors.flatMap(doctor => 
+      doctor.patients.flatMap(patient => patient.procedures)
+    );
+    
+    const totalProcedures = allProcedures.length;
+    const totalRevenue = allProcedures.reduce((sum, proc) => sum + (proc.value_reais || 0), 0);
+    
+    return {
+      totalDoctors,
+      totalPatients,
+      totalProcedures,
+      totalRevenue
+    };
+  }, [filteredDoctors]);
+  
+  // ✅ ATUALIZAR ESTATÍSTICAS NO COMPONENTE PAI (BASEADO NOS MÉDICOS FILTRADOS)
+  useEffect(() => {
+    if (onStatsUpdate && !isLoading) {
+      onStatsUpdate({
+        totalRevenue: filteredStats.totalRevenue,
+        totalDoctors: filteredStats.totalDoctors,
+        totalPatients: filteredStats.totalPatients,
+        totalProcedures: filteredStats.totalProcedures
+      });
+    }
+  }, [filteredStats, onStatsUpdate, isLoading]);
 
   if (isLoading) {
     return (
