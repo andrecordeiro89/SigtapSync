@@ -31,7 +31,7 @@ import {
 
 import { DoctorPatientService, type DoctorWithPatients } from '../services/doctorPatientService';
 
-// ✅ FUNÇÃO PARA FORMATAR VALORES MONETÁRIOS
+// ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 const formatCurrency = (value: number | null | undefined): string => {
   if (value == null || isNaN(value)) return 'R$ 0,00';
   return value.toLocaleString('pt-BR', {
@@ -42,13 +42,11 @@ const formatCurrency = (value: number | null | undefined): string => {
   });
 };
 
-// ✅ FUNÇÃO PARA FORMATAR NÚMEROS
 const formatNumber = (value: number | null | undefined): string => {
   if (value == null || isNaN(value)) return '0';
   return Math.round(value).toLocaleString('pt-BR');
 };
 
-// ✅ FUNÇÃO PARA CALCULAR ESTATÍSTICAS DO MÉDICO
 const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   const totalProcedures = doctorData.patients.reduce((sum, patient) => sum + patient.procedures.length, 0);
   const totalValue = doctorData.patients.reduce((sum, patient) => 
@@ -295,10 +293,53 @@ const MedicalProductionDashboard: React.FC = () => {
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
   const [filteredDoctors, setFilteredDoctors] = useState<DoctorWithPatients[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedHospital, setSelectedHospital] = useState<string>('all'); // 🆕 FILTRO DE HOSPITAL
+  const [availableHospitals, setAvailableHospitals] = useState<Array<{id: string, name: string}>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
   const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set());
   const [showDiagnostic, setShowDiagnostic] = useState(false); // 🆕 ESTADO PARA MOSTRAR DIAGNÓSTICO
+
+  // ✅ CARREGAR LISTA DE HOSPITAIS DISPONÍVEIS
+  const loadAvailableHospitals = async (doctorsData: DoctorWithPatients[]) => {
+    try {
+      // Extrair hospitais únicos dos dados dos médicos
+      const hospitalSet = new Set<string>();
+      const hospitalMap = new Map<string, string>();
+      
+      doctorsData.forEach(doctor => {
+        doctor.hospitals?.forEach(hospital => {
+          if (hospital.hospital_id && hospital.hospital_name && hospital.hospital_name !== 'Hospital não definido') {
+            hospitalSet.add(hospital.hospital_id);
+            hospitalMap.set(hospital.hospital_id, hospital.hospital_name);
+          }
+        });
+      });
+      
+      // Buscar hospitais adicionais da tabela hospitals se necessário
+      const { data: hospitalsFromDB } = await supabase
+        .from('hospitals')
+        .select('id, name')
+        .order('name');
+      
+      if (hospitalsFromDB) {
+        hospitalsFromDB.forEach(hospital => {
+          hospitalSet.add(hospital.id);
+          hospitalMap.set(hospital.id, hospital.name);
+        });
+      }
+      
+      // Converter para array ordenado
+      const hospitalsList = Array.from(hospitalSet)
+        .map(id => ({ id, name: hospitalMap.get(id) || `Hospital ${id}` }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      
+      setAvailableHospitals(hospitalsList);
+      console.log('🏥 Hospitais disponíveis:', hospitalsList);
+    } catch (error) {
+      console.error('❌ Erro ao carregar hospitais:', error);
+    }
+  };
 
   // ✅ CARREGAR DADOS DOS MÉDICOS COM FILTRO POR HOSPITAL
   useEffect(() => {
@@ -318,13 +359,16 @@ const MedicalProductionDashboard: React.FC = () => {
         const doctorsData = await DoctorPatientService.getAllDoctorsWithPatients();
         console.log('✅ Dados dos médicos carregados:', doctorsData);
         
+        // ✅ CARREGAR LISTA DE HOSPITAIS DISPONÍVEIS
+        await loadAvailableHospitals(doctorsData);
+        
         // ✅ FILTRAR MÉDICOS POR HOSPITAL (SE NÃO FOR ADMIN)
         let filteredDoctorsData = doctorsData;
         
         if (!isAdminMode && userHospitalId && userHospitalId !== 'ALL') {
           filteredDoctorsData = doctorsData.filter(doctor => {
             // Verificar se o médico tem associação com o hospital do usuário
-            return doctor.doctor_info.hospitals.some(hospital => 
+            return doctor.hospitals?.some(hospital =>
               hospital.hospital_id === userHospitalId
             );
           });
@@ -351,22 +395,32 @@ const MedicalProductionDashboard: React.FC = () => {
     loadDoctorsData();
   }, [user, canAccessAllHospitals, hasFullAccess]);
 
-  // ✅ FILTRAR MÉDICOS
+  // ✅ FILTRAR MÉDICOS BASEADO NO TERMO DE BUSCA E HOSPITAL SELECIONADO
   useEffect(() => {
-    if (!searchTerm) {
-      setFilteredDoctors(doctors);
-      return;
+    let filtered = doctors;
+    
+    // Filtrar por hospital se não for "all"
+    if (selectedHospital !== 'all') {
+      filtered = filtered.filter(doctor => {
+        return doctor.hospitals?.some(hospital =>
+          hospital.hospital_id === selectedHospital
+        );
+      });
+    }
+    
+    // Filtrar por termo de busca
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(doctor => {
+        return doctor.doctor_info.name.toLowerCase().includes(searchLower) ||
+               doctor.doctor_info.cns.includes(searchTerm) ||
+               doctor.doctor_info.crm?.toLowerCase().includes(searchLower) ||
+               doctor.doctor_info.specialty?.toLowerCase().includes(searchLower);
+      });
     }
 
-    const filtered = doctors.filter(doctor => 
-      doctor.doctor_info.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.doctor_info.cns.includes(searchTerm) ||
-      doctor.doctor_info.crm?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doctor.doctor_info.specialty?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
     setFilteredDoctors(filtered);
-  }, [searchTerm, doctors]);
+  }, [searchTerm, doctors, selectedHospital]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
   const toggleDoctorExpansion = (doctorCns: string) => {
@@ -514,19 +568,50 @@ const MedicalProductionDashboard: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Buscar por nome, CNS, CRM ou especialidade..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+          <div className="space-y-4 mb-6">
+            {/* ✅ LINHA DE BUSCA E FILTROS */}
+            <div className="flex items-center gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Buscar por nome, CNS, CRM ou especialidade..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Badge variant="secondary">
+                {filteredDoctors.length} médicos encontrados
+              </Badge>
             </div>
-            <Badge variant="secondary">
-              {filteredDoctors.length} médicos encontrados
-            </Badge>
+            
+            {/* ✅ FILTRO DE HOSPITAL */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Building className="h-4 w-4 text-gray-600" />
+                <span className="text-sm font-medium text-gray-700">Filtrar por Hospital:</span>
+              </div>
+              <select
+                value={selectedHospital}
+                onChange={(e) => setSelectedHospital(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[200px]"
+              >
+                <option value="all">Todos os Hospitais</option>
+                {availableHospitals.map((hospital) => (
+                  <option key={hospital.id} value={hospital.id}>
+                    {hospital.name}
+                  </option>
+                ))}
+              </select>
+              {selectedHospital !== 'all' && (
+                <button
+                  onClick={() => setSelectedHospital('all')}
+                  className="text-xs text-blue-600 hover:text-blue-800 underline"
+                >
+                  Limpar filtro
+                </button>
+              )}
+            </div>
           </div>
 
           {/* ✅ LISTA DE MÉDICOS */}
@@ -672,7 +757,7 @@ const MedicalProductionDashboard: React.FC = () => {
                             </div>
                                 <div className="text-base font-bold text-orange-800 leading-tight">
                                   {(() => {
-                                    const hospitals = (doctor as any).hospitals;
+                                    const hospitals = doctor.hospitals;
                                     if (hospitals && hospitals.length > 0) {
                                       const primaryHospital = hospitals.find((h: any) => h.is_primary_hospital);
                                       const hospital = primaryHospital || hospitals[0];
