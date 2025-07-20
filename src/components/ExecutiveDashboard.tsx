@@ -237,7 +237,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [selectedHospitals, setSelectedHospitals] = useState<string[]>(['all']);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState('hospitals');
+  const [activeTab, setActiveTab] = useState('doctors');
   
   // Data States
   const [kpiData, setKpiData] = useState<KPIData>({
@@ -335,7 +335,6 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       ]);
       
       // Atualizar estados com dados reais
-      setDoctorsData(doctorsResult.doctors);
       setSpecialtyStats(specialtiesData);
       setHospitalRevenueStats(hospitalsData);
       setBillingStats(billingStatsData);
@@ -406,16 +405,39 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
       const activeDoctors = doctorsResult.doctors.filter(d => d.activity_status === 'ATIVO').length;
       
+      // ✅ CALCULAR KPIs DOS MÉDICOS PARA O CABEÇALHO
+      // O cabeçalho sempre deve mostrar os dados dos médicos, não dos AIHs
+      const doctorsRevenue = doctorsResult.doctors.reduce((sum, doctor) => 
+        sum + safeValue(doctor.total_revenue_12months_reais || 0), 0
+      );
+      const doctorsProcedures = doctorsResult.doctors.reduce((sum, doctor) => 
+        sum + (doctor.total_procedures_12months || 0), 0
+      );
+      const doctorsPatients = Math.round(doctorsProcedures / 3); // Estimativa conservadora
+      const doctorsAverageTicket = doctorsPatients > 0 ? doctorsRevenue / doctorsPatients : 0;
+      
       setKpiData({
-        totalRevenue,
-        totalAIHs,
-        averageTicket,
+        totalRevenue: doctorsRevenue, // ✅ SEMPRE USAR DADOS DOS MÉDICOS
+        totalAIHs: doctorsPatients,   // ✅ SEMPRE USAR DADOS DOS MÉDICOS
+        averageTicket: doctorsAverageTicket, // ✅ SEMPRE USAR DADOS DOS MÉDICOS
         approvalRate,
         activeHospitals: hospitalsData.length,
         activeDoctors: activeDoctors,
         processingTime: 2.3, // Manter mock por enquanto
         monthlyGrowth: 12.5 // Manter mock por enquanto
       });
+      
+      // ✅ TAMBÉM ATUALIZAR O ESTADO DOS DADOS DOS MÉDICOS PARA SINCRONIZAÇÃO
+      setDoctorsData(doctorsResult.doctors);
+      
+      // ✅ SIMULAR A ATUALIZAÇÃO DOS STATS DOS MÉDICOS PARA MANTER CONSISTÊNCIA
+      const medicalStats = {
+        totalRevenue: doctorsRevenue,
+        totalDoctors: activeDoctors,
+        totalPatients: doctorsPatients,
+        totalProcedures: doctorsProcedures
+      };
+      setMedicalProductionStats(medicalStats);
 
       // Converter dados dos hospitais para o formato atual com valores normalizados
       const hospitalStatsConverted: HospitalStats[] = hospitalsData.map(hospital => ({
@@ -563,13 +585,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5 bg-blue-100">
-          <TabsTrigger value="hospitals" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            <Hospital className="h-4 w-4 mr-2" />
-            Hospitais
-          </TabsTrigger>
           <TabsTrigger value="doctors" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <Users className="h-4 w-4 mr-2" />
             Médicos
+          </TabsTrigger>
+          <TabsTrigger value="hospitals" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            <Hospital className="h-4 w-4 mr-2" />
+            Hospitais
           </TabsTrigger>
           <TabsTrigger value="procedures" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <FileText className="h-4 w-4 mr-2" />
@@ -587,6 +609,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
 
 
+        {/* TAB: MÉDICOS */}
+        <TabsContent value="doctors" className="space-y-6">
+          <MedicalProductionDashboard onStatsUpdate={updateMedicalProductionStats} />
+        </TabsContent>
+
         {/* TAB: HOSPITAIS */}
         <TabsContent value="hospitals" className="space-y-6">
           <HospitalRevenueDashboard doctorsData={doctorsData} />
@@ -595,11 +622,6 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         {/* TAB: ESPECIALIDADES */}
         <TabsContent value="specialties" className="space-y-6">
           <SpecialtyRevenueDashboard />
-        </TabsContent>
-
-        {/* TAB: MÉDICOS */}
-        <TabsContent value="doctors" className="space-y-6">
-          <MedicalProductionDashboard onStatsUpdate={updateMedicalProductionStats} />
         </TabsContent>
 
         {/* TAB: PROCEDIMENTOS */}
