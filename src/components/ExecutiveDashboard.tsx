@@ -286,36 +286,25 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   }) => {
     setMedicalProductionStats(stats);
     
-    // Se estamos na aba de médicos, atualizar o KPI do cabeçalho
-    if (activeTab === 'doctors') {
-      setKpiData(prev => ({
-        ...prev,
-        totalRevenue: stats.totalRevenue,
-        totalAIHs: stats.totalPatients, // Pacientes = AIHs na aba de médicos
-        averageTicket: stats.totalPatients > 0 ? stats.totalRevenue / stats.totalPatients : 0,
-        activeDoctors: stats.totalDoctors
-      }));
-      setLastUpdate(new Date());
-    }
+    // ✅ SEMPRE ATUALIZAR O KPI DO CABEÇALHO COM OS DADOS DOS MÉDICOS
+    // Independente da aba ativa, o cabeçalho sempre mostra os valores dos médicos
+    setKpiData(prev => ({
+      ...prev,
+      totalRevenue: stats.totalRevenue,
+      totalAIHs: stats.totalPatients, // Pacientes = AIHs na aba de médicos
+      averageTicket: stats.totalPatients > 0 ? stats.totalRevenue / stats.totalPatients : 0,
+      activeDoctors: stats.totalDoctors
+    }));
+    setLastUpdate(new Date());
   };
   
   // Função para lidar com mudança de aba
   const handleTabChange = (tabValue: string) => {
     setActiveTab(tabValue);
     
-    // Atualizar KPI baseado na aba ativa
-    if (tabValue === 'doctors' && medicalProductionStats) {
-      setKpiData(prev => ({
-        ...prev,
-        totalRevenue: medicalProductionStats.totalRevenue,
-        totalAIHs: medicalProductionStats.totalPatients,
-        averageTicket: medicalProductionStats.totalPatients > 0 ? medicalProductionStats.totalRevenue / medicalProductionStats.totalPatients : 0,
-        activeDoctors: medicalProductionStats.totalDoctors
-      }));
-    } else {
-      // Para outras abas, recarregar dados originais
-      loadExecutiveData();
-    }
+    // ✅ MANTER SEMPRE O VALOR DA ABA MÉDICOS NO CABEÇALHO
+    // Não alterar o KPI do cabeçalho ao trocar de aba
+    // O valor do faturamento total sempre refletirá os dados dos médicos
   };
   
 
@@ -600,7 +589,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
         {/* TAB: HOSPITAIS */}
         <TabsContent value="hospitals" className="space-y-6">
-          <HospitalRevenueDashboard />
+          <HospitalRevenueDashboard doctorsData={doctorsData} />
         </TabsContent>
 
         {/* TAB: ESPECIALIDADES */}

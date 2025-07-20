@@ -212,8 +212,13 @@ const getFallbackHospitalRevenue = async (hospitalId: string): Promise<number> =
   }
 };
 
+// ✅ INTERFACE PARA PROPRIEDADES DO COMPONENTE
+interface HospitalRevenueDashboardProps {
+  doctorsData?: DoctorAggregated[];
+}
+
 // ✅ COMPONENTE PRINCIPAL DO DASHBOARD - DESIGN PREMIUM
-const HospitalRevenueDashboard: React.FC = () => {
+const HospitalRevenueDashboard: React.FC<HospitalRevenueDashboardProps> = ({ doctorsData }) => {
   const [hospitalStats, setHospitalStats] = useState<HospitalStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [realRevenue, setRealRevenue] = useState<Record<string, number>>({});
@@ -245,25 +250,56 @@ const HospitalRevenueDashboard: React.FC = () => {
         setHospitalDetails(detailsMap);
       }
 
-      // 2. Buscar médicos únicos agregados
-      const doctorsResult = await DoctorsRevenueService.getDoctorsAggregated({ pageSize: 1000 });
-      const doctors = doctorsResult.doctors || [];
-      console.log('✅ Médicos únicos carregados:', doctors.length);
+      // 2. Usar dados dos médicos passados como propriedade ou buscar novos
+      let doctors: DoctorAggregated[] = [];
+      if (doctorsData && doctorsData.length > 0) {
+        console.log('✅ Usando dados dos médicos da aba Médicos:', doctorsData.length);
+        doctors = doctorsData;
+      } else {
+        const doctorsResult = await DoctorsRevenueService.getDoctorsAggregated({ pageSize: 1000 });
+        doctors = doctorsResult.doctors || [];
+        console.log('✅ Médicos únicos carregados do banco:', doctors.length);
+      }
       setUniqueDoctors(doctors);
 
-      // 3. Buscar faturamento real para cada hospital
-      const revenuePromises = stats.map(async (hospital) => {
-        const revenue = await getRealHospitalRevenue(hospital.hospital_id);
-        return { hospitalId: hospital.hospital_id, revenue };
-      });
+      // 3. Calcular faturamento real para cada hospital
+      let revenueMap: Record<string, number> = {};
+      
+      if (doctorsData && doctorsData.length > 0) {
+        // ✅ USAR DADOS DOS MÉDICOS: Calcular faturamento por hospital baseado nos médicos
+        console.log('✅ Calculando faturamento dos hospitais baseado nos dados dos médicos');
+        
+        stats.forEach(hospital => {
+          const hospitalDoctors = doctors.filter(doctor => {
+            if (!doctor.hospital_ids || doctor.hospital_ids.trim() === '') return false;
+            const hospitalIdsList = doctor.hospital_ids.split(',').map(id => id.trim());
+            return hospitalIdsList.includes(String(hospital.hospital_id).trim());
+          });
+          
+          const hospitalRevenue = hospitalDoctors.reduce((sum, doctor) => {
+            return sum + (doctor.total_revenue_12months_reais || 0);
+          }, 0);
+          
+          revenueMap[hospital.hospital_id] = hospitalRevenue;
+        });
+        
+        console.log('✅ Faturamento calculado dos médicos para', Object.keys(revenueMap).length, 'hospitais');
+      } else {
+        // ✅ BUSCAR DO BANCO: Usar método original
+        const revenuePromises = stats.map(async (hospital) => {
+          const revenue = await getRealHospitalRevenue(hospital.hospital_id);
+          return { hospitalId: hospital.hospital_id, revenue };
+        });
 
-      const revenueResults = await Promise.all(revenuePromises);
-      const revenueMap = revenueResults.reduce((acc, { hospitalId, revenue }) => {
-        acc[hospitalId] = revenue;
-        return acc;
-      }, {} as Record<string, number>);
+        const revenueResults = await Promise.all(revenuePromises);
+        revenueMap = revenueResults.reduce((acc, { hospitalId, revenue }) => {
+          acc[hospitalId] = revenue;
+          return acc;
+        }, {} as Record<string, number>);
 
-      console.log('✅ Faturamento real carregado:', Object.keys(revenueMap).length, 'hospitais');
+        console.log('✅ Faturamento real carregado do banco:', Object.keys(revenueMap).length, 'hospitais');
+      }
+      
       setRealRevenue(revenueMap);
 
     } catch (error) {
@@ -276,6 +312,13 @@ const HospitalRevenueDashboard: React.FC = () => {
   useEffect(() => {
     loadHospitalStats();
   }, []);
+
+  // ✅ RECARREGAR DADOS QUANDO OS DADOS DOS MÉDICOS MUDAREM
+  useEffect(() => {
+    if (doctorsData) {
+      loadHospitalStats();
+    }
+  }, [doctorsData]);
 
   // ✅ ESTATÍSTICAS AGREGADAS
   const totalHospitals = hospitalStats.length;
@@ -515,4 +558,4 @@ const PremiumHospitalCard: React.FC<PremiumHospitalCardProps> = ({
   );
 };
 
-export default HospitalRevenueDashboard; 
+export default HospitalRevenueDashboard;
