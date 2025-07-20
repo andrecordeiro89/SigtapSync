@@ -1572,17 +1572,53 @@ export class DoctorPatientService {
             })));
           }
 
-          // Se não tem hospitais cadastrados, adicionar um placeholder
+          // Se não tem hospitais cadastrados, tentar inferir do hospital das AIHs
           if (hospitals.length === 0) {
-            hospitals.push({
-              hospital_id: '',
-              hospital_name: 'Hospital não definido',
-              hospital_cnpj: '',
-              role: '',
-              department: '',
-              is_primary_hospital: true,
-              is_active: true
-            });
+            console.log(`⚠️ Médico ${doctor.name} (CNS: ${doctor.cns}) sem hospital cadastrado na tabela doctor_hospital`);
+            
+            // Tentar inferir hospital das AIHs onde este médico é responsável
+            const { data: aihsForDoctor } = await supabase
+              .from('aihs')
+              .select(`
+                hospital_id,
+                hospitals (
+                  id,
+                  name,
+                  cnpj
+                )
+              `)
+              .eq('cns_responsavel', doctor.cns)
+              .limit(1);
+            
+            if (aihsForDoctor && aihsForDoctor.length > 0) {
+              const aihHospital = aihsForDoctor[0];
+              const hospitalInfo = aihHospital.hospitals as any;
+              
+              hospitals.push({
+                hospital_id: aihHospital.hospital_id,
+                hospital_name: hospitalInfo?.name || 'Hospital identificado por AIH',
+                hospital_cnpj: hospitalInfo?.cnpj || '',
+                role: 'Médico Responsável',
+                department: 'Inferido por AIH',
+                is_primary_hospital: true,
+                is_active: true
+              });
+              
+              console.log(`✅ Hospital inferido para ${doctor.name}: ${hospitalInfo?.name || aihHospital.hospital_id}`);
+            } else {
+              // Último recurso: placeholder
+              hospitals.push({
+                hospital_id: '',
+                hospital_name: 'Hospital não definido',
+                hospital_cnpj: '',
+                role: '',
+                department: '',
+                is_primary_hospital: true,
+                is_active: true
+              });
+              
+              console.log(`❌ Não foi possível inferir hospital para ${doctor.name}`);
+            }
           }
 
           doctorsMap.set(doctor.cns, {
@@ -2022,4 +2058,4 @@ if (filtered.success) {
 ✅ VALORES PRECISOS: em reais e centavos
 ✅ STATUS DE APROVAÇÃO: para cada procedimento individual
 
-*/ 
+*/

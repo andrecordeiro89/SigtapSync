@@ -7,6 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collap
 import { Alert, AlertDescription } from './ui/alert';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import {
   Users,
   ChevronDown,
@@ -290,6 +291,7 @@ const DataDiagnostics: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
 // ✅ COMPONENTE PRINCIPAL
 const MedicalProductionDashboard: React.FC = () => {
+  const { user, canAccessAllHospitals, hasFullAccess } = useAuth();
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
   const [filteredDoctors, setFilteredDoctors] = useState<DoctorWithPatients[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -298,20 +300,46 @@ const MedicalProductionDashboard: React.FC = () => {
   const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set());
   const [showDiagnostic, setShowDiagnostic] = useState(false); // 🆕 ESTADO PARA MOSTRAR DIAGNÓSTICO
 
-  // ✅ CARREGAR DADOS DOS MÉDICOS
+  // ✅ CARREGAR DADOS DOS MÉDICOS COM FILTRO POR HOSPITAL
   useEffect(() => {
     const loadDoctorsData = async () => {
+      if (!user) return;
+      
       try {
         setIsLoading(true);
+        
+        // ✅ DETECTAR MODO DE ACESSO
+        const isAdminMode = canAccessAllHospitals() || hasFullAccess() || user.hospital_id === 'ALL';
+        const userHospitalId = user.hospital_id;
+        
         console.log('🔄 Carregando dados dos médicos...');
+        console.log(`🔐 Modo de acesso: ${isAdminMode ? 'ADMINISTRADOR (todos os hospitais)' : `USUÁRIO (hospital: ${userHospitalId})`}`);
         
         const doctorsData = await DoctorPatientService.getAllDoctorsWithPatients();
         console.log('✅ Dados dos médicos carregados:', doctorsData);
         
-        setDoctors(doctorsData);
-        setFilteredDoctors(doctorsData);
+        // ✅ FILTRAR MÉDICOS POR HOSPITAL (SE NÃO FOR ADMIN)
+        let filteredDoctorsData = doctorsData;
         
-        toast.success(`${doctorsData.length} médicos carregados com sucesso!`);
+        if (!isAdminMode && userHospitalId && userHospitalId !== 'ALL') {
+          filteredDoctorsData = doctorsData.filter(doctor => {
+            // Verificar se o médico tem associação com o hospital do usuário
+            return doctor.doctor_info.hospitals.some(hospital => 
+              hospital.hospital_id === userHospitalId
+            );
+          });
+          
+          console.log(`🏥 Filtrados ${filteredDoctorsData.length} médicos do hospital ${userHospitalId}`);
+        }
+        
+        setDoctors(filteredDoctorsData);
+        setFilteredDoctors(filteredDoctorsData);
+        
+        const message = isAdminMode 
+          ? `${filteredDoctorsData.length} médicos carregados (todos os hospitais)`
+          : `${filteredDoctorsData.length} médicos carregados do seu hospital`;
+        
+        toast.success(message);
       } catch (error) {
         console.error('❌ Erro ao carregar dados dos médicos:', error);
         toast.error('Erro ao carregar dados dos médicos');
@@ -321,7 +349,7 @@ const MedicalProductionDashboard: React.FC = () => {
     };
 
     loadDoctorsData();
-  }, []);
+  }, [user, canAccessAllHospitals, hasFullAccess]);
 
   // ✅ FILTRAR MÉDICOS
   useEffect(() => {
@@ -864,4 +892,4 @@ const MedicalProductionDashboard: React.FC = () => {
   );
 };
 
-export default MedicalProductionDashboard; 
+export default MedicalProductionDashboard;

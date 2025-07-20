@@ -1,15 +1,2 @@
 
-9ce9a897a03f08b646759b6bea96a154eece4dee	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752250934109,"size":11577}
-119292bb88250e7b057235cb24a755a6313ba83b	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752328246730,"size":11577}
-b54f554f4694f624e1324c1a5788299a1d44f6f7	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752365928512,"size":11577}
-1f62d5a8f06ba32981c0c4e4ab29de4de15f8674	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752410342544,"size":11577}
-5bdf860c7762b8bed47da752ab0896f6ef9cda1f	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752433395275,"size":11577}
-11b7c01e65c21dc8136430a2cde847918127a2ce	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752442609967,"size":11577}
-f5b01bca071e679b35c9423dc54bde95d0e5ad3d	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752490453921,"size":11577}
-01d17ec393fd6068888d021ab25390dabba828b1	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752514807431,"size":11577}
-2ef5fae33d39770b7a9e21ea299342647fe7b6b5	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752577869927,"size":11577}
-60b457e1633f0b81c6470345665c5d5235b73b7f	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752586051840,"size":11577}
-7987e310ee25d6267830dcd5ffc29c606972f56f	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752589505771,"size":11577}
-14d34bf1337445ebe933188fb40fe57618a77b8f	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752594613147,"size":11577}
-a16639ecaf0c7d75cb629197c07fd488f84364e6	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752670269591,"size":11577}
-473a8d0d72b8e661e065c87960498eba06d67988	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1752760234983,"size":11577}
+1f450b9fa465fde5bb8d663ecb3d7e9431ba200d	{"key":"pacote:tarball:chalk@4.1.2","integrity":"sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==","time":1753040632214,"size":11577}

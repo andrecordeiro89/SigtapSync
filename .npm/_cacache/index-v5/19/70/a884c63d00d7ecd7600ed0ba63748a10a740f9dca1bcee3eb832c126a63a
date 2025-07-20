@@ -1,15 +1,2 @@
 
-bba2d6ec6a627de9e3fa1cd900a7109fde71e814	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752250934407,"size":28388}
-5c759db05b7f859571957c9677aa4c342dc2c10d	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752328253857,"size":28388}
-d1c917912bed1760b981340e40f231641f64412e	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752365925459,"size":28388}
-ae45fd871b8f2bcb9be82e12a091363e41959e5a	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752410339175,"size":28388}
-706d275bc845871fcc8c78e36d6428071f85f0ac	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752433392632,"size":28388}
-62fae8ac9a3dbb96beaaf547d956dcaa7e058e5c	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752442605790,"size":28388}
-7400c70a147497f56ebb07eb693fe9a777e34deb	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752490447279,"size":28388}
-47bfe86de6139e4fdf31a198fe5d0606fec0625b	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752514805753,"size":28388}
-90c5402f1ab5d8344897f2b7ffda9c9ffeacc142	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752577859888,"size":28388}
-e88e86653412a20f8055e8645da4462b9d22b14d	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752586049973,"size":28388}
-0698a8508f71e6266adb2d4f31c3561aeba05fb9	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752589501547,"size":28388}
-0a6c3b80658b17068c5f1517494cb50098601c94	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752594610441,"size":28388}
-72a38385970588751ab00de6d199e913aa688da6	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752670262988,"size":28388}
-475a3d01daf817c724335f20583a6bc7c0d567ea	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1752760228306,"size":28388}
+108ad060186a456824093611b83c440380e8319f	{"key":"pacote:tarball:semver@7.7.2","integrity":"sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==","time":1753040632675,"size":28388}
