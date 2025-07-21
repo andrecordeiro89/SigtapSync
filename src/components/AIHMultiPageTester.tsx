@@ -50,8 +50,11 @@ import {
   debugSpecialRuleDetection,
   isInstrument04Procedure,     // ✅ NOVA função para Instrumento 04
   debugInstrument04Detection,  // ✅ NOVA função de debug
-  classifyProcedures          // ✅ NOVA função de classificação
+  classifyProcedures,          // ✅ NOVA função de classificação
+  isMedicalProcedure,          // ✅ NOVA função para identificar procedimentos médicos
+  calculateMedicalPayment      // ✅ NOVA função para calcular pagamento médico
 } from '../config/susCalculationRules';
+
 import { 
   formatParticipationCode, 
   getParticipationBadge, 
@@ -1165,6 +1168,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
             </div>
           </div>
           
+
+          
           {/* ✅ NOVO: Informativo sobre anestesistas */}
           {aihCompleta.procedimentos.filter(p => p.isAnesthesiaProcedure).length > 0 && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -1280,6 +1285,12 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                             {procedure.isAnesthesiaProcedure && (
                               <Badge variant="destructive" className="text-xs px-2 py-0.5 animate-pulse">
                                 🚫 Anestesista
+                              </Badge>
+                            )}
+                            {/* ✅ NOVO: Badge para pagamento médico */}
+                            {isMedicalProcedure(procedure.procedimento) && (
+                              <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-100 text-green-800 border-green-300">
+                                💰 Pagamento Médico
                               </Badge>
                             )}
                           </div>

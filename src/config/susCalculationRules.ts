@@ -9,6 +9,10 @@
  * - SP (Serviços Profissionais): sempre 100%
  * - SA (Serviços Ambulatoriais): INFORMATIVO (não faturado em AIH)
  * 
+ * 🏥 REGRAS DE PAGAMENTO MÉDICO:
+ * - Procedimentos "04" (código inicia com "04"): PAGAMENTO MÉDICO
+ * - Outros procedimentos: RECEITA DO HOSPITAL
+ * 
  * NOVA REGRA: Instrumento 04 - AIH (Proc. Especial) sempre 100% (SH + SP)
  */
 
@@ -80,7 +84,18 @@ export const SPECIAL_CALCULATION_RULES: SpecialCalculationRule[] = [
   }
 ];
 
-// ✅ NOVA FUNÇÃO: Verifica se é procedimento do Instrumento 04 - AIH (Proc. Especial)
+// ✅ NOVA FUNÇÃO: Verifica se é procedimento médico (código inicia com "04")
+export function isMedicalProcedure(procedureCode: string): boolean {
+  if (!procedureCode) return false;
+  
+  // Extrair apenas o código se vier com descrição
+  const cleanCode = procedureCode.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || procedureCode;
+  
+  // Verificar se o código inicia com "04"
+  return cleanCode.startsWith('04.');
+}
+
+// ✅ FUNÇÃO: Verifica se é procedimento do Instrumento 04 - AIH (Proc. Especial)
 export function isInstrument04Procedure(registrationInstrument?: string): boolean {
   if (!registrationInstrument) return false;
   
@@ -101,17 +116,28 @@ export function isInstrument04Procedure(registrationInstrument?: string): boolea
   return instrument04Patterns.some(pattern => instrument.includes(pattern));
 }
 
-// ✅ NOVA FUNÇÃO: Classifica procedimentos por tipo (especial vs normal)
+// ✅ NOVA FUNÇÃO: Classifica procedimentos por tipo (especial vs normal) e pagamento médico
 export function classifyProcedures(procedures: ProcedureWithSigtap[]): {
   instrument04Procedures: ProcedureWithSigtap[];
   normalProcedures: ProcedureWithSigtap[];
   specialRuleProcedures: ProcedureWithSigtap[];
+  medicalProcedures: ProcedureWithSigtap[];  // 🆕 Procedimentos médicos (código "04")
+  hospitalProcedures: ProcedureWithSigtap[]; // 🆕 Procedimentos do hospital (outros códigos)
 } {
   const instrument04Procedures: ProcedureWithSigtap[] = [];
   const normalProcedures: ProcedureWithSigtap[] = [];
   const specialRuleProcedures: ProcedureWithSigtap[] = [];
+  const medicalProcedures: ProcedureWithSigtap[] = [];
+  const hospitalProcedures: ProcedureWithSigtap[] = [];
   
   procedures.forEach(proc => {
+    // 🎯 CLASSIFICAÇÃO POR PAGAMENTO: Médico vs Hospital
+    if (isMedicalProcedure(proc.procedureCode)) {
+      medicalProcedures.push(proc);
+    } else {
+      hospitalProcedures.push(proc);
+    }
+    
     // 🎯 PRIORIDADE 1: Instrumento 04 - AIH (Proc. Especial)
     if (isInstrument04Procedure(proc.registrationInstrument)) {
       instrument04Procedures.push(proc);
@@ -126,7 +152,7 @@ export function classifyProcedures(procedures: ProcedureWithSigtap[]): {
     }
   });
   
-  return { instrument04Procedures, normalProcedures, specialRuleProcedures };
+  return { instrument04Procedures, normalProcedures, specialRuleProcedures, medicalProcedures, hospitalProcedures };
 }
 
 // Função para verificar se um procedimento tem regra especial
@@ -237,6 +263,60 @@ export function applySpecialCalculation(
   });
 }
 
+// ✅ NOVA FUNÇÃO: Calcula valores de pagamento médico vs hospital
+export function calculateMedicalPayment(procedures: Array<{
+  procedureCode: string;
+  valueHosp: number;
+  valueProf: number;
+  valueAmb: number;
+  calculatedTotal?: number;
+}>): {
+  medicalPayment: number;    // Valor total para médicos (procedimentos "04")
+  hospitalRevenue: number;   // Valor total para hospital (outros procedimentos)
+  totalValue: number;        // Valor total da AIH
+  medicalProcedures: string[];  // Lista de códigos médicos
+  hospitalProcedures: string[]; // Lista de códigos do hospital
+  breakdown: {
+    medical: Array<{ code: string; value: number; }>;
+    hospital: Array<{ code: string; value: number; }>;
+  };
+} {
+  let medicalPayment = 0;
+  let hospitalRevenue = 0;
+  const medicalProcedures: string[] = [];
+  const hospitalProcedures: string[] = [];
+  const medicalBreakdown: Array<{ code: string; value: number; }> = [];
+  const hospitalBreakdown: Array<{ code: string; value: number; }> = [];
+  
+  procedures.forEach(proc => {
+    const procedureValue = proc.calculatedTotal || (proc.valueHosp + proc.valueProf);
+    
+    if (isMedicalProcedure(proc.procedureCode)) {
+      // Procedimento médico (código "04") - vai para o médico
+      medicalPayment += procedureValue;
+      medicalProcedures.push(proc.procedureCode);
+      medicalBreakdown.push({ code: proc.procedureCode, value: procedureValue });
+    } else {
+      // Outros procedimentos - ficam para o hospital
+      hospitalRevenue += procedureValue;
+      hospitalProcedures.push(proc.procedureCode);
+      hospitalBreakdown.push({ code: proc.procedureCode, value: procedureValue });
+    }
+  });
+  
+  return {
+    medicalPayment,
+    hospitalRevenue,
+    totalValue: medicalPayment + hospitalRevenue,
+    medicalProcedures,
+    hospitalProcedures,
+    breakdown: {
+      medical: medicalBreakdown,
+      hospital: hospitalBreakdown
+    }
+  };
+}
+
 // ✅ FUNÇÃO ATUALIZADA: Verifica se uma lista contém procedimentos especiais (incluindo Instrumento 04)
 export function hasSpecialProceduresInList(procedures: Array<{ 
   procedureCode: string; 
@@ -247,12 +327,20 @@ export function hasSpecialProceduresInList(procedures: Array<{
   rules: SpecialCalculationRule[];
   hasInstrument04: boolean;
   instrument04Codes: string[];
+  hasMedicalProcedures: boolean;  // 🆕 Se tem procedimentos médicos
+  medicalCodes: string[];         // 🆕 Lista de códigos médicos
 } {
   const specialCodes: string[] = [];
   const rules: SpecialCalculationRule[] = [];
   const instrument04Codes: string[] = [];
+  const medicalCodes: string[] = [];
   
   procedures.forEach(proc => {
+    // Verificar procedimentos médicos
+    if (isMedicalProcedure(proc.procedureCode)) {
+      medicalCodes.push(proc.procedureCode);
+    }
+    
     // Verificar Instrumento 04
     if (isInstrument04Procedure(proc.registrationInstrument)) {
       instrument04Codes.push(proc.procedureCode);
@@ -271,7 +359,9 @@ export function hasSpecialProceduresInList(procedures: Array<{
     specialCodes,
     rules,
     hasInstrument04: instrument04Codes.length > 0,
-    instrument04Codes
+    instrument04Codes,
+    hasMedicalProcedures: medicalCodes.length > 0,
+    medicalCodes
   };
 }
 
@@ -355,4 +445,4 @@ export function validateSpecialRulesApplication(
     warnings,
     recommendations
   };
-} 
+}
