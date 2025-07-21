@@ -608,24 +608,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* HEADER COM DIAGNÓSTICO */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Produção Médica</h2>
-          <p className="text-muted-foreground text-sm">
-            Controle de produtividade médica por responsável
-          </p>
-        </div>
-        <Button 
-          onClick={() => setShowDiagnostic(!showDiagnostic)}
-          variant="outline"
-          className="gap-2"
-          size="sm"
-        >
-          <Database className="h-4 w-4" />
-          {showDiagnostic ? 'Ocultar' : 'Verificar'} Dados
-        </Button>
-      </div>
+
 
       {/* 🆕 COMPONENTE DE DIAGNÓSTICO */}
       {showDiagnostic && (
@@ -655,20 +638,26 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
       
 
-      {/* ✅ CONTROLES E FILTROS */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Stethoscope className="h-5 w-5 text-blue-600" />
-            Produção Médica - Médicos Responsáveis
+      {/* ✅ CONTROLES E FILTROS MODERNOS */}
+      <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-blue-50/30">
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+              <Stethoscope className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Produção Médica - Médicos Responsáveis</h3>
+              <p className="text-sm text-gray-600 mt-1">Visualização hierárquica completa: Médicos → Pacientes → Procedimentos</p>
+            </div>
           </CardTitle>
-          <CardDescription>
-            Visualização hierárquica completa: Médicos Responsáveis → Pacientes → Procedimentos
-          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4 mb-6">
-            {/* ✅ LINHA DE BUSCA E FILTROS */}
+        <CardContent className="space-y-6">
+          {/* 🔍 SEÇÃO DE BUSCA */}
+          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <Search className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-semibold text-gray-700">Busca Rápida</span>
+            </div>
             <div className="flex items-center gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -676,129 +665,151 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   placeholder="Buscar por nome, CNS, CRM ou especialidade..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
                 />
               </div>
-              <Badge variant="secondary">
-                {filteredDoctors.length} médicos encontrados
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800 px-3 py-2 font-medium">
+                {filteredDoctors.length} médicos
               </Badge>
             </div>
-            
-            {/* ✅ FILTRO DE HOSPITAL */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Building className="h-4 w-4 text-gray-600" />
-                <span className="text-sm font-medium text-gray-700">Filtrar por Hospital:</span>
-              </div>
-              <select
-                value={selectedHospital}
-                onChange={(e) => setSelectedHospital(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[200px]"
-              >
-                <option value="all">Todos os Hospitais</option>
-                {availableHospitals.map((hospital) => (
-                  <option key={hospital.id} value={hospital.id}>
-                    {hospital.name}
-                  </option>
-                ))}
-              </select>
-              {selectedHospital !== 'all' && (
-                <button
-                  onClick={() => setSelectedHospital('all')}
-                  className="text-xs text-blue-600 hover:text-blue-800 underline"
-                >
-                  Limpar filtro
-                </button>
-              )}
+          </div>
+
+          {/* 🏥 SEÇÃO DE FILTROS */}
+          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <Building className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-semibold text-gray-700">Filtros Avançados</span>
             </div>
             
-            {/* 🆕 FILTRO DE DATAS */}
-            <div className="border-t pt-4">
-              <div className="flex items-center gap-4 mb-3">
+            {/* FILTRO DE HOSPITAL */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Hospital</label>
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-700">Filtrar por Datas:</span>
+                  <select
+                    value={selectedHospital}
+                    onChange={(e) => setSelectedHospital(e.target.value)}
+                    className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  >
+                    <option value="all">Todos os Hospitais</option>
+                    {availableHospitals.map((hospital) => (
+                      <option key={hospital.id} value={hospital.id}>
+                        {hospital.name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedHospital !== 'all' && (
+                    <button
+                      onClick={() => setSelectedHospital('all')}
+                      className="px-3 py-2 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors font-medium"
+                    >
+                      Limpar
+                    </button>
+                  )}
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer">
+              </div>
+              
+              {/* TOGGLE FILTRO DE DATAS */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Período</label>
+                <label className="flex items-center gap-3 cursor-pointer p-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                   <input
                     type="checkbox"
                     checked={dateFilterEnabled}
                     onChange={(e) => setDateFilterEnabled(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
                   />
-                  <span className="text-sm text-gray-600">Ativar filtro de datas</span>
+                  <Calendar className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-700 font-medium">Filtrar por datas</span>
                 </label>
               </div>
-              
-              {dateFilterEnabled && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
+            </div>
+            
+            {/* FILTROS DE DATA EXPANDIDOS */}
+            {dateFilterEnabled && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* FILTRO DE ADMISSÃO */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-700 uppercase tracking-wide">Data de Admissão</label>
+                  <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        value={admissionDateFrom}
-                        onChange={(e) => setAdmissionDateFrom(e.target.value)}
-                        className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="De"
-                      />
-                      <span className="text-xs text-gray-500">até</span>
-                      <input
-                        type="date"
-                        value={admissionDateTo}
-                        onChange={(e) => setAdmissionDateTo(e.target.value)}
-                        className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Até"
-                      />
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <label className="text-sm font-semibold text-gray-700">Data de Admissão</label>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">De</label>
+                        <input
+                          type="date"
+                          value={admissionDateFrom}
+                          onChange={(e) => setAdmissionDateFrom(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">Até</label>
+                        <input
+                          type="date"
+                          value={admissionDateTo}
+                          onChange={(e) => setAdmissionDateTo(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        />
+                      </div>
                     </div>
                   </div>
                   
                   {/* FILTRO DE ALTA */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-gray-700 uppercase tracking-wide">Data de Alta</label>
+                  <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        value={dischargeDateFrom}
-                        onChange={(e) => setDischargeDateFrom(e.target.value)}
-                        className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="De"
-                      />
-                      <span className="text-xs text-gray-500">até</span>
-                      <input
-                        type="date"
-                        value={dischargeDateTo}
-                        onChange={(e) => setDischargeDateTo(e.target.value)}
-                        className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Até"
-                      />
+                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                      <label className="text-sm font-semibold text-gray-700">Data de Alta</label>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">De</label>
+                        <input
+                          type="date"
+                          value={dischargeDateFrom}
+                          onChange={(e) => setDischargeDateFrom(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600 mb-1 block">Até</label>
+                        <input
+                          type="date"
+                          value={dischargeDateTo}
+                          onChange={(e) => setDischargeDateTo(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              )}
-              
-              {/* BOTÕES DE AÇÃO PARA FILTROS DE DATA */}
-              {dateFilterEnabled && (admissionDateFrom || admissionDateTo || dischargeDateFrom || dischargeDateTo) && (
-                <div className="flex items-center gap-2 mt-3 pl-6">
-                  <button
-                    onClick={() => {
-                      setAdmissionDateFrom('');
-                      setAdmissionDateTo('');
-                      setDischargeDateFrom('');
-                      setDischargeDateTo('');
-                    }}
-                    className="text-xs text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Limpar datas
-                  </button>
-                  <span className="text-xs text-gray-500">•</span>
-                  <span className="text-xs text-gray-600">
-                    {filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0)} pacientes encontrados
-                  </span>
-                </div>
-              )}
-            </div>
+                
+                {/* AÇÕES DOS FILTROS DE DATA */}
+                {(admissionDateFrom || admissionDateTo || dischargeDateFrom || dischargeDateTo) && (
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-blue-200">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                      <span className="text-sm text-gray-700 font-medium">
+                        {filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0)} pacientes encontrados
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setAdmissionDateFrom('');
+                        setAdmissionDateTo('');
+                        setDischargeDateFrom('');
+                        setDischargeDateTo('');
+                      }}
+                      className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors font-medium"
+                    >
+                      Limpar datas
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ✅ LISTA DE MÉDICOS */}

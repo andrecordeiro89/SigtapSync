@@ -584,14 +584,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 bg-blue-100">
+        <TabsList className="grid w-full grid-cols-4 bg-blue-100">
           <TabsTrigger value="doctors" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <Users className="h-4 w-4 mr-2" />
             Médicos
-          </TabsTrigger>
-          <TabsTrigger value="hospitals" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            <Hospital className="h-4 w-4 mr-2" />
-            Hospitais
           </TabsTrigger>
           <TabsTrigger value="procedures" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <FileText className="h-4 w-4 mr-2" />
@@ -614,10 +610,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           <MedicalProductionDashboard onStatsUpdate={updateMedicalProductionStats} />
         </TabsContent>
 
-        {/* TAB: HOSPITAIS */}
-        <TabsContent value="hospitals" className="space-y-6">
-          <HospitalRevenueDashboard doctorsData={doctorsData} />
-        </TabsContent>
+
 
         {/* TAB: ESPECIALIDADES */}
         <TabsContent value="specialties" className="space-y-6">
