@@ -55,11 +55,11 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
           hospitals: [], // Array vazio por enquanto
           patients: result.data.patients.map(patient => ({
             patient_info: {
-              name: patient.patient_name || 'Nome não disponível',
-              cns: patient.patient_cns || 'CNS não disponível',
-              birth_date: patient.patient_birth_date || '',
-              gender: patient.patient_gender || '',
-              medical_record: patient.patient_id || ''
+              name: patient.patient_info?.name || 'Nome não disponível',
+              cns: patient.patient_info?.cns || 'CNS não disponível',
+              birth_date: patient.patient_info?.birth_date || '',
+              gender: patient.patient_info?.gender || '',
+              medical_record: patient.patient_info?.medical_record || ''
             },
             aih_info: {
               admission_date: patient.aih_info?.admission_date || '',
@@ -134,14 +134,9 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
   // Função para identificar procedimentos médicos (código 04)
   const isMedicalProcedure = (procedureCode: string): boolean => {
     if (!procedureCode) return false;
-    // Verifica múltiplos formatos possíveis para códigos 04
+    // Verifica se o código inicia com '04'
     const code = procedureCode.toString().trim();
-    return (
-      code.startsWith('04') || 
-      code.startsWith('04.') ||
-      code.includes('04.') ||
-      /^0+4/.test(code) // Para casos como 004, 0004, etc.
-    );
+    return code.startsWith('04');
   };
 
   // 📊 CALCULAR estatísticas dos pacientes
@@ -246,13 +241,13 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                   <div className="text-gray-500">Valor Total AIH</div>
                   <div className="font-bold text-emerald-600">{formatValue(stats.totalValue)}</div>
                 </div>
-                <div className="bg-white p-2 rounded border border-orange-200">
-                  <div className="text-orange-600 text-xs">Proc. Médicos (04)</div>
-                  <div className="font-bold text-orange-600">{stats.medicalProceduresCount}</div>
+                <div className="bg-white p-2 rounded border border-blue-200">
+                  <div className="text-blue-600 text-xs">Produção Médica</div>
+                  <div className="font-bold text-blue-600">{stats.medicalProceduresCount}</div>
                 </div>
-                <div className="bg-white p-2 rounded border border-orange-200">
-                  <div className="text-orange-600 text-xs">Valor Médico (04)</div>
-                  <div className="font-bold text-orange-600">{formatValue(stats.medicalProceduresValue)}</div>
+                <div className="bg-white p-2 rounded border border-blue-200">
+                  <div className="text-blue-600 text-xs">Valor Produção</div>
+                  <div className="font-bold text-blue-600">{formatValue(stats.medicalProceduresValue)}</div>
                 </div>
               </div>
             </div>

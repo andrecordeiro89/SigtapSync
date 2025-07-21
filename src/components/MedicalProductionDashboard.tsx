@@ -35,14 +35,9 @@ import { DoctorPatientService, type DoctorWithPatients } from '../services/docto
 // Função para identificar procedimentos médicos (código 04)
 const isMedicalProcedure = (procedureCode: string): boolean => {
   if (!procedureCode) return false;
-  // Verifica múltiplos formatos possíveis para códigos 04
+  // Verifica se o código inicia com '04'
   const code = procedureCode.toString().trim();
-  return (
-    code.startsWith('04') || 
-    code.startsWith('04.') ||
-    code.includes('04.') ||
-    /^0+4/.test(code) // Para casos como 004, 0004, etc.
-  );
+  return code.startsWith('04');
 };
 const formatCurrency = (value: number | null | undefined): string => {
   if (value == null || isNaN(value)) return 'R$ 0,00';
@@ -960,18 +955,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             </div>
                             </div>
                               {/* 🆕 CARD PARA PROCEDIMENTOS MÉDICOS "04" */}
-                              <div className="bg-gradient-to-br from-red-50 to-red-100 p-3 rounded-xl border border-red-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-8 h-8 bg-gradient-to-br from-red-200 to-red-300 rounded-lg flex items-center justify-center shadow-sm">
-                                    <Stethoscope className="h-4 w-4 text-red-700" />
-                                  </div>
-                                  <span className="text-red-700 font-semibold text-xs">Proc. Médicos (04)</span>
-                                </div>
-                                <div className="text-lg font-bold text-red-800">{doctorStats.medicalProceduresCount}</div>
-                                <div className="text-xs text-red-600 font-medium">
-                                  {formatCurrency(doctorStats.medicalProceduresValue)}
-                                </div>
-                              </div>
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-xl border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-200 to-blue-300 rounded-lg flex items-center justify-center shadow-sm">
+                    <Stethoscope className="h-4 w-4 text-blue-700" />
+                  </div>
+                  <span className="text-blue-700 font-semibold text-xs">Produção Médica</span>
+                </div>
+                <div className="text-lg font-bold text-blue-800">{doctorStats.medicalProceduresCount}</div>
+                <div className="text-xs text-blue-600 font-medium">
+                  {formatCurrency(doctorStats.medicalProceduresValue)}
+                </div>
+              </div>
                             </div>
                           </div>
                         </div>

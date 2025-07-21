@@ -92,7 +92,7 @@ export function isMedicalProcedure(procedureCode: string): boolean {
   const cleanCode = procedureCode.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || procedureCode;
   
   // Verificar se o código inicia com "04"
-  return cleanCode.startsWith('04.');
+  return cleanCode.startsWith('04');
 }
 
 // ✅ FUNÇÃO: Verifica se é procedimento do Instrumento 04 - AIH (Proc. Especial)
