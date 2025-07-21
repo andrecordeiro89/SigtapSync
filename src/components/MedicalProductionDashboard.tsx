@@ -32,6 +32,18 @@ import {
 import { DoctorPatientService, type DoctorWithPatients } from '../services/doctorPatientService';
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
+// Função para identificar procedimentos médicos (código 04)
+const isMedicalProcedure = (procedureCode: string): boolean => {
+  if (!procedureCode) return false;
+  // Verifica múltiplos formatos possíveis para códigos 04
+  const code = procedureCode.toString().trim();
+  return (
+    code.startsWith('04') || 
+    code.startsWith('04.') ||
+    code.includes('04.') ||
+    /^0+4/.test(code) // Para casos como 004, 0004, etc.
+  );
+};
 const formatCurrency = (value: number | null | undefined): string => {
   if (value == null || isNaN(value)) return 'R$ 0,00';
   return value.toLocaleString('pt-BR', {
@@ -60,12 +72,24 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   );
   const approvalRate = totalProcedures > 0 ? (approvedProcedures / totalProcedures) * 100 : 0;
   
+  // 🆕 CALCULAR valores específicos dos procedimentos médicos ("04")
+  const medicalProceduresValue = doctorData.patients.reduce((sum, patient) => 
+    sum + patient.procedures
+      .filter(proc => isMedicalProcedure(proc.procedure_code))
+      .reduce((procSum, proc) => procSum + (proc.value_reais || 0), 0), 0
+  );
+  const medicalProceduresCount = doctorData.patients.reduce((sum, patient) => 
+    sum + patient.procedures.filter(proc => isMedicalProcedure(proc.procedure_code)).length, 0
+  );
+  
   return {
     totalProcedures,
     totalValue,
     totalAIHs,
     avgTicket,
-    approvalRate
+    approvalRate,
+    medicalProceduresValue,
+    medicalProceduresCount
   };
 };
 
@@ -888,7 +912,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             </div>
                             
                             {/* ✅ ESTATÍSTICAS DO MÉDICO - DESIGN PREMIUM */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                               <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-xl border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
                                 <div className="flex items-center gap-2 mb-2">
                                   <div className="w-8 h-8 bg-gradient-to-br from-blue-200 to-blue-300 rounded-lg flex items-center justify-center shadow-sm">
@@ -935,6 +959,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   })()}
                             </div>
                             </div>
+                              {/* 🆕 CARD PARA PROCEDIMENTOS MÉDICOS "04" */}
+                              <div className="bg-gradient-to-br from-red-50 to-red-100 p-3 rounded-xl border border-red-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="w-8 h-8 bg-gradient-to-br from-red-200 to-red-300 rounded-lg flex items-center justify-center shadow-sm">
+                                    <Stethoscope className="h-4 w-4 text-red-700" />
+                                  </div>
+                                  <span className="text-red-700 font-semibold text-xs">Proc. Médicos (04)</span>
+                                </div>
+                                <div className="text-lg font-bold text-red-800">{doctorStats.medicalProceduresCount}</div>
+                                <div className="text-xs text-red-600 font-medium">
+                                  {formatCurrency(doctorStats.medicalProceduresValue)}
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1056,13 +1093,24 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               {patient.procedures
                                                 .sort((a, b) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime())
                                                 .map((procedure, procIndex) => (
-                                                <div key={procedure.procedure_id || procIndex} className="bg-white p-3 rounded-lg border-l-4 border-l-blue-200 shadow-sm">
+                                                <div key={procedure.procedure_id || procIndex} className={`bg-white p-3 rounded-lg border-l-4 shadow-sm ${
+                                                  isMedicalProcedure(procedure.procedure_code) ? 'border-l-red-400 bg-red-50/30' : 'border-l-blue-200'
+                                                }`}>
                                                   <div className="flex items-start justify-between">
                                                     <div className="flex-1">
                                                       <div className="flex items-center gap-2 mb-1">
-                                                        <div className="font-semibold text-gray-900 bg-blue-50 px-2 py-1 rounded text-xs">
+                                                        <div className={`font-semibold px-2 py-1 rounded text-xs ${
+                                                          isMedicalProcedure(procedure.procedure_code) 
+                                                            ? 'text-red-900 bg-red-100' 
+                                                            : 'text-gray-900 bg-blue-50'
+                                                        }`}>
                                                           {procedure.procedure_code}
                                                         </div>
+                                                        {isMedicalProcedure(procedure.procedure_code) && (
+                                                          <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300 text-xs">
+                                                            🩺 Médico 04
+                                                          </Badge>
+                                                        )}
                                                         {procedure.sequence && procedure.sequence > 1 && (
                                                           <Badge variant="outline" className="text-xs">
                                                             Seq. {procedure.sequence}
@@ -1120,7 +1168,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     </div>
                                                     
                                                     <div className="text-right ml-4">
-                                                      <div className="text-lg font-bold text-green-600">
+                                                      <div className={`text-lg font-bold ${
+                                                        isMedicalProcedure(procedure.procedure_code) ? 'text-red-600' : 'text-green-600'
+                                                      }`}>
                                                         {formatCurrency(procedure.value_reais)}
                                                       </div>
                                                     </div>

@@ -7,7 +7,7 @@
  * ================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronDown, User, FileText, Calendar, DollarSign, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { 
   DoctorPatientService,
@@ -31,7 +31,7 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // ✅ FUNÇÃO: Carregar dados do médico usando nosso serviço corrigido
-  const loadDoctorData = async () => {
+  const loadDoctorData = useCallback(async () => {
     if (isLoading) return;
     
     setIsLoading(true);
@@ -52,6 +52,7 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
             crm: result.data.doctor_crm,
             specialty: result.data.doctor_specialty
           },
+          hospitals: [], // Array vazio por enquanto
           patients: result.data.patients.map(patient => ({
             patient_info: {
               name: patient.patient_name || 'Nome não disponível',
@@ -60,6 +61,14 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
               gender: patient.patient_gender || '',
               medical_record: patient.patient_id || ''
             },
+            aih_info: {
+              admission_date: patient.aih_info?.admission_date || '',
+              discharge_date: patient.aih_info?.discharge_date,
+              aih_number: patient.aih_info?.aih_number || ''
+            },
+            total_value_reais: patient.total_value_reais || 0,
+            total_procedures: patient.total_procedures || patient.procedures?.length || 0,
+            approved_procedures: patient.approved_procedures || 0,
             procedures: patient.procedures || []
           }))
         };
@@ -77,14 +86,14 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [doctorName, doctorCns, isLoading]);
 
   // ✅ CARREGAR dados quando o dropdown for aberto
   useEffect(() => {
     if (isOpen && !doctorData) {
       loadDoctorData();
     }
-  }, [isOpen]);
+  }, [isOpen, doctorData, loadDoctorData]);
 
   // 💰 FORMATAR valores monetários
   const formatValue = (value: number) => {
@@ -122,9 +131,29 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
     }
   };
 
+  // Função para identificar procedimentos médicos (código 04)
+  const isMedicalProcedure = (procedureCode: string): boolean => {
+    if (!procedureCode) return false;
+    // Verifica múltiplos formatos possíveis para códigos 04
+    const code = procedureCode.toString().trim();
+    return (
+      code.startsWith('04') || 
+      code.startsWith('04.') ||
+      code.includes('04.') ||
+      /^0+4/.test(code) // Para casos como 004, 0004, etc.
+    );
+  };
+
   // 📊 CALCULAR estatísticas dos pacientes
   const calculateStats = () => {
-    if (!doctorData) return { totalPatients: 0, totalProcedures: 0, approvedProcedures: 0, totalValue: 0 };
+    if (!doctorData) return { 
+      totalPatients: 0, 
+      totalProcedures: 0, 
+      approvedProcedures: 0, 
+      totalValue: 0,
+      medicalProceduresValue: 0,
+      medicalProceduresCount: 0
+    };
     
     const totalPatients = doctorData.patients.length;
     const totalProcedures = doctorData.patients.reduce((sum, p) => sum + p.procedures.length, 0);
@@ -135,7 +164,25 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
       sum + p.procedures.reduce((procSum, proc) => procSum + proc.value_reais, 0), 0
     );
     
-    return { totalPatients, totalProcedures, approvedProcedures, totalValue };
+    // 🆕 CALCULAR valores específicos dos procedimentos médicos ("04")
+    const medicalProceduresValue = doctorData.patients.reduce((sum, p) => 
+      sum + p.procedures
+        .filter(proc => isMedicalProcedure(proc.procedure_code))
+        .reduce((procSum, proc) => procSum + proc.value_reais, 0), 0
+    );
+    
+    const medicalProceduresCount = doctorData.patients.reduce((sum, p) => 
+      sum + p.procedures.filter(proc => isMedicalProcedure(proc.procedure_code)).length, 0
+    );
+    
+    return { 
+      totalPatients, 
+      totalProcedures, 
+      approvedProcedures, 
+      totalValue,
+      medicalProceduresValue,
+      medicalProceduresCount
+    };
   };
 
   const stats = calculateStats();
@@ -196,8 +243,16 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                   <div className="font-bold text-green-600">{stats.approvedProcedures}</div>
                 </div>
                 <div className="bg-white p-2 rounded border">
-                  <div className="text-gray-500">Valor Total</div>
+                  <div className="text-gray-500">Valor Total AIH</div>
                   <div className="font-bold text-emerald-600">{formatValue(stats.totalValue)}</div>
+                </div>
+                <div className="bg-white p-2 rounded border border-orange-200">
+                  <div className="text-orange-600 text-xs">Proc. Médicos (04)</div>
+                  <div className="font-bold text-orange-600">{stats.medicalProceduresCount}</div>
+                </div>
+                <div className="bg-white p-2 rounded border border-orange-200">
+                  <div className="text-orange-600 text-xs">Valor Médico (04)</div>
+                  <div className="font-bold text-orange-600">{formatValue(stats.medicalProceduresValue)}</div>
                 </div>
               </div>
             </div>
@@ -218,14 +273,33 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                   
                   {/* 👤 CABEÇALHO DO PACIENTE */}
                   <div className="p-3 bg-gray-50 border-b">
-                    <div className="text-sm font-medium text-gray-900">
-                      {patient.patient_info?.name || 'Nome não disponível'}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      CNS: {patient.patient_info?.cns || 'CNS não disponível'}
-                    </div>
-                    <div className="text-xs text-blue-600 mt-1">
-                      {patient.procedures.length} procedimento(s)
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-gray-900">
+                          {patient.patient_info?.name || 'Nome não disponível'}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          CNS: {patient.patient_info?.cns || 'CNS não disponível'}
+                        </div>
+                        <div className="text-xs text-blue-600 mt-1">
+                          {patient.procedures.length} procedimento(s)
+                        </div>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <div className="text-xs text-gray-500">
+                          Total AIH: <span className="font-bold text-emerald-600">
+                            {formatValue(patient.procedures.reduce((sum, proc) => sum + proc.value_reais, 0))}
+                          </span>
+                        </div>
+                        <div className="text-xs text-orange-600">
+                          Proc. 04: <span className="font-bold">
+                            {formatValue(patient.procedures
+                              .filter(proc => isMedicalProcedure(proc.procedure_code))
+                              .reduce((sum, proc) => sum + proc.value_reais, 0))}
+                            ({patient.procedures.filter(proc => isMedicalProcedure(proc.procedure_code)).length})
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -237,12 +311,21 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                         return (
                           <div 
                             key={`${procedure.procedure_id}-${procIndex}`}
-                            className="p-3 hover:bg-gray-50 border-b last:border-b-0"
+                            className={`p-3 hover:bg-gray-50 border-b last:border-b-0 ${
+                               isMedicalProcedure(procedure.procedure_code) ? 'bg-orange-50 border-l-4 border-l-orange-400' : ''
+                             }`}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {procedure.procedure_description}
+                                <div className="flex items-center gap-2">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {procedure.procedure_description}
+                                  </div>
+                                  {isMedicalProcedure(procedure.procedure_code) && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                                      Médico 04
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-xs text-gray-500 space-y-1 mt-1">
                                   <div>Código: {procedure.procedure_code}</div>
@@ -256,7 +339,9 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                                 </div>
                               </div>
                               <div className="text-right space-y-1 ml-3">
-                                <div className="text-sm font-bold text-green-600">
+                                <div className={`text-sm font-bold ${
+                                  isMedicalProcedure(procedure.procedure_code) ? 'text-orange-600' : 'text-green-600'
+                                }`}>
                                   {formatValue(procedure.value_reais)}
                                 </div>
                                 <div className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${statusDisplay.color}`}>
@@ -298,4 +383,4 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
       )}
     </div>
   );
-}; 
+};
