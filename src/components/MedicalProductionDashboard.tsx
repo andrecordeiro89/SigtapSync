@@ -305,6 +305,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHospital, setSelectedHospital] = useState<string>('all'); // 🆕 FILTRO DE HOSPITAL
   const [availableHospitals, setAvailableHospitals] = useState<Array<{id: string, name: string}>>([]);
+  // 🆕 ESTADOS PARA FILTRO DE DATAS
+  const [admissionDateFrom, setAdmissionDateFrom] = useState<string>('');
+  const [admissionDateTo, setAdmissionDateTo] = useState<string>('');
+  const [dischargeDateFrom, setDischargeDateFrom] = useState<string>('');
+  const [dischargeDateTo, setDischargeDateTo] = useState<string>('');
+  const [dateFilterEnabled, setDateFilterEnabled] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
   const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set());
@@ -405,7 +411,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     loadDoctorsData();
   }, [user, canAccessAllHospitals, hasFullAccess]);
 
-  // ✅ FILTRAR MÉDICOS BASEADO NO TERMO DE BUSCA E HOSPITAL SELECIONADO
+  // ✅ FILTRAR MÉDICOS BASEADO NO TERMO DE BUSCA, HOSPITAL E DATAS
   useEffect(() => {
     let filtered = doctors;
     
@@ -416,6 +422,37 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           hospital.hospital_id === selectedHospital
         );
       });
+    }
+    
+    // 🆕 FILTRAR POR DATAS DE ADMISSÃO E ALTA
+    if (dateFilterEnabled && (admissionDateFrom || admissionDateTo || dischargeDateFrom || dischargeDateTo)) {
+      filtered = filtered.map(doctor => ({
+        ...doctor,
+        patients: doctor.patients.filter(patient => {
+          if (!patient.aih_info) return true; // Manter pacientes sem info de AIH
+          
+          const admissionDate = patient.aih_info.admission_date ? new Date(patient.aih_info.admission_date) : null;
+          const dischargeDate = patient.aih_info.discharge_date ? new Date(patient.aih_info.discharge_date) : null;
+          
+          // Verificar filtros de admissão
+          if (admissionDateFrom && admissionDate) {
+            if (admissionDate < new Date(admissionDateFrom)) return false;
+          }
+          if (admissionDateTo && admissionDate) {
+            if (admissionDate > new Date(admissionDateTo + 'T23:59:59')) return false;
+          }
+          
+          // Verificar filtros de alta (apenas se o paciente teve alta)
+          if (dischargeDateFrom && dischargeDate) {
+            if (dischargeDate < new Date(dischargeDateFrom)) return false;
+          }
+          if (dischargeDateTo && dischargeDate) {
+            if (dischargeDate > new Date(dischargeDateTo + 'T23:59:59')) return false;
+          }
+          
+          return true;
+        })
+      })).filter(doctor => doctor.patients.length > 0); // Remover médicos sem pacientes após filtro
     }
     
     // Filtrar por termo de busca
@@ -430,7 +467,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
 
     setFilteredDoctors(filtered);
-  }, [searchTerm, doctors, selectedHospital]);
+  }, [searchTerm, doctors, selectedHospital, dateFilterEnabled, admissionDateFrom, admissionDateTo, dischargeDateFrom, dischargeDateTo]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
   const toggleDoctorExpansion = (doctorCns: string) => {
@@ -655,6 +692,94 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 </button>
               )}
             </div>
+            
+            {/* 🆕 FILTRO DE DATAS */}
+            <div className="border-t pt-4">
+              <div className="flex items-center gap-4 mb-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-700">Filtrar por Datas:</span>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={dateFilterEnabled}
+                    onChange={(e) => setDateFilterEnabled(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-600">Ativar filtro de datas</span>
+                </label>
+              </div>
+              
+              {dateFilterEnabled && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
+                  {/* FILTRO DE ADMISSÃO */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-gray-700 uppercase tracking-wide">Data de Admissão</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={admissionDateFrom}
+                        onChange={(e) => setAdmissionDateFrom(e.target.value)}
+                        className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="De"
+                      />
+                      <span className="text-xs text-gray-500">até</span>
+                      <input
+                        type="date"
+                        value={admissionDateTo}
+                        onChange={(e) => setAdmissionDateTo(e.target.value)}
+                        className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Até"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* FILTRO DE ALTA */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-gray-700 uppercase tracking-wide">Data de Alta</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={dischargeDateFrom}
+                        onChange={(e) => setDischargeDateFrom(e.target.value)}
+                        className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="De"
+                      />
+                      <span className="text-xs text-gray-500">até</span>
+                      <input
+                        type="date"
+                        value={dischargeDateTo}
+                        onChange={(e) => setDischargeDateTo(e.target.value)}
+                        className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Até"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* BOTÕES DE AÇÃO PARA FILTROS DE DATA */}
+              {dateFilterEnabled && (admissionDateFrom || admissionDateTo || dischargeDateFrom || dischargeDateTo) && (
+                <div className="flex items-center gap-2 mt-3 pl-6">
+                  <button
+                    onClick={() => {
+                      setAdmissionDateFrom('');
+                      setAdmissionDateTo('');
+                      setDischargeDateFrom('');
+                      setDischargeDateTo('');
+                    }}
+                    className="text-xs text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Limpar datas
+                  </button>
+                  <span className="text-xs text-gray-500">•</span>
+                  <span className="text-xs text-gray-600">
+                    {filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0)} pacientes encontrados
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ✅ LISTA DE MÉDICOS */}
@@ -857,6 +982,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 </div>
                                                 <div className="text-xs text-gray-600 font-medium">
                                                   CNS: {patient.patient_info.cns}
+                                                </div>
+                                                <div className="text-xs text-gray-500 flex items-center gap-2">
+                                                  <span>Admissão: {new Date(patient.aih_info.admission_date).toLocaleDateString('pt-BR')}</span>
+                                                  {patient.aih_info.discharge_date && (
+                                                    <span>• Alta: {new Date(patient.aih_info.discharge_date).toLocaleDateString('pt-BR')}</span>
+                                                  )}
                                                 </div>
                                               </div>
                                             </div>

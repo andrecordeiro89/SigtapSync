@@ -32,6 +32,11 @@ export interface PatientWithProcedures {
     gender: string;
     medical_record: string;
   };
+  aih_info: {
+    admission_date: string;
+    discharge_date?: string;
+    aih_number: string;
+  };
   total_value_reais: number;
   procedures: ProcedureDetail[];
   total_procedures: number;
@@ -222,6 +227,11 @@ export class DoctorPatientService {
                 birth_date: aih.patient_birth_date,
                 gender: aih.patient_gender,
                 medical_record: aih.medical_record
+              },
+              aih_info: {
+                admission_date: aih.admission_date,
+                discharge_date: aih.discharge_date,
+                aih_number: aih.aih_number
               },
               total_value_reais: 0,
               procedures: [],
@@ -771,6 +781,11 @@ export class DoctorPatientService {
                 gender: patient.gender,
                 medical_record: patient.medical_record
               },
+              aih_info: {
+                admission_date: aih.admission_date,
+                discharge_date: aih.discharge_date,
+                aih_number: aih.aih_number
+              },
               total_value_reais: 0,
               procedures: [],
               total_procedures: 0,
@@ -1129,6 +1144,11 @@ export class DoctorPatientService {
               gender: 'F',
               medical_record: 'MR001'
             },
+            aih_info: {
+              admission_date: '2024-01-14',
+              discharge_date: '2024-01-16',
+              aih_number: 'AIH001234567890'
+            },
             total_value_reais: 185000,
             procedures: [
               {
@@ -1157,6 +1177,11 @@ export class DoctorPatientService {
               birth_date: '1978-07-22',
               gender: 'M',
               medical_record: 'MR002'
+            },
+            aih_info: {
+              admission_date: '2024-01-19',
+              discharge_date: '2024-01-21',
+              aih_number: 'AIH001234567891'
             },
             total_value_reais: 120000,
             procedures: [
@@ -1187,6 +1212,11 @@ export class DoctorPatientService {
               gender: 'F',
               medical_record: 'MR003'
             },
+            aih_info: {
+              admission_date: '2024-01-24',
+              discharge_date: '2024-01-26',
+              aih_number: 'AIH001234567892'
+            },
             total_value_reais: 98000,
             procedures: [
               {
@@ -1215,6 +1245,11 @@ export class DoctorPatientService {
               birth_date: '1965-04-18',
               gender: 'M',
               medical_record: 'MR004'
+            },
+            aih_info: {
+              admission_date: '2024-01-29',
+              discharge_date: '2024-02-02',
+              aih_number: 'AIH001234567893'
             },
             total_value_reais: 210000,
             procedures: [
@@ -1266,6 +1301,11 @@ export class DoctorPatientService {
               gender: 'F',
               medical_record: 'MR005'
             },
+            aih_info: {
+              admission_date: '2024-01-17',
+              discharge_date: '2024-01-19',
+              aih_number: 'AIH001234567894'
+            },
             total_value_reais: 165000,
             procedures: [
               {
@@ -1294,6 +1334,11 @@ export class DoctorPatientService {
               birth_date: '1993-02-14',
               gender: 'F',
               medical_record: 'MR006'
+            },
+            aih_info: {
+              admission_date: '2024-01-21',
+              discharge_date: '2024-01-23',
+              aih_number: 'AIH001234567895'
             },
             total_value_reais: 98000,
             procedures: [
@@ -1324,6 +1369,11 @@ export class DoctorPatientService {
               gender: 'F',
               medical_record: 'MR007'
             },
+            aih_info: {
+              admission_date: '2024-01-25',
+              discharge_date: '2024-01-27',
+              aih_number: 'AIH001234567896'
+            },
             total_value_reais: 125000,
             procedures: [
               {
@@ -1352,6 +1402,11 @@ export class DoctorPatientService {
               birth_date: '1982-11-17',
               gender: 'F',
               medical_record: 'MR008'
+            },
+            aih_info: {
+              admission_date: '2024-01-29',
+              discharge_date: '2024-01-31',
+              aih_number: 'AIH001234567897'
             },
             total_value_reais: 142000,
             procedures: [
@@ -1393,6 +1448,11 @@ export class DoctorPatientService {
               gender: 'M',
               medical_record: 'MR009'
             },
+            aih_info: {
+              admission_date: '2024-01-18',
+              discharge_date: '2024-01-20',
+              aih_number: 'AIH001234567898'
+            },
             total_value_reais: 245000,
             procedures: [
               {
@@ -1421,6 +1481,11 @@ export class DoctorPatientService {
               birth_date: '1975-08-25',
               gender: 'F',
               medical_record: 'MR010'
+            },
+            aih_info: {
+              admission_date: '2024-01-22',
+              discharge_date: '2024-01-24',
+              aih_number: 'AIH001234567899'
             },
             total_value_reais: 180000,
             procedures: [
@@ -1451,6 +1516,11 @@ export class DoctorPatientService {
               gender: 'M',
               medical_record: 'MR011'
             },
+            aih_info: {
+              admission_date: '2024-01-28',
+              discharge_date: '2024-01-30',
+              aih_number: 'AIH001234567900'
+            },
             total_value_reais: 320000,
             procedures: [
               {
@@ -1479,6 +1549,11 @@ export class DoctorPatientService {
               birth_date: '1987-05-14',
               gender: 'F',
               medical_record: 'MR012'
+            },
+            aih_info: {
+              admission_date: '2024-02-01',
+              discharge_date: '2024-02-03',
+              aih_number: 'AIH001234567901'
             },
             total_value_reais: 120000,
             procedures: [
