@@ -686,46 +686,45 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* 🔍 SEÇÃO DE BUSCA */}
+          {/* 🔍 FILTROS UNIFICADOS - CARD COMPACTO */}
           <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <Search className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-semibold text-gray-700">Busca Rápida</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar por nome, CNS, CRM ou especialidade..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                />
+            {/* HEADER DO CARD */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Search className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-semibold text-gray-700">Busca e Filtros</span>
               </div>
               <Badge variant="secondary" className="bg-blue-100 text-blue-800 px-3 py-2 font-medium">
                 {filteredDoctors.length} médicos
               </Badge>
             </div>
-          </div>
-
-          {/* 🏥 SEÇÃO DE FILTROS */}
-          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
-              <Building className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-semibold text-gray-700">Filtros Avançados</span>
-            </div>
             
-            {/* FILTRO DE HOSPITAL */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Hospital</label>
+            {/* LINHA 1: BUSCA RÁPIDA E HOSPITAL */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+              {/* BUSCA RÁPIDA */}
+              <div className="lg:col-span-2">
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">Busca Rápida</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Nome, CNS, CRM ou especialidade..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                  />
+                </div>
+              </div>
+              
+              {/* FILTRO DE HOSPITAL */}
+              <div>
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">Hospital</label>
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedHospital}
                     onChange={(e) => setSelectedHospital(e.target.value)}
-                    className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-10"
                   >
-                    <option value="all">Todos os Hospitais</option>
+                    <option value="all">Todos</option>
                     {availableHospitals.map((hospital) => (
                       <option key={hospital.id} value={hospital.id}>
                         {hospital.name}
@@ -735,98 +734,128 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   {selectedHospital !== 'all' && (
                     <button
                       onClick={() => setSelectedHospital('all')}
-                      className="px-3 py-2 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors font-medium"
+                      className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                      title="Limpar filtro de hospital"
                     >
-                      Limpar
+                      ✕
                     </button>
                   )}
                 </div>
               </div>
+            </div>
+            
+            {/* LINHA 2: FILTRO DE PERÍODO */}
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={dateFilterEnabled}
+                  onChange={(e) => setDateFilterEnabled(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                />
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-700 font-medium">Filtrar por período</span>
+              </label>
               
-              {/* TOGGLE FILTRO DE DATAS */}
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Período</label>
-                <label className="flex items-center gap-3 cursor-pointer p-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={dateFilterEnabled}
-                    onChange={(e) => setDateFilterEnabled(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-                  />
-                  <Calendar className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-700 font-medium">Filtrar por datas</span>
-                </label>
-              </div>
+              {/* INDICADOR DE FILTROS ATIVOS */}
+              {(searchTerm || selectedHospital !== 'all' || dateFilterEnabled) && (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    {searchTerm && (
+                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                        Busca
+                      </Badge>
+                    )}
+                    {selectedHospital !== 'all' && (
+                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                        Hospital
+                      </Badge>
+                    )}
+                    {dateFilterEnabled && (
+                      <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                        Período
+                      </Badge>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedHospital('all');
+                      setDateFilterEnabled(false);
+                      setAdmissionDateFrom('');
+                      setAdmissionDateTo('');
+                      setDischargeDateFrom('');
+                      setDischargeDateTo('');
+                    }}
+                    className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+                    title="Limpar todos os filtros"
+                  >
+                    Limpar tudo
+                  </button>
+                </div>
+              )}
             </div>
             
             {/* FILTROS DE DATA EXPANDIDOS */}
             {dateFilterEnabled && (
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-100">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* FILTRO DE ADMISSÃO */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <label className="text-sm font-semibold text-gray-700">Data de Admissão</label>
+                      <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Admissão</label>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-gray-600 mb-1 block">De</label>
-                        <input
-                          type="date"
-                          value={admissionDateFrom}
-                          onChange={(e) => setAdmissionDateFrom(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600 mb-1 block">Até</label>
-                        <input
-                          type="date"
-                          value={admissionDateTo}
-                          onChange={(e) => setAdmissionDateTo(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                        />
-                      </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="date"
+                        value={admissionDateFrom}
+                        onChange={(e) => setAdmissionDateFrom(e.target.value)}
+                        className="px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        placeholder="De"
+                      />
+                      <input
+                        type="date"
+                        value={admissionDateTo}
+                        onChange={(e) => setAdmissionDateTo(e.target.value)}
+                        className="px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        placeholder="Até"
+                      />
                     </div>
                   </div>
                   
                   {/* FILTRO DE ALTA */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
                       <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                      <label className="text-sm font-semibold text-gray-700">Data de Alta</label>
+                      <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">Alta</label>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-gray-600 mb-1 block">De</label>
-                        <input
-                          type="date"
-                          value={dischargeDateFrom}
-                          onChange={(e) => setDischargeDateFrom(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600 mb-1 block">Até</label>
-                        <input
-                          type="date"
-                          value={dischargeDateTo}
-                          onChange={(e) => setDischargeDateTo(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                        />
-                      </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="date"
+                        value={dischargeDateFrom}
+                        onChange={(e) => setDischargeDateFrom(e.target.value)}
+                        className="px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        placeholder="De"
+                      />
+                      <input
+                        type="date"
+                        value={dischargeDateTo}
+                        onChange={(e) => setDischargeDateTo(e.target.value)}
+                        className="px-2 py-1.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        placeholder="Até"
+                      />
                     </div>
                   </div>
                 </div>
                 
-                {/* AÇÕES DOS FILTROS DE DATA */}
+                {/* RESUMO DOS FILTROS DE DATA */}
                 {(admissionDateFrom || admissionDateTo || dischargeDateFrom || dischargeDateTo) && (
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-blue-200">
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm text-gray-700 font-medium">
-                        {filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0)} pacientes encontrados
+                      <span className="text-xs text-gray-600">
+                        {filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0)} pacientes no período
                       </span>
                     </div>
                     <button
@@ -836,7 +865,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         setDischargeDateFrom('');
                         setDischargeDateTo('');
                       }}
-                      className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors font-medium"
+                      className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
                     >
                       Limpar datas
                     </button>
@@ -889,70 +918,125 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         >
                           <div className="p-6">
                             <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-5">
-                              <div className="flex items-center gap-3">
-                                {isExpanded ? (
+                              <div className="flex items-center gap-4">
+                                {/* ÍCONE DE EXPANSÃO E AVATAR */}
+                                <div className="flex items-center gap-3">
+                                  {isExpanded ? (
                                     <ChevronDown className="h-5 w-5 text-slate-500 transition-transform duration-300" />
-                                ) : (
-                                    <ChevronRight className="h-5 w-5 text-slate-500 transition-transform duration-300" />
-                                )}
-                                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm border ${
-                                  doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' 
-                                      ? 'bg-slate-100 border-slate-200' 
-                                      : 'bg-slate-50 border-slate-200'
-                                }`}>
-                                  <Stethoscope className={`h-7 w-7 ${
-                                    doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' 
-                                        ? 'text-blue-500' 
-                                        : 'text-blue-600'
-                                  }`} style={{
-                                    filter: doctor.doctor_info.cns !== 'VIRTUAL_ORPHAN_DOCTOR' 
-                                      ? 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.5))' 
-                                      : 'none'
-                                  }} />
-                                </div>
-                              </div>
-                                <div className="space-y-2">
-                                  <div className="flex items-center gap-3 flex-wrap">
-                                    <h3 className="font-semibold text-lg text-slate-900 tracking-tight">
-                                    {doctor.doctor_info.name}
-                                  </h3>
-                                  {getRankingMedal(index) && (
-                                    <span className="text-2xl opacity-80">
-                                      {getRankingMedal(index)}
-                                    </span>
-                                  )}
-                                  {doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' && (
-                                      <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-xs font-medium px-3 py-1 rounded-full border border-slate-200">
-                                      🔗 Agrupamento
-                                    </Badge>
-                                  )}
-                                </div>
-                                  <div className="flex items-center gap-4 text-sm">
-                                  {doctor.doctor_info.cns !== 'VIRTUAL_ORPHAN_DOCTOR' ? (
-                                    <>
-                                        <span className="text-slate-600 font-medium">CNS: {doctor.doctor_info.cns}</span>
-                                        {doctor.doctor_info.crm && <span className="text-slate-600 font-medium">CRM: {doctor.doctor_info.crm}</span>}
-                                    </>
                                   ) : (
-                                      <span className="text-slate-700 font-medium">Procedimentos sem médico responsável identificado</span>
+                                    <ChevronRight className="h-5 w-5 text-slate-500 transition-transform duration-300" />
                                   )}
-                                  {doctor.doctor_info.specialty && (
-                                      <Badge variant="outline" className="bg-white text-slate-700 border-slate-300 font-medium px-3 py-1">
-                                        {doctor.doctor_info.specialty}
+                                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg border-2 ${
+                                    doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' 
+                                      ? 'bg-gradient-to-br from-slate-100 to-slate-200 border-slate-300' 
+                                      : 'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200'
+                                  }`}>
+                                    <Stethoscope className={`h-8 w-8 ${
+                                      doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' 
+                                        ? 'text-slate-600' 
+                                        : 'text-blue-600'
+                                    }`} style={{
+                                      filter: doctor.doctor_info.cns !== 'VIRTUAL_ORPHAN_DOCTOR' 
+                                        ? 'drop-shadow(0 2px 4px rgba(59, 130, 246, 0.3))' 
+                                        : 'none'
+                                    }} />
+                                  </div>
+                                </div>
+                                
+                                {/* INFORMAÇÕES PRINCIPAIS DO MÉDICO */}
+                                <div className="space-y-3">
+                                  {/* LINHA 1: NOME E MEDALHA */}
+                                   <div className="flex items-center gap-3">
+                                     <h3 className="font-semibold text-lg text-slate-900 tracking-tight">
+                                       {doctor.doctor_info.name}
+                                     </h3>
+                                     {getRankingMedal(index) && (
+                                       <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-full border-2 border-yellow-300 shadow-md">
+                                         <span className="text-lg">
+                                           {getRankingMedal(index)}
+                                         </span>
+                                       </div>
+                                     )}
+                                    {doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' && (
+                                      <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-xs font-medium px-3 py-1.5 rounded-full border border-slate-300">
+                                        🔗 Agrupamento
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  
+                                  {/* LINHA 2: CNS, CRM E ESPECIALIDADE */}
+                                  <div className="flex items-center gap-3 flex-wrap">
+                                    {doctor.doctor_info.cns !== 'VIRTUAL_ORPHAN_DOCTOR' ? (
+                                      <>
+                                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium px-2 py-1 text-xs">
+                                           CNS: {doctor.doctor_info.cns}
+                                         </Badge>
+                                         {doctor.doctor_info.crm && (
+                                           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 font-medium px-2 py-1 text-xs">
+                                             CRM: {doctor.doctor_info.crm}
+                                           </Badge>
+                                         )}
+                                      </>
+                                    ) : (
+                                      <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-300 font-medium px-2 py-1 text-xs">
+                                         Procedimentos sem médico responsável identificado
+                                       </Badge>
+                                    )}
+                                    
+                                    {/* BADGE DA ESPECIALIDADE COM CORES */}
+                                    {doctor.doctor_info.specialty && (
+                                      <Badge 
+                                         variant="outline" 
+                                         className={`font-medium px-2 py-1 text-xs ${
+                                          (() => {
+                                            const specialty = doctor.doctor_info.specialty.toLowerCase();
+                                            if (specialty.includes('cardiolog')) return 'bg-red-50 text-red-700 border-red-200';
+                                            if (specialty.includes('neurolog')) return 'bg-purple-50 text-purple-700 border-purple-200';
+                                            if (specialty.includes('ortoped')) return 'bg-orange-50 text-orange-700 border-orange-200';
+                                            if (specialty.includes('ginecolog') || specialty.includes('obstetr')) return 'bg-pink-50 text-pink-700 border-pink-200';
+                                            if (specialty.includes('pediatr')) return 'bg-cyan-50 text-cyan-700 border-cyan-200';
+                                            if (specialty.includes('anestesi')) return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                                            if (specialty.includes('cirurg')) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                                            if (specialty.includes('dermato')) return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+                                            if (specialty.includes('oftalmolog')) return 'bg-teal-50 text-teal-700 border-teal-200';
+                                            if (specialty.includes('psiquiatr')) return 'bg-violet-50 text-violet-700 border-violet-200';
+                                            if (specialty.includes('radiolog')) return 'bg-gray-50 text-gray-700 border-gray-200';
+                                            if (specialty.includes('urolog')) return 'bg-blue-50 text-blue-700 border-blue-200';
+                                            return 'bg-slate-50 text-slate-700 border-slate-200';
+                                          })()
+                                        }`}
+                                      >
+                                        {(() => {
+                                          const specialty = doctor.doctor_info.specialty.toLowerCase();
+                                          if (specialty.includes('cardiolog')) return '❤️';
+                                          if (specialty.includes('neurolog')) return '🧠';
+                                          if (specialty.includes('ortoped')) return '🦴';
+                                          if (specialty.includes('ginecolog') || specialty.includes('obstetr')) return '👶';
+                                          if (specialty.includes('pediatr')) return '🧸';
+                                          if (specialty.includes('anestesi')) return '💉';
+                                          if (specialty.includes('cirurg')) return '🔪';
+                                          if (specialty.includes('dermato')) return '🌟';
+                                          if (specialty.includes('oftalmolog')) return '👁️';
+                                          if (specialty.includes('psiquiatr')) return '🧘';
+                                          if (specialty.includes('radiolog')) return '📡';
+                                          if (specialty.includes('urolog')) return '🫧';
+                                          return '🩺';
+                                        })()} {doctor.doctor_info.specialty}
                                       </Badge>
                                     )}
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <div className="text-xl font-bold text-slate-900 mb-1">
-                                  {formatCurrency(doctorStats.totalValue)}
-                                </div>
-                                <div className="text-sm text-slate-600 font-medium">
-                                  {doctorStats.approvalRate.toFixed(1)}% aprovação
-                                </div>
-                              </div>
+                              
+                              {/* ESTATÍSTICAS FINANCEIRAS */}
+                               <div className="text-right">
+                                 <div className="text-xl font-bold text-slate-900 mb-1">
+                                   {formatCurrency(doctorStats.totalValue)}
+                                 </div>
+                                 <div className="text-sm text-slate-600 font-medium">
+                                   {doctorStats.approvalRate.toFixed(1)}% aprovação
+                                 </div>
+                               </div>
                             </div>
                             
                             {/* ✅ ESTATÍSTICAS DO MÉDICO - DESIGN ULTRA COMPACTO COM CORES SUAVES */}
