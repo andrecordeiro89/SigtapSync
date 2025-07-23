@@ -184,70 +184,178 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
 
   return (
     <div className="relative">
-      {/* ✅ BOTÃO PRINCIPAL */}
+      {/* ✅ BOTÃO PRINCIPAL - DESIGN EXECUTIVO */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full px-3 py-2 text-sm border rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className={`group flex items-center justify-between w-full px-4 py-3 text-sm border-2 rounded-lg transition-all duration-200 ${
+          isOpen 
+            ? 'border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md' 
+            : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50'
+        } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1`}
         disabled={isLoading}
       >
-        <div className="flex items-center gap-2">
-          <User className="h-4 w-4 text-gray-500" />
-          <span className="font-medium">{doctorName}</span>
+        <div className="flex items-center gap-3">
+          <div className={`flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
+            isOpen ? 'bg-blue-100 border-2 border-blue-200' : 'bg-gray-100 border-2 border-gray-200 group-hover:bg-blue-100 group-hover:border-blue-200'
+          }`}>
+            <User className={`h-4 w-4 transition-colors ${
+              isOpen ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'
+            }`} />
+          </div>
+          <div className="flex flex-col items-start">
+            <span className={`font-semibold transition-colors ${
+              isOpen ? 'text-blue-900' : 'text-gray-900 group-hover:text-blue-900'
+            }`}>
+              {doctorName}
+            </span>
+            <span className="text-xs text-gray-500 font-medium">
+              {doctorName === 'HUMBERTO MOREIRA DA SILVA' ? 'Médico Especialista' : 'Profissional Médico'}
+            </span>
+          </div>
           {isLoading && (
-            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ml-2"></div>
           )}
         </div>
-        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <div className="flex items-center space-x-2">
+          {doctorName === 'HUMBERTO MOREIRA DA SILVA' && (
+            <div className="bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded-full border border-orange-200">
+              04
+            </div>
+          )}
+          <ChevronDown className={`h-4 w-4 transition-all duration-200 ${
+            isOpen ? 'rotate-180 text-blue-600' : 'text-gray-400 group-hover:text-blue-600'
+          }`} />
+        </div>
       </button>
 
       {/* ✅ DROPDOWN CONTENT */}
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-96 overflow-y-auto">
           
-          {/* 📊 INFORMAÇÕES BÁSICAS DO MÉDICO */}
+          {/* 📊 CABEÇALHO EXECUTIVO DO MÉDICO */}
           {doctorData && (
-            <div className="p-3 border-b bg-blue-50">
-              <div className="text-sm font-medium text-blue-900">
-                {doctorData.doctor_info.name}
-              </div>
-              <div className="text-xs text-blue-700 space-y-1">
-                <div>CNS: {doctorData.doctor_info.cns}</div>
-                <div>CRM: {doctorData.doctor_info.crm}</div>
-                <div>Especialidade: {doctorData.doctor_info.specialty}</div>
+            <div className="p-4 border-b bg-gradient-to-r from-blue-50 via-indigo-50 to-slate-50">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full border-2 border-blue-200">
+                      <User className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-bold text-gray-900 leading-tight">
+                        {doctorData.doctor_info.name}
+                      </h2>
+                      <p className="text-xs text-gray-600 font-medium">
+                        {doctorData.doctor_info.specialty || 'Especialidade não informada'}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* CREDENCIAIS PROFISSIONAIS */}
+                  <div className="flex items-center space-x-4 mt-2">
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs font-medium text-gray-500">CNS:</span>
+                      <span className="text-xs font-mono text-gray-700 bg-white px-2 py-1 rounded border">
+                        {doctorData.doctor_info.cns}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs font-medium text-gray-500">CRM:</span>
+                      <span className="text-xs font-mono text-gray-700 bg-white px-2 py-1 rounded border">
+                        {doctorData.doctor_info.crm}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* BADGE DE STATUS */}
+                <div className="flex flex-col items-end space-y-1">
+                  <div className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full border border-green-200">
+                    ✓ Ativo
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {new Date().toLocaleDateString('pt-BR')}
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          {/* 📈 RESUMO DE PRODUTIVIDADE */}
+          {/* 📈 RESUMO EXECUTIVO - DESIGN SOFISTICADO */}
           {doctorData && (
-            <div className="p-3 border-b bg-gray-50">
-              <div className="text-sm font-medium text-gray-900 mb-2">
-                Resumo Geral
+            <div className="p-4 border-b bg-gradient-to-r from-slate-50 to-gray-50">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-800 tracking-wide uppercase">
+                  Performance Executiva
+                </h3>
+                <div className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full border">
+                  {stats.totalPatients} AIH{stats.totalPatients !== 1 ? 's' : ''}
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="bg-white p-2 rounded border">
-                  <div className="text-gray-500">Pacientes</div>
-                  <div className="font-bold text-blue-600">{stats.totalPatients}</div>
+              
+              {/* KPIs PRINCIPAIS - LAYOUT HORIZONTAL COMPACTO */}
+              <div className="space-y-3">
+                {/* LINHA 1: Métricas de Volume */}
+                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                  <div className="flex items-center space-x-6">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-xs text-gray-600 font-medium">Pacientes</span>
+                      <span className="text-sm font-bold text-gray-900">{stats.totalPatients}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                      <span className="text-xs text-gray-600 font-medium">Procedimentos</span>
+                      <span className="text-sm font-bold text-gray-900">{stats.totalProcedures}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-gray-500">Ticket Médio</div>
+                    <div className="text-sm font-bold text-gray-900">
+                      {stats.totalPatients > 0 ? formatValue(stats.totalValue / stats.totalPatients) : 'R$ 0,00'}
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-white p-2 rounded border">
-                  <div className="text-gray-500">Procedimentos</div>
-                  <div className="font-bold text-purple-600">{stats.totalProcedures}</div>
+                
+                {/* LINHA 2: Métricas Financeiras */}
+                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                  <div className="flex items-center space-x-6">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                      <span className="text-xs text-gray-600 font-medium">Faturamento Total</span>
+                      <span className="text-sm font-bold text-emerald-700">{formatValue(stats.totalValue)}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-gray-500">Taxa Aprovação</div>
+                    <div className="text-sm font-bold text-gray-900">
+                      {stats.totalProcedures > 0 ? Math.round((stats.approvedProcedures / stats.totalProcedures) * 100) : 0}%
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-white p-2 rounded border">
-                  <div className="text-gray-500">Aprovados</div>
-                  <div className="font-bold text-green-600">{stats.approvedProcedures}</div>
-                </div>
-                <div className="bg-white p-2 rounded border">
-                  <div className="text-gray-500">Valor Total AIH</div>
-                  <div className="font-bold text-emerald-600">{formatValue(stats.totalValue)}</div>
-                </div>
-                <div className="bg-white p-2 rounded border border-blue-200">
-                  <div className="text-blue-600 text-xs">Produção Médica</div>
-                  <div className="font-bold text-blue-600">{stats.medicalProceduresCount}</div>
-                </div>
-                <div className="bg-white p-2 rounded border border-blue-200">
-                  <div className="text-blue-600 text-xs">Valor Produção</div>
-                  <div className="font-bold text-blue-600">{formatValue(stats.medicalProceduresValue)}</div>
+                
+                {/* LINHA 3: Produção Médica (Destaque) */}
+                <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-3 border border-orange-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center justify-center w-8 h-8 bg-orange-100 rounded-full">
+                        <span className="text-xs font-bold text-orange-700">04</span>
+                      </div>
+                      <div>
+                        <div className="text-xs font-medium text-orange-800">Produção Médica</div>
+                        <div className="text-xs text-orange-600">{stats.medicalProceduresCount} procedimento(s) médico(s)</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-orange-700">{formatValue(stats.medicalProceduresValue)}</div>
+                      <div className="text-xs text-orange-600">
+                        {stats.medicalProceduresCount > 0 ? 
+                          `Média: ${formatValue(stats.medicalProceduresValue / stats.medicalProceduresCount)}` : 
+                          'Sem produção médica'
+                        }
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

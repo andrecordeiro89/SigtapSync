@@ -97,6 +97,7 @@ const DOCTOR_PAYMENT_RULES: Record<string, DoctorPaymentRule> = {
 
 /**
  * 💰 CALCULAR PAGAMENTO BASEADO NAS REGRAS DO MÉDICO
+ * Agora filtra apenas procedimentos com regras definidas
  */
 export function calculateDoctorPayment(
   doctorName: string,
@@ -109,21 +110,35 @@ export function calculateDoctorPayment(
   const rule = DOCTOR_PAYMENT_RULES[doctorName.toUpperCase()];
   
   if (!rule) {
-    // Sem regra específica, usar valores originais
+    // Sem regra específica, retornar array vazio
     return {
-      procedures: procedures.map(proc => ({
-        ...proc,
-        calculatedPayment: proc.value_reais,
-        paymentRule: 'Valor original',
-        isSpecialRule: false
-      })),
-      totalPayment: procedures.reduce((sum, proc) => sum + proc.value_reais, 0),
+      procedures: [],
+      totalPayment: 0,
       appliedRule: 'Nenhuma regra específica'
     };
   }
 
+  // Filtrar apenas procedimentos que estão nas regras definidas
+  const allRuleCodes = [
+    ...rule.rules.map(r => r.procedureCode),
+    ...(rule.multipleRule?.codes || [])
+  ];
+  
+  const filteredProcedures = procedures.filter(proc => 
+    allRuleCodes.includes(proc.procedure_code)
+  );
+
+  // Se não há procedimentos com regras, retornar vazio
+  if (filteredProcedures.length === 0) {
+    return {
+      procedures: [],
+      totalPayment: 0,
+      appliedRule: 'Nenhum procedimento com regra específica encontrado'
+    };
+  }
+
   // Verificar se há múltiplos procedimentos da regra especial
-  const specialProcedures = procedures.filter(proc => 
+  const specialProcedures = filteredProcedures.filter(proc => 
     rule.multipleRule?.codes.includes(proc.procedure_code)
   );
 
@@ -135,22 +150,22 @@ export function calculateDoctorPayment(
     const totalSpecialValue = rule.multipleRule.totalValue;
     const valuePerProcedure = totalSpecialValue / specialProcedures.length;
 
-    calculatedProcedures = procedures.map(proc => {
+    calculatedProcedures = filteredProcedures.map(proc => {
       if (rule.multipleRule?.codes.includes(proc.procedure_code)) {
         return {
           ...proc,
           calculatedPayment: valuePerProcedure,
-          paymentRule: `${rule.multipleRule.description} (${valuePerProcedure.toFixed(2)} cada)`,
+          paymentRule: `${rule.multipleRule.description} (R$ ${valuePerProcedure.toFixed(2)} cada)`,
           isSpecialRule: true
         };
       } else {
-        // Procedimentos não cobertos pela regra especial
+        // Procedimentos com regra individual
         const standardRule = rule.rules.find(r => r.procedureCode === proc.procedure_code);
         return {
           ...proc,
-          calculatedPayment: standardRule?.standardValue || proc.value_reais,
-          paymentRule: standardRule?.description || 'Valor original',
-          isSpecialRule: false
+          calculatedPayment: standardRule!.standardValue,
+          paymentRule: standardRule!.description || `R$ ${standardRule!.standardValue.toFixed(2)}`,
+          isSpecialRule: true
         };
       }
     });
@@ -158,27 +173,18 @@ export function calculateDoctorPayment(
     appliedRule = `Regra múltiplos procedimentos: ${specialProcedures.length} procedimentos = R$ ${totalSpecialValue.toFixed(2)} total`;
   } else {
     // Aplicar regras individuais
-    calculatedProcedures = procedures.map(proc => {
+    calculatedProcedures = filteredProcedures.map(proc => {
       const standardRule = rule.rules.find(r => r.procedureCode === proc.procedure_code);
       
-      if (standardRule) {
-        return {
-          ...proc,
-          calculatedPayment: standardRule.standardValue,
-          paymentRule: standardRule.description || `R$ ${standardRule.standardValue.toFixed(2)}`,
-          isSpecialRule: true
-        };
-      } else {
-        return {
-          ...proc,
-          calculatedPayment: proc.value_reais,
-          paymentRule: 'Valor original',
-          isSpecialRule: false
-        };
-      }
+      return {
+        ...proc,
+        calculatedPayment: standardRule!.standardValue,
+        paymentRule: standardRule!.description || `R$ ${standardRule!.standardValue.toFixed(2)}`,
+        isSpecialRule: true
+      };
     });
 
-    appliedRule = 'Regras individuais aplicadas';
+    appliedRule = `Regras individuais aplicadas para ${calculatedProcedures.length} procedimento(s)`;
   }
 
   const totalPayment = calculatedProcedures.reduce((sum, proc) => sum + proc.calculatedPayment, 0);
@@ -212,11 +218,12 @@ const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
   const paymentCalculation = calculateDoctorPayment(doctorName, procedures);
   const hasSpecialRules = DOCTOR_PAYMENT_RULES[doctorName.toUpperCase()];
 
-  if (!hasSpecialRules) {
-    return null; // Não mostrar componente se não há regras específicas
+  if (!hasSpecialRules || paymentCalculation.procedures.length === 0) {
+    return null; // Não mostrar componente se não há regras específicas ou procedimentos aplicáveis
   }
 
-  const originalTotal = procedures.reduce((sum, proc) => sum + proc.value_reais, 0);
+  // Calcular total original apenas dos procedimentos com regras
+  const originalTotal = paymentCalculation.procedures.reduce((sum, proc) => sum + proc.value_reais, 0);
   const difference = paymentCalculation.totalPayment - originalTotal;
 
   return (
@@ -241,7 +248,7 @@ const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
                   {paymentCalculation.appliedRule}
                 </div>
                 <div className="text-xs text-gray-600 mt-1">
-                  {paymentCalculation.procedures.filter(p => p.isSpecialRule).length} procedimento(s) com regra específica
+                  {paymentCalculation.procedures.length} procedimento(s) calculado(s) - apenas códigos com regras definidas
                 </div>
               </div>
             </div>
@@ -316,8 +323,8 @@ const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-blue-600 mt-0.5" />
               <div className="text-xs text-blue-800">
-                <strong>Importante:</strong> Estes valores são calculados baseados nas regras específicas definidas para este médico. 
-                Os valores mostrados representam o pagamento adequado conforme as regras estabelecidas.
+                <strong>Importante:</strong> Apenas procedimentos com regras específicas definidas são exibidos e calculados. 
+                Conforme regulamentação, o médico recebe pagamento somente pelos procedimentos que executa e que possuem regras estabelecidas.
               </div>
             </div>
           </div>
