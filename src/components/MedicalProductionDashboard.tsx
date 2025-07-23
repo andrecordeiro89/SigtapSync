@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 
 import { DoctorPatientService, type DoctorWithPatients } from '../services/doctorPatientService';
-import DoctorPaymentRules from './DoctorPaymentRules';
+import DoctorPaymentRules, { calculateDoctorPayment } from './DoctorPaymentRules';
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -68,15 +68,43 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   );
   const approvalRate = totalProcedures > 0 ? (approvedProcedures / totalProcedures) * 100 : 0;
   
-  // 🆕 CALCULAR valores específicos dos procedimentos médicos ("04")
-  const medicalProceduresValue = doctorData.patients.reduce((sum, patient) => 
+  // 🆕 CALCULAR valores específicos dos procedimentos médicos ("04") COM REGRAS DE PAGAMENTO
+  const medicalProceduresCount = doctorData.patients.reduce((sum, patient) => 
+    sum + patient.procedures.filter(proc => isMedicalProcedure(proc.procedure_code)).length, 0
+  );
+  
+  // 💰 CALCULAR VALOR TOTAL BASEADO NAS REGRAS DE PAGAMENTO ESPECÍFICAS
+  let medicalProceduresValue = 0;
+  let calculatedPaymentValue = 0;
+  
+  // Calcular valor original de todos os procedimentos médicos
+  medicalProceduresValue = doctorData.patients.reduce((sum, patient) => 
     sum + patient.procedures
       .filter(proc => isMedicalProcedure(proc.procedure_code))
       .reduce((procSum, proc) => procSum + (proc.value_reais || 0), 0), 0
   );
-  const medicalProceduresCount = doctorData.patients.reduce((sum, patient) => 
-    sum + patient.procedures.filter(proc => isMedicalProcedure(proc.procedure_code)).length, 0
-  );
+  
+  // 🎯 CALCULAR SOMA DOS VALORES DO DETALHAMENTO POR PROCEDIMENTO (POR PACIENTE)
+  calculatedPaymentValue = doctorData.patients.reduce((totalSum, patient) => {
+    // Coletar procedimentos médicos deste paciente
+    const patientMedicalProcedures = patient.procedures
+      .filter(proc => isMedicalProcedure(proc.procedure_code))
+      .map(proc => ({
+        procedure_code: proc.procedure_code,
+        procedure_description: proc.procedure_description,
+        value_reais: proc.value_reais || 0
+      }));
+    
+    // Se há procedimentos médicos para este paciente, calcular o valor baseado nas regras
+    if (patientMedicalProcedures.length > 0) {
+      const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures);
+      // Somar os valores calculados individuais (detalhamento por procedimento)
+      const patientCalculatedSum = paymentCalculation.procedures.reduce((sum, proc) => sum + proc.calculatedPayment, 0);
+      return totalSum + patientCalculatedSum;
+    }
+    
+    return totalSum;
+  }, 0);
   
   return {
     totalProcedures,
@@ -85,7 +113,8 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
     avgTicket,
     approvalRate,
     medicalProceduresValue,
-    medicalProceduresCount
+    medicalProceduresCount,
+    calculatedPaymentValue // 🆕 Valor calculado baseado nas regras
   };
 };
 
@@ -976,7 +1005,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 </div>
                 <div className="text-lg font-bold text-blue-800">{doctorStats.medicalProceduresCount}</div>
                 <div className="text-xs text-blue-600 font-medium">
-                  {formatCurrency(doctorStats.medicalProceduresValue)}
+                  {doctorStats.calculatedPaymentValue > 0 ? (
+                    <>
+                      <div className="font-bold text-green-700">
+                        {formatCurrency(doctorStats.calculatedPaymentValue)}
+                      </div>
+                      {doctorStats.calculatedPaymentValue !== doctorStats.medicalProceduresValue && (
+                        <div className="text-xs text-gray-500 line-through">
+                          {formatCurrency(doctorStats.medicalProceduresValue)}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    formatCurrency(doctorStats.medicalProceduresValue)
+                  )}
                 </div>
               </div>
                             </div>
