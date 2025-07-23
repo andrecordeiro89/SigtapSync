@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 
 import { DoctorPatientService, type DoctorWithPatients } from '../services/doctorPatientService';
+import DoctorPaymentRules from './DoctorPaymentRules';
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -1184,6 +1185,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 </div>
                                               ))}
                                             </div>
+                                          )}
+                                          
+                                          {/* 🆕 COMPONENTE DE REGRAS DE PAGAMENTO ESPECÍFICAS */}
+                                          {patient.procedures.length > 0 && (
+                                            <DoctorPaymentRules
+                                              doctorName={doctor.doctor_info.name}
+                                              procedures={patient.procedures.map(proc => ({
+                                                procedure_code: proc.procedure_code,
+                                                procedure_description: proc.procedure_description,
+                                                value_reais: proc.value_reais || 0
+                                              }))}
+                                              className="mt-4"
+                                            />
                                           )}
                                         </div>
                                       </CollapsibleContent>
