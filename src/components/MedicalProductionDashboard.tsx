@@ -364,6 +364,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
   const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set());
   const [showDiagnostic, setShowDiagnostic] = useState(false); // 🆕 ESTADO PARA MOSTRAR DIAGNÓSTICO
+  // 🆕 ESTADOS PARA PAGINAÇÃO DE PACIENTES
+  const [currentPatientPage, setCurrentPatientPage] = useState<Map<string, number>>(new Map());
+  const [patientSearchTerm, setPatientSearchTerm] = useState<Map<string, string>>(new Map());
+  const PATIENTS_PER_PAGE = 10;
 
   // ✅ CARREGAR LISTA DE HOSPITAIS DISPONÍVEIS
   const loadAvailableHospitals = async (doctorsData: DoctorWithPatients[]) => {
@@ -876,46 +880,50 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 };
                 
                 return (
-                  <Card key={doctor.doctor_info.cns} className="mb-4 shadow-xl border-0 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/40 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
+                  <Card key={doctor.doctor_info.cns} className="mb-6 border border-slate-200/60 bg-white/80 backdrop-blur-sm hover:shadow-lg hover:border-slate-300/60 transition-all duration-500 ease-out">
                     <Collapsible>
                       <CollapsibleTrigger asChild>
                         <div 
-                          className="w-full cursor-pointer hover:bg-gradient-to-br hover:from-blue-50/50 hover:to-indigo-50/50 transition-all duration-300 ease-in-out"
+                          className="w-full cursor-pointer hover:bg-slate-50/50 transition-all duration-300 ease-out"
                           onClick={() => toggleDoctorExpansion(doctor.doctor_info.cns)}
                         >
-                          <div className="p-4">
-                            <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-4">
-                              <div className="flex items-center gap-2">
+                          <div className="p-6">
+                            <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-5">
+                              <div className="flex items-center gap-3">
                                 {isExpanded ? (
-                                    <ChevronDown className="h-5 w-5 text-indigo-600 transition-transform duration-200" />
+                                    <ChevronDown className="h-5 w-5 text-slate-500 transition-transform duration-300" />
                                 ) : (
-                                    <ChevronRight className="h-5 w-5 text-indigo-600 transition-transform duration-200" />
+                                    <ChevronRight className="h-5 w-5 text-slate-500 transition-transform duration-300" />
                                 )}
-                                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-lg ${
+                                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm border ${
                                   doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' 
-                                      ? 'bg-gradient-to-br from-purple-100 to-purple-200 border-2 border-purple-200' 
-                                      : 'bg-gradient-to-br from-blue-100 to-indigo-200 border-2 border-blue-200'
+                                      ? 'bg-slate-100 border-slate-200' 
+                                      : 'bg-slate-50 border-slate-200'
                                 }`}>
-                                  <Stethoscope className={`h-6 w-6 ${
+                                  <Stethoscope className={`h-7 w-7 ${
                                     doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' 
-                                        ? 'text-purple-700' 
-                                        : 'text-blue-700'
-                                  }`} />
+                                        ? 'text-blue-500' 
+                                        : 'text-blue-600'
+                                  }`} style={{
+                                    filter: doctor.doctor_info.cns !== 'VIRTUAL_ORPHAN_DOCTOR' 
+                                      ? 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.5))' 
+                                      : 'none'
+                                  }} />
                                 </div>
                               </div>
-                                <div className="space-y-1">
+                                <div className="space-y-2">
                                   <div className="flex items-center gap-3 flex-wrap">
-                                    <h3 className="font-bold text-lg text-gray-900 tracking-tight">
+                                    <h3 className="font-semibold text-lg text-slate-900 tracking-tight">
                                     {doctor.doctor_info.name}
                                   </h3>
                                   {getRankingMedal(index) && (
-                                    <span className="text-2xl">
+                                    <span className="text-2xl opacity-80">
                                       {getRankingMedal(index)}
                                     </span>
                                   )}
                                   {doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' && (
-                                      <Badge variant="secondary" className="bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 text-xs font-semibold px-2 py-1 rounded-full border border-purple-300">
+                                      <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-xs font-medium px-3 py-1 rounded-full border border-slate-200">
                                       🔗 Agrupamento
                                     </Badge>
                                   )}
@@ -923,14 +931,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   <div className="flex items-center gap-4 text-sm">
                                   {doctor.doctor_info.cns !== 'VIRTUAL_ORPHAN_DOCTOR' ? (
                                     <>
-                                        <span className="text-gray-700 font-medium">CNS: {doctor.doctor_info.cns}</span>
-                                        {doctor.doctor_info.crm && <span className="text-gray-700 font-medium">CRM: {doctor.doctor_info.crm}</span>}
+                                        <span className="text-slate-600 font-medium">CNS: {doctor.doctor_info.cns}</span>
+                                        {doctor.doctor_info.crm && <span className="text-slate-600 font-medium">CRM: {doctor.doctor_info.crm}</span>}
                                     </>
                                   ) : (
-                                      <span className="text-purple-700 font-semibold">Procedimentos sem médico responsável identificado</span>
+                                      <span className="text-slate-700 font-medium">Procedimentos sem médico responsável identificado</span>
                                   )}
                                   {doctor.doctor_info.specialty && (
-                                      <Badge variant="outline" className="bg-white/60 text-indigo-700 border-indigo-300 font-medium px-3 py-1">
+                                      <Badge variant="outline" className="bg-white text-slate-700 border-slate-300 font-medium px-3 py-1">
                                         {doctor.doctor_info.specialty}
                                       </Badge>
                                     )}
@@ -938,52 +946,52 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className="text-xl font-bold text-green-700 mb-1">
+                                <div className="text-xl font-bold text-slate-900 mb-1">
                                   {formatCurrency(doctorStats.totalValue)}
                                 </div>
-                                <div className="text-xs text-green-600 font-medium">
+                                <div className="text-sm text-slate-600 font-medium">
                                   {doctorStats.approvalRate.toFixed(1)}% aprovação
                                 </div>
                               </div>
                             </div>
                             
-                            {/* ✅ ESTATÍSTICAS DO MÉDICO - DESIGN PREMIUM */}
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-xl border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-8 h-8 bg-gradient-to-br from-blue-200 to-blue-300 rounded-lg flex items-center justify-center shadow-sm">
-                                    <User className="h-4 w-4 text-blue-700" />
+                            {/* ✅ ESTATÍSTICAS DO MÉDICO - DESIGN ULTRA COMPACTO COM CORES SUAVES */}
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                              <div className="bg-blue-50/40 p-2.5 rounded-lg border border-blue-200/40 hover:bg-blue-50/60 hover:border-blue-300/50 transition-all duration-300">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <div className="w-6 h-6 bg-blue-100/60 rounded-md flex items-center justify-center">
+                                    <User className="h-3.5 w-3.5 text-blue-600" />
                                   </div>
-                                  <span className="text-blue-700 font-semibold text-xs">AIHs/Pacientes</span>
+                                  <span className="text-blue-700 font-medium text-xs">Pacientes</span>
                                 </div>
-                                <div className="text-xl font-bold text-blue-800">{doctorStats.totalAIHs}</div>
+                                <div className="text-lg font-bold text-blue-900">{doctorStats.totalAIHs}</div>
                               </div>
-                              <div className="bg-gradient-to-br from-green-50 to-green-100 p-3 rounded-xl border border-green-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-8 h-8 bg-gradient-to-br from-green-200 to-green-300 rounded-lg flex items-center justify-center shadow-sm">
-                                    <FileText className="h-4 w-4 text-green-700" />
+                              <div className="bg-purple-50/40 p-2.5 rounded-lg border border-purple-200/40 hover:bg-purple-50/60 hover:border-purple-300/50 transition-all duration-300">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <div className="w-6 h-6 bg-purple-100/60 rounded-md flex items-center justify-center">
+                                    <FileText className="h-3.5 w-3.5 text-purple-600" />
                                   </div>
-                                  <span className="text-green-700 font-semibold text-xs">Procedimentos</span>
+                                  <span className="text-purple-700 font-medium text-xs">Procedimentos</span>
                                 </div>
-                                <div className="text-xl font-bold text-green-800">{doctorStats.totalProcedures}</div>
+                                <div className="text-lg font-bold text-purple-900">{doctorStats.totalProcedures}</div>
                               </div>
-                              <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-3 rounded-xl border border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-8 h-8 bg-gradient-to-br from-purple-200 to-purple-300 rounded-lg flex items-center justify-center shadow-sm">
-                                    <TrendingUp className="h-4 w-4 text-purple-700" />
+                              <div className="bg-amber-50/40 p-2.5 rounded-lg border border-amber-200/40 hover:bg-amber-50/60 hover:border-amber-300/50 transition-all duration-300">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <div className="w-6 h-6 bg-amber-100/60 rounded-md flex items-center justify-center">
+                                    <TrendingUp className="h-3.5 w-3.5 text-amber-600" />
                                   </div>
-                                  <span className="text-purple-700 font-semibold text-xs">Ticket Médio</span>
+                                  <span className="text-amber-700 font-medium text-xs">Ticket Médio</span>
                                 </div>
-                                <div className="text-xl font-bold text-purple-800">{formatCurrency(doctorStats.avgTicket)}</div>
+                                <div className="text-lg font-bold text-amber-900">{formatCurrency(doctorStats.avgTicket)}</div>
                             </div>
-                              <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-3 rounded-xl border border-orange-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-8 h-8 bg-gradient-to-br from-orange-200 to-orange-300 rounded-lg flex items-center justify-center shadow-sm">
-                                    <Building className="h-4 w-4 text-orange-700" />
+                              <div className="bg-indigo-50/40 p-2.5 rounded-lg border border-indigo-200/40 hover:bg-indigo-50/60 hover:border-indigo-300/50 transition-all duration-300">
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <div className="w-6 h-6 bg-indigo-100/60 rounded-md flex items-center justify-center">
+                                    <Building className="h-3.5 w-3.5 text-indigo-600" />
                           </div>
-                                  <span className="text-orange-700 font-semibold text-xs">Hospital</span>
+                                  <span className="text-indigo-700 font-medium text-xs">Hospital</span>
                             </div>
-                                <div className="text-base font-bold text-orange-800 leading-tight">
+                                <div className="text-sm font-semibold text-indigo-900 leading-tight">
                                   {(() => {
                                     const hospitals = doctor.hospitals;
                                     if (hospitals && hospitals.length > 0) {
@@ -995,30 +1003,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   })()}
                             </div>
                             </div>
-                              {/* 🆕 CARD PARA PROCEDIMENTOS MÉDICOS "04" */}
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-xl border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02]">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-200 to-blue-300 rounded-lg flex items-center justify-center shadow-sm">
-                    <Stethoscope className="h-4 w-4 text-blue-700" />
+                              {/* 🆕 CARD PRODUÇÃO MÉDICA - APENAS VALOR */}
+              <div className="bg-emerald-50/40 p-2.5 rounded-lg border border-emerald-200/40 hover:bg-emerald-50/60 hover:border-emerald-300/50 transition-all duration-300">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="w-6 h-6 bg-emerald-100/60 rounded-md flex items-center justify-center">
+                    <Stethoscope className="h-3.5 w-3.5 text-emerald-600" />
                   </div>
-                  <span className="text-blue-700 font-semibold text-xs">Produção Médica</span>
+                  <span className="text-emerald-700 font-medium text-xs">Produção Médica</span>
                 </div>
-                <div className="text-lg font-bold text-blue-800">{doctorStats.medicalProceduresCount}</div>
-                <div className="text-xs text-blue-600 font-medium">
-                  {doctorStats.calculatedPaymentValue > 0 ? (
-                    <>
-                      <div className="font-bold text-green-700">
-                        {formatCurrency(doctorStats.calculatedPaymentValue)}
-                      </div>
-                      {doctorStats.calculatedPaymentValue !== doctorStats.medicalProceduresValue && (
-                        <div className="text-xs text-gray-500 line-through">
-                          {formatCurrency(doctorStats.medicalProceduresValue)}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    formatCurrency(doctorStats.medicalProceduresValue)
-                  )}
+                <div className="text-lg font-bold text-emerald-900">
+                  {doctorStats.calculatedPaymentValue > 0 
+                    ? formatCurrency(doctorStats.calculatedPaymentValue)
+                    : formatCurrency(doctorStats.medicalProceduresValue)
+                  }
                 </div>
               </div>
                             </div>
@@ -1026,50 +1023,153 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         </div>
                       </CollapsibleTrigger>
 
-                      {/* ✅ LISTA DE PACIENTES - DESIGN PREMIUM */}
+                      {/* ✅ LISTA DE PACIENTES - DESIGN SOFISTICADO */}
                       <CollapsibleContent>
-                        <div className="px-4 pb-4">
-                          <div className="border-t border-gray-200 pt-4">
-                            <h4 className="font-bold text-lg text-gray-800 mb-4 flex items-center gap-2">
-                              <div className="w-6 h-6 bg-gradient-to-br from-green-100 to-green-200 rounded-lg flex items-center justify-center">
-                                <User className="h-4 w-4 text-green-700" />
+                        <div className="px-6 pb-6">
+                          <div className="border-t border-slate-200/60 pt-6">
+                            <div className="flex items-center justify-between mb-5">
+                              <h4 className="font-semibold text-lg text-slate-800 flex items-center gap-3">
+                                <div className="w-7 h-7 bg-slate-100 rounded-xl flex items-center justify-center">
+                                  <User className="h-4 w-4 text-slate-600" />
+                                </div>
+                                Pacientes Atendidos ({(() => {
+                                   const searchTerm = patientSearchTerm.get(doctor.doctor_info.cns) || '';
+                                   if (searchTerm) {
+                                     const filteredCount = doctor.patients.filter(patient => 
+                                       patient.patient_info.name.toLowerCase().includes(searchTerm.toLowerCase())
+                                     ).length;
+                                     return `${filteredCount} de ${doctor.patients.length}`;
+                                   }
+                                   return doctor.patients.length;
+                                 })()})
+                              </h4>
+                              
+                              <div className="flex items-center gap-3">
+                                {/* Campo de busca */}
+                                <div className="relative">
+                                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                  <Input
+                                    placeholder="Buscar paciente..."
+                                    value={patientSearchTerm.get(doctor.doctor_info.cns) || ''}
+                                    onChange={(e) => {
+                                      const newSearchTerms = new Map(patientSearchTerm);
+                                      newSearchTerms.set(doctor.doctor_info.cns, e.target.value);
+                                      setPatientSearchTerm(newSearchTerms);
+                                      // Reset para primeira página ao buscar
+                                      const newPages = new Map(currentPatientPage);
+                                      newPages.set(doctor.doctor_info.cns, 1);
+                                      setCurrentPatientPage(newPages);
+                                    }}
+                                    className="pl-10 w-64"
+                                  />
+                                </div>
+                                
+                                {/* Controles de paginação no header */}
+                                {(() => {
+                                  const searchTerm = patientSearchTerm.get(doctor.doctor_info.cns) || '';
+                                  const filteredPatients = doctor.patients.filter(patient => 
+                                    patient.patient_info.name.toLowerCase().includes(searchTerm.toLowerCase())
+                                  );
+                                  const totalPages = Math.ceil(filteredPatients.length / PATIENTS_PER_PAGE);
+                                  const currentPage = currentPatientPage.get(doctor.doctor_info.cns) || 1;
+                                  
+                                  if (totalPages > 1) {
+                                    return (
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => {
+                                            const newPages = new Map(currentPatientPage);
+                                            newPages.set(doctor.doctor_info.cns, Math.max(1, currentPage - 1));
+                                            setCurrentPatientPage(newPages);
+                                          }}
+                                          disabled={currentPage === 1}
+                                        >
+                                          Anterior
+                                        </Button>
+                                        <span className="text-sm text-gray-600 px-2">
+                                          {currentPage} de {totalPages}
+                                        </span>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => {
+                                            const newPages = new Map(currentPatientPage);
+                                            newPages.set(doctor.doctor_info.cns, Math.min(totalPages, currentPage + 1));
+                                            setCurrentPatientPage(newPages);
+                                          }}
+                                          disabled={currentPage === totalPages}
+                                        >
+                                          Próximo
+                                        </Button>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
-                              Pacientes Atendidos ({doctor.patients.length})
-                            </h4>
+                            </div>
                             
-                            <div className="space-y-3">
-                              {doctor.patients.map((patient) => {
-                                const patientKey = `${doctor.doctor_info.cns}-${patient.patient_info.cns}`;
-                                const isPatientExpanded = expandedPatients.has(patientKey);
+                            <div className="space-y-4">
+                              {(() => {
+                                const doctorKey = doctor.doctor_info.cns;
+                                const searchTerm = patientSearchTerm.get(doctorKey) || '';
+                                const filteredPatients = doctor.patients.filter(patient => 
+                                  patient.patient_info.name.toLowerCase().includes(searchTerm.toLowerCase())
+                                );
+                                const currentPage = currentPatientPage.get(doctorKey) || 1;
+                                const startIndex = (currentPage - 1) * PATIENTS_PER_PAGE;
+                                const endIndex = startIndex + PATIENTS_PER_PAGE;
+                                const paginatedPatients = filteredPatients.slice(startIndex, endIndex);
+                                const totalPages = Math.ceil(filteredPatients.length / PATIENTS_PER_PAGE);
                                 
                                 return (
-                                  <div key={patientKey} className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-3 shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300">
+                                  <>
+                                    {paginatedPatients.length === 0 && searchTerm ? (
+                                      <div className="text-center py-8 text-slate-500">
+                                        <Search className="h-8 w-8 mx-auto mb-3 text-slate-300" />
+                                        <div className="text-sm">Nenhum paciente encontrado para "{searchTerm}"</div>
+                                      </div>
+                                    ) : paginatedPatients.length === 0 ? (
+                                      <div className="text-center py-8 text-slate-500">
+                                        <User className="h-8 w-8 mx-auto mb-3 text-slate-300" />
+                                        <div className="text-sm">Nenhum paciente encontrado</div>
+                                      </div>
+                                    ) : null}
+                                    
+                                    {paginatedPatients.map((patient) => {
+                                      const patientKey = `${doctor.doctor_info.cns}-${patient.patient_info.cns}`;
+                                      const isPatientExpanded = expandedPatients.has(patientKey);
+                                
+                                return (
+                                  <div key={patientKey} className="bg-white/60 rounded-xl p-4 border border-slate-200/60 hover:bg-white/80 hover:border-slate-300/60 transition-all duration-300">
                                     <Collapsible>
                                       <CollapsibleTrigger asChild>
                                         <div 
-                                          className="w-full cursor-pointer hover:bg-gradient-to-br hover:from-green-50/50 hover:to-blue-50/50 rounded-xl p-2 transition-all duration-200"
+                                          className="w-full cursor-pointer hover:bg-slate-50/50 rounded-xl p-3 transition-all duration-200"
                                           onClick={() => togglePatientExpansion(patientKey)}
                                         >
                                           <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-4">
                                             <div className="flex items-center gap-3">
                                                 {isPatientExpanded ? (
-                                                  <ChevronDown className="h-4 w-4 text-green-600 transition-transform duration-200" />
+                                                  <ChevronDown className="h-4 w-4 text-slate-500 transition-transform duration-200" />
                                                 ) : (
-                                                  <ChevronRight className="h-4 w-4 text-green-600 transition-transform duration-200" />
+                                                  <ChevronRight className="h-4 w-4 text-slate-500 transition-transform duration-200" />
                                                 )}
-                                                <div className="w-10 h-10 bg-gradient-to-br from-green-100 to-emerald-200 rounded-xl flex items-center justify-center shadow-md">
-                                                  <User className="h-5 w-5 text-green-700" />
+                                                <div className="w-11 h-11 bg-slate-100 rounded-xl flex items-center justify-center">
+                                                  <User className="h-5 w-5 text-slate-600" />
                                                 </div>
                                               </div>
                                               <div className="space-y-1">
-                                                <div className="font-bold text-base text-gray-900">
+                                                <div className="font-semibold text-base text-slate-900">
                                                   {patient.patient_info.name}
                                                 </div>
-                                                <div className="text-xs text-gray-600 font-medium">
+                                                <div className="text-sm text-slate-600 font-medium">
                                                   CNS: {patient.patient_info.cns}
                                                 </div>
-                                                <div className="text-xs text-gray-500 flex items-center gap-2">
+                                                <div className="text-sm text-slate-500 flex items-center gap-2">
                                                   <span>Admissão: {new Date(patient.aih_info.admission_date).toLocaleDateString('pt-BR')}</span>
                                                   {patient.aih_info.discharge_date && (
                                                     <span>• Alta: {new Date(patient.aih_info.discharge_date).toLocaleDateString('pt-BR')}</span>
@@ -1078,10 +1178,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               </div>
                                             </div>
                                             <div className="text-right">
-                                              <div className="font-semibold text-green-600 text-base">
+                                              <div className="font-bold text-lg text-slate-900">
                                                 {formatCurrency(patient.procedures.reduce((sum, proc) => sum + (proc.value_reais || 0), 0))}
                                               </div>
-                                              <div className="text-xs text-gray-600 mb-1">
+                                              <div className="text-sm text-slate-600 mb-2">
                                                 {patient.procedures.length} procedimento(s)
                                               </div>
                                               {/* ✅ ESTATÍSTICAS RÁPIDAS DOS PROCEDIMENTOS */}
@@ -1095,17 +1195,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     return (
                                                       <>
                                                         {approved > 0 && (
-                                                          <Badge variant="default" className="bg-green-100 text-green-700 text-xs px-1 py-0">
+                                                          <Badge variant="default" className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 border-emerald-200">
                                                             ✓{approved}
                                                           </Badge>
                                                         )}
                                                         {pending > 0 && (
-                                                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 text-xs px-1 py-0">
+                                                          <Badge variant="secondary" className="bg-amber-100 text-amber-700 text-xs px-2 py-1 border-amber-200">
                                                             ⏳{pending}
                                                           </Badge>
                                                         )}
                                                         {rejected > 0 && (
-                                                          <Badge variant="destructive" className="text-xs px-1 py-0">
+                                                          <Badge variant="destructive" className="bg-red-100 text-red-700 text-xs px-2 py-1 border-red-200">
                                                             ✗{rejected}
                                                           </Badge>
                                                         )}
@@ -1121,61 +1221,61 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
                                       {/* ✅ LISTA DE PROCEDIMENTOS */}
                                       <CollapsibleContent>
-                                        <div className="mt-2 space-y-2">
+                                        <div className="mt-4 space-y-3">
                                           <div className="flex items-center justify-between">
-                                            <h5 className="font-medium text-gray-700 flex items-center gap-2 text-sm">
+                                            <h5 className="font-medium text-slate-700 flex items-center gap-2 text-sm">
                                               <FileText className="h-4 w-4" />
                                               Procedimentos Realizados
                                             </h5>
-                                            <Badge variant="secondary" className="text-xs">
+                                            <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-xs border-slate-200">
                                               {patient.procedures.length} procedimento(s)
                                             </Badge>
                                           </div>
                                           
                                           {patient.procedures.length === 0 ? (
-                                            <div className="text-center py-6 text-gray-500">
-                                              <Activity className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                                            <div className="text-center py-8 text-slate-500">
+                                              <Activity className="h-8 w-8 mx-auto mb-3 text-slate-300" />
                                               <div className="text-sm">Nenhum procedimento encontrado</div>
                                             </div>
                                           ) : (
-                                            <div className="space-y-2">
+                                            <div className="space-y-3">
                                               {patient.procedures
                                                 .sort((a, b) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime())
                                                 .map((procedure, procIndex) => (
-                                                <div key={procedure.procedure_id || procIndex} className={`bg-white p-3 rounded-lg border-l-4 shadow-sm ${
-                                                  isMedicalProcedure(procedure.procedure_code) ? 'border-l-red-400 bg-red-50/30' : 'border-l-blue-200'
+                                                <div key={procedure.procedure_id || procIndex} className={`bg-white/80 p-4 rounded-xl border-l-4 ${
+                                                  isMedicalProcedure(procedure.procedure_code) ? 'border-l-emerald-400 bg-emerald-50/20' : 'border-l-slate-300'
                                                 }`}>
                                                   <div className="flex items-start justify-between">
                                                     <div className="flex-1">
-                                                      <div className="flex items-center gap-2 mb-1">
-                                                        <div className={`font-semibold px-2 py-1 rounded text-xs ${
+                                                      <div className="flex items-center gap-2 mb-2">
+                                                        <div className={`font-medium px-3 py-1 rounded-lg text-sm ${
                                                           isMedicalProcedure(procedure.procedure_code) 
-                                                            ? 'text-red-900 bg-red-100' 
-                                                            : 'text-gray-900 bg-blue-50'
+                                                            ? 'text-emerald-800 bg-emerald-100 border border-emerald-200' 
+                                                            : 'text-slate-800 bg-slate-100 border border-slate-200'
                                                         }`}>
                                                           {procedure.procedure_code}
                                                         </div>
                                                         {isMedicalProcedure(procedure.procedure_code) && (
-                                                          <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300 text-xs">
+                                                          <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-300 text-xs">
                                                             🩺 Médico 04
                                                           </Badge>
                                                         )}
                                                         {procedure.sequence && procedure.sequence > 1 && (
-                                                          <Badge variant="outline" className="text-xs">
+                                                          <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 text-xs">
                                                             Seq. {procedure.sequence}
                                                           </Badge>
                                                         )}
                                                       </div>
                                                       
-                                                      <div className="text-xs text-gray-700 mb-1 leading-relaxed">
+                                                      <div className="text-sm text-slate-700 mb-3 leading-relaxed">
                                                         {procedure.procedure_description || 'Descrição não disponível'}
                                                       </div>
                                                       
-                                                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-gray-600">
-                                                        <div className="flex items-center gap-1">
-                                                          <Calendar className="h-3 w-3 text-blue-500" />
+                                                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm text-slate-600">
+                                                        <div className="flex items-center gap-2">
+                                                          <Calendar className="h-4 w-4 text-slate-500" />
                                                           <span className="font-medium">Data:</span>
-                                                          <span className="text-gray-800">
+                                                          <span className="text-slate-800">
                                                           {procedure.procedure_date ? new Date(procedure.procedure_date).toLocaleDateString('pt-BR') : 'Não informada'}
                                                           </span>
                                                         </div>
@@ -1183,32 +1283,32 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
                                                         
                                                         {procedure.professional_name && (
-                                                          <div className="flex items-center gap-1">
-                                                            <Stethoscope className="h-3 w-3 text-green-500" />
+                                                          <div className="flex items-center gap-2">
+                                                            <Stethoscope className="h-4 w-4 text-slate-500" />
                                                             <span className="font-medium">Executante:</span>
                                                             <span className="truncate">{procedure.professional_name}</span>
                                                           </div>
                                                         )}
                                                         
                                                         {procedure.cbo && (
-                                                          <div className="flex items-center gap-1">
-                                                            <Badge variant="outline" className="text-xs">
+                                                          <div className="flex items-center gap-2">
+                                                            <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 text-xs">
                                                               CBO: {procedure.cbo}
                                                             </Badge>
                                                           </div>
                                                         )}
                                                         
                                                         {procedure.participation && (
-                                                          <div className="flex items-center gap-1">
-                                                            <Users className="h-3 w-3 text-orange-500" />
+                                                          <div className="flex items-center gap-2">
+                                                            <Users className="h-4 w-4 text-slate-500" />
                                                             <span className="font-medium">Participação:</span>
                                                             <span>{procedure.participation}</span>
                                                           </div>
                                                         )}
                                                         
                                                         {procedure.match_confidence && procedure.match_confidence > 0 && (
-                                                          <div className="flex items-center gap-1">
-                                                            <TrendingUp className="h-3 w-3 text-indigo-500" />
+                                                          <div className="flex items-center gap-2">
+                                                            <TrendingUp className="h-4 w-4 text-slate-500" />
                                                             <span className="font-medium">Confiança:</span>
                                                             <span>{(procedure.match_confidence * 100).toFixed(1)}%</span>
                                                           </div>
@@ -1217,8 +1317,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     </div>
                                                     
                                                     <div className="text-right ml-4">
-                                                      <div className={`text-lg font-bold ${
-                                                        isMedicalProcedure(procedure.procedure_code) ? 'text-red-600' : 'text-green-600'
+                                                      <div className={`text-xl font-bold ${
+                                                        isMedicalProcedure(procedure.procedure_code) ? 'text-emerald-700' : 'text-slate-900'
                                                       }`}>
                                                         {formatCurrency(procedure.value_reais)}
                                                       </div>
@@ -1238,7 +1338,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 procedure_description: proc.procedure_description,
                                                 value_reais: proc.value_reais || 0
                                               }))}
-                                              className="mt-4"
+                                              className="mt-5"
                                             />
                                           )}
                                         </div>
@@ -1247,7 +1347,48 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   </div>
                                 );
                               })}
-                            </div>
+                              
+                              {/* 🆕 CONTROLES DE PAGINAÇÃO */}
+                              {totalPages > 1 && (
+                                <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200/60">
+                                  <div className="text-sm text-slate-600">
+                                    Mostrando {startIndex + 1}-{Math.min(endIndex, doctor.patients.length)} de {doctor.patients.length} pacientes
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => {
+                                        const newPage = Math.max(1, currentPage - 1);
+                                        const newMap = new Map(currentPatientPage);
+                                        newMap.set(doctorKey, newPage);
+                                        setCurrentPatientPage(newMap);
+                                      }}
+                                      disabled={currentPage === 1}
+                                      className="px-3 py-1 text-sm border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      Anterior
+                                    </button>
+                                    <span className="text-sm text-slate-600">
+                                      Página {currentPage} de {totalPages}
+                                    </span>
+                                    <button
+                                      onClick={() => {
+                                        const newPage = Math.min(totalPages, currentPage + 1);
+                                        const newMap = new Map(currentPatientPage);
+                                        newMap.set(doctorKey, newPage);
+                                        setCurrentPatientPage(newMap);
+                                      }}
+                                      disabled={currentPage === totalPages}
+                                      className="px-3 py-1 text-sm border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      Próxima
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
                           </div>
                         </div>
                       </CollapsibleContent>
