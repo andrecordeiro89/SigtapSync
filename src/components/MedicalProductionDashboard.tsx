@@ -927,20 +927,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     <ChevronRight className="h-5 w-5 text-slate-500 transition-transform duration-300" />
                                   )}
                                   <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg border-2 ${
-                                    doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' 
-                                      ? 'bg-gradient-to-br from-slate-100 to-slate-200 border-slate-300' 
-                                      : 'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200'
-                                  }`}>
-                                    <Stethoscope className={`h-8 w-8 ${
-                                      doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' 
-                                        ? 'text-slate-600' 
-                                        : 'text-blue-600'
-                                    }`} style={{
-                                      filter: doctor.doctor_info.cns !== 'VIRTUAL_ORPHAN_DOCTOR' 
-                                        ? 'drop-shadow(0 2px 4px rgba(59, 130, 246, 0.3))' 
-                                        : 'none'
-                                    }} />
-                                  </div>
+                                     doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' 
+                                       ? 'bg-gradient-to-br from-slate-100 to-slate-200 border-slate-300' 
+                                       : 'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200'
+                                   }`}>
+                                     <Stethoscope className={`h-7 w-7 ${
+                                       doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' 
+                                         ? 'text-slate-600' 
+                                         : 'text-blue-600'
+                                     }`} style={{
+                                       filter: doctor.doctor_info.cns !== 'VIRTUAL_ORPHAN_DOCTOR' 
+                                         ? 'drop-shadow(0 2px 4px rgba(59, 130, 246, 0.3))' 
+                                         : 'none'
+                                     }} />
+                                   </div>
                                 </div>
                                 
                                 {/* INFORMAÇÕES PRINCIPAIS DO MÉDICO */}
