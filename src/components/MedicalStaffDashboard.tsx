@@ -44,7 +44,11 @@ import {
   Hash,
   RotateCcw,
   Plus,
-  Info
+  Info,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
 import { getSpecialtyColor, getSpecialtyIcon } from '../utils/specialtyColors';
 import { useAuth } from '../contexts/AuthContext';
@@ -86,6 +90,10 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHospital, setSelectedHospital] = useState<string>('all');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
+  
+  // Paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
 
   
   // Estados de controle removidos - não mais necessários
@@ -295,11 +303,41 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     setSearchTerm('');
     setSelectedHospital('all');
     setSelectedSpecialty('all');
+    setCurrentPage(1); // Reset para primeira página
     
     toast({
       title: "Filtros limpos",
       description: "Todos os filtros foram removidos"
     });
+  };
+
+  // 📄 LÓGICA DE PAGINAÇÃO
+  const totalPages = Math.ceil(filteredDoctors.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentDoctors = filteredDoctors.slice(startIndex, endIndex);
+
+  // Reset página quando filtros mudarem
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedHospital, selectedSpecialty]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    // Scroll para o topo da tabela
+    document.querySelector('.medical-staff-table')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      handlePageChange(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      handlePageChange(currentPage + 1);
+    }
   };
 
   const handleUpdateDoctorNote = (doctorId: string, note: string) => {
@@ -388,101 +426,133 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
 
   return (
     <div className={`space-y-6 ${className}`}>
+      {/* HEADER */}
+      <div className="flex justify-between items-start">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Stethoscope className="h-6 w-6 text-blue-600" />
+            Corpo Médico
+          </h2>
+          <p className="text-gray-600 mt-1">
+            Gestão completa dos profissionais médicos
+          </p>
+        </div>
+        
+        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          <Database className="h-3 w-3 mr-1" />
+          Dados Reais
+        </Badge>
+      </div>
+
+      {/* CARDS DE RESUMO */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total de Médicos</p>
+                <p className="text-2xl font-bold text-gray-900">{filteredDoctors.length}</p>
+              </div>
+              <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="h-4 w-4 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Especialidades</p>
+                <p className="text-2xl font-bold text-gray-900">{availableSpecialties.length}</p>
+              </div>
+              <div className="h-8 w-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <Stethoscope className="h-4 w-4 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Hospitais</p>
+                <p className="text-2xl font-bold text-gray-900">{availableHospitals.length}</p>
+              </div>
+              <div className="h-8 w-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Building2 className="h-4 w-4 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Filtros Ativos</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') ? '✓' : '0'}
+                </p>
+              </div>
+              <div className="h-8 w-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                <Filter className="h-4 w-4 text-orange-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* CONTROLES E FILTROS */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Filter className="h-5 w-5" />
-              <span>Filtros e Controles</span>
+            <span className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Profissionais Médicos
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={loadRealData}
+                disabled={isLoading}
+                size="sm"
+                variant="outline"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                {isLoading ? 'Carregando...' : 'Atualizar'}
+              </Button>
+              <Button
+                onClick={handleExport}
+                size="sm"
+                variant="outline"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exportar
+              </Button>
             </div>
-            {/* Indicador de filtros ativos */}
-            {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Filter className="h-3 w-3" />
-                Filtros Ativos
-              </Badge>
-            )}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {/* Botões de ação */}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={handleRefresh}
+        <CardContent className="space-y-4">
+          {/* Busca */}
+          <div className="flex items-center space-x-2">
+            <Search className="w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Buscar por nome, CNS ou especialidade..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               disabled={isLoading}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              Atualizar
-            </Button>
-
-            <Button
-              onClick={handleClearFilters}
-              disabled={isLoading}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <X className="h-4 w-4" />
-              Limpar Filtros
-            </Button>
-
-            <Button
-              onClick={handleExport}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Download className="h-4 w-4" />
-              Exportar
-            </Button>
+              className="flex-1"
+            />
           </div>
 
           {/* Filtros */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                <Search className="h-4 w-4" />
-                Buscar
-              </Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Nome, CRM, CNS ou especialidade..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    try {
-                      setSearchTerm(e.target.value);
-                    } catch (error) {
-                      console.error('❌ Erro ao atualizar termo de busca:', error);
-                    }
-                  }}
-                  className="pl-10 pr-10"
-                  disabled={isLoading}
-                />
-                {/* Indicador de busca ativa */}
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600"
-                    type="button"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-                {/* Indicador de debounce */}
-                {searchTerm !== debouncedSearchTerm && (
-                  <div className="absolute right-8 top-3">
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                  </div>
-                )}
-              </div>
-            </div>
-
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
               <Label className="text-sm font-medium flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
@@ -546,48 +616,142 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Ações</Label>
+              <Button
+                onClick={handleClearFilters}
+                disabled={isLoading}
+                variant="outline"
+                size="sm"
+                className="w-full"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Limpar Filtros
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* TABELA DE PROFISSIONAIS */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Users className="h-5 w-5" />
-            <span>Lista de Profissionais</span>
-            <Badge variant="secondary">
-              {isLoading ? '...' : `${filteredDoctors.length} profissionais`}
-            </Badge>
-            {/* Mostrar filtros ativos */}
-            {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') && (
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                <Filter className="h-3 w-3 mr-1" />
-                Filtrado
+      <div className="border rounded-lg medical-staff-table">
+        <div className="p-4 border-b bg-gray-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-gray-600" />
+              <span className="font-medium text-gray-900">Lista de Profissionais</span>
+              <Badge variant="secondary">
+                {isLoading ? '...' : `${filteredDoctors.length} profissionais`}
               </Badge>
-            )}
-            <Badge variant="default" className="bg-green-600 text-white">
-              <Database className="h-3 w-3 mr-1" />
-              Dados Reais
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
-                  <div className="h-12 w-12 bg-gray-200 rounded-full animate-pulse" />
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
-                    <div className="h-3 bg-gray-200 rounded w-1/2 mt-1 animate-pulse" />
-                  </div>
-                </div>
-              ))}
+              {totalPages > 1 && (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  Página {currentPage} de {totalPages}
+                </Badge>
+              )}
+              {/* Mostrar filtros ativos */}
+              {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') && (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  <Filter className="h-3 w-3 mr-1" />
+                  Filtrado
+                </Badge>
+              )}
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            
+            {/* CONTROLES DE PAGINAÇÃO NO CABEÇALHO */}
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                {/* Primeira página */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(1)}
+                  disabled={currentPage === 1}
+                  className="h-7 w-7 p-0"
+                >
+                  <ChevronsLeft className="h-3 w-3" />
+                </Button>
+                
+                {/* Página anterior */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousPage}
+                  disabled={currentPage === 1}
+                  className="h-7 w-7 p-0"
+                >
+                  <ChevronLeft className="h-3 w-3" />
+                </Button>
+                
+                {/* Números das páginas (versão compacta) */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                    let pageNumber;
+                    if (totalPages <= 3) {
+                      pageNumber = i + 1;
+                    } else if (currentPage <= 2) {
+                      pageNumber = i + 1;
+                    } else if (currentPage >= totalPages - 1) {
+                      pageNumber = totalPages - 2 + i;
+                    } else {
+                      pageNumber = currentPage - 1 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNumber}
+                        variant={currentPage === pageNumber ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(pageNumber)}
+                        className="h-7 w-7 p-0 text-xs"
+                      >
+                        {pageNumber}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                {/* Próxima página */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  className="h-7 w-7 p-0"
+                >
+                  <ChevronRight className="h-3 w-3" />
+                </Button>
+                
+                {/* Última página */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-7 w-7 p-0"
+                >
+                  <ChevronsRight className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {isLoading ? (
+          <div className="p-4 space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center space-x-4">
+                <div className="h-12 w-12 bg-gray-200 rounded-full animate-pulse" />
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
+                  <div className="h-3 bg-gray-200 rounded w-1/2 mt-1 animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12"></TableHead>
@@ -597,23 +761,27 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredDoctors.length === 0 ? (
+                  {currentDoctors.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8">
+                      <TableCell colSpan={4} className="text-center py-12">
                         <div className="flex flex-col items-center justify-center text-gray-500">
-                          <Users className="h-12 w-12 mb-4 text-gray-300" />
-                          <p className="text-lg font-medium mb-2">Nenhum médico encontrado</p>
-                          <p className="text-sm mb-4">
-                            {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') 
-                              ? 'Nenhum médico corresponde aos filtros aplicados' 
-                              : 'Ainda não há médicos cadastrados no sistema'}
+                          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                            <Users className="h-8 w-8 text-slate-400" />
+                          </div>
+                          <p className="text-lg font-medium mb-2 text-gray-700">Nenhum médico encontrado</p>
+                          <p className="text-sm mb-6 text-gray-500 max-w-md">
+                            {filteredDoctors.length === 0 
+                              ? (searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') 
+                                ? 'Nenhum médico corresponde aos filtros aplicados. Tente ajustar os critérios de busca.' 
+                                : 'Ainda não há médicos cadastrados no sistema.'
+                              : `Mostrando ${currentDoctors.length} de ${filteredDoctors.length} médicos encontrados.`}
                           </p>
                           {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') && (
                             <Button 
                               variant="outline" 
                               size="sm" 
                               onClick={handleClearFilters}
-                              className="flex items-center gap-2"
+                              className="flex items-center gap-2 border-slate-300 text-slate-600 hover:bg-slate-50"
                             >
                               <X className="h-4 w-4" />
                               Limpar Filtros
@@ -623,7 +791,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredDoctors.map((doctor) => {
+                    currentDoctors.map((doctor) => {
                       try {
                         // Proteção adicional contra dados inválidos
                         if (!doctor || !doctor.id) {
@@ -635,28 +803,28 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                     
                     return (
                       <React.Fragment key={doctor.id}>
-                        <TableRow className={isExpanded ? 'bg-blue-50' : ''}>
-                          <TableCell>
+                        <TableRow className={isExpanded ? 'bg-slate-50' : 'hover:bg-gray-50'}>
+                          <TableCell className="w-12">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => toggleRowExpansion(doctor.id)}
-                              className="h-8 w-8 p-0"
+                              className="h-8 w-8 p-0 hover:bg-gray-100"
                             >
                               {isExpanded ? (
-                                <ChevronUp className="h-4 w-4" />
+                                <ChevronUp className="h-4 w-4 text-gray-600" />
                               ) : (
-                                <ChevronDown className="h-4 w-4" />
+                                <ChevronDown className="h-4 w-4 text-gray-600" />
                               )}
                             </Button>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                <User className="h-5 w-5 text-blue-600" />
+                              <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                                <User className="h-5 w-5 text-slate-600" />
                               </div>
                               <div>
-                                <div className="font-medium">{doctor.name}</div>
+                                <div className="font-medium text-gray-900">{doctor.name}</div>
                                 <div className="text-sm text-gray-500">CNS: {doctor.cns}</div>
                               </div>
                             </div>
@@ -664,59 +832,88 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                           <TableCell>
                             {doctor.speciality ? (
                               <Badge
-                                variant="outline"
-                                className={`
-                                  text-xs px-2 py-1 flex items-center gap-1 w-fit
-                                  ${getSpecialtyColor(doctor.speciality)}
-                                `}
+                                variant="secondary"
+                                className="text-xs px-3 py-1 bg-slate-100 text-slate-700 border-slate-200 font-medium"
                               >
-                                <span>{getSpecialtyIcon(doctor.speciality)}</span>
+                                <span className="mr-1">{getSpecialtyIcon(doctor.speciality)}</span>
                                 {doctor.speciality}
                               </Badge>
                             ) : (
-                              <div className="text-sm text-gray-500">Não informado</div>
+                              <span className="text-sm text-gray-400">Não informado</span>
                             )}
                           </TableCell>
                           <TableCell>
                             <div className="text-sm">
                               {doctor.hospitals && doctor.hospitals.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {doctor.hospitals.map((hospital: string, index: number) => (
-                                    <span key={index} className="text-gray-700">
+                                <div className="space-y-1">
+                                  {doctor.hospitals.slice(0, 2).map((hospital: string, index: number) => (
+                                    <div key={index} className="text-gray-700 font-medium">
                                       {hospital}
-                                      {index < doctor.hospitals.length - 1 && ', '}
-                                    </span>
+                                    </div>
                                   ))}
+                                  {doctor.hospitals.length > 2 && (
+                                    <div className="text-xs text-gray-500">
+                                      +{doctor.hospitals.length - 2} outros hospitais
+                                    </div>
+                                  )}
                                   {doctor.hospitals.length > 1 && (
-                                    <span className="text-xs text-gray-500 ml-1">
-                                      ({doctor.hospitals.length} hospitais)
-                                    </span>
+                                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                      {doctor.hospitals.length} hospitais
+                                    </Badge>
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-gray-500">Não informado</span>
+                                <span className="text-gray-400">Não informado</span>
                               )}
                             </div>
                           </TableCell>
                         </TableRow>
                         {isExpanded && (
                           <TableRow>
-                            <TableCell colSpan={4} className="bg-blue-50 border-t-0">
-                              <div className="p-4 space-y-4">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <MessageSquare className="h-4 w-4 text-blue-600" />
-                                  <h4 className="font-medium text-gray-900">Observações</h4>
+                            <TableCell colSpan={4} className="bg-slate-50 border-t">
+                              <div className="py-4 space-y-3">
+                                <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                                  <MessageSquare className="h-4 w-4 text-slate-600" />
+                                  Observações sobre o profissional
                                 </div>
-                                <div className="space-y-2">
-                                  <textarea
+                                
+                                <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
+                                  <Textarea
                                     placeholder="Adicione observações sobre este profissional..."
                                     value={doctorObservations[doctor.id] || ''}
-                                    onChange={(e) => handleUpdateDoctorNote(doctor.id, e.target.value)}
-                                    className="w-full p-3 border border-gray-300 rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    rows={3}
+                                    onChange={(e) => {
+                                      setDoctorObservations(prev => ({
+                                        ...prev,
+                                        [doctor.id]: e.target.value
+                                      }));
+                                    }}
+                                    className="min-h-[80px] resize-none border-slate-200 focus:border-slate-400 focus:ring-slate-400"
                                   />
-                                  <div className="text-xs text-gray-500">
-                                    As observações são salvas automaticamente conforme você digita.
+                                  
+                                  <div className="flex justify-end gap-2 mt-3">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        setDoctorObservations(prev => {
+                                          const newObs = { ...prev };
+                                          delete newObs[doctor.id];
+                                          return newObs;
+                                        });
+                                      }}
+                                      className="border-slate-300 text-slate-600 hover:bg-slate-50"
+                                    >
+                                      <X className="h-4 w-4 mr-1" />
+                                      Limpar
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleUpdateDoctorNote(doctor.id, doctorObservations[doctor.id] || '')}
+                                      className="bg-slate-700 hover:bg-slate-800 text-white"
+                                    >
+                                      <Save className="h-4 w-4 mr-1" />
+                                      Salvar
+                                    </Button>
                                   </div>
                                 </div>
                               </div>
@@ -735,8 +932,92 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+          
+          {/* CONTROLES DE PAGINAÇÃO */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t bg-gray-50">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  Mostrando {startIndex + 1} a {Math.min(endIndex, filteredDoctors.length)} de {filteredDoctors.length} profissionais
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {/* Primeira página */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  {/* Página anterior */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  {/* Números das páginas */}
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNumber;
+                      if (totalPages <= 5) {
+                        pageNumber = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNumber = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNumber = totalPages - 4 + i;
+                      } else {
+                        pageNumber = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNumber}
+                          variant={currentPage === pageNumber ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNumber)}
+                          className="h-8 w-8 p-0"
+                        >
+                          {pageNumber}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Próxima página */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  
+                  {/* Última página */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+      </div>
     </div>
   );
 };
