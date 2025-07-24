@@ -657,7 +657,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                               </div>
                               <div>
                                 <div className="font-medium">{doctor.name}</div>
-                                <div className="text-sm text-gray-500">CRM: {doctor.crm}</div>
+                                <div className="text-sm text-gray-500">CNS: {doctor.cns}</div>
                               </div>
                             </div>
                           </TableCell>
