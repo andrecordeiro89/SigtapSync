@@ -113,16 +113,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       order: 6,
       color: 'from-pink-500 to-purple-600'
     },
-    {
-      id: 'medical-staff',
-      label: 'Corpo Médico',
-      icon: Users,
-      description: 'Gestão e análise do corpo clínico médico',
-      requiresAdmin: true,
-      requiresExecutive: true,
-      order: 7,
-      color: 'from-indigo-500 to-purple-600'
-    },
+
     {
       id: 'audit-dashboard',
       label: 'Auditoria AIH',
@@ -683,4 +674,4 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
   );
 };
 
-export default SidebarNavigation; 
+export default SidebarNavigation;

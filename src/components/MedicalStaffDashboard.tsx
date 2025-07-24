@@ -39,15 +39,14 @@ import {
   User,
   ChevronDown,
   ChevronUp,
-  Target,
   ClipboardList,
   MessageSquare,
   Hash,
-  BarChart2,
   RotateCcw,
   Plus,
   Info
 } from 'lucide-react';
+import { getSpecialtyColor, getSpecialtyIcon } from '../utils/specialtyColors';
 import { useAuth } from '../contexts/AuthContext';
 import { DoctorsCrudService } from '../services/doctorsCrudService';
 import { 
@@ -58,32 +57,8 @@ import {
 import { toast } from './ui/use-toast';
 
 // ================================================================
-// TIPOS PARA CONTRATOS
+// TIPOS E INTERFACES
 // ================================================================
-
-interface DoctorContract {
-  id: string;
-  doctorId: string;
-  contractType: 'meta' | 'producao';
-  targetProcedures?: number; // Para contratos por meta
-  productionRate?: number; // Para contratos por produção (%)
-  description: string;
-  startDate: string;
-  endDate?: string;
-  isActive: boolean;
-  notes: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface DoctorNote {
-  id: string;
-  doctorId: string;
-  note: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
-}
 
 // ✅ Tipo MedicalDoctor agora já inclui campo hospitals opcional
 
@@ -103,31 +78,17 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
   const [doctors, setDoctors] = useState<MedicalDoctor[]>([]);
   const [specialties, setSpecialties] = useState<MedicalSpecialty[]>([]);
   const [hospitalStats, setHospitalStats] = useState<HospitalMedicalStats[]>([]);
-  const [contracts, setContracts] = useState<DoctorContract[]>([]);
-  const [doctorNotes, setDoctorNotes] = useState<DoctorNote[]>([]);
+  // Estados para observações e expansão
+  const [doctorObservations, setDoctorObservations] = useState<{[key: string]: string}>({});
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHospital, setSelectedHospital] = useState<string>('all');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
-  const [selectedContractType, setSelectedContractType] = useState<string>('all');
+
   
-  // Controle de expansão
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [editingNotes, setEditingNotes] = useState<Set<string>>(new Set());
-  const [tempNotes, setTempNotes] = useState<{[key: string]: string}>({});
-  
-  // Controle de criação de contrato inline
-  const [creatingContract, setCreatingContract] = useState<Set<string>>(new Set());
-  const [contractForms, setContractForms] = useState<{[key: string]: {
-    contractType: 'meta' | 'producao';
-    targetProcedures: number;
-    productionRate: number;
-    description: string;
-    startDate: string;
-    endDate: string;
-    notes: string;
-  }}>({});
+  // Estados de controle removidos - não mais necessários
 
   // Verificar acesso
   const hasAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('medical_management');
@@ -224,9 +185,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
         console.log('✅ Estatísticas de hospitais carregadas:', hospitalStatsResult.data?.length);
       }
 
-      // Carregar contratos e anotações
-      await loadContracts();
-      await loadDoctorNotes();
+      // Carregamento de contratos e anotações removido
 
     } catch (error) {
       console.error('❌ Erro ao carregar dados:', error);
@@ -240,32 +199,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     }
   };
 
-  // Carregar contratos (mock por enquanto)
-  const loadContracts = async () => {
-    // Mock data para exemplo
-    const mockContracts: DoctorContract[] = [
-      {
-        id: '1',
-        doctorId: '1',
-        contractType: 'meta',
-        targetProcedures: 50,
-        description: 'Meta de 50 procedimentos mensais',
-        startDate: '2024-01-01',
-        isActive: true,
-        notes: 'Contrato renovado em janeiro',
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
-      }
-    ];
-    setContracts(mockContracts);
-  };
-
-  // Carregar anotações dos médicos
-  const loadDoctorNotes = async () => {
-    // Mock data para exemplo
-    const mockNotes: DoctorNote[] = [];
-    setDoctorNotes(mockNotes);
-  };
+  // Funções de carregamento removidas - não mais necessárias
 
   // Agrupar médicos e filtrar com proteção contra erros
   const filteredDoctors = React.useMemo(() => {
@@ -322,11 +256,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
           const matchesSpecialty = selectedSpecialty === 'all' || 
             doctorSpecialty === selectedSpecialty;
           
-          // 📄 FILTRO DE TIPO DE CONTRATO
-          const matchesContractType = selectedContractType === 'all' || 
-            getDoctorContract(doctor?.id)?.contractType === selectedContractType;
-          
-          const passes = matchesSearch && matchesHospital && matchesSpecialty && matchesContractType;
+          const passes = matchesSearch && matchesHospital && matchesSpecialty;
           
           // Médico passou na filtragem
           
@@ -338,7 +268,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
       });
       
       // Log apenas quando há filtros ativos
-      if (searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all' || selectedContractType !== 'all') {
+      if (searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') {
         console.log(`🔍 Filtragem: ${groupedArray.length} → ${filteredArray.length} médicos`);
       }
       
@@ -347,17 +277,9 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
       console.error('❌ Erro crítico na filtragem:', error);
       return []; // Retornar array vazio em caso de erro
     }
-  }, [doctors, searchTerm, selectedHospital, selectedSpecialty, selectedContractType, contracts]);
+  }, [doctors, searchTerm, selectedHospital, selectedSpecialty]);
 
-  // Obter contrato do médico
-  const getDoctorContract = (doctorId: string) => {
-    return contracts.find(contract => contract.doctorId === doctorId && contract.isActive);
-  };
-
-  // Obter anotações do médico
-  const getDoctorNote = (doctorId: string) => {
-    return doctorNotes.find(note => note.doctorId === doctorId);
-  };
+  // Função removida - não mais necessária
 
   // Handlers
   const handleRefresh = () => {
@@ -373,7 +295,6 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     setSearchTerm('');
     setSelectedHospital('all');
     setSelectedSpecialty('all');
-    setSelectedContractType('all');
     
     toast({
       title: "Filtros limpos",
@@ -381,135 +302,24 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     });
   };
 
-  const handleResetContract = async (doctor: MedicalDoctor) => {
-    try {
-      // Desativar todos os contratos do médico
-      setContracts(prev => 
-        prev.map(contract => 
-          contract.doctorId === doctor.id 
-            ? { ...contract, isActive: false, updatedAt: new Date().toISOString() }
-            : contract
-        )
-      );
-
-      // Limpar anotações se necessário
-      setDoctorNotes(prev => prev.filter(note => note.doctorId !== doctor.id));
-
-      // Fechar expansão se estiver aberta
-      setExpandedRows(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(doctor.id);
-        return newSet;
-      });
-
-      // Limpar estados de criação
-      setCreatingContract(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(doctor.id);
-        return newSet;
-      });
-
-      toast({
-        title: "Sucesso",
-        description: `Contrato do Dr. ${doctor.name} foi resetado com sucesso`
-      });
-
-    } catch (error) {
-      console.error('Erro ao resetar contrato:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Erro ao resetar contrato do médico"
-      });
-    }
-  };
-
-  const handleStartCreateContract = (doctorId: string) => {
-    setCreatingContract(prev => new Set([...prev, doctorId]));
-    setContractForms(prev => ({
+  const handleUpdateDoctorNote = (doctorId: string, note: string) => {
+    setDoctorObservations(prev => ({
       ...prev,
-      [doctorId]: {
-        contractType: 'meta',
-        targetProcedures: 0,
-        productionRate: 0,
-        description: '',
-        startDate: '',
-        endDate: '',
-        notes: ''
-      }
+      [doctorId]: note
     }));
   };
 
-  const handleCancelCreateContract = (doctorId: string) => {
-    setCreatingContract(prev => {
+  // Função para controlar expansão das linhas
+  const toggleRowExpansion = (doctorId: string) => {
+    setExpandedRows(prev => {
       const newSet = new Set(prev);
-      newSet.delete(doctorId);
+      if (newSet.has(doctorId)) {
+        newSet.delete(doctorId);
+      } else {
+        newSet.add(doctorId);
+      }
       return newSet;
     });
-    setContractForms(prev => {
-      const newForms = { ...prev };
-      delete newForms[doctorId];
-      return newForms;
-    });
-  };
-
-  const handleSaveContract = async (doctorId: string) => {
-    const form = contractForms[doctorId];
-    if (!form) return;
-
-    try {
-      const newContract: DoctorContract = {
-        id: Date.now().toString(),
-        doctorId,
-        contractType: form.contractType,
-        targetProcedures: form.contractType === 'meta' ? form.targetProcedures : undefined,
-        productionRate: form.contractType === 'producao' ? form.productionRate : undefined,
-        description: form.description,
-        startDate: form.startDate,
-        endDate: form.endDate || undefined,
-        isActive: true,
-        notes: form.notes,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      setContracts(prev => [...prev, newContract]);
-      
-      // Limpar estados de criação
-      setCreatingContract(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(doctorId);
-        return newSet;
-      });
-      setContractForms(prev => {
-        const newForms = { ...prev };
-        delete newForms[doctorId];
-        return newForms;
-      });
-
-      toast({
-        title: "Sucesso",
-        description: "Contrato salvo com sucesso"
-      });
-
-    } catch (error) {
-      console.error('Erro ao salvar contrato:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Erro ao salvar contrato"
-      });
-    }
-  };
-
-  const handleUpdateContractForm = (doctorId: string, field: string, value: any) => {
-    setContractForms(prev => ({
-      ...prev,
-      [doctorId]: {
-        ...prev[doctorId],
-        [field]: value
-      }
-    }));
   };
 
   const handleExport = () => {
@@ -519,22 +329,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     });
   };
 
-  const getContractTypeBadge = (type: string) => {
-    const types = {
-      meta: { label: 'Meta', color: 'bg-blue-100 text-blue-800', icon: Target },
-      producao: { label: 'Produção', color: 'bg-green-100 text-green-800', icon: BarChart2 }
-    };
-    
-    const typeInfo = types[type as keyof typeof types] || types.meta;
-    const IconComponent = typeInfo.icon;
-    
-    return (
-      <Badge className={`${typeInfo.color} flex items-center gap-1`}>
-        <IconComponent className="h-3 w-3" />
-        {typeInfo.label}
-      </Badge>
-    );
-  };
+  // Função removida - não mais necessária
 
   const getHospitalBadgeColor = (hospitalName: string) => {
     // Lista de cores vibrantes e bem contrastadas para hospitais
@@ -564,94 +359,9 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     return colors[Math.abs(hash) % colors.length];
   };
 
-  // Controle de expansão
-  const toggleRowExpansion = (doctorId: string) => {
-    const newExpanded = new Set(expandedRows);
-    if (newExpanded.has(doctorId)) {
-      newExpanded.delete(doctorId);
-      // Cancelar criação de contrato se estiver aberta
-      setCreatingContract(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(doctorId);
-        return newSet;
-      });
-    } else {
-      newExpanded.add(doctorId);
-    }
-    setExpandedRows(newExpanded);
-  };
+  // Função duplicada removida - já existe declaração anterior
 
-  const startEditingNote = (doctorId: string) => {
-    const currentNote = getDoctorNote(doctorId);
-    setTempNotes(prev => ({
-      ...prev,
-      [doctorId]: currentNote?.note || ''
-    }));
-    setEditingNotes(prev => new Set([...prev, doctorId]));
-  };
-
-  const cancelEditingNote = (doctorId: string) => {
-    setEditingNotes(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(doctorId);
-      return newSet;
-    });
-    setTempNotes(prev => {
-      const newNotes = { ...prev };
-      delete newNotes[doctorId];
-      return newNotes;
-    });
-  };
-
-  const saveNote = async (doctorId: string) => {
-    const noteText = tempNotes[doctorId] || '';
-    
-    try {
-      const existingNote = getDoctorNote(doctorId);
-      
-      if (existingNote) {
-        // Atualizar nota existente
-        const updatedNote = {
-          ...existingNote,
-          note: noteText,
-          updatedAt: new Date().toISOString()
-        };
-        setDoctorNotes(prev => 
-          prev.map(note => note.id === existingNote.id ? updatedNote : note)
-        );
-      } else {
-        // Criar nova nota
-        const newNote: DoctorNote = {
-          id: Date.now().toString(),
-          doctorId,
-          note: noteText,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          createdBy: user?.id || 'unknown'
-        };
-        setDoctorNotes(prev => [...prev, newNote]);
-      }
-
-      setEditingNotes(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(doctorId);
-        return newSet;
-      });
-
-      toast({
-        title: "Sucesso",
-        description: "Anotação salva com sucesso"
-      });
-
-    } catch (error) {
-      console.error('Erro ao salvar anotação:', error);
-      toast({
-        variant: "destructive",
-        title: "Erro",
-        description: "Erro ao salvar anotação"
-      });
-    }
-  };
+  // Funções de anotações removidas - não mais necessárias
 
   // Carrega dados no mount
   useEffect(() => {
@@ -678,55 +388,32 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* HEADER */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-lg shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2 flex items-center space-x-2">
-              <Stethoscope className="h-8 w-8" />
-              <span>Corpo Médico</span>
-            </h1>
-            <p className="text-blue-100">
-              Gestão Centralizada de Profissionais da Saúde
-            </p>
-          </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold flex items-center justify-end gap-2">
-              {isLoading ? '...' : filteredDoctors.length}
-              <Users className="h-6 w-6 text-blue-300" />
-            </div>
-            <div className="text-blue-100">Profissionais</div>
-          </div>
-        </div>
-      </div>
-
-
 
       {/* CONTROLES E FILTROS */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filtros e Controles</span>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Filter className="h-5 w-5" />
+              <span>Filtros e Controles</span>
+            </div>
+            {/* Indicador de filtros ativos */}
+            {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <Filter className="h-3 w-3" />
+                Filtros Ativos
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* 1º - Agrupamento Inteligente */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start space-x-2">
-              <Info className="h-4 w-4 text-blue-600 mt-0.5" />
-              <div className="text-sm text-blue-800">
-                <strong>Agrupamento Inteligente:</strong> Médicos que atendem em múltiplos hospitais são exibidos em uma única linha com badges indicando todos os hospitais onde atuam.
-              </div>
-            </div>
-          </div>
-
-          {/* 2º - Botões de ação */}
-          <div className="flex flex-wrap gap-3">
+        <CardContent className="space-y-3">
+          {/* Botões de ação */}
+          <div className="flex flex-wrap gap-2">
             <Button
               onClick={handleRefresh}
               disabled={isLoading}
               variant="outline"
+              size="sm"
               className="flex items-center gap-2"
             >
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -737,6 +424,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               onClick={handleClearFilters}
               disabled={isLoading}
               variant="outline"
+              size="sm"
               className="flex items-center gap-2"
             >
               <X className="h-4 w-4" />
@@ -746,24 +434,17 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             <Button
               onClick={handleExport}
               variant="outline"
+              size="sm"
               className="flex items-center gap-2"
             >
               <Download className="h-4 w-4" />
               Exportar
             </Button>
-            
-            {/* Indicador de filtros ativos */}
-            {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all' || selectedContractType !== 'all') && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Filter className="h-3 w-3" />
-                Filtros Ativos
-              </Badge>
-            )}
           </div>
 
-          {/* 3º - Filtros */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
+          {/* Filtros */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-1">
               <Label className="text-sm font-medium flex items-center gap-2">
                 <Search className="h-4 w-4" />
                 Buscar
@@ -802,7 +483,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Label className="text-sm font-medium flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
                 Hospital
@@ -834,7 +515,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Label className="text-sm font-medium flex items-center gap-2">
                 <Stethoscope className="h-4 w-4" />
                 Especialidade
@@ -865,27 +546,6 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Tipo de Contrato
-              </Label>
-              <Select 
-                value={selectedContractType} 
-                onValueChange={setSelectedContractType} 
-                disabled={isLoading}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Tipo de contrato" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Tipos</SelectItem>
-                  <SelectItem value="meta">Meta</SelectItem>
-                  <SelectItem value="producao">Produção</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -900,7 +560,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               {isLoading ? '...' : `${filteredDoctors.length} profissionais`}
             </Badge>
             {/* Mostrar filtros ativos */}
-            {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all' || selectedContractType !== 'all') && (
+            {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') && (
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                 <Filter className="h-3 w-3 mr-1" />
                 Filtrado
@@ -930,27 +590,25 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12"></TableHead>
                     <TableHead>Profissional</TableHead>
                     <TableHead>Especialidade</TableHead>
                     <TableHead>Hospital</TableHead>
-                    <TableHead>Contrato</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredDoctors.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8">
+                      <TableCell colSpan={4} className="text-center py-8">
                         <div className="flex flex-col items-center justify-center text-gray-500">
                           <Users className="h-12 w-12 mb-4 text-gray-300" />
                           <p className="text-lg font-medium mb-2">Nenhum médico encontrado</p>
                           <p className="text-sm mb-4">
-                            {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all' || selectedContractType !== 'all') 
+                            {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') 
                               ? 'Nenhum médico corresponde aos filtros aplicados' 
                               : 'Ainda não há médicos cadastrados no sistema'}
                           </p>
-                          {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all' || selectedContractType !== 'all') && (
+                          {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') && (
                             <Button 
                               variant="outline" 
                               size="sm" 
@@ -967,19 +625,31 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                   ) : (
                     filteredDoctors.map((doctor) => {
                       try {
-                        const contract = getDoctorContract(doctor?.id);
-                        const isExpanded = expandedRows.has(doctor?.id);
-                        const isCreating = creatingContract.has(doctor?.id);
-                        
                         // Proteção adicional contra dados inválidos
                         if (!doctor || !doctor.id) {
                           console.warn('⚠️ Médico com dados inválidos:', doctor);
                           return null;
                         }
                     
+                    const isExpanded = expandedRows.has(doctor.id);
+                    
                     return (
                       <React.Fragment key={doctor.id}>
                         <TableRow className={isExpanded ? 'bg-blue-50' : ''}>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleRowExpansion(doctor.id)}
+                              className="h-8 w-8 p-0"
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-3">
                               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -992,347 +662,63 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                             </div>
                           </TableCell>
                           <TableCell>
-                            <div className="text-sm">
-                              {doctor.speciality || 'Não informado'}
-                            </div>
+                            {doctor.speciality ? (
+                              <Badge
+                                variant="outline"
+                                className={`
+                                  text-xs px-2 py-1 flex items-center gap-1 w-fit
+                                  ${getSpecialtyColor(doctor.speciality)}
+                                `}
+                              >
+                                <span>{getSpecialtyIcon(doctor.speciality)}</span>
+                                {doctor.speciality}
+                              </Badge>
+                            ) : (
+                              <div className="text-sm text-gray-500">Não informado</div>
+                            )}
                           </TableCell>
                           <TableCell>
-                            <div className="space-y-1">
+                            <div className="text-sm">
                               {doctor.hospitals && doctor.hospitals.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
                                   {doctor.hospitals.map((hospital: string, index: number) => (
-                                    <Badge
-                                      key={index}
-                                      variant="outline"
-                                      className={`
-                                        text-xs px-2 py-1 
-                                        ${getHospitalBadgeColor(hospital)}
-                                      `}
-                                    >
-                                      <Building2 className="h-3 w-3 mr-1" />
+                                    <span key={index} className="text-gray-700">
                                       {hospital}
-                                    </Badge>
+                                      {index < doctor.hospitals.length - 1 && ', '}
+                                    </span>
                                   ))}
                                   {doctor.hospitals.length > 1 && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      +{doctor.hospitals.length} hospitais
-                                    </Badge>
+                                    <span className="text-xs text-gray-500 ml-1">
+                                      ({doctor.hospitals.length} hospitais)
+                                    </span>
                                   )}
                                 </div>
                               ) : (
-                                <div className="text-sm text-gray-500">Não informado</div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {contract ? (
-                              <div className="space-y-1">
-                                {getContractTypeBadge(contract.contractType)}
-                                <div className="text-xs text-gray-500">
-                                  {contract.contractType === 'meta' && contract.targetProcedures 
-                                    ? `${contract.targetProcedures} proc/mês`
-                                    : contract.contractType === 'producao' && contract.productionRate
-                                    ? `${contract.productionRate}% produção`
-                                    : 'Definir parâmetros'
-                                  }
-                                </div>
-                              </div>
-                            ) : (
-                              <Badge variant="outline" className="text-gray-500">
-                                Sem contrato
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {contract ? (
-                              <Badge variant="default" className="bg-green-100 text-green-800">
-                                <Check className="h-3 w-3 mr-1" />
-                                Ativo
-                              </Badge>
-                            ) : (
-                              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                                <AlertCircle className="h-3 w-3 mr-1" />
-                                Pendente
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex space-x-2">
-                              <Button
-                                onClick={() => toggleRowExpansion(doctor.id)}
-                                size="sm"
-                                variant="outline"
-                                title={isExpanded ? "Recolher" : "Expandir"}
-                              >
-                                {isExpanded ? 
-                                  <ChevronUp className="h-4 w-4" /> : 
-                                  <ChevronDown className="h-4 w-4" />
-                                }
-                              </Button>
-                              {contract && (
-                                <Button
-                                  onClick={() => handleResetContract(doctor)}
-                                  size="sm"
-                                  variant="outline"
-                                  title="Resetar contrato"
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <RotateCcw className="h-4 w-4" />
-                                </Button>
+                                <span className="text-gray-500">Não informado</span>
                               )}
                             </div>
                           </TableCell>
                         </TableRow>
-                        
-                        {/* LINHA EXPANDIDA */}
                         {isExpanded && (
-                          <TableRow className="bg-blue-50">
-                            <TableCell colSpan={6} className="border-t">
+                          <TableRow>
+                            <TableCell colSpan={4} className="bg-blue-50 border-t-0">
                               <div className="p-4 space-y-4">
-                                {/* SEM CONTRATO - FORMULÁRIO DE CRIAÇÃO */}
-                                {!contract && (
-                                  <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                      <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                                        <Plus className="h-4 w-4" />
-                                        {isCreating ? 'Criando Contrato' : 'Criar Contrato'}
-                                      </h4>
-                                      {!isCreating && (
-                                        <Button
-                                          onClick={() => handleStartCreateContract(doctor.id)}
-                                          size="sm"
-                                          className="bg-green-600 hover:bg-green-700"
-                                        >
-                                          <Plus className="h-4 w-4 mr-2" />
-                                          Novo Contrato
-                                        </Button>
-                                      )}
-                                    </div>
-
-                                    {isCreating && contractForms[doctor.id] && (
-                                      <div className="bg-white p-4 rounded-lg border space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                          <div className="space-y-2">
-                                            <Label>Tipo de Contrato</Label>
-                                            <Select 
-                                              value={contractForms[doctor.id].contractType}
-                                              onValueChange={(value) => handleUpdateContractForm(doctor.id, 'contractType', value)}
-                                            >
-                                              <SelectTrigger>
-                                                <SelectValue />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                <SelectItem value="meta">
-                                                  <div className="flex items-center gap-2">
-                                                    <Target className="h-4 w-4" />
-                                                    Meta de Procedimentos
-                                                  </div>
-                                                </SelectItem>
-                                                <SelectItem value="producao">
-                                                  <div className="flex items-center gap-2">
-                                                    <BarChart2 className="h-4 w-4" />
-                                                    Produção (% do faturamento)
-                                                  </div>
-                                                </SelectItem>
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-
-                                          <div className="space-y-2">
-                                            <Label>Descrição do Contrato</Label>
-                                            <Input
-                                              value={contractForms[doctor.id].description}
-                                              onChange={(e) => handleUpdateContractForm(doctor.id, 'description', e.target.value)}
-                                              placeholder="Ex: Contrato de cardiologia com meta mensal"
-                                            />
-                                          </div>
-                                        </div>
-
-                                        {contractForms[doctor.id].contractType === 'meta' && (
-                                          <div className="space-y-2">
-                                            <Label>Meta de Procedimentos (por mês)</Label>
-                                            <Input
-                                              type="number"
-                                              value={contractForms[doctor.id].targetProcedures}
-                                              onChange={(e) => handleUpdateContractForm(doctor.id, 'targetProcedures', Number(e.target.value))}
-                                              placeholder="Ex: 50"
-                                            />
-                                          </div>
-                                        )}
-
-                                        {contractForms[doctor.id].contractType === 'producao' && (
-                                          <div className="space-y-2">
-                                            <Label>Percentual da Produção (%)</Label>
-                                            <Input
-                                              type="number"
-                                              value={contractForms[doctor.id].productionRate}
-                                              onChange={(e) => handleUpdateContractForm(doctor.id, 'productionRate', Number(e.target.value))}
-                                              placeholder="Ex: 30"
-                                              min="0"
-                                              max="100"
-                                            />
-                                          </div>
-                                        )}
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                          <div className="space-y-2">
-                                            <Label>Data de Início</Label>
-                                            <Input
-                                              type="date"
-                                              value={contractForms[doctor.id].startDate}
-                                              onChange={(e) => handleUpdateContractForm(doctor.id, 'startDate', e.target.value)}
-                                            />
-                                          </div>
-                                          <div className="space-y-2">
-                                            <Label>Data de Fim (Opcional)</Label>
-                                            <Input
-                                              type="date"
-                                              value={contractForms[doctor.id].endDate}
-                                              onChange={(e) => handleUpdateContractForm(doctor.id, 'endDate', e.target.value)}
-                                            />
-                                          </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                          <Label>Observações</Label>
-                                          <Textarea
-                                            value={contractForms[doctor.id].notes}
-                                            onChange={(e) => handleUpdateContractForm(doctor.id, 'notes', e.target.value)}
-                                            placeholder="Informações adicionais sobre o contrato..."
-                                          />
-                                        </div>
-
-                                        <div className="flex gap-2">
-                                          <Button
-                                            onClick={() => handleSaveContract(doctor.id)}
-                                            className="bg-green-600 hover:bg-green-700"
-                                          >
-                                            <Save className="h-4 w-4 mr-2" />
-                                            Salvar Contrato
-                                          </Button>
-                                          <Button
-                                            onClick={() => handleCancelCreateContract(doctor.id)}
-                                            variant="outline"
-                                          >
-                                            <X className="h-4 w-4 mr-2" />
-                                            Cancelar
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    )}
+                                <div className="flex items-center gap-2 mb-3">
+                                  <MessageSquare className="h-4 w-4 text-blue-600" />
+                                  <h4 className="font-medium text-gray-900">Observações</h4>
+                                </div>
+                                <div className="space-y-2">
+                                  <textarea
+                                    placeholder="Adicione observações sobre este profissional..."
+                                    value={doctorObservations[doctor.id] || ''}
+                                    onChange={(e) => handleUpdateDoctorNote(doctor.id, e.target.value)}
+                                    className="w-full p-3 border border-gray-300 rounded-md resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    rows={3}
+                                  />
+                                  <div className="text-xs text-gray-500">
+                                    As observações são salvas automaticamente conforme você digita.
                                   </div>
-                                )}
-
-                                {/* COM CONTRATO - DETALHES E ANOTAÇÕES */}
-                                {contract && (
-                                  <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                      <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                                        <ClipboardList className="h-4 w-4" />
-                                        Detalhes do Contrato e Anotações
-                                      </h4>
-                                    </div>
-                                    
-                                    {/* Informações do contrato */}
-                                    <div className="bg-white p-3 rounded-lg border">
-                                      <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2">
-                                          <ClipboardList className="h-4 w-4 text-blue-600" />
-                                          <span className="font-medium">Detalhes do Contrato</span>
-                                        </div>
-                                        {getContractTypeBadge(contract.contractType)}
-                                      </div>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                        <div>
-                                          <span className="text-gray-600">Descrição:</span>
-                                          <div className="font-medium">{contract.description || 'Não informado'}</div>
-                                        </div>
-                                        <div>
-                                          <span className="text-gray-600">Parâmetro:</span>
-                                          <div className="font-medium">
-                                            {contract.contractType === 'meta' && contract.targetProcedures 
-                                              ? `${contract.targetProcedures} procedimentos/mês`
-                                              : contract.contractType === 'producao' && contract.productionRate
-                                              ? `${contract.productionRate}% da produção`
-                                              : 'Não definido'
-                                            }
-                                          </div>
-                                        </div>
-                                        <div>
-                                          <span className="text-gray-600">Início:</span>
-                                          <div className="font-medium">
-                                            {new Date(contract.startDate).toLocaleDateString('pt-BR')}
-                                          </div>
-                                        </div>
-                                        <div>
-                                          <span className="text-gray-600">Fim:</span>
-                                          <div className="font-medium">
-                                            {contract.endDate ? 
-                                              new Date(contract.endDate).toLocaleDateString('pt-BR') : 
-                                              'Indeterminado'
-                                            }
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Área de anotações */}
-                                    <div className="bg-white p-3 rounded-lg border">
-                                      <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center gap-2">
-                                          <MessageSquare className="h-4 w-4 text-green-600" />
-                                          <span className="font-medium">Anotações</span>
-                                        </div>
-                                        {!editingNotes.has(doctor.id) && (
-                                          <Button
-                                            onClick={() => startEditingNote(doctor.id)}
-                                            size="sm"
-                                            variant="outline"
-                                          >
-                                            <Edit3 className="h-4 w-4 mr-2" />
-                                            Editar
-                                          </Button>
-                                        )}
-                                      </div>
-                                      
-                                      {editingNotes.has(doctor.id) ? (
-                                        <div className="space-y-3">
-                                          <Textarea
-                                            value={tempNotes[doctor.id] || ''}
-                                            onChange={(e) => setTempNotes(prev => ({
-                                              ...prev,
-                                              [doctor.id]: e.target.value
-                                            }))}
-                                            placeholder="Adicione suas anotações sobre o contrato, metas, observações especiais..."
-                                            className="min-h-[100px]"
-                                          />
-                                          <div className="flex gap-2">
-                                            <Button
-                                              onClick={() => saveNote(doctor.id)}
-                                              size="sm"
-                                              className="bg-green-600 hover:bg-green-700"
-                                            >
-                                              <Save className="h-4 w-4 mr-2" />
-                                              Salvar
-                                            </Button>
-                                            <Button
-                                              onClick={() => cancelEditingNote(doctor.id)}
-                                              size="sm"
-                                              variant="outline"
-                                            >
-                                              <X className="h-4 w-4 mr-2" />
-                                              Cancelar
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <div className="text-sm text-gray-600">
-                                          {getDoctorNote(doctor.id)?.note || 'Nenhuma anotação registrada. Clique em "Editar" para adicionar.'}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
+                                </div>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -1355,4 +741,4 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
   );
 };
 
-export default MedicalStaffDashboard; 
+export default MedicalStaffDashboard;

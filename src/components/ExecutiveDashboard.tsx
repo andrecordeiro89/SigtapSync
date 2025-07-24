@@ -19,7 +19,9 @@ import {
   Activity,
   Stethoscope,
   Target,
-  Award
+  Award,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 // Services
@@ -29,6 +31,7 @@ import { supabase } from '../lib/supabase';
 import HospitalRevenueDashboard from './HospitalRevenueDashboard';
 import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
 import MedicalProductionDashboard from './MedicalProductionDashboard';
+import MedicalStaffDashboard from './MedicalStaffDashboard';
 
 // ✅ FUNÇÃO OTIMIZADA PARA FORMATAR VALORES MONETÁRIOS
 const formatCurrency = (value: number | null | undefined): string => {
@@ -238,6 +241,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState('doctors');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   
   // Data States
   const [kpiData, setKpiData] = useState<KPIData>({
@@ -273,6 +278,77 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
   // Authentication
   const { user, isDirector, isAdmin, isCoordinator, isTI, hasPermission } = useAuth();
+
+  // Paginação
+  const procedures = billingStats?.byProcedure || [];
+  const totalPages = Math.ceil(procedures.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentProcedures = procedures.slice(startIndex, endIndex);
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
+
+  const PaginationControls = () => (
+    <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-200">
+      <div className="flex items-center text-sm text-gray-700">
+        <span>
+          Mostrando {startIndex + 1} a {Math.min(endIndex, procedures.length)} de {procedures.length} procedimentos
+        </span>
+      </div>
+      <div className="flex items-center space-x-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => goToPage(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="flex items-center"
+        >
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          Anterior
+        </Button>
+        
+        <div className="flex items-center space-x-1">
+          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+            let pageNum;
+            if (totalPages <= 5) {
+              pageNum = i + 1;
+            } else if (currentPage <= 3) {
+              pageNum = i + 1;
+            } else if (currentPage >= totalPages - 2) {
+              pageNum = totalPages - 4 + i;
+            } else {
+              pageNum = currentPage - 2 + i;
+            }
+            
+            return (
+              <Button
+                key={pageNum}
+                variant={currentPage === pageNum ? "default" : "outline"}
+                size="sm"
+                onClick={() => goToPage(pageNum)}
+                className="w-8 h-8 p-0"
+              >
+                {pageNum}
+              </Button>
+            );
+          })}
+        </div>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => goToPage(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="flex items-center"
+        >
+          Próxima
+          <ChevronRight className="h-4 w-4 ml-1" />
+        </Button>
+      </div>
+    </div>
+  );
 
   // Access Control
   const hasExecutiveAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('generate_reports');
@@ -593,9 +669,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             <FileText className="h-4 w-4 mr-2" />
             Procedimentos
           </TabsTrigger>
-          <TabsTrigger value="specialties" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            <Stethoscope className="h-4 w-4 mr-2" />
-            Especialidades
+          <TabsTrigger value="medical-staff" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            <Users className="h-4 w-4 mr-2" />
+            Corpo Médico
           </TabsTrigger>
           <TabsTrigger value="reports" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <Target className="h-4 w-4 mr-2" />
@@ -612,83 +688,111 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
 
 
-        {/* TAB: ESPECIALIDADES */}
-        <TabsContent value="specialties" className="space-y-6">
-          <SpecialtyRevenueDashboard />
+        {/* TAB: CORPO MÉDICO */}
+        <TabsContent value="medical-staff" className="space-y-6">
+          <MedicalStaffDashboard />
         </TabsContent>
 
         {/* TAB: PROCEDIMENTOS */}
         <TabsContent value="procedures" className="space-y-6">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-purple-600" />
-                Top Procedimentos por Valor
-              </CardTitle>
-              <CardDescription>
-                Procedimentos com maior faturamento baseado nas AIHs processadas
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {billingStats && billingStats.byProcedure.length > 0 ? (
-                <div className="space-y-4">
-                  {billingStats.byProcedure.slice(0, 20).map((procedure, index) => (
-                    <div key={procedure.procedure_code} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-700 font-bold">
-                            {index + 1}
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900">{procedure.procedure_code}</h4>
-                            <div className="text-sm text-gray-600 max-w-md">
-                              {procedure.procedure_description || 'Descrição não disponível'}
+          <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="bg-white p-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="bg-gray-100 p-2 rounded-lg mr-3">
+                     <FileText className="h-6 w-6 text-gray-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Top Procedimentos por Valor</h3>
+                      <p className="text-gray-600 text-xs mt-1">
+                        Procedimentos com maior faturamento baseado nas AIHs processadas
+                      </p>
+                  </div>
+                </div>
+                <div className="bg-gray-100 px-2 py-1 rounded-full">
+                    <span className="text-xs font-medium text-gray-700">{procedures.length} itens</span>
+                  </div>
+              </div>
+            </div>
+            
+            {/* Paginação Superior */}
+            {procedures.length > itemsPerPage && <PaginationControls />}
+            
+            <div className="p-4">
+              {currentProcedures.length > 0 ? (
+                <div className="space-y-3">
+                  {currentProcedures.map((procedure, index) => (
+                    <div key={procedure.procedure_code} className="group hover:shadow-md transition-all duration-300 bg-white rounded-lg border border-gray-200 overflow-hidden">
+                       <div className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 pr-6">
+                            <div className="flex items-center mb-2">
+                              <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-r from-purple-500 to-purple-600 text-white text-sm font-bold rounded-full mr-3 shadow-sm">
+                                {startIndex + index + 1}
+                              </div>
+                              <span className="font-mono text-sm text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg border">
+                                {procedure.procedure_code}
+                              </span>
                             </div>
+                            
+                            <h4 className="font-medium text-gray-900 mb-3 text-sm leading-relaxed group-hover:text-slate-700 transition-colors">
+                              {procedure.procedure_description || 'Descrição não disponível'}
+                            </h4>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                               <div className="bg-blue-50 p-2 rounded-md border border-blue-100">
+                                 <div className="flex items-center mb-1">
+                                   <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1.5"></div>
+                                   <span className="text-xs font-medium text-blue-700">AIHs Total</span>
+                                 </div>
+                                 <div className="text-sm font-bold text-blue-900">{formatNumber(procedure.total_aihs)}</div>
+                               </div>
+                               
+                               <div className="bg-green-50 p-2 rounded-md border border-green-100">
+                                 <div className="flex items-center mb-1">
+                                   <div className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5"></div>
+                                   <span className="text-xs font-medium text-green-700">Valor Unitário</span>
+                                 </div>
+                                 <div className="text-sm font-bold text-green-900">{formatCurrency(safeValue(procedure.avg_value_per_aih))}</div>
+                               </div>
+                             </div>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xl font-bold text-purple-700">
-                            {formatCurrency(safeValue(procedure.total_aihs * procedure.avg_value_per_aih))}
-                          </div>
-                          <div className="text-xs text-gray-600">
-                            {((procedure.approved_aihs / procedure.total_aihs) * 100).toFixed(1)}% aprovação
+                          
+                          <div className="text-right">
+                            <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-3 rounded-lg border border-slate-200 shadow-sm">
+                               <div className="text-xs font-medium text-slate-700 mb-1 flex items-center justify-end">
+                                 <span className="mr-1">💰</span>
+                                 Valor Total
+                               </div>
+                               <div className="text-lg font-bold text-slate-800 mb-1">
+                                 {formatCurrency(procedure.total_aihs * safeValue(procedure.avg_value_per_aih))}
+                               </div>
+                               <div className="text-xs text-slate-600 bg-white/60 px-2 py-0.5 rounded-full">
+                                 {formatNumber(procedure.total_aihs)} × {formatCurrency(safeValue(procedure.avg_value_per_aih))}
+                               </div>
+                             </div>
                           </div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-600">AIHs Total:</span>
-                          <div className="font-semibold">{procedure.total_aihs}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Valor do Procedimento:</span>
-                          <div className="font-semibold">{formatCurrency(safeValue(procedure.avg_value_per_aih))}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Hospitais:</span>
-                          <div className="font-semibold">{procedure.unique_hospitals}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Médicos:</span>
-                          <div className="font-semibold">{procedure.unique_doctors}</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Especialidades:</span>
-                          <div className="font-semibold">{procedure.unique_specialties}</div>
-                        </div>
-                      </div>
+                      
+                      <div className="h-0.5 bg-gradient-to-r from-slate-400 via-blue-400 to-green-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <div className="text-lg">Aguardando dados dos procedimentos</div>
-                  <div className="text-sm">Processe algumas AIHs para ver o ranking</div>
+                <div className="text-center py-12 text-gray-500">
+                  <div className="bg-gray-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FileText className="h-10 w-10 text-gray-400" />
+                  </div>
+                  <div className="text-xl font-semibold text-gray-700 mb-2">Aguardando dados dos procedimentos</div>
+                  <div className="text-sm text-gray-500">Processe algumas AIHs para ver o ranking</div>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+            
+            {/* Paginação Inferior */}
+            {procedures.length > itemsPerPage && <PaginationControls />}
+          </div>
         </TabsContent>
 
         {/* TAB: RELATÓRIOS */}
