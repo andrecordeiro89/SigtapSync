@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 import {
@@ -32,6 +33,7 @@ import HospitalRevenueDashboard from './HospitalRevenueDashboard';
 import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
 import MedicalProductionDashboard from './MedicalProductionDashboard';
 import MedicalStaffDashboard from './MedicalStaffDashboard';
+import ReportGenerator from './ReportGenerator';
 
 // ✅ FUNÇÃO OTIMIZADA PARA FORMATAR VALORES MONETÁRIOS
 const formatCurrency = (value: number | null | undefined): string => {
@@ -243,6 +245,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [activeTab, setActiveTab] = useState('doctors');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [showReportGenerator, setShowReportGenerator] = useState(false);
   
   // Data States
   const [kpiData, setKpiData] = useState<KPIData>({
@@ -809,7 +812,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Button className="h-24 flex flex-col items-center justify-center bg-green-600 hover:bg-green-700">
+                <Button 
+                  className="h-24 flex flex-col items-center justify-center bg-green-600 hover:bg-green-700"
+                  onClick={() => setShowReportGenerator(true)}
+                >
                   <FileText className="h-6 w-6 mb-2" />
                   <div className="text-center">
                     <div className="font-semibold">Relatório Financeiro</div>
@@ -817,7 +823,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   </div>
                 </Button>
                 
-                <Button className="h-24 flex flex-col items-center justify-center bg-blue-600 hover:bg-blue-700">
+                <Button 
+                  className="h-24 flex flex-col items-center justify-center bg-blue-600 hover:bg-blue-700"
+                  onClick={() => setShowReportGenerator(true)}
+                >
                   <Users className="h-6 w-6 mb-2" />
                   <div className="text-center">
                     <div className="font-semibold">Relatório de Médicos</div>
@@ -825,7 +834,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   </div>
                 </Button>
                 
-                <Button className="h-24 flex flex-col items-center justify-center bg-purple-600 hover:bg-purple-700">
+                <Button 
+                  className="h-24 flex flex-col items-center justify-center bg-purple-600 hover:bg-purple-700"
+                  onClick={() => setShowReportGenerator(true)}
+                >
                   <Hospital className="h-6 w-6 mb-2" />
                   <div className="text-center">
                     <div className="font-semibold">Relatório Hospitalar</div>
@@ -837,6 +849,19 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* Dialog do Gerador de Relatórios */}
+      <Dialog open={showReportGenerator} onOpenChange={setShowReportGenerator}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby="report-generator-description">
+          <DialogHeader>
+            <DialogTitle>Gerador de Relatórios PDF</DialogTitle>
+            <p id="report-generator-description" className="text-sm text-muted-foreground">
+              Gere relatórios detalhados em PDF com dados financeiros, médicos e hospitalares.
+            </p>
+          </DialogHeader>
+          <ReportGenerator onClose={() => setShowReportGenerator(false)} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
