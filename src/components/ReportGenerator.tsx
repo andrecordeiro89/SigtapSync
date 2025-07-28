@@ -10,6 +10,8 @@ import { supabase } from '@/lib/supabase';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import { DoctorPatientService, type DoctorWithPatients } from '@/services/doctorPatientService';
+import { calculateDoctorPayment } from './DoctorPaymentRules';
 import { ptBR } from 'date-fns/locale';
 
 interface ReportGeneratorProps {
@@ -480,6 +482,187 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
     }
   };
 
+  // Função para calcular estatísticas do médico (mesma lógica da tela de Médicos)
+  const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
+    const totalProcedures = doctorData.patients.reduce((sum, patient) => sum + patient.procedures.length, 0);
+    const totalValue = doctorData.patients.reduce((sum, patient) => sum + patient.total_value_reais, 0);
+    const totalAIHs = doctorData.patients.length;
+    const avgTicket = totalAIHs > 0 ? totalValue / totalAIHs : 0;
+    
+    // Calcular procedimentos médicos (código '04')
+    const medicalProcedures = doctorData.patients.flatMap(patient => 
+      patient.procedures.filter(proc => proc.procedure_code && proc.procedure_code.startsWith('04'))
+    );
+    
+    const medicalProceduresCount = medicalProcedures.length;
+    const medicalProceduresValue = medicalProcedures.reduce((sum, proc) => sum + (proc.value_reais || 0), 0);
+    
+    // Calcular valor de produção usando as regras de pagamento
+    const patientMedicalProcedures = medicalProcedures.map(proc => ({
+      procedure_code: proc.procedure_code,
+      value_reais: proc.value_reais || 0,
+      quantity: 1
+    }));
+    
+    const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures);
+    const calculatedPaymentValue = paymentCalculation.totalPayment;
+    
+    // Taxa de aprovação (assumindo 100% se não houver dados específicos)
+    const approvalRate = 100;
+    
+    return {
+      totalProcedures,
+      totalValue,
+      totalAIHs,
+      avgTicket,
+      approvalRate,
+      medicalProceduresCount,
+      medicalProceduresValue,
+      calculatedPaymentValue
+    };
+  };
+
+  // Função para gerar relatório de produção médica
+  const generateMedicalProductionReport = async (): Promise<void> => {
+    try {
+      setIsGenerating(true);
+      toast({
+        title: "Gerando relatório de produção médica",
+        description: "Coletando dados dos médicos...",
+      });
+
+      // Buscar dados dos médicos
+      const doctorsData = await DoctorPatientService.getAllDoctorsWithPatients();
+      
+      if (!doctorsData || doctorsData.length === 0) {
+        toast({
+          title: "Nenhum dado encontrado",
+          description: "Não foram encontrados dados de médicos para o relatório.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Filtrar dados por período se necessário
+      const periodDays = parseInt(period);
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - periodDays);
+
+      const filteredDoctors = doctorsData.map(doctor => ({
+        ...doctor,
+        patients: doctor.patients.filter(patient => {
+          const admissionDate = new Date(patient.aih_info.admission_date);
+          return admissionDate >= cutoffDate;
+        })
+      })).filter(doctor => doctor.patients.length > 0);
+
+      // Calcular estatísticas para cada médico usando a mesma lógica da tela de Médicos
+      const doctorStats = filteredDoctors.map(doctor => {
+        const stats = calculateDoctorStats(doctor);
+        
+        // Valor de produção: usar calculatedPaymentValue se disponível, senão usar medicalProceduresValue
+        const productionValue = stats.calculatedPaymentValue > 0 
+          ? stats.calculatedPaymentValue 
+          : stats.medicalProceduresValue;
+
+        return {
+          name: doctor.doctor_info.name || 'Nome não informado',
+          specialty: doctor.doctor_info.specialty || 'Não informado',
+          totalPatients: stats.totalAIHs,
+          totalProcedures: stats.totalProcedures,
+          totalRevenue: stats.totalValue,
+          productionValue
+        };
+      });
+
+      // Ordenar por receita total (decrescente)
+      doctorStats.sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+      // Gerar PDF
+      const doc = new jsPDF();
+      
+      // Cabeçalho
+      doc.setFontSize(18);
+      doc.text('Relatório de Produção Médica', 20, 20);
+      
+      doc.setFontSize(12);
+      doc.text(`Período: Últimos ${period} dias`, 20, 35);
+      doc.text(`Data de geração: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`, 20, 45);
+      doc.text(`Usuário: ${user?.email || 'Não identificado'}`, 20, 55);
+      
+      // Estatísticas gerais
+      const totalDoctors = doctorStats.length;
+      const totalPatients = doctorStats.reduce((sum, doc) => sum + doc.totalPatients, 0);
+      const totalProcedures = doctorStats.reduce((sum, doc) => sum + doc.totalProcedures, 0);
+      const totalRevenue = doctorStats.reduce((sum, doc) => sum + doc.totalRevenue, 0);
+      const totalProduction = doctorStats.reduce((sum, doc) => sum + doc.productionValue, 0);
+      
+      doc.setFontSize(14);
+      doc.text('Resumo Geral:', 20, 70);
+      doc.setFontSize(10);
+      doc.text(`Total de Médicos: ${totalDoctors}`, 20, 80);
+      doc.text(`Total de Pacientes: ${totalPatients}`, 20, 90);
+      doc.text(`Total de Procedimentos: ${totalProcedures}`, 20, 100);
+      doc.text(`Valor Total: ${formatCurrency(totalRevenue)}`, 20, 110);
+      doc.text(`Valor de Produção: ${formatCurrency(totalProduction)}`, 20, 120);
+
+      // Tabela de dados
+      const tableData = doctorStats.map(doctor => [
+        doctor.name,
+        doctor.specialty,
+        doctor.totalPatients.toString(),
+        doctor.totalProcedures.toString(),
+        formatCurrency(doctor.totalRevenue),
+        formatCurrency(doctor.productionValue)
+      ]);
+
+      autoTable(doc, {
+        head: [[
+          'Médico',
+          'Especialidades',
+          'Pacientes',
+          'Procedimentos',
+          'Valor Total',
+          'Valor de Produção'
+        ]],
+        body: tableData,
+        startY: 135,
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+        },
+        headStyles: {
+          fillColor: [255, 165, 0], // Cor laranja
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+        },
+        columnStyles: {
+          4: { halign: 'right' }, // Valor Total
+          5: { halign: 'right' }, // Valor de Produção
+        },
+      });
+
+      // Salvar PDF
+      const fileName = `relatorio-producao-medica-${format(new Date(), 'yyyy-MM-dd-HHmm')}.pdf`;
+      doc.save(fileName);
+
+      toast({
+        title: "Relatório gerado com sucesso!",
+        description: `${fileName} foi baixado.`,
+      });
+      
+    } catch (error) {
+      console.error('Erro ao gerar relatório de produção médica:', error);
+      toast({
+        title: "Erro ao gerar relatório",
+        description: "Ocorreu um erro ao gerar o relatório de produção médica. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleGenerateReport = async (): Promise<void> => {
     if (!reportType) {
       toast({
@@ -499,6 +682,9 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
         break;
       case 'hospital':
         await generateHospitalReport();
+        break;
+      case 'medical-production':
+        await generateMedicalProductionReport();
         break;
       default:
         toast({
@@ -544,6 +730,12 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
                   Relatório Hospitalar
+                </div>
+              </SelectItem>
+              <SelectItem value="medical-production">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                  Relatório de Produção Médica
                 </div>
               </SelectItem>
             </SelectContent>
