@@ -654,40 +654,7 @@ const PatientManagement = () => {
         </div>
       </div>
 
-      {/* Estatísticas Refinadas */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="bg-gradient-to-br from-blue-50 via-white to-blue-50/30 border-blue-200/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl shadow-sm">
-                  <User className="w-6 h-6 text-blue-700" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-600 font-medium">Total de Pacientes</p>
-                  <p className="text-3xl font-bold text-blue-900 mb-1">{stats.total_patients}</p>
-                  <p className="text-xs text-blue-600 font-medium">Cadastrados no sistema</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gradient-to-br from-green-50 via-white to-green-50/30 border-green-200/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-gradient-to-br from-green-100 to-green-200 rounded-xl shadow-sm">
-                  <FileText className="w-6 h-6 text-green-700" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-600 font-medium">AIHs Processadas</p>
-                  <p className="text-3xl font-bold text-green-900 mb-1">{stats.total_aihs}</p>
-                  <p className="text-xs text-green-600 font-medium">Total no sistema</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+
 
 
 
