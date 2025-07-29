@@ -217,9 +217,7 @@ const PatientManagement = () => {
   const loadAIHs = async () => {
     try {
       console.log('🔍 Carregando AIHs para hospital:', currentHospitalId);
-      const data = await persistenceService.getAIHs(currentHospitalId, {
-        limit: 100
-      });
+      const data = await persistenceService.getAIHs(currentHospitalId);
       setAIHs(data);
       console.log('📊 AIHs carregadas:', data.length);
     } catch (error) {
