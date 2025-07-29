@@ -32,6 +32,11 @@ export interface DoctorPaymentRule {
     totalValue: number;
     description: string;
   };
+  multipleRules?: {
+    codes: string[];
+    totalValue: number;
+    description: string;
+  }[];
 }
 
 export interface ProcedurePaymentInfo {
@@ -52,8 +57,15 @@ interface DoctorPaymentRulesProps {
 // ================================================================
 // REGRAS DE PAGAMENTO POR MÉDICO
 // ================================================================
+// Organizado por Hospital - Programa Opera Paraná
+// Hospital: Torao Tokuda - Apucarana
+// ================================================================
 
 const DOCTOR_PAYMENT_RULES: Record<string, DoctorPaymentRule> = {
+  // ================================================================
+  // HOSPITAL TORAO TOKUDA - APUCARANA
+  // ================================================================
+  
   'HUMBERTO MOREIRA DA SILVA': {
     doctorName: 'HUMBERTO MOREIRA DA SILVA',
     rules: [
@@ -88,7 +100,222 @@ const DOCTOR_PAYMENT_RULES: Record<string, DoctorPaymentRule> = {
       totalValue: 800.00,
       description: 'Dois ou mais procedimentos: R$ 800,00 TOTAL'
     }
+  },
+  
+  'JOSE GABRIEL GUERREIRO': {
+    doctorName: 'JOSE GABRIEL GUERREIRO',
+    rules: [
+      {
+        procedureCode: '04.06.02.056-6',
+        standardValue: 1050.00,
+        description: 'TRATAMENTO CIRURGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
+      },
+      {
+        procedureCode: '04.06.02.057-4',
+        standardValue: 1000.00,
+        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
+      }
+    ]
+  },
+  
+  'HELIO SHINDY KISSINA': {
+    doctorName: 'HELIO SHINDY KISSINA',
+    rules: [
+      // Procedimentos individuais
+      {
+        procedureCode: '04.09.01.023-5',
+        standardValue: 1000.00,
+        description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00'
+      },
+      {
+        procedureCode: '04.09.01.059-6',
+        standardValue: 900.00,
+        description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00'
+      },
+      {
+        procedureCode: '04.09.01.018-9',
+        standardValue: 1000.00,
+        description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00'
+      },
+      {
+        procedureCode: '04.09.01.017-0',
+        standardValue: 250.00,
+        description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00'
+      },
+      {
+        procedureCode: '04.09.03.004-0',
+        standardValue: 1000.00,
+        description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00'
+      },
+      {
+        procedureCode: '04.09.03.002-3',
+        standardValue: 1000.00,
+        description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00'
+      },
+      {
+        procedureCode: '04.09.04.021-5',
+        standardValue: 300.00,
+        description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00'
+      },
+      {
+        procedureCode: '04.09.05.008-3',
+        standardValue: 250.00,
+        description: 'POSTECTOMIA - R$ 250,00'
+      },
+      {
+        procedureCode: '04.09.04.024-0',
+        standardValue: 450.00,
+        description: 'VASECTOMIA - R$ 450,00'
+      },
+      {
+        procedureCode: '04.09.04.013-4',
+        standardValue: 400.00,
+        description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00'
+      },
+      {
+        procedureCode: '04.09.04.012-6',
+        standardValue: 450.00,
+        description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00'
+      },
+      {
+        procedureCode: '04.09.01.006-5',
+        standardValue: 600.00,
+        description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00'
+      },
+      {
+        procedureCode: '04.09.05.007-5',
+        standardValue: 500.00,
+        description: 'PLASTICA TOTAL DO PENIS (INCLUI PEYRONIE) - R$ 500,00'
+      },
+      {
+        procedureCode: '04.09.04.016-9',
+        standardValue: 500.00,
+        description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00'
+      },
+      {
+        procedureCode: '04.09.01.032-4',
+        standardValue: 700.00,
+        description: 'PIELOPLASTIA - R$ 700,00'
+      },
+      {
+        procedureCode: '04.09.01.021-9',
+        standardValue: 1200.00,
+        description: 'NEFRECTOMIA TOTAL - R$ 1.200,00'
+      },
+      {
+        procedureCode: '04.09.01.020-0',
+        standardValue: 1000.00,
+        description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00'
+      },
+      {
+        procedureCode: '04.09.01.022-7',
+        standardValue: 900.00,
+        description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00'
+      },
+      {
+        procedureCode: '04.09.01.029-4',
+        standardValue: 400.00,
+        description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00'
+      },
+      {
+        procedureCode: '04.09.02.017-6',
+        standardValue: 250.00,
+        description: 'URETROTOMIA INTERNA - R$ 250,00'
+      },
+      {
+        procedureCode: 'RESSECÇÃO_CISTOS',
+        standardValue: 250.00,
+        description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00'
+      }
+    ],
+    // Regras para múltiplos procedimentos específicos
+    multipleRules: [
+      {
+        codes: ['04.09.01.023-5', '04.09.01.017-0'],
+        totalValue: 1100.00,
+        description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00'
+      },
+      {
+        codes: ['04.09.01.023-5', '04.09.01.014-6'],
+        totalValue: 1300.00,
+        description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO CÁLCULO PELVE RENAL - R$ 1.300,00'
+      },
+      {
+        codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6'],
+        totalValue: 1400.00,
+        description: 'NEFROLITOTOMIA + CATETER + EXTRAÇÃO CÁLCULO - R$ 1.400,00'
+      },
+      {
+        codes: ['04.09.01.023-5', '04.09.01.014-6', '04.09.01.059-6'],
+        totalValue: 1500.00,
+        description: 'NEFROLITOTOMIA + EXTRAÇÃO + URETEROLITOTRIPSIA - R$ 1.500,00'
+      },
+      {
+        codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'],
+        totalValue: 1600.00,
+        description: 'NEFROLITOTOMIA + CATETER + EXTRAÇÃO + URETEROLITOTRIPSIA - R$ 1.600,00'
+      },
+      {
+        codes: ['04.09.01.059-6', '04.09.01.017-0'],
+        totalValue: 1000.00,
+        description: 'URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.000,00'
+      },
+      {
+        codes: ['04.09.01.018-9', '04.09.01.017-0'],
+        totalValue: 1100.00,
+        description: 'LITOTRIPSIA + CATETER DUPLO J - R$ 1.100,00'
+      },
+      {
+        codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'],
+        totalValue: 1200.00,
+        description: 'LITOTRIPSIA + EXTRAÇÃO + CATETER - R$ 1.200,00'
+      },
+      {
+        codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'],
+        totalValue: 1300.00,
+        description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + EXTRAÇÃO + CATETER - R$ 1.300,00'
+      },
+      {
+        codes: ['04.09.03.004-0', '04.09.01.038-3'],
+        totalValue: 1200.00,
+        description: 'RESSECÇÃO PRÓSTATA + RESSECÇÃO LESÃO VESICAL - R$ 1.200,00'
+      },
+      {
+        codes: ['04.09.04.021-5', '04.09.04.019-3'],
+        totalValue: 400.00,
+        description: 'HIDROCELE + RESSECÇÃO BOLSA ESCROTAL - R$ 400,00'
+      },
+      {
+        codes: ['04.09.04.021-5', '04.09.04.019-3', '04.09.04.017-7'],
+        totalValue: 500.00,
+        description: 'HIDROCELE + RESSECÇÃO + PLÁSTICA BOLSA - R$ 500,00'
+      },
+      {
+        codes: ['04.09.04.013-4', '04.09.04.017-7'],
+        totalValue: 550.00,
+        description: 'ORQUIDOPEXIA + PLÁSTICA BOLSA ESCROTAL - R$ 550,00'
+      },
+      {
+        codes: ['04.09.04.012-6', '04.09.04.017-7'],
+        totalValue: 550.00,
+        description: 'ORQUIDOPEXIA BILATERAL + PLÁSTICA BOLSA - R$ 550,00'
+      },
+      {
+        codes: ['04.09.01.032-4', '04.09.01.057-0'],
+        totalValue: 1000.00,
+        description: 'PIELOPLASTIA + URETEROPLASTIA - R$ 1.000,00'
+      },
+      {
+        codes: ['04.09.01.032-4', '04.09.01.057-0', '04.09.01.017-0'],
+        totalValue: 1100.00,
+        description: 'PIELOPLASTIA + URETEROPLASTIA + CATETER - R$ 1.100,00'
+      }
+    ]
   }
+  
+  // ================================================================
+  // OUTROS HOSPITAIS (adicionar conforme necessário)
+  // ================================================================
 };
 
 // ================================================================
@@ -121,7 +348,8 @@ export function calculateDoctorPayment(
   // Filtrar apenas procedimentos que estão nas regras definidas
   const allRuleCodes = [
     ...rule.rules.map(r => r.procedureCode),
-    ...(rule.multipleRule?.codes || [])
+    ...(rule.multipleRule?.codes || []),
+    ...(rule.multipleRules?.flatMap(mr => mr.codes) || [])
   ];
   
   const filteredProcedures = procedures.filter(proc => 
@@ -137,7 +365,41 @@ export function calculateDoctorPayment(
     };
   }
 
-  // Verificar se há múltiplos procedimentos da regra especial
+  const procedureCodes = filteredProcedures.map(p => p.procedure_code);
+  
+  // Verificar se há regras para múltiplas combinações específicas (multipleRules)
+  if (rule.multipleRules && procedureCodes.length > 1) {
+    // Procurar por combinação exata de códigos
+    for (const multiRule of rule.multipleRules) {
+      const procedureCodesSet = new Set(procedureCodes);
+      
+      // Verificar se todos os códigos da regra estão presentes nos procedimentos
+      const hasAllCodes = multiRule.codes.every(code => procedureCodesSet.has(code));
+      
+      if (hasAllCodes && multiRule.codes.length === procedureCodes.length) {
+        // Combinação exata encontrada
+        const calculatedProcedures = filteredProcedures.map(proc => ({
+          ...proc,
+          calculatedPayment: 0, // Valor individual zerado
+          paymentRule: multiRule.description,
+          isSpecialRule: true
+        }));
+        
+        // Aplicar valor total apenas no primeiro procedimento
+        if (calculatedProcedures.length > 0) {
+          calculatedProcedures[0].calculatedPayment = multiRule.totalValue;
+        }
+        
+        return {
+          procedures: calculatedProcedures,
+          totalPayment: multiRule.totalValue,
+          appliedRule: multiRule.description
+        };
+      }
+    }
+  }
+
+  // Verificar se há múltiplos procedimentos da regra especial (multipleRule - regra antiga)
   const specialProcedures = filteredProcedures.filter(proc => 
     rule.multipleRule?.codes.includes(proc.procedure_code)
   );
