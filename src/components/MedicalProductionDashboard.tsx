@@ -12,6 +12,7 @@ import {
   Users,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Search,
   Stethoscope,
   DollarSign,
@@ -368,6 +369,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [currentPatientPage, setCurrentPatientPage] = useState<Map<string, number>>(new Map());
   const [patientSearchTerm, setPatientSearchTerm] = useState<Map<string, string>>(new Map());
   const PATIENTS_PER_PAGE = 10;
+  
+  // 🆕 ESTADOS PARA PAGINAÇÃO DE MÉDICOS
+  const [currentDoctorPage, setCurrentDoctorPage] = useState<number>(1);
+  const DOCTORS_PER_PAGE = 10;
 
   // ✅ CARREGAR LISTA DE HOSPITAIS DISPONÍVEIS
   const loadAvailableHospitals = async (doctorsData: DoctorWithPatients[]) => {
@@ -520,6 +525,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
 
     setFilteredDoctors(filtered);
+    
+    // Reset da página atual quando filtros são aplicados
+    setCurrentDoctorPage(1);
   }, [searchTerm, doctors, selectedHospital, dateFilterEnabled, admissionDateFrom, admissionDateTo, dischargeDateFrom, dischargeDateTo]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
@@ -875,7 +883,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             )}
           </div>
 
-          {/* ✅ LISTA DE MÉDICOS */}
+          {/* ✅ LISTA DE MÉDICOS COM PAGINAÇÃO */}
           <div className="space-y-4">
             {filteredDoctors.length === 0 ? (
               <div className="text-center py-12">
@@ -888,13 +896,66 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 </div>
               </div>
             ) : (
-              filteredDoctors
-                .map((doctor) => ({
-                  ...doctor,
-                  totalValue: calculateDoctorStats(doctor).totalValue
-                }))
-                .sort((a, b) => b.totalValue - a.totalValue)
-                .map((doctor, index) => {
+              (() => {
+                // Preparar dados dos médicos ordenados
+                const sortedDoctors = filteredDoctors
+                  .map((doctor) => ({
+                    ...doctor,
+                    totalValue: calculateDoctorStats(doctor).totalValue
+                  }))
+                  .sort((a, b) => b.totalValue - a.totalValue);
+                
+                // Calcular paginação
+                const totalDoctors = sortedDoctors.length;
+                const totalPages = Math.ceil(totalDoctors / DOCTORS_PER_PAGE);
+                const startIndex = (currentDoctorPage - 1) * DOCTORS_PER_PAGE;
+                const endIndex = startIndex + DOCTORS_PER_PAGE;
+                const paginatedDoctors = sortedDoctors.slice(startIndex, endIndex);
+                
+                return (
+                  <>
+                    {/* Pagination Controls - Top */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentDoctorPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentDoctorPage === 1}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                            <Button
+                              key={page}
+                              variant={currentDoctorPage === page ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setCurrentDoctorPage(page)}
+                            >
+                              {page}
+                            </Button>
+                          ))}
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentDoctorPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentDoctorPage === totalPages}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        
+                        <div className="text-sm text-muted-foreground">
+                          Mostrando {startIndex + 1}-{Math.min(endIndex, totalDoctors)} de {totalDoctors} médicos
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lista de médicos paginada */}
+                    {paginatedDoctors.map((doctor, index) => {
                 const doctorStats = calculateDoctorStats(doctor);
                 const isExpanded = expandedDoctors.has(doctor.doctor_info.cns);
                 
@@ -1479,7 +1540,54 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                     </Collapsible>
                   </Card>
                 );
-              })
+                    })}
+                    
+                    {/* 🆕 CONTROLES DE PAGINAÇÃO DOS MÉDICOS */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-200/60">
+                        <div className="text-sm text-slate-600">
+                          Mostrando {startIndex + 1}-{Math.min(endIndex, totalDoctors)} de {totalDoctors} médicos
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentDoctorPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentDoctorPage === 1}
+                            className="h-8 w-8 p-0"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                              <Button
+                                key={page}
+                                variant={currentDoctorPage === page ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setCurrentDoctorPage(page)}
+                                className="h-8 w-8 p-0"
+                              >
+                                {page}
+                              </Button>
+                            ))}
+                          </div>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentDoctorPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentDoctorPage === totalPages}
+                            className="h-8 w-8 p-0"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()
             )}
           </div>
         </CardContent>
