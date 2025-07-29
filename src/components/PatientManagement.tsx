@@ -860,7 +860,7 @@ const PatientManagement = () => {
                         {/* Botão de Exclusão */}
                         {(() => {
                           const userRole = user?.role as string;
-                          const hasPermission = (['operator', 'coordinator', 'director', 'admin'] as const).includes(userRole as any);
+                          const hasPermission = (['user', 'operator', 'coordinator', 'director', 'admin'] as const).includes(userRole as any);
                           
                           return hasPermission && (
                             <Button
@@ -1082,29 +1082,38 @@ const PatientManagement = () => {
                             <h4 className="font-semibold text-red-900 text-sm">Ações de Exclusão</h4>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDeleteRequest('aih', item.id, item.aih_number)}
-                              className="flex items-center space-x-1 text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50 text-xs px-3 py-1"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              <span>Excluir AIH</span>
-                            </Button>
-                            
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleCompleteDeleteRequest(
-                                item.id, 
-                                item.aih_number, 
-                                item.patients?.name || 'Paciente não identificado'
-                              )}
-                              className="flex items-center space-x-1 text-red-800 hover:text-red-900 border-red-300 hover:border-red-400 bg-red-100 hover:bg-red-200 text-xs px-3 py-1"
-                            >
-                              <AlertTriangle className="w-3 h-3" />
-                              <span>Exclusão Completa</span>
-                            </Button>
+                            {(() => {
+                              const userRole = user?.role as string;
+                              const hasPermission = (['user', 'operator', 'coordinator', 'director', 'admin'] as const).includes(userRole as any);
+                              
+                              return hasPermission && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeleteRequest('aih', item.id, item.aih_number)}
+                                    className="flex items-center space-x-1 text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50 text-xs px-3 py-1"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    <span>Excluir AIH</span>
+                                  </Button>
+                                  
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleCompleteDeleteRequest(
+                                      item.id, 
+                                      item.aih_number, 
+                                      item.patients?.name || 'Paciente não identificado'
+                                    )}
+                                    className="flex items-center space-x-1 text-red-800 hover:text-red-900 border-red-300 hover:border-red-400 bg-red-100 hover:bg-red-200 text-xs px-3 py-1"
+                                  >
+                                    <AlertTriangle className="w-3 h-3" />
+                                    <span>Exclusão Completa</span>
+                                  </Button>
+                                </>
+                              );
+                            })()}
                           </div>
                           <p className="text-xs text-red-600 mt-2">
                             💡 <strong>Dica:</strong> Para excluir procedimentos individuais, use os botões nos cards dos procedimentos acima.

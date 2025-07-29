@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -357,7 +357,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const hasExecutiveAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('generate_reports');
   
   // Função para atualizar dados dos médicos da aba de Médicos
-  const updateMedicalProductionStats = (stats: {
+  const updateMedicalProductionStats = useCallback((stats: {
     totalRevenue: number;
     totalDoctors: number;
     totalPatients: number;
@@ -375,7 +375,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       activeDoctors: stats.totalDoctors
     }));
     setLastUpdate(new Date());
-  };
+  }, []);
   
   // Função para lidar com mudança de aba
   const handleTabChange = (tabValue: string) => {

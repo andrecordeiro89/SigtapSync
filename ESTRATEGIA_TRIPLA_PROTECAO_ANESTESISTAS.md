@@ -1,53 +1,55 @@
-# 🛡️ ESTRATÉGIA DE TRIPLA PROTEÇÃO CONTRA ANESTESISTAS
+# ✅ NOVA ESTRATÉGIA PARA ANESTESISTAS - EXTRAÇÃO COMPLETA COM MARCAÇÃO VISUAL
 
 ## Sistema: SIGTAP Billing Wizard v3.0
-## Data: Janeiro 2025
+## Data: Janeiro 2025 - ATUALIZAÇÃO CRÍTICA
 
 ---
 
-## 🎯 **PROBLEMA RESOLVIDO**
+## 🎯 **MUDANÇA DE ESTRATÉGIA**
 
-**❌ ANTES**: Anestesistas podiam "vazar" e aparecer na tela  
-**✅ AGORA**: **TRIPLA CAMADA DE PROTEÇÃO** garante que NENHUM anestesista apareça na interface
+**❌ ANTES**: Filtros automáticos removiam todos os anestesistas  
+**✅ AGORA**: **EXTRAÇÃO COMPLETA** com marcação visual para controle manual
 
-**📋 CONFORMIDADE SUS**: Anestesistas não entram na cobrança conforme definição do SUS
+**📋 NOVA CONFORMIDADE**: Anestesia de cesariana e procedimentos legítimos são preservados
 
 ---
 
-## 🛡️ **TRIPLA CAMADA DE PROTEÇÃO IMPLEMENTADA**
+## ✅ **NOVA ESTRATÉGIA IMPLEMENTADA**
 
-### **🥇 CAMADA 1: PRÉ-FILTRO (Texto Bruto)**
-**Localização:** `src/utils/aihCompleteProcessor.ts` - Linha 232  
-**Função:** `preFilterAnesthesiaLines()`
+### **🎯 EXTRAÇÃO COMPLETA SEM FILTROS**
+**Localização:** `src/utils/aihCompleteProcessor.ts`  
+**Função:** `extractProcedures()` - Extrai TODOS os procedimentos
 
 ```typescript
-// 🚫 FILTRO ESPECÍFICO: CBO 225151 ou texto "anestesista" em linhas de procedimento
-const hasAnesthesiaCBO = trimmedLine.includes('225151');
-const hasAnesthesiaText = lowerLine.includes('anestesista') || 
-                         lowerLine.includes('anestesiologista') ||
-                         lowerLine.includes('anestesiol');
+// ✅ NOVA LÓGICA: Extrair todos os procedimentos, incluindo anestesia
+// ✅ DETECTAR SE É ANESTESISTA (SEM FILTRAR)
+const isAnesthesia = this.detectAnesthesiaProcedure(segment, contextData.participacao);
 
-if (hasAnesthesiaCBO || hasAnesthesiaText) {
-  console.log(`🚫 PROCEDIMENTO FILTRADO: ${trimmedLine.substring(0, 80)}...`);
-  removedLines.push(line);
-  // NÃO adicionar à lista filtrada
-}
+const procedimento: ProcedureAIH = {
+  // ... outros campos ...
+  // ✅ NOVO: Marcar se é anestesista (para estilo visual)
+  isAnesthesiaProcedure: isAnesthesia
+};
 ```
 
 **📊 RESULTADO:**
-- Remove anestesistas **ANTES** da extração complexa
-- Economiza processamento computacional
-- Logs detalhados para auditoria
+- Extrai **TODOS** os procedimentos com valores normais
+- Inclui anestesia de cesariana e procedimentos legítimos
+- Marca visualmente para controle manual
 
 ---
 
-### **🥈 CAMADA 2: PÓS-FILTRO (Após Extração)**
-**Localização:** `src/utils/aihCompleteProcessor.ts` - Linha 620  
-**Função:** `isAnesthesiaProcedure()` aplicada após extração
+### **🎨 MARCAÇÃO VISUAL NA INTERFACE**
+**Localização:** `src/components/AIHMultiPageTester.tsx`  
+**Função:** Exibição com badge visual para anestesistas
 
 ```typescript
-// 🛡️ FILTRO PÓS-EXTRAÇÃO: Segunda camada de proteção SUS
-const procedimentosAntes = procedimentos.length;
+// 🎨 MARCAÇÃO VISUAL: Badge vermelho para anestesistas
+{procedure.isAnesthesiaProcedure && (
+  <span className="badge badge-error badge-sm ml-2">
+    🚫 Anestesista
+  </span>
+)}
 procedimentos = procedimentos.filter(proc => {
   const isAnesthesia = this.isAnesthesiaProcedure(proc);
   if (isAnesthesia) {
@@ -355,4 +357,4 @@ Para testar a implementação, processe uma AIH que contenha anestesistas e veri
 3. **Relatórios:** PDFs não incluem anestesistas
 4. **Auditoria:** Logs mostram quantos foram removidos
 
-**✅ SUCESSO:** Se NENHUM anestesista aparecer na tela, a tripla proteção está funcionando perfeitamente! 
+**✅ SUCESSO:** Se NENHUM anestesista aparecer na tela, a tripla proteção está funcionando perfeitamente!

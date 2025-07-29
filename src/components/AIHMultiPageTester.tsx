@@ -306,14 +306,21 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     
     procedimentos.forEach(proc => {
       if (proc.isAnesthesiaProcedure) {
-        // 🚫 ANESTESISTAS: NENHUMA REGRA APLICADA
+        // ✅ ANESTESISTAS: EXTRAIR COM VALORES NORMAIS PARA CONTROLE MANUAL
+        const valorTotalSigtap = proc.sigtapProcedure?.valueHosp || 0;
+        const valorSP = proc.sigtapProcedure?.valueProf || 0;
+        const valorSH = valorTotalSigtap - valorSP;
+        const valorTotal = valorSH + valorSP;
+        
         anestesistas.push({
           ...proc,
-          porcentagemSUS: 0, // Zero pois não há cobrança
-          valorCalculado: 0, // Zero pois será removido
-          valorOriginal: 0,  // Zero pois não é faturado
-          isAnesthesiaProcedure: true, // Manter marcação
-          regraEspecial: 'Anestesista - Não faturado (será removido)'
+          porcentagemSUS: 100, // Valor normal para visualização
+          valorCalculado: valorTotal * (proc.quantity || 1), // Valor real calculado
+          valorOriginal: valorTotal,  // Valor original do SIGTAP
+          valorCalculadoSH: valorSH * (proc.quantity || 1),
+          valorCalculadoSP: valorSP * (proc.quantity || 1),
+          isAnesthesiaProcedure: true, // Manter marcação visual
+          regraEspecial: '🚫 Anestesia - Controle manual (pode ser removido)'
         });
       } else {
         // ✅ PROCEDIMENTOS NORMAIS: APLICAR REGRAS
@@ -482,18 +489,25 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     const todosProcedimentos = [...procedimentosComPercentagem, ...anestesistas];
     todosProcedimentos.sort((a, b) => a.sequencia - b.sequencia); // Reordenar por sequência
 
-    // ✅ CALCULAR TOTAIS APENAS DOS PROCEDIMENTOS APROVADOS (EXCLUINDO ANESTESISTAS)
-    const valorTotalCalculado = procedimentosComPercentagem
+    // ✅ CALCULAR TOTAIS INCLUINDO ANESTESISTAS (PARA CONTROLE MANUAL)
+    const valorTotalProcedimentosNormais = procedimentosComPercentagem
       .filter(p => p.aprovado)
       .reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
+    
+    const valorTotalAnestesistas = anestesistas
+      .filter(p => p.aprovado !== false) // Incluir anestesistas não rejeitados
+      .reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
+    
+    const valorTotalCalculado = valorTotalProcedimentosNormais + valorTotalAnestesistas;
 
-    console.log(`💰 VALOR TOTAL FATURADO (SH + SP): R$ ${valorTotalCalculado.toFixed(2)}`);
-    console.log(`🚫 ANESTESISTAS EXCLUÍDOS DOS CÁLCULOS: ${anestesistas.length} procedimentos`);
+    console.log(`💰 VALOR TOTAL PROCEDIMENTOS NORMAIS: R$ ${valorTotalProcedimentosNormais.toFixed(2)}`);
+    console.log(`🚫 VALOR TOTAL ANESTESISTAS (CONTROLE MANUAL): R$ ${valorTotalAnestesistas.toFixed(2)}`);
+    console.log(`💰 VALOR TOTAL GERAL: R$ ${valorTotalCalculado.toFixed(2)}`);
 
     return {
       ...aihCompleta,
       procedimentos: todosProcedimentos,
-      procedimentosAprovados: procedimentosComPercentagem.filter(p => p.aprovado).length, // Só contar não-anestesistas
+      procedimentosAprovados: procedimentosComPercentagem.filter(p => p.aprovado).length + anestesistas.filter(p => p.aprovado !== false).length,
       procedimentosRejeitados: procedimentosComPercentagem.filter(p => p.matchStatus === 'rejected').length,
       valorTotalCalculado
     };

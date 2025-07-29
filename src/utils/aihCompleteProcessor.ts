@@ -7,38 +7,12 @@ import { isValidParticipationCode, formatParticipationCode, getParticipationInfo
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 /**
- * ❌ FUNÇÃO DEPRECIADA: filterOutAnesthesia 
- * ✅ NOVA ABORDAGEM: Exibir todos os procedimentos com marcação visual
- * 
- * Anteriormente filtrava anestesistas na INTERFACE (camada 3 - exibição)
- * Agora: Extrair tudo e marcar visualmente para controle manual do usuário
+ * ✅ NOVA LÓGICA PARA ANESTESISTAS:
+ * - Extrair TODOS os procedimentos, incluindo anestesia, com valores normais
+ * - Marcar visualmente procedimentos de anestesia na interface
+ * - Permitir que o usuário delete manualmente se necessário
+ * - Anestesia de cesariana e outros procedimentos legítimos são preservados
  */
-/*
-export const filterOutAnesthesia = (procedimento: ProcedureAIH): boolean => {
-  // 🎯 FUNÇÃO DEPRECIADA - Nova lógica: exibir tudo com marcação visual
-  // Se não há participação definida, não é anestesista
-  if (!procedimento.participacao) {
-    return true;
-  }
-  
-  // Termos de anestesia em português  
-  const anesthesiaTerms = [
-    'anestesista', 'anestesiologista', 'anestesiol', 'anestes', 'anes', 'anest',
-    'anestsista', 'anestesita', 'anestesis', 'anastesista', 'anastesiologista',
-    'anesthesi', 'anesthesiol', 'anest.', 'anes.'
-  ];
-  
-  const participacao = procedimento.participacao.toLowerCase().trim();
-  const isAnesthesia = anesthesiaTerms.some(term => participacao.includes(term));
-  
-  if (isAnesthesia) {
-    console.log(`🚫 INTERFACE-FILTRO DEPRECIADO: Anestesista seria removido da tela - Agora é marcado visualmente`);
-    return false; // Filtrar (não exibir) - COMPORTAMENTO ANTIGO
-  }
-  
-  return true; // Não filtrar (exibir)
-};
-*/
 
 export class AIHCompleteProcessor {
   private aihProcessor: AIHPDFProcessor;
@@ -264,93 +238,11 @@ export class AIHCompleteProcessor {
    * Preserva cabeçalhos, estrutura do documento e outras informações
    * ✅ CORREÇÃO: Filtro mais específico para evitar remoção de procedimentos subsequentes
    */
-  private preFilterAnesthesiaLines(text: string): { filteredText: string; removedLines: string[] } {
-    console.log(`🚫 PRÉ-FILTRO CORRIGIDO: Aplicando filtro inteligente de anestesia...`);
-    
-    // 🔧 QUEBRA INTELIGENTE: PDF pode vir como bloco contínuo, quebrar por padrões de procedimento
-    const smartLines = this.smartSplitProcedureText(text);
-    
-    const filteredLines: string[] = [];
-    const removedLines: string[] = [];
-    
-    for (const line of smartLines) {
-      const trimmedLine = line.trim();
-      
-      // 🎯 SKIP: Linhas vazias ou muito curtas (preservar estrutura)
-      if (trimmedLine.length < 10) {
-        filteredLines.push(line);
-        console.log(`⏭️ LINHA CURTA PRESERVADA (${trimmedLine.length} chars): ${trimmedLine}`);
-        continue;
-      }
-      
-      // ✅ CORREÇÃO: Verificação mais específica de anestesia
-      const lowerLine = trimmedLine.toLowerCase();
-      
-      // 📋 DETECÇÃO DE ANESTESIA - APENAS PROCEDIMENTOS REAIS DE ANESTESIA
-      const anesthesiaTerms = [
-        'anestesista', 'anestesiologista', 'anestesiologia', 'anestesiologic',
-        'anestesiol', 'anestes', 'anes', 'anest', 'anestesi',
-        'anestsista', 'anestesita', 'anestesis', 'anastesista', 'anastesiologista',
-        'anesthesi', 'anesthesiol', 'anest.', 'anes.', 'anestesista.',
-        // Variações com espaços ou caracteres especiais
-        'anestesi ', ' anestesi', 'anestes ', ' anestes'
-      ];
-      
-      const hasAnesthesiaText = anesthesiaTerms.some(term => lowerLine.includes(term));
-      
-      // ✅ CORREÇÃO: Só filtrar se for REALMENTE um procedimento de anestesia
-      if (hasAnesthesiaText && this.isProcedureLine(trimmedLine)) {
-        const foundTerm = anesthesiaTerms.find(term => lowerLine.includes(term)) || 'termo de anestesia';
-        console.log(`🚫 ANESTESIA FILTRADA: ${trimmedLine.substring(0, 80)}...`);
-        console.log(`   📋 Motivo: ${foundTerm}`);
-        console.log(`   🎯 STATUS: REMOVIDO (procedimento de anestesia confirmado)`);
-        removedLines.push(line);
-        continue; // NÃO adicionar à lista filtrada
-      }
-      
-      // ✅ CORREÇÃO: Se contém anestesia mas não é procedimento válido, preservar
-      if (hasAnesthesiaText && !this.isProcedureLine(trimmedLine)) {
-        console.log(`📋 ANESTESIA DETECTADA mas NÃO é procedimento - PRESERVADO: ${trimmedLine.substring(0, 60)}...`);
-        filteredLines.push(line);
-        continue;
-      }
-      
-      // 🎯 VERIFICAÇÃO SECUNDÁRIA: Cabeçalhos (após filtro de anestesia)
-      if (this.isHeaderOrSystemLine(trimmedLine)) {
-        filteredLines.push(line);
-        console.log(`📋 CABEÇALHO PRESERVADO: ${trimmedLine.substring(0, 60)}...`);
-        continue;
-      }
-      
-      // 🎯 VERIFICAR: Linhas que parecem ser procedimentos (após todos os filtros)
-      if (this.isProcedureLine(trimmedLine)) {
-        console.log(`✅ PROCEDIMENTO MANTIDO: ${trimmedLine.substring(0, 60)}...`);
-        filteredLines.push(line);
-      } else {
-        // Não é linha de procedimento - preservar sempre (já passou por todos os filtros)
-        console.log(`📄 LINHA NÃO-PROCEDIMENTO PRESERVADA: ${trimmedLine.substring(0, 60)}...`);
-        filteredLines.push(line);
-      }
-    }
-    
-    const filteredText = filteredLines.join('\n');
-    
-    console.log(`✅ PRÉ-FILTRO INTELIGENTE CORRIGIDO CONCLUÍDO:`);
-    console.log(`   📄 Segmentos originais: ${smartLines.length}`);
-    console.log(`   ✅ Segmentos mantidos: ${filteredLines.length}`);
-    console.log(`   🚫 Procedimentos de anestesia filtrados: ${removedLines.length}`);
-    
-    if (removedLines.length > 0) {
-      console.log(`   🎯 FILTROS APLICADOS:`);
-      removedLines.forEach((line, index) => {
-        console.log(`   🚫 ${index + 1}. ${line.substring(0, 80)}...`);
-      });
-    } else {
-      console.log(`   ℹ️ Nenhum procedimento de anestesia encontrado para filtrar`);
-    }
-    
-    return { filteredText, removedLines };
-  }
+  // ❌ FUNÇÃO REMOVIDA: preFilterAnesthesiaLines
+  // ✅ NOVA LÓGICA: Extrair TODOS os procedimentos incluindo anestesistas
+  // Os procedimentos de anestesia agora são extraídos normalmente com valores
+  // e marcados na interface para remoção manual pelo usuário
+  // Isso permite que anestesia de cesariana e outros procedimentos legítimos sejam cobrados
 
   /**
    * 🔧 QUEBRA INTELIGENTE: Divide texto de PDF em segmentos lógicos
@@ -472,87 +364,28 @@ export class AIHCompleteProcessor {
   }
 
   /**
-   * Verifica se um procedimento é de anestesista e deve ser filtrado
-   * ✅ ALTERAÇÃO: Removido filtro por CBO 225151 para permitir procedimentos pré-operatórios
-   * 🎯 MANTÉM: Filtro por texto na participação para casos reais de anestesia
+   * ❌ FUNÇÃO DEPRECIADA: isAnesthesiaProcedure
+   * ✅ NOVA LÓGICA: Esta função não é mais usada para filtrar procedimentos
+   * Os procedimentos de anestesia são agora detectados apenas para marcação visual
+   * e extraídos normalmente com valores para controle manual do usuário
    */
   private isAnesthesiaProcedure(procedimento: ProcedureAIH): boolean {
-    // 🎯 ÚNICA VERIFICAÇÃO: Detecção por texto na participação
-    const participacao = (procedimento.participacao || '').toLowerCase().trim();
-    
-    // Se não há participação definida, não é anestesista
-    if (!participacao) {
-      return false;
-    }
-    
-    // 📋 TERMOS DE ANESTESIA EM PORTUGUÊS - como backup
-    const anesthesiaTerms = [
-      // Termos principais
-      'anestesista',        // Termo exato da tabela
-      'anestesiologista',   // Variação comum
-      'anestesiol',         // Abreviação comum
-      'anestes',            // Variação
-      'anes',               // Abreviação curta
-      'anest',              // Abreviação
-      
-      // Variações e erros de digitação
-      'anestsista',         // Erro comum
-      'anestesita',         // Erro comum
-      'anestesis',          // Variação
-      'anastesista',        // Erro comum
-      'anastesiologista',   // Erro comum
-      
-      // Termos em inglês (caso apareçam)
-      'anesthesi',          // Inglês
-      'anesthesiol',        // Inglês abreviado
-      
-      // Termos relacionados
-      'anest.',             // Abreviação com ponto
-      'anes.',              // Abreviação com ponto
-    ];
-    
-    // Verificar se algum termo de anestesia está presente na participação
-    const isAnesthesia = anesthesiaTerms.some(term => 
-      participacao.includes(term)
-    );
-    
-    return isAnesthesia;
+    // ⚠️ FUNÇÃO MANTIDA APENAS PARA COMPATIBILIDADE
+    // Não é mais usada para filtrar procedimentos
+    return false;
   }
 
   /**
    * Retorna detalhes sobre por que um procedimento foi filtrado (para debug)
    * ✅ ALTERAÇÃO: Removido verificação por CBO 225151
    */
+  /**
+   * ❌ FUNÇÃO DEPRECIADA: getFilterReason
+   * ✅ NOVA LÓGICA: Não há mais filtros - todos os procedimentos são extraídos
+   * Mantida apenas para compatibilidade
+   */
   private getFilterReason(procedimento: ProcedureAIH): string {
-    // 🎯 ÚNICA VERIFICAÇÃO: Verificar se foi filtrado por texto na participação
-    const participacao = (procedimento.participacao || '').toLowerCase().trim();
-    
-    if (!participacao) {
-      return 'Erro: Procedimento filtrado sem participação - revisar lógica';
-    }
-    
-    const anesthesiaTerms = [
-      // Termos principais  
-      'anestesista', 'anestesiologista', 'anestesiologia',
-      // Abreviações
-      'anestesiol', 'anestes', 'anes', 'anest',
-      // Variações e erros
-      'anestsista', 'anestesita', 'anestesis', 'anastesista', 'anastesiologista',
-      // Inglês
-      'anesthesi', 'anesthesiol',
-      // Com pontos
-      'anest.', 'anes.'
-    ];
-    
-    const foundTerm = anesthesiaTerms.find(term => 
-      participacao.includes(term)
-    );
-    
-    if (foundTerm) {
-      return `Termo de anestesia '${foundTerm}' encontrado na Participação: "${procedimento.participacao}" (filtro por texto)`;
-    }
-    
-    return `Erro: Procedimento filtrado sem critério válido - Participação: "${procedimento.participacao}"`;
+    return 'Função depreciada - não há mais filtros aplicados';
   }
 
   /**
@@ -659,14 +492,14 @@ export class AIHCompleteProcessor {
    */
   private extractProcedures(text: string, sequenciaInicial: number = 1): ProcedureAIH[] {
     try {
-      console.log(`📋 EXTRAÇÃO COMPLETA: Extraindo TODOS os procedimentos (sequência inicial: ${sequenciaInicial})...`);
-      console.log(`🔍 NOVA LÓGICA: SEM FILTROS - Extrair tudo e marcar anestesistas visualmente`);
+      console.log(`📋 EXTRAÇÃO COMPLETA: Extraindo TODOS os procedimentos incluindo anestesistas (sequência inicial: ${sequenciaInicial})...`);
+      console.log(`🔍 NOVA LÓGICA: EXTRAIR TUDO - Anestesistas marcados visualmente para remoção manual`);
       console.log(`📏 Tamanho do texto: ${text.length} caracteres`);
       
       // 🔬 DEBUG AVANÇADO da extração
       this.debugProcedureExtraction(text);
       
-      // ✅ MUDANÇA: USAR QUEBRA INTELIGENTE SEM PRÉ-FILTRO
+      // ✅ MUDANÇA: USAR QUEBRA INTELIGENTE SEM QUALQUER FILTRO
       const smartLines = this.smartSplitProcedureText(text);
       console.log(`📄 Segmentos para processamento: ${smartLines.length}`);
       
@@ -1296,14 +1129,14 @@ export class AIHCompleteProcessor {
    * ✅ NOVO: Verifica por texto na linha, não apenas código.
    */
   private detectAnesthesiaProcedure(line: string, participacao: string): boolean {
-    // 🎯 ÚNICA VERIFICAÇÃO: Detecção por texto na participação
-    if (!participacao) {
+    // 🎯 DETECÇÃO INTELIGENTE: Marca anestesistas para controle manual do usuário
+    if (!participacao && !line) {
       return false;
     }
     
-    // 📋 TERMOS DE ANESTESIA EM PORTUGUÊS - como backup
+    // 📋 TERMOS DE ANESTESIA - Incluindo procedimentos legítimos como cesariana
     const anesthesiaTerms = [
-      // Termos principais
+      // Termos principais de anestesistas
       'anestesista',        // Termo exato da tabela
       'anestesiologista',   // Variação comum
       'anestesiol',         // Abreviação comum
@@ -1327,22 +1160,27 @@ export class AIHCompleteProcessor {
       'anes.',              // Abreviação com ponto
     ];
     
-    // Verificar se algum termo de anestesia está presente na participação
-    const isAnesthesia = anesthesiaTerms.some(term => 
-      participacao.includes(term)
+    // Verificar participação
+    const participacaoLower = (participacao || '').toLowerCase().trim();
+    const isAnesthesiaByParticipacao = anesthesiaTerms.some(term => 
+      participacaoLower.includes(term)
     );
     
-    // 🎯 NOVO: Verifica também por texto na linha, mesmo que não seja um procedimento
+    // Verificar linha completa
+    const lineLower = (line || '').toLowerCase().trim();
+    const isAnesthesiaByLine = anesthesiaTerms.some(term => 
+      lineLower.includes(term)
+    );
+    
+    const isAnesthesia = isAnesthesiaByParticipacao || isAnesthesiaByLine;
+    
+    // 📝 LOG para auditoria
     if (isAnesthesia) {
-      return true;
+      console.log(`🚫 ANESTESIA DETECTADA (marcação visual): ${participacao || 'N/A'} | Linha: ${line.substring(0, 50)}...`);
+      console.log(`   💡 AÇÃO: Procedimento será EXTRAÍDO com valores e marcado para remoção manual`);
     }
-
-    // 🎯 ÚNICA VERIFICAÇÃO: Detecção por texto na participação
-    const participacaoLine = line.toLowerCase().trim();
     
-    const hasAnesthesiaText = anesthesiaTerms.some(term => participacaoLine.includes(term));
-    
-    return hasAnesthesiaText;
+    return isAnesthesia;
   }
 
   /**
@@ -1395,4 +1233,4 @@ export class AIHCompleteProcessor {
     
     return procedimentos;
   }
-} 
+}
