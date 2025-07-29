@@ -987,12 +987,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   ) : (
                                     <ChevronRight className="h-5 w-5 text-slate-500 transition-transform duration-300" />
                                   )}
-                                  <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg border-2 ${
+                                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg border-2 ${
                                      doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' 
                                        ? 'bg-gradient-to-br from-slate-100 to-slate-200 border-slate-300' 
                                        : 'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200'
                                    }`}>
-                                     <Stethoscope className={`h-7 w-7 ${
+                                     <Stethoscope className={`h-5 w-5 ${
                                        doctor.doctor_info.cns === 'VIRTUAL_ORPHAN_DOCTOR' 
                                          ? 'text-slate-600' 
                                          : 'text-blue-600'
