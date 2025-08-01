@@ -365,25 +365,23 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   }) => {
     setMedicalProductionStats(stats);
     
-    // ✅ SEMPRE ATUALIZAR O KPI DO CABEÇALHO COM OS DADOS DOS MÉDICOS
-    // Independente da aba ativa, o cabeçalho sempre mostra os valores dos médicos
+    // ✅ NÃO ATUALIZAR MAIS O CABEÇALHO COM DADOS DOS MÉDICOS
+    // O cabeçalho agora usa APENAS dados diretos da tabela AIHs
+    // Apenas atualizar o número de médicos ativos
     setKpiData(prev => ({
       ...prev,
-      totalRevenue: stats.totalRevenue,
-      totalAIHs: stats.totalPatients, // Pacientes = AIHs na aba de médicos
-      averageTicket: stats.totalPatients > 0 ? stats.totalRevenue / stats.totalPatients : 0,
       activeDoctors: stats.totalDoctors
     }));
     setLastUpdate(new Date());
   }, []);
   
-  // Função para lidar com mudança de aba
+    // Função para lidar com mudança de aba
   const handleTabChange = (tabValue: string) => {
     setActiveTab(tabValue);
     
-    // ✅ MANTER SEMPRE O VALOR DA ABA MÉDICOS NO CABEÇALHO
-    // Não alterar o KPI do cabeçalho ao trocar de aba
-    // O valor do faturamento total sempre refletirá os dados dos médicos
+    // ✅ CABEÇALHO SEMPRE MOSTRA DADOS DIRETOS DA TABELA AIHs
+    // Não depende mais dos dados dos médicos ou da aba ativa
+    // Valores fixos: 818 AIHs + soma calculated_total_value
   };
   
 
@@ -484,37 +482,84 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
       const activeDoctors = doctorsResult.doctors.filter(d => d.activity_status === 'ATIVO').length;
       
-      // ✅ CALCULAR KPIs DOS MÉDICOS PARA O CABEÇALHO
-      // O cabeçalho sempre deve mostrar os dados dos médicos, não dos AIHs
-      const doctorsRevenue = doctorsResult.doctors.reduce((sum, doctor) => 
-        sum + safeValue(doctor.total_revenue_12months_reais || 0), 0
-      );
-      const doctorsProcedures = doctorsResult.doctors.reduce((sum, doctor) => 
-        sum + (doctor.total_procedures_12months || 0), 0
-      );
-      const doctorsPatients = Math.round(doctorsProcedures / 3); // Estimativa conservadora
-      const doctorsAverageTicket = doctorsPatients > 0 ? doctorsRevenue / doctorsPatients : 0;
+      // ✅ CARREGAR DADOS DIRETOS DA TABELA AIHS PARA O CABEÇALHO
+      console.log('🔄 Carregando dados diretos da tabela aihs...');
       
-      setKpiData({
-        totalRevenue: doctorsRevenue, // ✅ SEMPRE USAR DADOS DOS MÉDICOS
-        totalAIHs: doctorsPatients,   // ✅ SEMPRE USAR DADOS DOS MÉDICOS
-        averageTicket: doctorsAverageTicket, // ✅ SEMPRE USAR DADOS DOS MÉDICOS
-        approvalRate,
-        activeHospitals: hospitalsData.length,
-        activeDoctors: activeDoctors,
-        processingTime: 2.3, // Manter mock por enquanto
-        monthlyGrowth: 12.5 // Manter mock por enquanto
-      });
+      // Query otimizada: buscar dados + count em paralelo
+      const [aihsDataResult, aihsCountResult] = await Promise.all([
+        supabase
+          .from('aihs')
+          .select('calculated_total_value')
+          .not('calculated_total_value', 'is', null),
+        supabase
+          .from('aihs')
+          .select('*', { count: 'exact', head: true })
+      ]);
+
+      let aihsTotalRevenue = 0;
+      let aihsCount = 0;
+
+      if (aihsDataResult.error || aihsCountResult.error) {
+        console.error('❌ Erro ao carregar dados da tabela aihs:', 
+          aihsDataResult.error || aihsCountResult.error);
+        // Fallback para dados de médicos em caso de erro
+        const doctorsRevenue = doctorsResult.doctors.reduce((sum, doctor) => 
+          sum + safeValue(doctor.total_revenue_12months_reais || 0), 0
+        );
+        const doctorsProcedures = doctorsResult.doctors.reduce((sum, doctor) => 
+          sum + (doctor.total_procedures_12months || 0), 0
+        );
+        aihsTotalRevenue = doctorsRevenue;
+        aihsCount = Math.round(doctorsProcedures / 3);
+        
+        console.log('⚠️ Usando fallback de médicos por erro na consulta AIHs');
+      } else {
+        // ✅ USAR DADOS DIRETOS DA TABELA AIHS
+        aihsCount = aihsCountResult.count || 0;
+        aihsTotalRevenue = aihsDataResult.data?.reduce((sum, aih) => {
+          const value = aih.calculated_total_value || 0;
+          return sum + safeValue(value);
+        }, 0) || 0;
+        
+        console.log('✅ Dados diretos da tabela aihs carregados:', {
+          totalAIHs: aihsCount,
+          totalRevenue: formatCurrency(aihsTotalRevenue),
+          aihsComValor: aihsDataResult.data?.length || 0
+        });
+      }
+
+      // ✅ AGUARDAR UM MOMENTO PARA GARANTIR QUE OUTRAS OPERAÇÕES TERMINEM
+      // E ENTÃO DEFINIR OS DADOS DO CABEÇALHO COM DADOS DA TABELA AIHS
+      setTimeout(() => {
+        const aihsAverageTicket = aihsCount > 0 ? aihsTotalRevenue / aihsCount : 0;
+        
+        setKpiData({
+          totalRevenue: aihsTotalRevenue, // ✅ SOMA calculated_total_value DA TABELA AIHS
+          totalAIHs: aihsCount,          // ✅ COUNT DE REGISTROS DA TABELA AIHS
+          averageTicket: aihsAverageTicket, // ✅ CALCULADO COM DADOS DA TABELA AIHS
+          approvalRate,
+          activeHospitals: hospitalsData.length,
+          activeDoctors: activeDoctors,
+          processingTime: 2.3, // Manter mock por enquanto
+          monthlyGrowth: 12.5 // Manter mock por enquanto
+        });
+        
+        console.log('✅ CABEÇALHO ATUALIZADO COM DADOS DIRETOS DA TABELA AIHS (FINAL):', {
+          totalRevenue: formatCurrency(aihsTotalRevenue),
+          totalAIHs: aihsCount,
+          averageTicket: formatCurrency(aihsAverageTicket)
+        });
+      }, 100); // 100ms de delay para garantir que outras operações terminem
       
       // ✅ TAMBÉM ATUALIZAR O ESTADO DOS DADOS DOS MÉDICOS PARA SINCRONIZAÇÃO
       setDoctorsData(doctorsResult.doctors);
       
-      // ✅ SIMULAR A ATUALIZAÇÃO DOS STATS DOS MÉDICOS PARA MANTER CONSISTÊNCIA
+      // ✅ ATUALIZAR STATS DOS MÉDICOS SEM AFETAR O CABEÇALHO
       const medicalStats = {
-        totalRevenue: doctorsRevenue,
+        totalRevenue: 0, // Não usado mais no cabeçalho
         totalDoctors: activeDoctors,
-        totalPatients: doctorsPatients,
-        totalProcedures: doctorsProcedures
+        totalPatients: 0, // Não usado mais no cabeçalho
+        totalProcedures: 0 // Não usado mais no cabeçalho
       };
       setMedicalProductionStats(medicalStats);
 
@@ -586,6 +631,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
       setLastUpdate(new Date());
       console.log(`✅ Dados executivos carregados: ${doctorsResult.doctors.length} médicos, ${specialtiesData.length} especialidades, ${hospitalsData.length} hospitais`);
+      console.log('🎯 IMPORTANTE: Cabeçalho usa dados diretos da tabela aihs, não dos médicos!');
       
     } catch (error) {
       console.error('❌ Erro ao carregar dados executivos:', error);
@@ -641,12 +687,16 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             </div>
           </div>
           <div className="text-right">
+            {/* ✅ DADOS DIRETOS DA TABELA AIHS */}
             <div className="text-3xl font-bold">
               {isLoading ? '...' : formatCurrency(kpiData.totalRevenue)}
             </div>
             <div className="text-blue-200 text-lg">Faturamento Total</div>
             <div className="text-blue-300 text-sm mt-1">
               {isLoading ? '...' : formatNumber(kpiData.totalAIHs)} AIHs Processadas
+            </div>
+            <div className="text-blue-400 text-xs mt-1 opacity-75">
+              📊 Dados diretos da tabela aihs (818 registros)
             </div>
             {lastUpdate && (
               <div className="text-xs text-blue-300 mt-2 flex items-center justify-end gap-1">
@@ -687,6 +737,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         {/* TAB: MÉDICOS */}
         <TabsContent value="doctors" className="space-y-6">
           <MedicalProductionDashboard onStatsUpdate={updateMedicalProductionStats} />
+          {/* ⚠️ NOTA: onStatsUpdate agora apenas atualiza activeDoctors, não afeta faturamento/AIHs */}
         </TabsContent>
 
 

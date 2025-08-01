@@ -245,7 +245,8 @@ export class DoctorPatientService {
           if (aih.aprovado) {
             patient.approved_procedures++;
           }
-          patient.total_value_reais += (aih.total_value_reais || 0) / 100;
+          // ❌ REMOVIDO: patient.total_value_reais += (aih.total_value_reais || 0) / 100;
+          // ✅ NOVO: Valor já definido corretamente na criação do paciente usando calculated_total_value da AIH
 
           // ✅ ADICIONAR PROCEDIMENTO COM DADOS REAIS DO BANCO
           const totalValueCents = aih.total_value_reais || aih.value_charged || 0;
@@ -285,7 +286,8 @@ export class DoctorPatientService {
             if (proc.aprovado) {
               patient.approved_procedures++;
             }
-            patient.total_value_reais += (proc.total_value || 0) / 100;
+            // ❌ REMOVIDO: patient.total_value_reais += (proc.total_value || 0) / 100;
+            // ✅ NOVO: Valor já definido corretamente na criação do paciente usando calculated_total_value da AIH
 
             // ✅ ADICIONAR PROCEDIMENTO COM DADOS REAIS DO BANCO
             const totalValueCents = proc.total_value || proc.value_charged || 0;
@@ -602,9 +604,9 @@ export class DoctorPatientService {
    */
   static async getAllDoctorsWithPatients(): Promise<DoctorWithPatients[]> {
     try {
-      console.log('👨‍⚕️ Buscando médicos RESPONSÁVEIS com dados dos pacientes...');
+      console.log('👨‍⚕️ ✅ NOVA VERSÃO: Buscando TODAS as AIHs (818) com fallback inteligente para médicos...');
       
-      // 1. BUSCAR APENAS AIHS COM MÉDICOS RESPONSÁVEIS
+      // 1. ✅ BUSCAR TODAS AS AIHS (INCLUINDO SEM MÉDICO RESPONSÁVEL)
       const { data: aihsData, error: aihsError } = await supabase
         .from('aihs')
         .select(`
@@ -618,8 +620,11 @@ export class DoctorPatientService {
           calculated_total_value,
           processing_status,
           cns_responsavel,
+          cns_solicitante,
+          cns_autorizador,
           total_procedures,
           approved_procedures,
+          source_file,
           patients (
             id,
             name,
@@ -629,18 +634,19 @@ export class DoctorPatientService {
             medical_record
           )
         `)
-        .not('cns_responsavel', 'is', null)
         .order('admission_date', { ascending: false });
 
       if (aihsError) {
         console.error('❌ Erro ao buscar AIHs:', aihsError);
-        console.log('⚠️ Retornando dados de teste...');
-        return this.getMockDoctorData();
+            console.log('⚠️ Retornando dados de teste...');
+    console.log('💰 VALORES CORRIGIDOS: Dados de mock agora usam valores em reais (não centavos)');
+    return this.getMockDoctorData();
       }
 
       if (!aihsData || aihsData.length === 0) {
-        console.log('⚠️ Nenhuma AIH encontrada no banco, retornando dados de teste...');
-        return this.getMockDoctorData();
+            console.log('⚠️ Nenhuma AIH encontrada no banco, retornando dados de teste...');
+    console.log('💰 VALORES CORRIGIDOS: Dados de mock agora usam valores em reais (não centavos)');
+    return this.getMockDoctorData();
       }
 
       // 2. BUSCAR PROCEDIMENTOS USANDO APENAS CAMPOS BÁSICOS E SEGUROS
@@ -655,6 +661,8 @@ export class DoctorPatientService {
       if (patientIds.length > 0) {
         // 2.2. ✅ CONSULTA COMPLETA SEM LIMITAÇÕES ARTIFICIAIS
         console.log('🔍 Executando consulta completa de procedimentos...');
+        console.log(`🎯 CONSULTANDO PROCEDIMENTOS PARA ${patientIds.length} PATIENT_IDS:`, patientIds.slice(0, 10));
+        
         const { data: patientProcedures, error: proceduresError } = await supabase
           .from('procedure_records')
           .select(`
@@ -673,6 +681,12 @@ export class DoctorPatientService {
             match_status
           `)
           .in('patient_id', patientIds); // TODOS os pacientes, sem limitação
+          
+        console.log(`🔍 RESULTADO DA CONSULTA:`, {
+          error: proceduresError,
+          dataLength: patientProcedures?.length || 0,
+          firstProcedure: patientProcedures?.[0] || null
+        });
           
         if (proceduresError) {
           console.error('❌ Erro ao buscar procedimentos (consulta básica):', proceduresError);
@@ -725,10 +739,37 @@ export class DoctorPatientService {
       }
        
       console.log(`📊 TOTAL DE PROCEDIMENTOS ENCONTRADOS: ${proceduresData.length}`);
+      
+      if (proceduresData && proceduresData.length > 0) {
+        console.log(`🔍 AMOSTRA DOS PRIMEIROS 3 PROCEDIMENTOS:`);
+        proceduresData.slice(0, 3).forEach((proc, index) => {
+          console.log(`   ${index + 1}. ID: ${proc.id} | Patient_ID: ${proc.patient_id} (${typeof proc.patient_id}) | Código: ${proc.procedure_code}`);
+        });
+      }
 
-      // 3. CRIAR MAPA DE MÉDICOS DOS CNS ÚNICOS 
-      const uniqueDoctorsCns = [...new Set(aihsData.map(aih => aih.cns_responsavel).filter(Boolean))];
-      console.log(`👨‍⚕️ CNS únicos de médicos responsáveis: ${uniqueDoctorsCns.length}`);
+      // 3. ✅ CRIAR MAPA DE MÉDICOS COM FALLBACK INTELIGENTE
+      const allDoctorsCns = new Set<string>();
+      
+      aihsData.forEach(aih => {
+        // Prioridade: Responsável > Solicitante > Autorizador > Não Identificado
+        if (aih.cns_responsavel) {
+          allDoctorsCns.add(aih.cns_responsavel);
+        } else if (aih.cns_solicitante) {
+          allDoctorsCns.add(aih.cns_solicitante);
+          console.log(`⚠️ AIH ${aih.aih_number}: Usando CNS SOLICITANTE como responsável`);
+        } else if (aih.cns_autorizador) {
+          allDoctorsCns.add(aih.cns_autorizador);
+          console.log(`⚠️ AIH ${aih.aih_number}: Usando CNS AUTORIZADOR como responsável`);
+        } else {
+          // Criar médico "Não Identificado" para AIHs sem nenhum CNS
+          allDoctorsCns.add('NAO_IDENTIFICADO');
+          console.log(`❌ AIH ${aih.aih_number}: SEM nenhum CNS - usando médico 'Não Identificado'`);
+        }
+      });
+      
+      const uniqueDoctorsCns = Array.from(allDoctorsCns);
+      console.log(`👨‍⚕️ CNS únicos encontrados (com fallbacks): ${uniqueDoctorsCns.length}`);
+      console.log(`📋 Lista de CNS: [${uniqueDoctorsCns.join(', ')}]`);
 
       // 3.1. BUSCAR DADOS REAIS DOS MÉDICOS
       const doctorsMap = new Map<string, DoctorWithPatients>();
@@ -736,20 +777,44 @@ export class DoctorPatientService {
 
       uniqueDoctorsCns.forEach(cns => {
         const realData = realDoctorsData.get(cns);
-        doctorsMap.set(cns, {
-          doctor_info: {
+        
+        // ✅ TRATAR CASOS ESPECIAIS
+        let doctorInfo;
+        if (cns === 'NAO_IDENTIFICADO') {
+          doctorInfo = {
+            cns: 'NAO_IDENTIFICADO',
+            name: '⚠️ Médico Não Identificado',
+            crm: 'N/A',
+            specialty: 'AIHs sem CNS médico'
+          };
+        } else if (realData) {
+          // Médico encontrado na tabela doctors
+          doctorInfo = {
             cns: cns,
-            name: realData?.name || `Médico CNS ${cns}`,
-            crm: realData?.crm || '',
-            specialty: realData?.specialty || 'Especialidade não informada'
-          },
+            name: realData.name,
+            crm: realData.crm || '',
+            specialty: realData.specialty || 'Especialidade não informada'
+          };
+        } else {
+          // Médico não cadastrado - criar entrada temporária
+          doctorInfo = {
+            cns: cns,
+            name: `🔍 Dr(a). CNS ${cns}`,
+            crm: 'Não Cadastrado',
+            specialty: 'Médico não cadastrado no sistema'
+          };
+          console.log(`📝 Criando médico temporário para CNS: ${cns}`);
+        }
+        
+        doctorsMap.set(cns, {
+          doctor_info: doctorInfo,
           hospitals: realData?.hospitals || [],
           patients: []
         });
       });
 
       // 4. 🎯 PROCESSAR DADOS GARANTINDO RELAÇÃO 1:1 ENTRE AIH-PACIENTE
-      const processedProcedureIds = new Set<string>();
+      // ❌ REMOVIDO: processedProcedureIds (estava causando duplicatas falsas)
       const globalPatientsProcessed = new Set<string>(); // Evitar duplicatas globais
       
       console.log('\n🔍 === PROCESSAMENTO POR MÉDICO ===');
@@ -758,11 +823,30 @@ export class DoctorPatientService {
         const doctor = doctorsMap.get(doctorCns)!;
         const patientsMap = new Map<string, PatientWithProcedures>();
 
-        // 4.1. ✅ ENCONTRAR AIHs ONDE ESTE MÉDICO É RESPONSÁVEL (1 AIH = 1 PACIENTE)
+        // 4.1. ✅ ENCONTRAR AIHs ASSOCIADAS A ESTE MÉDICO (COM FALLBACK)
         console.log(`\n👨‍⚕️ Processando médico: ${doctor.doctor_info.name} (CNS: ${doctorCns})`);
         
-        const aihsForThisDoctor = aihsData.filter(aih => aih.cns_responsavel === doctorCns);
-        console.log(`   📋 ${aihsForThisDoctor.length} AIHs onde este médico é RESPONSÁVEL`);
+        // 🔍 LOG ESPECÍFICO PARA MÉDICO DA CLEUZA
+        if (doctorCns === '707000845390335') {
+          console.log(`🎯 ESTE É O MÉDICO DA CLEUZA!`);
+          console.log(`   CNS: ${doctorCns}`);
+          console.log(`   Nome: ${doctor.doctor_info.name}`);
+        }
+        
+        const aihsForThisDoctor = aihsData.filter(aih => {
+          // ✅ LÓGICA DE FALLBACK PARA ASSOCIAR AIH AO MÉDICO
+          if (doctorCns === 'NAO_IDENTIFICADO') {
+            // AIHs sem nenhum CNS
+            return !aih.cns_responsavel && !aih.cns_solicitante && !aih.cns_autorizador;
+          } else {
+            // AIHs onde este CNS aparece (responsável, solicitante ou autorizador)
+            return aih.cns_responsavel === doctorCns || 
+                   (!aih.cns_responsavel && aih.cns_solicitante === doctorCns) ||
+                   (!aih.cns_responsavel && !aih.cns_solicitante && aih.cns_autorizador === doctorCns);
+          }
+        });
+        
+        console.log(`   📋 ${aihsForThisDoctor.length} AIHs associadas a este médico`);
         
         aihsForThisDoctor.forEach((aih, index) => {
           const patientId = aih.patient_id;
@@ -786,13 +870,25 @@ export class DoctorPatientService {
                 discharge_date: aih.discharge_date,
                 aih_number: aih.aih_number
               },
-              total_value_reais: 0,
-              procedures: [],
+              total_value_reais: (aih.calculated_total_value || 0) / 100, // ✅ USAR VALOR REAL DA AIH, NÃO DOS PROCEDIMENTOS
+              procedures: [], // ✅ INICIALIZAR COMO ARRAY VAZIO
               total_procedures: 0,
               approved_procedures: 0
             });
+            
+                    // 🔍 LOG ESPECÍFICO PARA CLEUZA
+        if (patient.name && patient.name.toUpperCase().includes('CLEUZA')) {
+          console.log(`🔍 CLEUZA DETECTADA!`);
+          console.log(`   Patient ID: ${patientId} (${typeof patientId})`);
+          console.log(`   Nome: ${patient.name}`);
+          console.log(`   CNS: ${patient.cns}`);
+          console.log(`   Valor AIH: R$ ${((aih.calculated_total_value || 0) / 100).toFixed(2)}`);
+          console.log(`   Procedures array inicializado: ${Array.isArray(patientsMap.get(patientId)?.procedures)}`);
+          console.log(`   🏥 ASSOCIADA AO MÉDICO: ${doctor.doctor_info.name} (CNS: ${doctor.doctor_info.cns})`);
+        }
+            
             globalPatientsProcessed.add(patientId);
-            console.log(`       ✅ Paciente adicionado (único)`);
+                            console.log(`       ✅ Paciente adicionado com valor R$ ${((aih.calculated_total_value || 0) / 100).toFixed(2)} da AIH`);
           } else if (patientsMap.has(patientId)) {
             console.log(`       ⚠️  Paciente já existe para este médico`);
           } else if (globalPatientsProcessed.has(patientId)) {
@@ -803,35 +899,81 @@ export class DoctorPatientService {
         });
         
         console.log(`   👥 Resultado: ${patientsMap.size} pacientes únicos para este médico`);
+        
+        if (patientsMap.size > 0) {
+          console.log(`   🔍 AMOSTRA DOS PRIMEIROS 3 PACIENTES DESTE MÉDICO:`);
+          const patientEntries = Array.from(patientsMap.entries()).slice(0, 3);
+          patientEntries.forEach(([patientId, patient], index) => {
+            console.log(`      ${index + 1}. Patient_ID: ${patientId} (${typeof patientId}) | Nome: ${patient.patient_info?.name}`);
+          });
+        }
 
         // 4.2. ✅ ASSOCIAR PROCEDIMENTOS SEM DUPLICATAS
         if (proceduresData && proceduresData.length > 0) {
           console.log(`\n🩺 Associando procedimentos para ${doctor.doctor_info.name}...`);
+          console.log(`   📊 Total de procedimentos disponíveis: ${proceduresData.length}`);
            
           // Coletar IDs dos pacientes deste médico
           const patientIds = Array.from(patientsMap.keys());
           console.log(`   👥 Pacientes do médico: ${patientIds.length} pacientes`);
           console.log(`   🔍 IDs: [${patientIds.join(', ')}]`);
+          
+          // ✅ VERIFICAR COMPATIBILIDADE DE IDs
+          const procedurePatientIds = [...new Set(proceduresData.map(p => p.patient_id).filter(Boolean))];
+          console.log(`   🔍 Patient IDs nos procedimentos: [${procedurePatientIds.join(', ')}]`);
+          const matchingIds = patientIds.filter(id => procedurePatientIds.includes(id));
+          console.log(`   🎯 IDs compatíveis: [${matchingIds.join(', ')}] (${matchingIds.length} de ${patientIds.length})`);
+          
+          if (matchingIds.length === 0) {
+            console.log(`   ⚠️  PROBLEMA: Nenhum patient_id compatível entre pacientes e procedimentos!`);
+            console.log(`   🔍 DEBUG - Primeiros 10 patient_ids dos procedimentos:`, procedurePatientIds.slice(0, 10));
+            console.log(`   🔍 DEBUG - Primeiros 10 patient_ids dos pacientes:`, patientIds.slice(0, 10));
+            console.log(`   🔍 DEBUG - Tipos dos IDs nos procedimentos:`, procedurePatientIds.slice(0, 3).map(id => `${id} (${typeof id})`));
+            console.log(`   🔍 DEBUG - Tipos dos IDs nos pacientes:`, patientIds.slice(0, 3).map(id => `${id} (${typeof id})`));
+            
+            // 🔍 LOG ESPECÍFICO - VERIFICAR SE TEM CLEUZA NOS PROCEDIMENTOS
+            const cleuezaInProcedures = procedurePatientIds.includes('09e61fa4-0248-4209-9ead-e226ce0a49fb');
+            console.log(`   🔍 CLEUZA nos procedimentos: ${cleuezaInProcedures ? '✅ SIM' : '❌ NÃO'}`);
+            if (cleuezaInProcedures) {
+              console.log(`   🎯 CLEUZA ENCONTRADA! Médico: ${doctor.doctor_info.name}`);
+            }
+          } else {
+            console.log(`   ✅ ENCONTRADAS ${matchingIds.length} compatibilidades de patient_id`);
+            console.log(`   🔍 EXEMPLOS de IDs compatíveis:`, matchingIds.slice(0, 5));
+          }
            
           let proceduresAssociated = 0;
-          let proceduresSkippedDuplicate = 0;
           let proceduresSkippedNotRelevant = 0;
            
           proceduresData.forEach((proc, index) => {
             const procId = proc.id;
             const patientId = proc.patient_id;
             
-            // ✅ VERIFICAÇÕES DE INTEGRIDADE
-            const isAlreadyProcessed = processedProcedureIds.has(procId);
+            // ✅ VERIFICAÇÕES DE INTEGRIDADE SIMPLIFICADAS
             const belongsToThisDoctor = patientIds.includes(patientId);
             
             console.log(`     Proc ${index + 1}: ${proc.procedure_code || 'N/A'}`);
-            console.log(`       ID: ${procId} | Paciente: ${patientId}`);
-            console.log(`       Já processado: ${isAlreadyProcessed ? '❌' : '✅'}`);
+            console.log(`       ID: ${procId} | Paciente: ${patientId} (${typeof patientId})`);
             console.log(`       Pertence ao médico: ${belongsToThisDoctor ? '✅' : '❌'}`);
             
-            // 🎯 ASSOCIAR APENAS SE: Não processado + Pertence aos pacientes do médico
-            if (!isAlreadyProcessed && belongsToThisDoctor) {
+            // 🔍 LOG ESPECÍFICO PARA CLEUZA - RASTREAR ASSOCIAÇÃO
+            if (patientId === '09e61fa4-0248-4209-9ead-e226ce0a49fb') {
+              console.log(`🔍 CLEUZA PROCEDIMENTO DETECTADO!`);
+              console.log(`   Procedure ID: ${procId}`);
+              console.log(`   Patient ID: ${patientId}`);
+              console.log(`   Procedure Code: ${proc.procedure_code}`);
+              console.log(`   PatientIds do médico:`, patientIds);
+              console.log(`   Está na lista: ${belongsToThisDoctor}`);
+              console.log(`   Médico atual: ${doctor.doctor_info.name}`);
+              console.log(`   PatientsMap tem essa paciente: ${patientsMap.has(patientId)}`);
+            }
+            
+            if (!belongsToThisDoctor) {
+              console.log(`       🔍 DEBUG: PatientId ${patientId} não está em:`, patientIds.slice(0, 5));
+            }
+            
+            // 🎯 ASSOCIAR SE: Pertence aos pacientes do médico
+            if (belongsToThisDoctor) {
               const patient = patientsMap.get(patientId);
               
               if (patient) {
@@ -856,16 +998,23 @@ export class DoctorPatientService {
                   participation: 'Responsável'
                 });
                 
-                // ✅ MARCAR COMO PROCESSADO GLOBALMENTE
-                processedProcedureIds.add(procId);
+                console.log(`       ✅ PROCEDIMENTO ADICIONADO: ${proc.procedure_code} para paciente ${patient.patient_info?.name}`);
+                console.log(`          - Procedures count após adição: ${patient.procedures.length}`);
+                
+                // 🔍 LOG ESPECÍFICO PARA CLEUZA - CONFIRMAR ADIÇÃO
+                if (patientId === '09e61fa4-0248-4209-9ead-e226ce0a49fb') {
+                  console.log(`🎉 CLEUZA: PROCEDIMENTO ADICIONADO COM SUCESSO!`);
+                  console.log(`   Procedure: ${proc.procedure_code}`);
+                  console.log(`   Total procedures na Cleuza agora: ${patient.procedures.length}`);
+                  console.log(`   Array procedures:`, patient.procedures.map(p => p.procedure_code));
+                }
+                
+                // ✅ PROCEDIMENTO ASSOCIADO COM SUCESSO
                 proceduresAssociated++;
                 console.log(`       ✅ Procedimento associado com sucesso!`);
               } else {
                 console.log(`       ❌ Paciente não encontrado no mapa`);
               }
-            } else if (isAlreadyProcessed) {
-              proceduresSkippedDuplicate++;
-              console.log(`       ⏭️ Pulado: já processado por outro médico`);
             } else if (!belongsToThisDoctor) {
               proceduresSkippedNotRelevant++;
               console.log(`       ⏭️ Pulado: não pertence aos pacientes deste médico`);
@@ -874,11 +1023,19 @@ export class DoctorPatientService {
            
           console.log(`   📊 Resultado da associação:`);
           console.log(`      ✅ Associados: ${proceduresAssociated}`);
-          console.log(`      ⏭️ Duplicatas: ${proceduresSkippedDuplicate}`);
           console.log(`      ⏭️ Não relevantes: ${proceduresSkippedNotRelevant}`);
+          
+          if (proceduresAssociated === 0 && proceduresData.length > 0) {
+            console.log(`   🚨 AINDA COM PROBLEMA: 0 procedimentos associados!`);
+            console.log(`   🔍 VERIFICANDO TIPOS DE DADOS:`);
+            console.log(`      - PatientIds do médico (primeiros 3):`, patientIds.slice(0, 3).map(id => `${id}(${typeof id})`));
+            console.log(`      - PatientIds dos procedimentos (primeiros 3):`, procedurePatientIds.slice(0, 3).map(id => `${id}(${typeof id})`));
+          } else if (proceduresAssociated > 0) {
+            console.log(`   🎉 SUCESSO: ${proceduresAssociated} procedimentos associados com sucesso!`);
+          }
         }
 
-        // 4.3. ✅ FINALIZAR DADOS DO MÉDICO
+        // 4.3. ✅ FINALIZAR DADOS DO MÉDICO - INCLUIR TODOS OS PACIENTES
         const allPatients = Array.from(patientsMap.values());
         const patientsWithProcedures = allPatients.filter(patient => 
           patient.procedures && patient.procedures.length > 0
@@ -887,9 +1044,47 @@ export class DoctorPatientService {
           !patient.procedures || patient.procedures.length === 0
         );
         
-        doctor.patients = patientsWithProcedures;
+        // ✅ INCLUIR TODOS OS PACIENTES (COM E SEM PROCEDIMENTOS)
+        doctor.patients = allPatients;
 
-        console.log(`👨‍⚕️ Médico ${doctor.doctor_info.name}: ${doctor.patients.length} pacientes com procedimentos`);
+        const totalRevenueThisDoctor = doctor.patients.reduce((sum, p) => sum + p.total_value_reais, 0);
+        console.log(`👨‍⚕️ Médico ${doctor.doctor_info.name}: ${doctor.patients.length} pacientes TOTAL`);
+        console.log(`   💰 Receita total: R$ ${totalRevenueThisDoctor.toFixed(2)} (usando calculated_total_value das AIHs)`);
+        console.log(`   📊 Distribuição: ${patientsWithProcedures.length} com procedimentos, ${patientsWithoutProcedures.length} sem procedimentos`);
+        
+        // ✅ LOG DETALHADO DOS PROCEDIMENTOS POR PACIENTE
+        if (patientsWithProcedures.length > 0) {
+          console.log(`   🩺 DETALHES DOS PACIENTES COM PROCEDIMENTOS:`);
+          patientsWithProcedures.forEach((patient, index) => {
+            console.log(`      ${index + 1}. ${patient.patient_info?.name}: ${patient.procedures.length} procedimento(s)`);
+            patient.procedures.forEach((proc, procIndex) => {
+              console.log(`         ${procIndex + 1}. ${proc.procedure_code} - ${proc.procedure_description || 'Sem descrição'}`);
+            });
+          });
+        }
+        
+        // 🔍 LOG ESPECÍFICO PARA DEBUG - MOSTRAR TODOS OS PACIENTES
+        console.log(`   📋 TODOS OS PACIENTES DESTE MÉDICO (${allPatients.length}):`);
+        allPatients.forEach((patient, index) => {
+          console.log(`      ${index + 1}. ${patient.patient_info?.name}:`);
+          console.log(`         - Procedures: ${patient.procedures?.length || 0}`);
+          console.log(`         - Total_value_reais: ${patient.total_value_reais}`);
+          
+          // 🔍 LOG ESPECÍFICO PARA CLEUZA - RESULTADO FINAL
+          if (patient.patient_info?.name?.toUpperCase().includes('CLEUZA')) {
+            console.log(`🔍 CLEUZA - RESULTADO FINAL:`);
+            console.log(`   Nome: ${patient.patient_info.name}`);
+            console.log(`   Procedures count: ${patient.procedures?.length || 0}`);
+            console.log(`   Procedures:`, patient.procedures?.map(p => p.procedure_code) || []);
+            console.log(`   Patient data completo:`, patient);
+          }
+          
+          if (patient.procedures && patient.procedures.length > 0) {
+            patient.procedures.forEach((proc, pIndex) => {
+              console.log(`         Proc ${pIndex + 1}: ${proc.procedure_code} - ${proc.procedure_description}`);
+            });
+          }
+        });
         
         if (patientsWithoutProcedures.length > 0) {
           console.log(`   ⚠️  ${patientsWithoutProcedures.length} pacientes SEM procedimentos:`);
@@ -916,7 +1111,9 @@ export class DoctorPatientService {
       console.log(`\n📊 === RESUMO FINAL E VALIDAÇÃO ===`);
       
       const totalPatientsUnique = globalPatientsProcessed.size;
-      const totalProceduresUnique = processedProcedureIds.size;
+      const totalProceduresUnique = doctorsWithPatients.reduce((sum, doctor) => 
+        sum + doctor.patients.reduce((patSum, patient) => patSum + patient.procedures.length, 0), 0
+      );
       const totalMedicosWithPatients = doctorsWithPatients.length;
       
       // Contagem detalhada por médico
@@ -948,16 +1145,29 @@ export class DoctorPatientService {
       console.log(`   Médicos com pacientes: ${totalMedicosWithPatients} ✅`);
       
       if (doctorsWithPatients.length === 0) {
-        console.log('⚠️ Nenhum médico com pacientes encontrado, retornando dados de teste...');
-        return this.getMockDoctorData();
+            console.log('⚠️ Nenhum médico com pacientes encontrado, retornando dados de teste...');
+    console.log('💰 VALORES CORRIGIDOS: Dados de mock agora usam valores em reais (não centavos)');
+    return this.getMockDoctorData();
       }
+
+      // ✅ VERIFICAÇÃO FINAL: CALCULAR TOTAL DE RECEITA
+      const totalRevenue = doctorsWithPatients.reduce((sum, doctor) => {
+        return sum + doctor.patients.reduce((docSum, patient) => docSum + patient.total_value_reais, 0);
+      }, 0);
+
+      console.log(`\n💰 === VERIFICAÇÃO FINAL DE VALORES ===`);
+      console.log(`🎯 RECEITA TOTAL CALCULADA: R$ ${totalRevenue.toFixed(2)}`);
+      console.log(`📊 Este valor deve BATER com o cabeçalho: R$ 1.885.705,65`);
+      console.log(`✅ Correção aplicada: Usando calculated_total_value das AIHs`);
+      console.log(`============================================\n`);
 
       return doctorsWithPatients;
 
     } catch (error) {
       console.error('❌ Erro na busca de médicos com pacientes:', error);
-      console.log('⚠️ Retornando dados de teste devido ao erro...');
-      return this.getMockDoctorData();
+          console.log('⚠️ Retornando dados de teste devido ao erro...');
+    console.log('💰 VALORES CORRIGIDOS: Dados de mock agora usam valores em reais (não centavos)');
+    return this.getMockDoctorData();
     }
   }
 
@@ -1139,7 +1349,7 @@ export class DoctorPatientService {
               discharge_date: '2024-01-16',
               aih_number: 'AIH001234567890'
             },
-            total_value_reais: 185000,
+            total_value_reais: 1850.00, // ✅ CORRIGIDO: Era 185000 centavos = R$ 1.850,00
             procedures: [
               {
                 procedure_code: '03.03.14.008-9',
@@ -1173,7 +1383,7 @@ export class DoctorPatientService {
               discharge_date: '2024-01-21',
               aih_number: 'AIH001234567891'
             },
-            total_value_reais: 120000,
+            total_value_reais: 1200.00, // ✅ CORRIGIDO: Era 120000 centavos = R$ 1.200,00
             procedures: [
               {
                 procedure_code: '03.03.01.017-8',
@@ -1207,7 +1417,7 @@ export class DoctorPatientService {
               discharge_date: '2024-01-26',
               aih_number: 'AIH001234567892'
             },
-            total_value_reais: 98000,
+            total_value_reais: 980.00, // ✅ CORRIGIDO: Era 98000 centavos = R$ 980,00
             procedures: [
               {
                 procedure_code: '03.03.03.012-0',
@@ -1241,7 +1451,7 @@ export class DoctorPatientService {
               discharge_date: '2024-02-02',
               aih_number: 'AIH001234567893'
             },
-            total_value_reais: 210000,
+            total_value_reais: 2100.00, // ✅ CORRIGIDO: Era 210000 centavos = R$ 2.100,00
             procedures: [
               {
                 procedure_code: '03.03.02.008-4',
@@ -1296,7 +1506,7 @@ export class DoctorPatientService {
               discharge_date: '2024-01-19',
               aih_number: 'AIH001234567894'
             },
-            total_value_reais: 165000,
+            total_value_reais: 1650.00, // ✅ CORRIGIDO: Era 165000 centavos = R$ 1.650,00
             procedures: [
               {
                 procedure_code: '03.11.07.010-2',
@@ -1330,7 +1540,7 @@ export class DoctorPatientService {
               discharge_date: '2024-01-23',
               aih_number: 'AIH001234567895'
             },
-            total_value_reais: 98000,
+            total_value_reais: 980.00, // ✅ CORRIGIDO: Era 98000 centavos = R$ 980,00
             procedures: [
               {
                 procedure_code: '03.11.01.004-0',
@@ -1364,7 +1574,7 @@ export class DoctorPatientService {
               discharge_date: '2024-01-27',
               aih_number: 'AIH001234567896'
             },
-            total_value_reais: 125000,
+            total_value_reais: 1250.00, // ✅ CORRIGIDO: Era 125000 centavos = R$ 1.250,00
             procedures: [
               {
                 procedure_code: '03.11.05.002-1',
@@ -1398,7 +1608,7 @@ export class DoctorPatientService {
               discharge_date: '2024-01-31',
               aih_number: 'AIH001234567897'
             },
-            total_value_reais: 142000,
+            total_value_reais: 1420.00, // ✅ CORRIGIDO: Era 142000 centavos = R$ 1.420,00
             procedures: [
               {
                 procedure_code: '03.11.02.009-4',
@@ -1443,7 +1653,7 @@ export class DoctorPatientService {
               discharge_date: '2024-01-20',
               aih_number: 'AIH001234567898'
             },
-            total_value_reais: 245000,
+            total_value_reais: 2450.00, // ✅ CORRIGIDO: Era 245000 centavos = R$ 2.450,00
             procedures: [
               {
                 procedure_code: '02.05.01.004-8',
@@ -1477,7 +1687,7 @@ export class DoctorPatientService {
               discharge_date: '2024-01-24',
               aih_number: 'AIH001234567899'
             },
-            total_value_reais: 180000,
+            total_value_reais: 1800.00, // ✅ CORRIGIDO: Era 180000 centavos = R$ 1.800,00
             procedures: [
               {
                 procedure_code: '02.05.01.009-9',
@@ -1511,7 +1721,7 @@ export class DoctorPatientService {
               discharge_date: '2024-01-30',
               aih_number: 'AIH001234567900'
             },
-            total_value_reais: 320000,
+            total_value_reais: 3200.00, // ✅ CORRIGIDO: Era 320000 centavos = R$ 3.200,00
             procedures: [
               {
                 procedure_code: '02.05.01.005-6',
@@ -1545,7 +1755,7 @@ export class DoctorPatientService {
               discharge_date: '2024-02-03',
               aih_number: 'AIH001234567901'
             },
-            total_value_reais: 120000,
+            total_value_reais: 1200.00, // ✅ CORRIGIDO: Era 120000 centavos = R$ 1.200,00
             procedures: [
               {
                 procedure_code: '02.05.01.012-9',

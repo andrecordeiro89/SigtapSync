@@ -32,6 +32,8 @@ import {
 
 import { DoctorPatientService, type DoctorWithPatients } from '../services/doctorPatientService';
 import DoctorPaymentRules, { calculateDoctorPayment } from './DoctorPaymentRules';
+import ProcedurePatientDiagnostic from './ProcedurePatientDiagnostic';
+import CleuezaDebugComponent from './CleuezaDebugComponent';
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -58,11 +60,15 @@ const formatNumber = (value: number | null | undefined): string => {
 
 const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   const totalProcedures = doctorData.patients.reduce((sum, patient) => sum + patient.procedures.length, 0);
-  const totalValue = doctorData.patients.reduce((sum, patient) => 
-    sum + patient.procedures.reduce((procSum, proc) => procSum + (proc.value_reais || 0), 0), 0
-  );
+  // ✅ CORREÇÃO: USAR patient.total_value_reais QUE VEM DO calculated_total_value DA AIH
+  const totalValue = doctorData.patients.reduce((sum, patient) => sum + patient.total_value_reais, 0);
   const totalAIHs = doctorData.patients.length;
   const avgTicket = totalAIHs > 0 ? totalValue / totalAIHs : 0;
+  
+  // 🔍 LOG PARA VERIFICAÇÃO DA CORREÇÃO
+  if (doctorData.patients.length > 0) {
+    console.log(`💰 Médico ${doctorData.doctor_info.name}: R$ ${totalValue.toFixed(2)} (usando patient.total_value_reais)`);
+  }
   
   const approvedProcedures = doctorData.patients.reduce((sum, patient) => 
     sum + patient.procedures.filter(proc => proc.approval_status === 'approved').length, 0
@@ -365,6 +371,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
   const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set());
   const [showDiagnostic, setShowDiagnostic] = useState(false); // 🆕 ESTADO PARA MOSTRAR DIAGNÓSTICO
+  const [showProcedureDiagnostic, setShowProcedureDiagnostic] = useState(false); // 🆕 DIAGNÓSTICO DE PROCEDIMENTOS
+  const [showCleuezaDebug, setShowCleuezaDebug] = useState(false); // 🆕 DEBUG ESPECÍFICO CLEUZA
   // 🆕 ESTADOS PARA PAGINAÇÃO DE PACIENTES
   const [currentPatientPage, setCurrentPatientPage] = useState<Map<string, number>>(new Map());
   const [patientSearchTerm, setPatientSearchTerm] = useState<Map<string, string>>(new Map());
@@ -656,6 +664,57 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       {showDiagnostic && (
         <DataDiagnostics onClose={() => setShowDiagnostic(false)} />
       )}
+      
+      {/* 🆕 DIAGNÓSTICO DE PROCEDIMENTOS */}
+      {showProcedureDiagnostic && (
+        <ProcedurePatientDiagnostic />
+      )}
+      
+      {/* 🆕 DEBUG ESPECÍFICO CLEUZA */}
+      {showCleuezaDebug && (
+        <CleuezaDebugComponent />
+      )}
+
+      {/* 🔧 PAINEL DE DIAGNÓSTICOS */}
+      <Card className="border-2 border-dashed border-blue-200 bg-blue-50/30">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-blue-900">🔍 Ferramentas de Diagnóstico</h3>
+              <p className="text-sm text-blue-700">Identifique problemas na associação de dados</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowDiagnostic(!showDiagnostic)}
+                variant="outline"
+                size="sm"
+                className="bg-yellow-50 border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+              >
+                <Database className="h-4 w-4 mr-1" />
+                {showDiagnostic ? 'Ocultar' : 'Diagnóstico Estrutural'}
+              </Button>
+              <Button
+                onClick={() => setShowProcedureDiagnostic(!showProcedureDiagnostic)}
+                variant="outline"
+                size="sm"
+                className="bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
+              >
+                <Activity className="h-4 w-4 mr-1" />
+                {showProcedureDiagnostic ? 'Ocultar' : 'Diagnóstico Procedimentos'}
+              </Button>
+              <Button
+                onClick={() => setShowCleuezaDebug(!showCleuezaDebug)}
+                variant="outline"
+                size="sm"
+                className="bg-red-50 border-red-300 text-red-700 hover:bg-red-100"
+              >
+                <Search className="h-4 w-4 mr-1" />
+                {showCleuezaDebug ? 'Ocultar' : 'Debug Cleuza'}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ⚠️ AVISO DE DADOS DE DEMONSTRAÇÃO */}
       {globalStats.isDemoData && (
