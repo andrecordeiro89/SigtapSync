@@ -742,7 +742,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             const convertedProcedures = proceduresToAssign.map(proc => ({
               procedure_id: proc.id,
               procedure_code: proc.procedure_code,
-              procedure_description: proc.procedure_name,
+              procedure_description: proc.procedure_description,
               procedure_date: proc.procedure_date,
               value_reais: (proc.value_charged || proc.total_value || 0) / 100, // Converter centavos para reais
               value_cents: proc.value_charged || proc.total_value || 0,

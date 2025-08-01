@@ -18,6 +18,7 @@ export interface ProcedureRecord {
   procedure_date: string;
   procedure_code: string;
   procedure_name: string;
+  procedure_description?: string;
   procedure_code_original?: string;
   
   // Financial Information  
@@ -85,6 +86,7 @@ export class ProcedureRecordsService {
           procedure_date,
           procedure_code,
           procedure_name,
+          procedure_description,
           procedure_code_original,
           value_charged,
           value_original,
@@ -158,6 +160,7 @@ export class ProcedureRecordsService {
           procedure_date,
           procedure_code,
           procedure_name,
+          procedure_description,
           procedure_code_original,
           value_charged,
           value_original,
@@ -257,7 +260,7 @@ export class ProcedureRecordsService {
       while (hasMore) {
         const { data, error } = await supabase
           .from('procedure_records')
-          .select('*')
+          .select('*, procedure_description')
           .range(page * pageSize, (page + 1) * pageSize - 1)
           .order('created_at', { ascending: false });
 
