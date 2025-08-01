@@ -133,6 +133,16 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       requiresDeveloper: true,
       order: 9,
       color: 'from-slate-500 to-gray-600'
+    },
+    {
+      id: 'procedure-debugger',
+      label: 'Debug Procedimentos',
+      icon: Code,
+      description: 'Debug da tabela procedure_records - Desenvolvimento',
+      requiresAdmin: true,
+      requiresDeveloper: true,
+      order: 10,
+      color: 'from-red-500 to-pink-600'
     }
   ];
 

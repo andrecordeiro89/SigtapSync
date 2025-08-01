@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 
 import { DoctorPatientService, type DoctorWithPatients } from '../services/doctorPatientService';
+import { ProcedureRecordsService, type ProcedureRecord } from '../services/simplifiedProcedureService';
 import DoctorPaymentRules, { calculateDoctorPayment } from './DoctorPaymentRules';
 import ProcedurePatientDiagnostic from './ProcedurePatientDiagnostic';
 import CleuezaDebugComponent from './CleuezaDebugComponent';
@@ -423,6 +424,399 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
   };
 
+  // 🚀 FUNÇÃO PARA CARREGAR PROCEDIMENTOS SEPARADAMENTE (SOLUÇÃO IMEDIATA)
+  const loadProceduresForPatients = async (doctorsData: DoctorWithPatients[]) => {
+    try {
+      console.log('🔄 SOLUÇÃO IMEDIATA: Carregando procedimentos separadamente...');
+      
+      // 1. ESTRATÉGIA DIRETA: Buscar TODOS os procedimentos da tabela procedure_records
+      console.log('🔍 [SOLUÇÃO DEFINITIVA] Buscando TODOS os procedimentos (sem qualquer limite)...');
+      const sampleResult = await ProcedureRecordsService.getAllProcedures(); // Buscar TODOS sem limite
+      
+      if (!sampleResult.success) {
+        console.error('❌ Erro ao buscar amostra de procedimentos:', sampleResult.error);
+        return;
+      }
+      
+      console.log(`📊 Encontrados ${sampleResult.procedures.length} procedimentos TOTAIS`);
+      console.log('🔍 Exemplo de procedure_record:', sampleResult.procedures[0]);
+      
+      // 2. Coletar informações dos pacientes dos médicos PRIMEIRO
+      const doctorPatients = new Map<string, any>();
+      const doctorPatientIds = new Set<string>();
+      
+      doctorsData.forEach(doctor => {
+        doctor.patients.forEach(patient => {
+          // Buscar por patient_id real (UUID da tabela patients)
+          const patientRecord = patient.patient_info || patient;
+          
+          // Tentar encontrar o patient_id real através da relação AIH → patient
+          // Normalmente estará em patient.patient_id ou similar
+          let realPatientId = null;
+          
+          // Estratégia 1: Buscar na estrutura patient_info
+          if ((patientRecord as any).id) {
+            realPatientId = (patientRecord as any).id;
+          }
+          
+          // Estratégia 2: Buscar através do CNS na tabela patients
+          if (!realPatientId && (patientRecord as any).cns) {
+            // Adicionar CNS para possível lookup
+            doctorPatients.set((patientRecord as any).cns, patient);
+            doctorPatientIds.add((patientRecord as any).cns);
+          }
+          
+          // Estratégia 3: Se tiver patient_id direto
+          if ((patient as any).patient_id) {
+            doctorPatients.set((patient as any).patient_id, patient);
+            doctorPatientIds.add((patient as any).patient_id);
+          }
+          
+          // Registrar também o realPatientId se encontrado
+          if (realPatientId) {
+            doctorPatients.set(realPatientId, patient);
+            doctorPatientIds.add(realPatientId);
+          }
+        });
+      });
+      
+      console.log(`📋 Pacientes dos médicos registrados: ${doctorPatients.size}`);
+      console.log('🔍 [DEBUG] Patient IDs dos médicos (primeiros 10):', Array.from(doctorPatientIds).slice(0, 10));
+      
+      // 3. Coletar patient_ids únicos dos procedimentos encontrados
+      const procedurePatientIds = [...new Set(sampleResult.procedures.map(p => p.patient_id))];
+      console.log(`👥 Patient IDs únicos nos procedimentos: ${procedurePatientIds.length}`);
+      console.log('🔍 Primeiros patient_ids dos procedimentos:', procedurePatientIds.slice(0, 5));
+      
+      // 4. 🎯 SOLUÇÃO DEFINITIVA: Associação via CNS (único e confiável)
+      console.log('\n🎯 SOLUÇÃO VIA CNS: Usando CNS como chave única de associação!');
+      
+      // Coletar CNS dos pacientes dos médicos
+      const patientCNSs = new Set<string>();
+      const cnsToPatientMap = new Map<string, any>();
+      
+      doctorsData.forEach(doctor => {
+        doctor.patients.forEach(patient => {
+          const cns = patient.patient_info?.cns;
+          if (cns) {
+            patientCNSs.add(cns);
+            cnsToPatientMap.set(cns, patient);
+          }
+        });
+      });
+      
+      console.log(`🔍 Coletados ${patientCNSs.size} CNS únicos dos pacientes`);
+      console.log('🔍 Exemplos de CNS:', Array.from(patientCNSs).slice(0, 3));
+      
+      // Buscar patient_ids na tabela patients usando CNS
+      const cnsToPatientIdMap = new Map<string, string>();
+      
+      if (patientCNSs.size > 0) {
+        try {
+          console.log('🔍 Buscando patient_ids via CNS na tabela patients...');
+          
+          // Buscar em lotes para evitar URLs muito grandes
+          const cnsArray = Array.from(patientCNSs);
+          const batchSize = 100;
+          
+          for (let i = 0; i < cnsArray.length; i += batchSize) {
+            const batch = cnsArray.slice(i, i + batchSize);
+            
+            const { data: patientsData, error } = await supabase
+              .from('patients')
+              .select('id, cns')
+              .in('cns', batch);
+              
+            if (!error && patientsData) {
+              patientsData.forEach(patient => {
+                cnsToPatientIdMap.set(patient.cns, patient.id);
+              });
+            }
+          }
+          
+          console.log(`✅ Encontrados ${cnsToPatientIdMap.size} patient_ids via CNS`);
+          console.log('🔍 Exemplos CNS → Patient_ID:', Array.from(cnsToPatientIdMap.entries()).slice(0, 3));
+          
+        } catch (error) {
+          console.error('❌ Erro ao buscar patient_ids via CNS:', error);
+        }
+      }
+      
+      // Buscar procedimentos usando os patient_ids obtidos via CNS
+      let directResult = null;
+      const patientIdsViaCNS = new Set(Array.from(cnsToPatientIdMap.values()));
+      
+      if (patientIdsViaCNS.size > 0) {
+        console.log('🎯 Buscando procedimentos via PATIENT_IDs obtidos do CNS...');
+        
+        // Filtrar procedimentos da amostra que têm patient_id correspondente
+        const proceduresViaPatientId = sampleResult.procedures.filter(proc => 
+          proc.patient_id && patientIdsViaCNS.has(proc.patient_id)
+        );
+        
+        if (proceduresViaPatientId.length > 0) {
+          directResult = {
+            success: true,
+            procedures: proceduresViaPatientId,
+            uniquePatientIds: [...new Set(proceduresViaPatientId.map(p => p.patient_id))]
+          };
+          console.log(`🎉 SUCESSO VIA CNS! Encontrados ${proceduresViaPatientId.length} procedimentos`);
+          console.log(`📊 Patient IDs únicos nos procedimentos: ${[...new Set(proceduresViaPatientId.map(p => p.patient_id))].length}`);
+        } else {
+          console.log(`⚠️ Nenhum procedimento encontrado via CNS. Verificando incompatibilidade...`);
+          
+          // Debug: verificar alguns patient_ids dos procedimentos vs CNS
+          const procedurePatientIds = [...new Set(sampleResult.procedures.map(p => p.patient_id).filter(Boolean))];
+          console.log('🔍 Exemplos de patient_ids nos procedimentos:', procedurePatientIds.slice(0, 5));
+          console.log('🔍 Exemplos de patient_ids via CNS:', Array.from(patientIdsViaCNS).slice(0, 5));
+          
+          // Tentar busca por proximidade de UUID
+          const similarPatientIds = procedurePatientIds.filter(patientId => 
+            Array.from(patientIdsViaCNS).some(cnsPatientId => 
+              patientId.substring(0, 8) === cnsPatientId.substring(0, 8)
+            )
+          );
+          console.log('🔍 Patient IDs com prefixos similares:', similarPatientIds.slice(0, 3));
+        }
+      } else {
+        console.log('❌ Nenhum patient_id encontrado via CNS - possível problema na tabela patients');
+      }
+      
+      // 5. Usar resultado via CNS se disponível, senão usar amostra geral
+      const result = (directResult?.success && directResult.procedures.length > 0) 
+        ? directResult 
+        : sampleResult;
+      
+      console.log(`📊 USANDO RESULTADO: ${directResult?.success ? 'BUSCA VIA CNS (CORRETO)' : 'AMOSTRA GERAL'}`);
+      console.log(`📋 Total de procedimentos: ${result.procedures.length}`);
+      
+      // 🚨 DEBUG CRÍTICO: VERIFICAR DISPONIBILIDADE DE PATIENT_IDs VIA CNS
+      const currentProcedurePatientIds = [...new Set(result.procedures.map(p => p.patient_id).filter(Boolean))];
+      const intersection = Array.from(patientIdsViaCNS).filter(id => currentProcedurePatientIds.includes(id));
+      console.log(`🔍 [DEBUG] INTERSEÇÃO VIA CNS: ${intersection.length} IDs em comum`);
+      if (intersection.length > 0) {
+        console.log('✅ [DEBUG] Patient_IDs em comum via CNS:', intersection.slice(0, 5));
+      } else {
+        console.log('❌ [DEBUG] NENHUM PATIENT_ID em comum via CNS!');
+        console.log('🔍 [DEBUG] Exemplo Patient_ID via CNS:', Array.from(patientIdsViaCNS)[0]);
+        console.log('🔍 [DEBUG] Exemplo Patient_ID procedimento:', currentProcedurePatientIds[0]);
+        console.log('🔍 [DEBUG] Total Patient_IDs via CNS:', patientIdsViaCNS.size);
+        console.log('🔍 [DEBUG] Total Patient_IDs dos procedimentos:', currentProcedurePatientIds.length);
+      }
+      
+      if (!result.success) {
+        console.error('❌ Erro ao carregar procedimentos:', result.error);
+        return;
+      }
+      
+      console.log(`✅ Encontrados ${result.procedures.length} procedimentos`);
+      
+      // 🚨 DEBUG CRÍTICO: INVESTIGAR DADOS
+      if (result.procedures.length > 0) {
+        console.log('🔍 [DEBUG] Exemplo de procedimento da tabela:', result.procedures[0]);
+        console.log('🔍 [DEBUG] Patient IDs únicos nos procedimentos:', result.uniquePatientIds.slice(0, 10));
+        console.log(`🔍 [DEBUG] Total de patient_ids únicos: ${result.uniquePatientIds.length}`);
+      } else {
+        console.log('⚠️ [DEBUG] NENHUM PROCEDIMENTO encontrado na tabela procedure_records!');
+        // Se não há procedimentos, vamos buscar informações da tabela
+        const debugTableInfo = await ProcedureRecordsService.getTableInfo();
+        console.log('🔍 [DEBUG] Info da tabela procedure_records:', debugTableInfo);
+      }
+      
+      // 3. 🔧 CORREÇÃO FINAL: Agrupar procedimentos por patient_id (correto)
+      const proceduresByPatientId = new Map<string, ProcedureRecord[]>();
+      result.procedures.forEach(proc => {
+        if (proc.patient_id) { // Só considerar procedimentos com patient_id válido
+          if (!proceduresByPatientId.has(proc.patient_id)) {
+            proceduresByPatientId.set(proc.patient_id, []);
+          }
+          proceduresByPatientId.get(proc.patient_id)!.push(proc);
+        }
+      });
+      
+      console.log(`📊 Procedimentos agrupados para ${proceduresByPatientId.size} pacientes`);
+      console.log('🔍 Exemplos de patient_ids com procedimentos:', Array.from(proceduresByPatientId.keys()).slice(0, 3));
+      
+      // 4. ESTRATÉGIA INTELIGENTE DE ASSOCIAÇÃO COM ESTATÍSTICAS
+      let totalProceduresAssociated = 0;
+      let associationsFound = 0;
+      
+      // Contadores de diagnóstico
+      let patientsWithoutCNS = 0;
+      let patientsWithCNSNotInDB = 0;
+      let patientsWithValidIdButNoProcedures = 0;
+      let patientsWithProcedures = 0;
+      
+      console.log('\n🔗 === INICIANDO ASSOCIAÇÃO INTELIGENTE ===');
+      
+      doctorsData.forEach((doctor, doctorIndex) => {
+        console.log(`\n👨‍⚕️ Médico ${doctorIndex + 1}: ${doctor.doctor_info.name}`);
+        
+        doctor.patients.forEach((patient, patientIndex) => {
+          // Limpar procedimentos existentes
+          patient.procedures = [];
+          
+          console.log(`  👤 Paciente ${patientIndex + 1}: ${patient.patient_info.name}`);
+          console.log(`      CNS: ${patient.patient_info.cns}`);
+          
+          let proceduresToAssign = [];
+          
+          // ESTRATÉGIA 1: 🎯 BUSCA VIA CNS → PATIENT_ID (SOLUÇÃO DEFINITIVA)
+          const patientCNS = patient.patient_info?.cns;
+          
+          if (patientCNS) {
+            console.log(`      🔍 Buscando procedimentos via CNS: ${patientCNS}`);
+            
+            // Buscar patient_id através do CNS
+            const patientIdViaCNS = cnsToPatientIdMap.get(patientCNS);
+            
+            if (patientIdViaCNS) {
+              console.log(`      ✅ Patient_ID encontrado via CNS: ${patientIdViaCNS}`);
+              
+              // Buscar procedimentos usando o patient_id
+              const foundProcedures = proceduresByPatientId.get(patientIdViaCNS);
+              if (foundProcedures && foundProcedures.length > 0) {
+                proceduresToAssign = foundProcedures;
+                console.log(`      🎉 ENCONTRADOS ${foundProcedures.length} procedimentos via CNS!`);
+                associationsFound++;
+                patientsWithProcedures++;
+              } else {
+                console.log(`      ⚠️ Patient_ID encontrado mas sem procedimentos: ${patientIdViaCNS}`);
+                patientsWithValidIdButNoProcedures++;
+              }
+            } else {
+              console.log(`      ❌ CNS não encontrado na tabela patients: ${patientCNS}`);
+              patientsWithCNSNotInDB++;
+            }
+          } else {
+            console.log(`      ❌ Paciente sem CNS: ${patient.patient_info?.name}`);
+            patientsWithoutCNS++;
+          }
+          
+          // ESTRATÉGIA 2: Debug específico para identificar o problema
+          if (proceduresToAssign.length === 0) {
+            console.log(`      🚨 DIAGNÓSTICO DETALHADO PARA: ${patient.patient_info?.name}`);
+            console.log(`        🆔 CNS do paciente: ${patientCNS}`);
+            
+            if (!patientCNS) {
+              console.log(`        ❌ PROBLEMA: Paciente sem CNS`);
+            } else {
+              const patientIdViaCNS = cnsToPatientIdMap.get(patientCNS);
+              console.log(`        🔍 Patient_ID via CNS: ${patientIdViaCNS}`);
+              
+              if (!patientIdViaCNS) {
+                console.log(`        ❌ PROBLEMA: CNS não encontrado na tabela patients`);
+                console.log(`        💡 SOLUÇÃO: Verificar se CNS ${patientCNS} existe na tabela patients`);
+                
+                // Verificar se é problema de formatação do CNS
+                const similarCNS = Array.from(cnsToPatientIdMap.keys()).filter(cns => 
+                  cns.replace(/\D/g, '') === patientCNS.replace(/\D/g, '')
+                );
+                if (similarCNS.length > 0) {
+                  console.log(`        🔍 CNS com formatação similar encontrado: ${similarCNS[0]}`);
+                }
+              } else {
+                const hasProcs = proceduresByPatientId.has(patientIdViaCNS);
+                console.log(`        🔍 Tem procedimentos: ${hasProcs}`);
+                
+                if (!hasProcs) {
+                  console.log(`        ❌ PROBLEMA: Patient_ID encontrado mas sem procedimentos em procedure_records`);
+                  console.log(`        💡 SOLUÇÃO: Verificar se patient_id ${patientIdViaCNS} tem registros em procedure_records`);
+                  
+                  // Verificar IDs similares
+                  const similarPatientIds = Array.from(proceduresByPatientId.keys()).filter(id => 
+                    id.substring(0, 8) === patientIdViaCNS.substring(0, 8)
+                  );
+                  if (similarPatientIds.length > 0) {
+                    console.log(`        🔍 Patient_IDs similares com procedimentos: ${similarPatientIds.slice(0, 2)}`);
+                  }
+                }
+              }
+            }
+          }
+          
+
+          
+          if (proceduresToAssign.length > 0) {
+            // Converter ProcedureRecord para ProcedureDetail
+            const convertedProcedures = proceduresToAssign.map(proc => ({
+              procedure_id: proc.id,
+              procedure_code: proc.procedure_code,
+              procedure_description: proc.procedure_name,
+              procedure_date: proc.procedure_date,
+              value_reais: (proc.value_charged || proc.total_value || 0) / 100, // Converter centavos para reais
+              value_cents: proc.value_charged || proc.total_value || 0,
+              approval_status: proc.billing_status || 'pending',
+              professional_name: proc.professional_name || proc.professional || 'Profissional não informado',
+              cbo: proc.professional_cbo,
+              participation: 'Executante'
+            }));
+            
+            patient.procedures.push(...convertedProcedures);
+            totalProceduresAssociated += convertedProcedures.length;
+            
+            console.log(`      ✅ Associados ${convertedProcedures.length} procedimentos`);
+            console.log(`      📋 Códigos: ${convertedProcedures.map(p => p.procedure_code).join(', ')}`);
+          } else {
+            console.log(`      ⚠️  Nenhum procedimento encontrado`);
+          }
+        });
+      });
+      
+      console.log('\n📊 === RESULTADO DA ASSOCIAÇÃO (VIA CNS) ===');
+      console.log(`✅ Total de procedimentos associados: ${totalProceduresAssociated}`);
+      console.log(`🔗 Associações diretas encontradas: ${associationsFound}`);
+      console.log(`👥 Total de pacientes processados: ${doctorsData.reduce((sum, d) => sum + d.patients.length, 0)}`);
+      
+      // 🚨 RESUMO ESTATÍSTICO DETALHADO
+      const totalPatients = doctorsData.reduce((sum, d) => sum + d.patients.length, 0);
+      
+      console.log('\n📊 === RESUMO ESTATÍSTICO DETALHADO ===');
+      console.log(`📋 Procedimentos na tabela: ${result.procedures.length}`);
+      console.log(`👥 Patient IDs únicos nos procedimentos: ${currentProcedurePatientIds.length}`);
+      console.log(`🆔 CNS únicos dos médicos: ${patientCNSs.size}`);
+      console.log(`🔗 Patient_IDs via CNS: ${cnsToPatientIdMap.size}`);
+      console.log(`🎯 Intersecção via CNS: ${intersection.length}`);
+      
+      console.log('\n🎯 === BREAKDOWN POR CATEGORIA ===');
+      console.log(`👥 Total de pacientes: ${totalPatients}`);
+      console.log(`✅ Pacientes COM procedimentos: ${patientsWithProcedures} (${((patientsWithProcedures/totalPatients)*100).toFixed(1)}%)`);
+      console.log(`⚠️ Pacientes SEM procedimentos: ${totalPatients - patientsWithProcedures} (${(((totalPatients - patientsWithProcedures)/totalPatients)*100).toFixed(1)}%)`);
+      
+      console.log('\n🔍 === DETALHAMENTO DOS PROBLEMAS ===');
+      if (patientsWithoutCNS > 0) {
+        console.log(`❌ Pacientes sem CNS: ${patientsWithoutCNS}`);
+        console.log(`   💡 SOLUÇÃO: Verificar por que alguns pacientes não têm CNS`);
+      }
+      if (patientsWithCNSNotInDB > 0) {
+        console.log(`❌ CNS não encontrado na tabela patients: ${patientsWithCNSNotInDB}`);
+        console.log(`   💡 SOLUÇÃO: Verificar se esses CNS existem na tabela patients`);
+      }
+      if (patientsWithValidIdButNoProcedures > 0) {
+        console.log(`❌ Patient_ID válido mas sem procedimentos: ${patientsWithValidIdButNoProcedures}`);
+        console.log(`   💡 SOLUÇÃO: Verificar se esses patient_ids têm registros em procedure_records`);
+      }
+      
+      if (patientsWithProcedures > 0) {
+        console.log(`\n🎉 SUCESSO PARCIAL!`);
+        console.log(`   ✅ ${patientsWithProcedures} pacientes já estão recebendo procedimentos`);
+        console.log(`   📈 Taxa de sucesso: ${((patientsWithProcedures/totalPatients)*100).toFixed(1)}%`);
+      }
+      
+      console.log(`🎯 RESULTADO: ${totalProceduresAssociated} procedimentos associados aos pacientes`);
+      
+      if (totalProceduresAssociated > 0) {
+        toast.success(`✅ Carregados ${totalProceduresAssociated} procedimentos!`);
+      } else {
+        toast.warning('⚠️ Nenhum procedimento associado. Verifique o console para debug.');
+      }
+      
+    } catch (error) {
+      console.error('❌ Erro ao carregar procedimentos separadamente:', error);
+      toast.error('Erro ao carregar procedimentos');
+    }
+  };
+
   // ✅ CARREGAR DADOS DOS MÉDICOS COM FILTRO POR HOSPITAL
   useEffect(() => {
     const loadDoctorsData = async () => {
@@ -440,6 +834,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         
         const doctorsData = await DoctorPatientService.getAllDoctorsWithPatients();
         console.log('✅ Dados dos médicos carregados:', doctorsData);
+        
+        // 🚀 SOLUÇÃO IMEDIATA: CARREGAR PROCEDIMENTOS SEPARADAMENTE
+        await loadProceduresForPatients(doctorsData);
         
         // ✅ CARREGAR LISTA DE HOSPITAIS DISPONÍVEIS
         await loadAvailableHospitals(doctorsData);
@@ -675,6 +1072,29 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         <CleuezaDebugComponent />
       )}
 
+      {/* 🚀 SOLUÇÃO IMEDIATA IMPLEMENTADA */}
+      <Card className="border-2 border-green-200 bg-green-50/30 mb-4">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-green-900">🚀 Solução Imediata: Procedimentos Simplificados</h3>
+              <p className="text-sm text-green-700">Sistema de carregamento direto da tabela procedure_records implementado</p>
+              <div className="flex gap-2 mt-2">
+                <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+                  ✅ SimplifiedProcedureService ativo
+                </Badge>
+                <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                  🔄 Carregamento automático
+                </Badge>
+                <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
+                  🧪 Modo debug disponível
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* 🔧 PAINEL DE DIAGNÓSTICOS */}
       <Card className="border-2 border-dashed border-blue-200 bg-blue-50/30">
         <CardContent className="p-4">
@@ -710,6 +1130,36 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               >
                 <Search className="h-4 w-4 mr-1" />
                 {showCleuezaDebug ? 'Ocultar' : 'Debug Cleuza'}
+              </Button>
+              
+              <Button
+                onClick={async () => {
+                  console.log('🔄 [MANUAL DEBUG] Recarregando procedimentos...');
+                  const currentDoctors = doctors;
+                  if (currentDoctors.length > 0) {
+                    await loadProceduresForPatients(currentDoctors);
+                  } else {
+                    console.log('❌ Nenhum médico disponível para debug');
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100"
+              >
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Debug Procedimentos
+              </Button>
+              <Button
+                onClick={async () => {
+                  console.log('🚀 TESTE MANUAL: Recarregando procedimentos...');
+                  await loadProceduresForPatients(doctors);
+                }}
+                variant="outline"
+                size="sm"
+                className="bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
+              >
+                <RefreshCw className="h-4 w-4 mr-1" />
+                🚀 Teste Procedimentos
               </Button>
             </div>
           </div>
@@ -1387,6 +1837,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               </div>
                                               <div className="text-sm text-slate-600 mb-2">
                                                 {patient.procedures.length} procedimento(s)
+                                                {patient.procedures.length > 0 && (
+                                                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200 text-xs">
+                                                    ✅ Carregados
+                                                  </Badge>
+                                                )}
                                               </div>
                                               {/* ✅ ESTATÍSTICAS RÁPIDAS DOS PROCEDIMENTOS */}
                                               {patient.procedures.length > 0 && (
