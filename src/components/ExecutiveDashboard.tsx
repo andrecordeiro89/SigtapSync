@@ -29,11 +29,13 @@ import {
 import { DoctorsRevenueService, type DoctorAggregated, type SpecialtyStats, type HospitalStats as HospitalRevenueStats } from '../services/doctorsRevenueService';
 import { AIHBillingService, type CompleteBillingStats } from '../services/aihBillingService';
 import { supabase } from '../lib/supabase';
+import { DateRange } from '../types';
 import HospitalRevenueDashboard from './HospitalRevenueDashboard';
 import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
 import MedicalProductionDashboard from './MedicalProductionDashboard';
 import MedicalStaffDashboard from './MedicalStaffDashboard';
 import ReportGenerator from './ReportGenerator';
+import ExecutiveDateFilters from './ExecutiveDateFilters';
 
 // ✅ FUNÇÃO OTIMIZADA PARA FORMATAR VALORES MONETÁRIOS
 const formatCurrency = (value: number | null | undefined): string => {
@@ -77,15 +79,31 @@ const calculatePercentage = (part: number, total: number): number => {
 };
 
 // ✅ FUNÇÃO PARA BUSCAR DADOS REAIS DAS AIHS (FALLBACK PARA VIEWS)
-const getRealAIHData = async () => {
+const getRealAIHData = async (dateRange?: DateRange) => {
   try {
     console.log('🔄 Buscando dados reais das AIHs processadas...');
     
-    // Buscar AIHs simples
-    const { data: aihs, error: aihsError } = await supabase
+    let query = supabase
       .from('aihs')
       .select('*')
       .order('created_at', { ascending: false });
+    
+    // Aplicar filtros de data se fornecidos
+    if (dateRange) {
+      const startDateISO = dateRange.startDate.toISOString();
+      const endDateISO = dateRange.endDate.toISOString();
+      
+      console.log('📅 Aplicando filtros de data na consulta fallback:', {
+        inicio: startDateISO,
+        fim: endDateISO
+      });
+      
+      query = query
+        .gte('admission_date', startDateISO)
+        .lte('admission_date', endDateISO);
+    }
+    
+    const { data: aihs, error: aihsError } = await query;
 
     if (aihsError) {
       console.error('❌ Erro ao buscar AIHs:', aihsError);
@@ -238,7 +256,12 @@ interface AlertItem {
 
 const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   // State Management
-  const [selectedTimeRange, setSelectedTimeRange] = useState('30d');
+  const [selectedTimeRange, setSelectedTimeRange] = useState('7d');
+  const [selectedDateRange, setSelectedDateRange] = useState<DateRange>(() => {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return { startDate: sevenDaysAgo, endDate: now };
+  });
   const [selectedHospitals, setSelectedHospitals] = useState<string[]>(['all']);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -374,6 +397,20 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     }));
     setLastUpdate(new Date());
   }, []);
+
+  // Função para lidar com mudanças no filtro de data
+  const handleDateRangeChange = useCallback((range: DateRange) => {
+    console.log('📅 Alterando período de análise:', {
+      inicio: range.startDate.toLocaleDateString('pt-BR'),
+      fim: range.endDate.toLocaleDateString('pt-BR')
+    });
+    setSelectedDateRange(range);
+    setIsLoading(true);
+    // Carregar dados com o novo período
+    if (hasExecutiveAccess) {
+      loadExecutiveData(range);
+    }
+  }, [hasExecutiveAccess]);
   
     // Função para lidar com mudança de aba
   const handleTabChange = (tabValue: string) => {
@@ -387,21 +424,24 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
 
   // Load Data
-  const loadExecutiveData = async () => {
+  const loadExecutiveData = async (dateRange?: DateRange) => {
     if (!hasExecutiveAccess) return;
     
     setIsLoading(true);
     try {
-      console.log('📊 Carregando dados executivos reais...');
+      const currentDateRange = dateRange || selectedDateRange;
+      console.log('📊 Carregando dados executivos reais...', {
+        periodo: `${currentDateRange.startDate.toLocaleDateString('pt-BR')} - ${currentDateRange.endDate.toLocaleDateString('pt-BR')}`
+      });
       
       // ✅ PRIMEIRO: Tentar carregar das views, se falhar usar dados reais das tabelas
       let billingStatsData = null;
       try {
-        billingStatsData = await AIHBillingService.getCompleteBillingStats();
+        billingStatsData = await AIHBillingService.getCompleteBillingStats(currentDateRange);
         console.log('✅ Dados carregados das views de billing');
       } catch (error) {
         console.warn('⚠️ Views de billing não disponíveis, buscando dados reais das tabelas:', error);
-        billingStatsData = await getRealAIHData();
+        billingStatsData = await getRealAIHData(currentDateRange);
       }
 
       // Carregar dados das views de médicos/hospitais em paralelo
@@ -482,18 +522,31 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
       const activeDoctors = doctorsResult.doctors.filter(d => d.activity_status === 'ATIVO').length;
       
-      // ✅ CARREGAR DADOS DIRETOS DA TABELA AIHS PARA O CABEÇALHO
-      console.log('🔄 Carregando dados diretos da tabela aihs...');
+      // ✅ CARREGAR DADOS DIRETOS DA TABELA AIHS PARA O CABEÇALHO COM FILTROS DE DATA
+      console.log('🔄 Carregando dados diretos da tabela aihs com filtros de período...');
       
-      // Query otimizada: buscar dados + count em paralelo
+      // Converter datas para formato ISO para o Supabase
+      const startDateISO = currentDateRange.startDate.toISOString();
+      const endDateISO = currentDateRange.endDate.toISOString();
+      
+      console.log('📅 Aplicando filtros de data:', {
+        inicio: startDateISO,
+        fim: endDateISO
+      });
+      
+      // Query otimizada: buscar dados + count em paralelo com filtros de data
       const [aihsDataResult, aihsCountResult] = await Promise.all([
         supabase
           .from('aihs')
           .select('calculated_total_value')
-          .not('calculated_total_value', 'is', null),
+          .not('calculated_total_value', 'is', null)
+          .gte('admission_date', startDateISO)
+          .lte('admission_date', endDateISO),
         supabase
           .from('aihs')
           .select('*', { count: 'exact', head: true })
+          .gte('admission_date', startDateISO)
+          .lte('admission_date', endDateISO)
       ]);
 
       let aihsTotalRevenue = 0;
@@ -644,9 +697,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   // Effects
   useEffect(() => {
     if (hasExecutiveAccess) {
-      loadExecutiveData();
+      loadExecutiveData(selectedDateRange);
     }
-  }, [selectedTimeRange, selectedHospitals, hasExecutiveAccess]);
+  }, [selectedTimeRange, selectedHospitals, selectedDateRange, hasExecutiveAccess]);
 
   // Access Control Render
   if (!hasExecutiveAccess) {
@@ -695,9 +748,6 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             <div className="text-blue-300 text-sm mt-1">
               {isLoading ? '...' : formatNumber(kpiData.totalAIHs)} AIHs Processadas
             </div>
-            <div className="text-blue-400 text-xs mt-1 opacity-75">
-              📊 Dados diretos da tabela aihs (818 registros)
-            </div>
             {lastUpdate && (
               <div className="text-xs text-blue-300 mt-2 flex items-center justify-end gap-1">
                 <Clock className="h-3 w-3" />
@@ -736,7 +786,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
         {/* TAB: MÉDICOS */}
         <TabsContent value="doctors" className="space-y-6">
-          <MedicalProductionDashboard onStatsUpdate={updateMedicalProductionStats} />
+          <MedicalProductionDashboard 
+            onStatsUpdate={updateMedicalProductionStats}
+            dateRange={selectedDateRange}
+            onDateRangeChange={handleDateRangeChange}
+          />
           {/* ⚠️ NOTA: onStatsUpdate agora apenas atualiza activeDoctors, não afeta faturamento/AIHs */}
         </TabsContent>
 

@@ -14,6 +14,8 @@ interface ExecutiveDateFiltersProps {
   showExport?: boolean;
   title?: string;
   subtitle?: string;
+  compact?: boolean;
+  defaultPreset?: string;
 }
 
 const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
@@ -23,9 +25,11 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
   isLoading = false,
   showExport = true,
   title = "Filtros Executivos",
-  subtitle = "Selecione o período para análise"
+  subtitle = "Selecione o período para análise",
+  compact = false,
+  defaultPreset = '30d'
 }) => {
-  const [selectedPreset, setSelectedPreset] = useState<string>('30d');
+  const [selectedPreset, setSelectedPreset] = useState<string>(defaultPreset);
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
   const [isCustomRange, setIsCustomRange] = useState(false);
@@ -123,6 +127,64 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
     return 'Período não selecionado';
   };
 
+  // Versão compacta
+  if (compact) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">Período</span>
+          </div>
+          <Badge variant="outline" className="bg-blue-100 text-blue-700 text-xs">
+            {getCurrentPeriodText()}
+          </Badge>
+        </div>
+        
+        <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
+          {presets.map((preset) => (
+            <Button
+              key={preset.value}
+              variant={selectedPreset === preset.value ? "default" : "outline"}
+              size="sm"
+              className={`text-xs px-2 py-1 h-8 ${
+                selectedPreset === preset.value 
+                  ? 'bg-blue-600 text-white border-blue-600' 
+                  : 'hover:bg-blue-50 hover:border-blue-300'
+              }`}
+              onClick={() => setSelectedPreset(preset.value)}
+            >
+              <span className="mr-1">{preset.icon}</span>
+              <span>{preset.label}</span>
+            </Button>
+          ))}
+        </div>
+
+        {/* Datas Personalizadas - Versão Compacta */}
+        {isCustomRange && (
+          <div className="grid grid-cols-2 gap-2 p-2 bg-gray-50 rounded">
+            <Input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              className="text-xs h-8"
+              placeholder="Data inicial"
+            />
+            <Input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              className="text-xs h-8"
+              max={formatDateForInput(new Date())}
+              placeholder="Data final"
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Versão completa
   return (
     <Card className="border-2 border-blue-100 bg-gradient-to-r from-blue-50 to-purple-50">
       <CardHeader className="pb-3">
