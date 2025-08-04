@@ -112,16 +112,33 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
     return date.toISOString().split('T')[0];
   };
 
-  const getCurrentPeriodText = (): string => {
+  const getCurrentPeriodText = (isCompactMode: boolean = false): string => {
     const selectedPresetData = presets.find(p => p.value === selectedPreset);
+    
     if (selectedPresetData && selectedPresetData.value !== 'custom') {
-      return selectedPresetData.label;
+      // Para presets, mostrar label + datas específicas
+      const range = getDateRangeFromPreset(selectedPreset);
+      const start = range.startDate.toLocaleDateString('pt-BR');
+      const end = range.endDate.toLocaleDateString('pt-BR');
+      
+      if (isCompactMode) {
+        // Versão compacta: só as datas
+        return `${start} - ${end}`;
+      } else {
+        // Versão completa: label + datas
+        return `${selectedPresetData.label} (${start} - ${end})`;
+      }
     }
     
     if (isCustomRange && customStartDate && customEndDate) {
       const start = new Date(customStartDate).toLocaleDateString('pt-BR');
       const end = new Date(customEndDate).toLocaleDateString('pt-BR');
-      return `${start} - ${end}`;
+      
+      if (isCompactMode) {
+        return `${start} - ${end}`;
+      } else {
+        return `Personalizado (${start} - ${end})`;
+      }
     }
     
     return 'Período não selecionado';
@@ -135,9 +152,15 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-gray-600" />
             <span className="text-sm font-medium text-gray-700">Período</span>
+            {/* Indicador do preset selecionado */}
+            {!isCustomRange && (
+              <span className="text-xs text-gray-500">
+                ({presets.find(p => p.value === selectedPreset)?.label})
+              </span>
+            )}
           </div>
-          <Badge variant="outline" className="bg-blue-100 text-blue-700 text-xs">
-            {getCurrentPeriodText()}
+          <Badge variant="outline" className="bg-blue-100 text-blue-700 text-xs font-mono">
+            {getCurrentPeriodText(true)}
           </Badge>
         </div>
         
@@ -196,7 +219,7 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
           <div className="flex items-center space-x-2">
             <Badge variant="outline" className="bg-blue-100 text-blue-700">
               <Clock className="h-3 w-3 mr-1" />
-              {getCurrentPeriodText()}
+              {getCurrentPeriodText(false)}
             </Badge>
           </div>
         </CardTitle>
