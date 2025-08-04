@@ -916,7 +916,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Button 
                   className="h-24 flex flex-col items-center justify-center bg-green-600 hover:bg-green-700"
                   onClick={() => setShowReportGenerator(true)}
@@ -947,6 +947,17 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <div className="text-center">
                     <div className="font-semibold">Relatório Hospitalar</div>
                     <div className="text-xs opacity-90">Comparação entre unidades</div>
+                  </div>
+                </Button>
+
+                <Button 
+                  className="h-24 flex flex-col items-center justify-center bg-red-600 hover:bg-red-700"
+                  onClick={() => setShowReportGenerator(true)}
+                >
+                  <FileText className="h-6 w-6 mb-2" />
+                  <div className="text-center">
+                    <div className="font-semibold">Relatório SUS</div>
+                    <div className="text-xs opacity-90">Médico + Pacientes + Valores</div>
                   </div>
                 </Button>
               </div>
