@@ -111,7 +111,7 @@ export class ProcedureRecordsService {
           notes
         `)
         .eq('patient_id', patientId)
-        .or('professional_cbo.neq.225151,professional_cbo.is.null,and(professional_cbo.eq.225151,procedure_code.like.03%)') // 🚫 EXCLUIR ANESTESISTAS 04.xxx
+        .or('professional_cbo.neq.225151,professional_cbo.is.null,and(professional_cbo.eq.225151,procedure_code.like.03%),and(professional_cbo.eq.225151,procedure_code.eq.04.17.01.001-0)') // 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
         .order('procedure_date', { ascending: false });
 
       if (error) {
@@ -186,7 +186,7 @@ export class ProcedureRecordsService {
           notes
         `)
         .in('patient_id', patientIds)
-        .or('professional_cbo.neq.225151,professional_cbo.is.null,and(professional_cbo.eq.225151,procedure_code.like.03%)') // 🚫 EXCLUIR ANESTESISTAS 04.xxx
+        .or('professional_cbo.neq.225151,professional_cbo.is.null,and(professional_cbo.eq.225151,procedure_code.like.03%),and(professional_cbo.eq.225151,procedure_code.eq.04.17.01.001-0)') // 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
         .order('procedure_date', { ascending: false });
 
       if (error) {

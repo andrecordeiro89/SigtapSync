@@ -42,7 +42,12 @@ export const shouldCalculateAnesthetistProcedure = (cbo?: string, procedureCode?
     return true;
   }
   
-  // 🚫 Procedimentos 04.xxx - ANESTESISTA NÃO RECEBE  
+  // ✅ EXCEÇÃO: Anestesia de Cesariana - ANESTESISTA RECEBE (mesmo sendo 04.xxx)
+  if (code === '04.17.01.001-0') {
+    return true;
+  }
+  
+  // 🚫 Outros procedimentos 04.xxx - ANESTESISTA NÃO RECEBE  
   if (code.startsWith('04')) {
     return false;
   }
@@ -90,6 +95,18 @@ export const getAnesthetistProcedureType = (cbo?: string, procedureCode?: string
     };
   }
   
+  // ✅ EXCEÇÃO: Anestesia de Cesariana
+  if (code === '04.17.01.001-0') {
+    return {
+      isAnesthetist: true,
+      shouldCalculate: true,
+      badge: '🤱 Cesariana',
+      message: 'Anestesia de cesariana - Calculado pelo SUS',
+      badgeVariant: 'default' as const,
+      badgeClass: 'bg-green-100 text-green-700 border-green-300'
+    };
+  }
+  
   if (code.startsWith('04')) {
     return {
       isAnesthetist: true,
@@ -131,7 +148,8 @@ export const buildAnesthetistSQLCondition = (cboColumn: string = 'professional_c
   return `(
     ${cboColumn} != '225151' OR 
     ${cboColumn} IS NULL OR
-    (${cboColumn} = '225151' AND ${procedureCodeColumn} LIKE '03%')
+    (${cboColumn} = '225151' AND ${procedureCodeColumn} LIKE '03%') OR
+    (${cboColumn} = '225151' AND ${procedureCodeColumn} = '04.17.01.001-0')
   )`;
 };
 

@@ -74,8 +74,9 @@ LEFT JOIN procedure_records pr ON (
 ) AND (
   pr.professional_cbo != '225151' OR 
   pr.professional_cbo IS NULL OR
-  (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%')
-) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx)
+  (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%') OR
+  (pr.professional_cbo = '225151' AND pr.procedure_code = '04.17.01.001-0')
+) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
 WHERE d.is_active = true
 GROUP BY d.id, d.name, d.cns, d.crm, d.specialty, d.secondary_specialties, 
          d.email, d.phone, d.is_active, d.notes,
@@ -124,8 +125,9 @@ SELECT
      AND (
        pr.professional_cbo != '225151' OR 
        pr.professional_cbo IS NULL OR
-       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%')
-     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx)
+       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%') OR
+       (pr.professional_cbo = '225151' AND pr.procedure_code = '04.17.01.001-0')
+     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
      AND pr.procedure_date >= NOW() - INTERVAL '12 months'
   ) as total_revenue_12months_cents,
   
@@ -135,8 +137,9 @@ SELECT
            AND (
        pr.professional_cbo != '225151' OR 
        pr.professional_cbo IS NULL OR
-       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%')
-     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx)
+       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%') OR
+       (pr.professional_cbo = '225151' AND pr.procedure_code = '04.17.01.001-0')
+     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
            AND pr.procedure_date >= NOW() - INTERVAL '12 months'
         ) / 100.0, 2) as total_revenue_12months_reais,
   
@@ -146,8 +149,9 @@ SELECT
      AND (
        pr.professional_cbo != '225151' OR 
        pr.professional_cbo IS NULL OR
-       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%')
-     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx)
+       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%') OR
+       (pr.professional_cbo = '225151' AND pr.procedure_code = '04.17.01.001-0')
+     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
      AND pr.procedure_date >= NOW() - INTERVAL '12 months'
   ) as total_procedures_12months,
   
@@ -160,8 +164,9 @@ SELECT
      AND (
        pr.professional_cbo != '225151' OR 
        pr.professional_cbo IS NULL OR
-       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%')
-     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx)
+       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%') OR
+       (pr.professional_cbo = '225151' AND pr.procedure_code = '04.17.01.001-0')
+     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
      AND pr.procedure_date >= NOW() - INTERVAL '12 months'
   ), 2) as avg_payment_rate_12months,
   
@@ -172,8 +177,9 @@ SELECT
      AND (
        pr.professional_cbo != '225151' OR 
        pr.professional_cbo IS NULL OR
-       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%')
-     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx)
+       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%') OR
+       (pr.professional_cbo = '225151' AND pr.procedure_code = '04.17.01.001-0')
+     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
   ) as last_activity_date,
   
   -- Status de atividade
@@ -184,8 +190,9 @@ SELECT
             AND (
        pr.professional_cbo != '225151' OR 
        pr.professional_cbo IS NULL OR
-       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%')
-     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx)
+       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%') OR
+       (pr.professional_cbo = '225151' AND pr.procedure_code = '04.17.01.001-0')
+     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
          ) >= NOW() - INTERVAL '30 days' THEN 'ATIVO'
     WHEN (SELECT MAX(pr.procedure_date) 
           FROM procedure_records pr 
@@ -193,8 +200,9 @@ SELECT
             AND (
        pr.professional_cbo != '225151' OR 
        pr.professional_cbo IS NULL OR
-       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%')
-     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx)
+       (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%') OR
+       (pr.professional_cbo = '225151' AND pr.procedure_code = '04.17.01.001-0')
+     ) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
          ) >= NOW() - INTERVAL '90 days' THEN 'POUCO_ATIVO'
     ELSE 'INATIVO'
   END as activity_status
@@ -231,15 +239,16 @@ LEFT JOIN doctors d ON dh.doctor_id = d.id
 WHERE (
   pr.professional_cbo != '225151' OR 
   pr.professional_cbo IS NULL OR
-  (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%')
-) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx)
+  (pr.professional_cbo = '225151' AND pr.procedure_code LIKE '03%') OR
+  (pr.professional_cbo = '225151' AND pr.procedure_code = '04.17.01.001-0')
+) -- 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
 GROUP BY pr.hospital_id, h.name, pr.documento_profissional, d.name, d.crm, d.specialty
 ORDER BY total_value_cents DESC;
 
 -- PASSO 4: Adicionar comentários explicativos
-COMMENT ON VIEW v_doctor_revenue_monthly IS 'Faturamento mensal por médico - EXCLUI anestesistas 04.xxx (CBO 225151), INCLUI 03.xxx';
-COMMENT ON VIEW v_doctors_aggregated IS 'Médicos agregados com faturamento - EXCLUI anestesistas 04.xxx (CBO 225151), INCLUI 03.xxx';  
-COMMENT ON VIEW v_doctor_procedure_summary IS 'Resumo de procedimentos por médico - EXCLUI anestesistas 04.xxx (CBO 225151), INCLUI 03.xxx';
+COMMENT ON VIEW v_doctor_revenue_monthly IS 'Faturamento mensal por médico - EXCLUI anestesistas 04.xxx (CBO 225151), INCLUI 03.xxx + cesariana';
+COMMENT ON VIEW v_doctors_aggregated IS 'Médicos agregados com faturamento - EXCLUI anestesistas 04.xxx (CBO 225151), INCLUI 03.xxx + cesariana';  
+COMMENT ON VIEW v_doctor_procedure_summary IS 'Resumo de procedimentos por médico - EXCLUI anestesistas 04.xxx (CBO 225151), INCLUI 03.xxx + cesariana';
 
 -- PASSO 5: Criar view para auditoria de anestesistas
 DROP VIEW IF EXISTS v_anesthetists_audit CASCADE;
@@ -297,7 +306,8 @@ BEGIN
     WHERE (
       professional_cbo != '225151' OR 
       professional_cbo IS NULL OR
-      (professional_cbo = '225151' AND procedure_code LIKE '03%')
+      (professional_cbo = '225151' AND procedure_code LIKE '03%') OR
+      (professional_cbo = '225151' AND procedure_code = '04.17.01.001-0')
     );
     
     -- Calcular quantos foram excluídos
