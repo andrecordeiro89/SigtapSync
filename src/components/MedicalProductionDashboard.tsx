@@ -33,7 +33,7 @@ import {
 import { DoctorPatientService, type DoctorWithPatients } from '../services/doctorPatientService';
 import { ProcedureRecordsService, type ProcedureRecord } from '../services/simplifiedProcedureService';
 import { DateRange } from '../types';
-import DoctorPaymentRules, { calculateDoctorPayment } from './DoctorPaymentRules';
+import DoctorPaymentRules, { calculateDoctorPayment, calculatePercentagePayment } from './DoctorPaymentRules';
 import ProcedurePatientDiagnostic from './ProcedurePatientDiagnostic';
 import CleuezaDebugComponent from './CleuezaDebugComponent';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
@@ -113,29 +113,41 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   );
   
   // 🎯 CALCULAR SOMA DOS VALORES DO DETALHAMENTO POR PROCEDIMENTO (POR PACIENTE)
-  calculatedPaymentValue = doctorData.patients.reduce((totalSum, patient) => {
-    // Coletar procedimentos médicos deste paciente (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
-    const patientMedicalProcedures = patient.procedures
-      .filter(proc => 
-        isMedicalProcedure(proc.procedure_code) && 
-        shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
-      )
-      .map(proc => ({
-        procedure_code: proc.procedure_code,
-        procedure_description: proc.procedure_description,
-        value_reais: proc.value_reais || 0
-      }));
+  // 🆕 VERIFICAR SE O MÉDICO TEM REGRA DE PERCENTUAL
+  const percentageCalculation = calculatePercentagePayment(doctorData.doctor_info.name, totalValue);
+  
+  if (percentageCalculation.hasPercentageRule) {
+    // ✅ USAR REGRA DE PERCENTUAL SOBRE VALOR TOTAL
+    calculatedPaymentValue = percentageCalculation.calculatedPayment;
     
-    // Se há procedimentos médicos para este paciente, calcular o valor baseado nas regras
-    if (patientMedicalProcedures.length > 0) {
-      const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures);
-      // Somar os valores calculados individuais (detalhamento por procedimento)
-      const patientCalculatedSum = paymentCalculation.procedures.reduce((sum, proc) => sum + proc.calculatedPayment, 0);
-      return totalSum + patientCalculatedSum;
-    }
-    
-    return totalSum;
-  }, 0);
+    // 🔍 LOG PARA VERIFICAÇÃO DA REGRA DE PERCENTUAL
+    console.log(`🎯 ${doctorData.doctor_info.name}: ${percentageCalculation.appliedRule}`);
+  } else {
+    // ✅ USAR REGRAS INDIVIDUAIS POR PROCEDIMENTO
+    calculatedPaymentValue = doctorData.patients.reduce((totalSum, patient) => {
+      // Coletar procedimentos médicos deste paciente (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
+      const patientMedicalProcedures = patient.procedures
+        .filter(proc => 
+          isMedicalProcedure(proc.procedure_code) && 
+          shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+        )
+        .map(proc => ({
+          procedure_code: proc.procedure_code,
+          procedure_description: proc.procedure_description,
+          value_reais: proc.value_reais || 0
+        }));
+      
+      // Se há procedimentos médicos para este paciente, calcular o valor baseado nas regras
+      if (patientMedicalProcedures.length > 0) {
+        const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures);
+        // Somar os valores calculados individuais (detalhamento por procedimento)
+        const patientCalculatedSum = paymentCalculation.procedures.reduce((sum, proc) => sum + proc.calculatedPayment, 0);
+        return totalSum + patientCalculatedSum;
+      }
+      
+      return totalSum;
+    }, 0);
+  }
   
   return {
     totalProcedures,

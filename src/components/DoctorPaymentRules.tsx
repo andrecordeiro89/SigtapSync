@@ -21,6 +21,11 @@ import { shouldCalculateAnesthetistProcedure } from '../utils/anesthetistLogic';
 export interface DoctorPaymentRule {
   doctorName: string;
   doctorCns?: string;
+  // 🆕 REGRA DE PERCENTUAL SOBRE TOTAL
+  percentageRule?: {
+    percentage: number;
+    description: string;
+  };
   rules: {
     procedureCode: string;
     standardValue: number;
@@ -909,6 +914,16 @@ const DOCTOR_PAYMENT_RULES: Record<string, DoctorPaymentRule> = {
         description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR + TRATAMENTO INCONTINÊNCIA URINÁRIA - R$ 900,00'
       }
     ]
+  },
+
+  'RENE SERPA ROUEDE': {
+    doctorName: 'RENE SERPA ROUEDE',
+    // 🆕 REGRA DE PERCENTUAL: 65% sobre o valor total
+    percentageRule: {
+      percentage: 65,
+      description: 'Produção Médica: 65% sobre valor total do médico'
+    },
+    rules: [] // Sem regras individuais, usa apenas percentual
   }
   
   // ================================================================
@@ -1057,6 +1072,37 @@ export function calculateDoctorPayment(
 }
 
 /**
+ * 🆕 CALCULAR VALOR BASEADO EM PERCENTUAL DO TOTAL
+ * Para médicos que têm regra de percentual sobre o valor total
+ */
+export function calculatePercentagePayment(
+  doctorName: string,
+  totalValue: number
+): {
+  calculatedPayment: number;
+  appliedRule: string;
+  hasPercentageRule: boolean;
+} {
+  const rule = DOCTOR_PAYMENT_RULES[doctorName.toUpperCase()];
+  
+  if (!rule || !rule.percentageRule) {
+    return {
+      calculatedPayment: 0,
+      appliedRule: 'Nenhuma regra de percentual definida',
+      hasPercentageRule: false
+    };
+  }
+
+  const calculatedPayment = (totalValue * rule.percentageRule.percentage) / 100;
+  
+  return {
+    calculatedPayment,
+    appliedRule: `${rule.percentageRule.description} (${rule.percentageRule.percentage}% de R$ ${totalValue.toFixed(2)} = R$ ${calculatedPayment.toFixed(2)})`,
+    hasPercentageRule: true
+  };
+}
+
+/**
  * 💰 FORMATAR VALOR MONETÁRIO
  */
 const formatCurrency = (value: number) => {
@@ -1077,9 +1123,14 @@ const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
 }) => {
   const paymentCalculation = calculateDoctorPayment(doctorName, procedures);
   const hasSpecialRules = DOCTOR_PAYMENT_RULES[doctorName.toUpperCase()];
+  
+  // 🆕 VERIFICAR SE HÁ REGRA DE PERCENTUAL
+  const totalValueProcedures = procedures.reduce((sum, proc) => sum + proc.value_reais, 0);
+  const percentageCalculation = calculatePercentagePayment(doctorName, totalValueProcedures);
 
-  if (!hasSpecialRules || paymentCalculation.procedures.length === 0) {
-    return null; // Não mostrar componente se não há regras específicas ou procedimentos aplicáveis
+  // Se não há regras específicas nem regras de percentual, não mostrar
+  if (!hasSpecialRules || (paymentCalculation.procedures.length === 0 && !percentageCalculation.hasPercentageRule)) {
+    return null;
   }
 
   // Calcular total original apenas dos procedimentos com regras
@@ -1099,20 +1150,42 @@ const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
             </Badge>
           </div>
 
-          {/* Resumo da Regra Aplicada */}
-          <div className="bg-white rounded-lg p-3 border border-orange-200">
-            <div className="flex items-start gap-2">
-              <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-800">
-                  {paymentCalculation.appliedRule}
-                </div>
-                <div className="text-xs text-gray-600 mt-1">
-                  {paymentCalculation.procedures.length} procedimento(s) calculado(s) - apenas códigos com regras definidas
+          {/* 🆕 SEÇÃO DA REGRA DE PERCENTUAL */}
+          {percentageCalculation.hasPercentageRule && (
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
+              <div className="flex items-start gap-2">
+                <DollarSign className="h-4 w-4 text-green-600 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-sm font-bold text-green-800">
+                    💰 Regra de Percentual Aplicada
+                  </div>
+                  <div className="text-xs text-green-700 mt-1">
+                    {percentageCalculation.appliedRule}
+                  </div>
+                  <div className="text-xs text-green-600 mt-1 font-medium">
+                    ✅ Esta regra substitui cálculos individuais por procedimento
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Resumo da Regra Aplicada */}
+          {!percentageCalculation.hasPercentageRule && (
+            <div className="bg-white rounded-lg p-3 border border-orange-200">
+              <div className="flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-800">
+                    {paymentCalculation.appliedRule}
+                  </div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    {paymentCalculation.procedures.length} procedimento(s) calculado(s) - apenas códigos com regras definidas
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Comparação de Valores */}
           <div className="grid grid-cols-3 gap-3">

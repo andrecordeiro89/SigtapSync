@@ -11,7 +11,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { DoctorPatientService, type DoctorWithPatients } from '@/services/doctorPatientService';
-import { calculateDoctorPayment } from './DoctorPaymentRules';
+import { calculateDoctorPayment, calculatePercentagePayment } from './DoctorPaymentRules';
 import { ptBR } from 'date-fns/locale';
 import { ProcedureRecordsService } from '@/services/simplifiedProcedureService';
 import { isMedicalProcedure } from '@/config/susCalculationRules';
@@ -689,15 +689,24 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
     const medicalProceduresCount = medicalProcedures.length;
     const medicalProceduresValue = medicalProcedures.reduce((sum, proc) => sum + (proc.value_reais || 0), 0);
     
-    // Calcular valor de produção usando as regras de pagamento
-    const patientMedicalProcedures = medicalProcedures.map(proc => ({
-      procedure_code: proc.procedure_code,
-      value_reais: proc.value_reais || 0,
-      quantity: 1
-    }));
+    // 🆕 VERIFICAR SE O MÉDICO TEM REGRA DE PERCENTUAL
+    const percentageCalculation = calculatePercentagePayment(doctorData.doctor_info.name, totalValue);
+    let calculatedPaymentValue = 0;
     
-    const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures);
-    const calculatedPaymentValue = paymentCalculation.totalPayment;
+    if (percentageCalculation.hasPercentageRule) {
+      // ✅ USAR REGRA DE PERCENTUAL SOBRE VALOR TOTAL
+      calculatedPaymentValue = percentageCalculation.calculatedPayment;
+    } else {
+      // ✅ USAR REGRAS INDIVIDUAIS POR PROCEDIMENTO
+      const patientMedicalProcedures = medicalProcedures.map(proc => ({
+        procedure_code: proc.procedure_code,
+        value_reais: proc.value_reais || 0,
+        quantity: 1
+      }));
+      
+      const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures);
+      calculatedPaymentValue = paymentCalculation.totalPayment;
+    }
     
     // Taxa de aprovação (assumindo 100% se não houver dados específicos)
     const approvalRate = 100;
