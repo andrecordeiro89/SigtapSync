@@ -275,9 +275,9 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
 
   // 🆕 FUNÇÃO SIMPLIFICADA: Calcular totais considerando quantidade (valores já corretos)
   const calculateTotalsWithQuantity = (aih: AIHComplete): AIHComplete => {
-    // ✅ Os valores já estão corretos, só preciso recalcular o total geral
+    // ✅ Os valores já estão corretos, só preciso recalcular o total geral (EXCLUINDO ANESTESISTAS)
     const valorTotal = aih.procedimentos
-      .filter(p => p.aceitar !== false) // Incluir apenas procedimentos aceitos
+      .filter(p => p.aceitar !== false && !p.isAnesthesiaProcedure) // 🚫 EXCLUIR ANESTESISTAS dos cálculos
       .reduce((sum, proc) => sum + (proc.valorCalculado || 0), 0);
     
     return {
@@ -498,16 +498,17 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       .filter(p => p.aprovado !== false) // Incluir anestesistas não rejeitados
       .reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
     
-    const valorTotalCalculado = valorTotalProcedimentosNormais + valorTotalAnestesistas;
+    // 🚫 ANESTESISTAS NÃO ENTRAM NO VALOR TOTAL (apenas controle de quantidade)
+    const valorTotalCalculado = valorTotalProcedimentosNormais; // EXCLUIR anestesistas do total
 
     console.log(`💰 VALOR TOTAL PROCEDIMENTOS NORMAIS: R$ ${valorTotalProcedimentosNormais.toFixed(2)}`);
-    console.log(`🚫 VALOR TOTAL ANESTESISTAS (CONTROLE MANUAL): R$ ${valorTotalAnestesistas.toFixed(2)}`);
-    console.log(`💰 VALOR TOTAL GERAL: R$ ${valorTotalCalculado.toFixed(2)}`);
+    console.log(`🚫 ANESTESISTAS (CONTROLE MANUAL - SEM VALOR): R$ ${valorTotalAnestesistas.toFixed(2)} (excluído do total)`);
+    console.log(`💰 VALOR TOTAL FINAL (SEM ANESTESISTAS): R$ ${valorTotalCalculado.toFixed(2)}`);
 
     return {
       ...aihCompleta,
       procedimentos: todosProcedimentos,
-      procedimentosAprovados: procedimentosComPercentagem.filter(p => p.aprovado).length + anestesistas.filter(p => p.aprovado !== false).length,
+      procedimentosAprovados: procedimentosComPercentagem.filter(p => p.aprovado).length, // 🚫 EXCLUIR anestesistas da contagem
       procedimentosRejeitados: procedimentosComPercentagem.filter(p => p.matchStatus === 'rejected').length,
       valorTotalCalculado
     };
@@ -1394,8 +1395,24 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                         </div>
                       </TableCell>
                       <TableCell>
-                        {/* COLUNA VALORES - EXIBINDO AUTOMATICAMENTE SP + SH */}
-                        {procedure.sigtapProcedure && (procedure.valorCalculadoSH !== undefined || procedure.valorCalculadoSP !== undefined) ? (
+                        {/* COLUNA VALORES - LÓGICA CONDICIONAL PARA ANESTESISTAS */}
+                        {procedure.isAnesthesiaProcedure ? (
+                          // 🚫 ANESTESISTA: Não exibir valores, apenas controle
+                          <div className="text-center py-4">
+                            <div className="flex flex-col items-center gap-2">
+                              <Badge variant="outline" className="text-xs px-3 py-1 bg-orange-100 text-orange-800 border-orange-300">
+                                💉 Anestesia
+                              </Badge>
+                              <div className="text-sm text-orange-600 font-medium">
+                                Qtd: {procedure.quantity || 1}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Sem valor monetário
+                              </div>
+                            </div>
+                          </div>
+                        ) : procedure.sigtapProcedure && (procedure.valorCalculadoSH !== undefined || procedure.valorCalculadoSP !== undefined) ? (
+                          // ✅ PROCEDIMENTO NORMAL: Exibir valores SP + SH
                           <div className="text-center py-2">
                             <div className="font-bold text-lg text-green-600 mb-1">
                               {formatCurrency((procedure.valorCalculadoSH || 0) + (procedure.valorCalculadoSP || 0))}
@@ -1426,6 +1443,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                             </div>
                           </div>
                         ) : procedure.valorCalculado && procedure.sigtapProcedure ? (
+                          // ✅ PROCEDIMENTO NORMAL: Exibir valor total
                           <div className="text-center py-2">
                             <div className="font-bold text-lg text-green-600 mb-1">
                               {formatCurrency(procedure.valorCalculado)}
