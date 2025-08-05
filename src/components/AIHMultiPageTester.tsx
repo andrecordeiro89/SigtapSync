@@ -56,6 +56,11 @@ import {
 } from '../config/susCalculationRules';
 
 import { 
+  shouldCalculateAnesthetistProcedure, 
+  getAnesthetistProcedureType 
+} from '../utils/anesthetistLogic';
+
+import { 
   formatParticipationCode, 
   getParticipationBadge, 
   requiresPayment, 
@@ -275,9 +280,9 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
 
   // 🆕 FUNÇÃO SIMPLIFICADA: Calcular totais considerando quantidade (valores já corretos)
   const calculateTotalsWithQuantity = (aih: AIHComplete): AIHComplete => {
-    // ✅ Os valores já estão corretos, só preciso recalcular o total geral (EXCLUINDO ANESTESISTAS)
+    // ✅ Os valores já estão corretos, só preciso recalcular o total geral (EXCLUINDO ANESTESISTAS 04.xxx)
     const valorTotal = aih.procedimentos
-      .filter(p => p.aceitar !== false && !p.isAnesthesiaProcedure) // 🚫 EXCLUIR ANESTESISTAS dos cálculos
+      .filter(p => p.aceitar !== false && shouldCalculateAnesthetistProcedure(p.cbo, p.procedimento)) // 🚫 EXCLUIR ANESTESISTAS 04.xxx
       .reduce((sum, proc) => sum + (proc.valorCalculado || 0), 0);
     
     return {
@@ -1296,12 +1301,21 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                 Principal
                               </Badge>
                             )}
-                            {/* ✅ NOVO: Badge para anestesistas */}
-                            {procedure.isAnesthesiaProcedure && (
-                              <Badge variant="destructive" className="text-xs px-2 py-0.5 animate-pulse">
-                                🚫 Anestesista
-                              </Badge>
-                            )}
+                            {/* ✅ NOVO: Badge refinado para anestesistas baseado no código */}
+                            {(() => {
+                              const anesthetistInfo = getAnesthetistProcedureType(procedure.cbo, procedure.procedimento);
+                              if (anesthetistInfo.isAnesthetist) {
+                                return (
+                                  <Badge 
+                                    variant={anesthetistInfo.badgeVariant} 
+                                    className={`${anesthetistInfo.badgeClass} text-xs px-2 py-0.5 ${anesthetistInfo.shouldCalculate ? '' : 'animate-pulse'}`}
+                                  >
+                                    {anesthetistInfo.badge}
+                                  </Badge>
+                                );
+                              }
+                              return null;
+                            })()}
                             {/* ✅ NOVO: Badge para pagamento médico */}
                             {isMedicalProcedure(procedure.procedimento) && (
                               <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-100 text-green-800 border-green-300">
@@ -1395,89 +1409,104 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                         </div>
                       </TableCell>
                       <TableCell>
-                        {/* COLUNA VALORES - LÓGICA CONDICIONAL PARA ANESTESISTAS */}
-                        {procedure.isAnesthesiaProcedure ? (
-                          // 🚫 ANESTESISTA: Não exibir valores, apenas controle
-                          <div className="text-center py-4">
-                            <div className="flex flex-col items-center gap-2">
-                              <Badge variant="outline" className="text-xs px-3 py-1 bg-orange-100 text-orange-800 border-orange-300">
-                                💉 Anestesia
-                              </Badge>
-                              <div className="text-sm text-orange-600 font-medium">
-                                Qtd: {procedure.quantity || 1}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                Sem valor monetário
-                              </div>
-                            </div>
-                          </div>
-                        ) : procedure.sigtapProcedure && (procedure.valorCalculadoSH !== undefined || procedure.valorCalculadoSP !== undefined) ? (
-                          // ✅ PROCEDIMENTO NORMAL: Exibir valores SP + SH
-                          <div className="text-center py-2">
-                            <div className="font-bold text-lg text-green-600 mb-1">
-                              {formatCurrency((procedure.valorCalculadoSH || 0) + (procedure.valorCalculadoSP || 0))}
-                            </div>
-                            <div className="flex flex-col items-center gap-1">
-                              <div className="text-xs text-gray-500">
-                                SP + SH {procedure.quantity && procedure.quantity > 1 && (
-                                  <span className="text-blue-600 font-medium">
-                                    ({formatCurrency(((procedure.valorCalculadoSH || 0) + (procedure.valorCalculadoSP || 0)) / procedure.quantity)} × {procedure.quantity})
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex justify-center">
-                                {procedure.isInstrument04 ? (
-                                  <Badge variant="outline" className="text-xs px-2 bg-blue-100 text-blue-800 border-blue-300">
-                                    🎯 Instrumento 04
+                        {/* COLUNA VALORES - LÓGICA REFINADA PARA ANESTESISTAS */}
+                        {(() => {
+                          const anesthetistInfo = getAnesthetistProcedureType(procedure.cbo, procedure.procedimento);
+                          
+                          if (anesthetistInfo.isAnesthetist && !anesthetistInfo.shouldCalculate) {
+                            // 🚫 ANESTESISTA 04.xxx: Não exibir valores, apenas controle
+                            return (
+                              <div className="text-center py-4">
+                                <div className="flex flex-col items-center gap-2">
+                                  <Badge 
+                                    variant={anesthetistInfo.badgeVariant} 
+                                    className={`${anesthetistInfo.badgeClass} text-xs px-3 py-1 animate-pulse`}
+                                  >
+                                    {anesthetistInfo.badge}
                                   </Badge>
-                                ) : procedure.isSpecialRule ? (
-                                  <Badge variant="outline" className="text-xs px-2 bg-orange-100 text-orange-800 border-orange-300">
-                                    ⚡ Regra Especial
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-xs px-2">
-                                    {procedure.porcentagemSUS || (procedure.sequencia === 1 ? '100' : 'Manual')}% SUS
-                                  </Badge>
-                                )}
+                                  <div className="text-sm text-red-600 font-medium">
+                                    Qtd: {procedure.quantity || 1}
+                                  </div>
+                                  <div className="text-xs text-red-500">
+                                    {anesthetistInfo.message}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                        ) : procedure.valorCalculado && procedure.sigtapProcedure ? (
-                          // ✅ PROCEDIMENTO NORMAL: Exibir valor total
-                          <div className="text-center py-2">
-                            <div className="font-bold text-lg text-green-600 mb-1">
-                              {formatCurrency(procedure.valorCalculado)}
-                            </div>
-                            <div className="flex flex-col items-center gap-1">
-                              <div className="text-xs text-gray-500">
-                                Valor Total {procedure.quantity && procedure.quantity > 1 && (
-                                  <span className="text-blue-600 font-medium">
-                                    ({formatCurrency(procedure.valorCalculado / procedure.quantity)} × {procedure.quantity})
-                                  </span>
-                                )}
+                            );
+                          } else if (procedure.sigtapProcedure && (procedure.valorCalculadoSH !== undefined || procedure.valorCalculadoSP !== undefined)) {
+                            // ✅ PROCEDIMENTO NORMAL OU ANESTESISTA 03.xxx: Exibir valores SP + SH
+                            return (
+                              <div className="text-center py-2">
+                                <div className="font-bold text-lg text-green-600 mb-1">
+                                  {formatCurrency((procedure.valorCalculadoSH || 0) + (procedure.valorCalculadoSP || 0))}
+                                </div>
+                                <div className="flex flex-col items-center gap-1">
+                                  <div className="text-xs text-gray-500">
+                                    SP + SH {procedure.quantity && procedure.quantity > 1 && (
+                                      <span className="text-blue-600 font-medium">
+                                        ({formatCurrency(((procedure.valorCalculadoSH || 0) + (procedure.valorCalculadoSP || 0)) / procedure.quantity)} × {procedure.quantity})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex justify-center">
+                                    {procedure.isInstrument04 ? (
+                                      <Badge variant="outline" className="text-xs px-2 bg-blue-100 text-blue-800 border-blue-300">
+                                        🎯 Instrumento 04
+                                      </Badge>
+                                    ) : procedure.isSpecialRule ? (
+                                      <Badge variant="outline" className="text-xs px-2 bg-orange-100 text-orange-800 border-orange-300">
+                                        ⚡ Regra Especial
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-xs px-2">
+                                        {procedure.porcentagemSUS || (procedure.sequencia === 1 ? '100' : 'Manual')}% SUS
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex justify-center">
-                                {procedure.isInstrument04 ? (
-                                  <Badge variant="outline" className="text-xs px-2 bg-blue-100 text-blue-800 border-blue-300">
-                                    🎯 Instrumento 04
-                                  </Badge>
-                                ) : procedure.isSpecialRule ? (
-                                  <Badge variant="outline" className="text-xs px-2 bg-orange-100 text-orange-800 border-orange-300">
-                                    ⚡ Regra Especial
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-xs px-2">
-                                    {procedure.porcentagemSUS || (procedure.sequencia === 1 ? '100' : 'Manual')}% SUS
-                                  </Badge>
-                                )}
+                            );
+                          } else if (procedure.valorCalculado && procedure.sigtapProcedure) {
+                            // ✅ PROCEDIMENTO NORMAL: Exibir valor total
+                            return (
+                              <div className="text-center py-2">
+                                <div className="font-bold text-lg text-green-600 mb-1">
+                                  {formatCurrency(procedure.valorCalculado)}
+                                </div>
+                                <div className="flex flex-col items-center gap-1">
+                                  <div className="text-xs text-gray-500">
+                                    Valor Total {procedure.quantity && procedure.quantity > 1 && (
+                                      <span className="text-blue-600 font-medium">
+                                        ({formatCurrency(procedure.valorCalculado / procedure.quantity)} × {procedure.quantity})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex justify-center">
+                                    {procedure.isInstrument04 ? (
+                                      <Badge variant="outline" className="text-xs px-2 bg-blue-100 text-blue-800 border-blue-300">
+                                        🎯 Instrumento 04
+                                      </Badge>
+                                    ) : procedure.isSpecialRule ? (
+                                      <Badge variant="outline" className="text-xs px-2 bg-orange-100 text-orange-800 border-orange-300">
+                                        ⚡ Regra Especial
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-xs px-2">
+                                        {procedure.porcentagemSUS || (procedure.sequencia === 1 ? '100' : 'Manual')}% SUS
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center py-4">
-                            <span className="text-gray-400 text-sm">Não calculado</span>
-                          </div>
-                        )}
+                            );
+                          } else {
+                            return (
+                              <div className="text-center py-4">
+                                <span className="text-gray-400 text-sm">Não calculado</span>
+                              </div>
+                            );
+                          }
+                        })()}
                       </TableCell>
                       <TableCell className="text-center">
                         <Button
@@ -2149,7 +2178,7 @@ const AIHMultiPageTester = () => {
 
     // ✅ MUDANÇA: Usar dados reais da AIH processada (EXCLUINDO anestesistas dos cálculos)
     const procedimentosAprovados = aihCompleta.procedimentos
-      .filter(p => p.aprovado && !p.isAnesthesiaProcedure); // 🚫 EXCLUIR ANESTESISTAS
+      .filter(p => p.aprovado && shouldCalculateAnesthetistProcedure(p.cbo, p.procedimento)); // 🚫 EXCLUIR ANESTESISTAS 04.xxx
     const procedimentosAnestesia = aihCompleta.procedimentos.filter(p => p.isAnesthesiaProcedure);
     const procedimentosNormais = procedimentosAprovados.filter(p => !p.isInstrument04);
     const procedimentosInstrumento04 = procedimentosAprovados.filter(p => p.isInstrument04);

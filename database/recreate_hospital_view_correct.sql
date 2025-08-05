@@ -32,7 +32,8 @@ SELECT
     AND dh.is_active = true
     AND EXISTS (
       SELECT 1 FROM procedure_records pr 
-      WHERE (pr.professional = d.cns OR pr.professional_cbo = d.cns)
+      WHERE (pr.professional = d.cns OR pr.professional_cbo = d.cns) 
+  AND pr.professional_cbo != '225151' -- 🚫 EXCLUIR ANESTESISTAS
       AND pr.procedure_date >= NOW() - INTERVAL '30 days'
     )
   ), 0) as very_active_doctors,

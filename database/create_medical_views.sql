@@ -63,6 +63,7 @@ FROM procedure_records pr
 LEFT JOIN hospitals h ON pr.hospital_id = h.id
 LEFT JOIN doctor_hospital dh ON (dh.hospital_id = pr.hospital_id AND dh.doctor_cns = pr.documento_profissional)
 LEFT JOIN doctors d ON dh.doctor_id = d.id
+WHERE pr.professional_cbo != '225151' OR pr.professional_cbo IS NULL -- 🚫 EXCLUIR ANESTESISTAS
 GROUP BY pr.hospital_id, h.name, pr.documento_profissional, d.name, d.crm, d.specialty
 ORDER BY total_value_cents DESC;
 

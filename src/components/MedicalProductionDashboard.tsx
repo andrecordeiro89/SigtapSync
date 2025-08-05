@@ -37,6 +37,11 @@ import DoctorPaymentRules, { calculateDoctorPayment } from './DoctorPaymentRules
 import ProcedurePatientDiagnostic from './ProcedurePatientDiagnostic';
 import CleuezaDebugComponent from './CleuezaDebugComponent';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
+import { 
+  shouldCalculateAnesthetistProcedure, 
+  getAnesthetistProcedureType,
+  filterCalculableProcedures 
+} from '../utils/anesthetistLogic';
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -62,7 +67,9 @@ const formatNumber = (value: number | null | undefined): string => {
 };
 
 const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
-  const totalProcedures = doctorData.patients.reduce((sum, patient) => sum + patient.procedures.length, 0);
+  // 🚫 EXCLUIR ANESTESISTAS (apenas 04.xxx) da contagem de procedimentos
+  const totalProcedures = doctorData.patients.reduce((sum, patient) => 
+    sum + patient.procedures.filter(filterCalculableProcedures).length, 0);
   // ✅ CORREÇÃO: USAR patient.total_value_reais QUE VEM DO calculated_total_value DA AIH
   const totalValue = doctorData.patients.reduce((sum, patient) => sum + patient.total_value_reais, 0);
   const totalAIHs = doctorData.patients.length;
@@ -73,32 +80,46 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
     console.log(`💰 Médico ${doctorData.doctor_info.name}: R$ ${totalValue.toFixed(2)} (usando patient.total_value_reais)`);
   }
   
+  // 🚫 EXCLUIR ANESTESISTAS (apenas 04.xxx) dos procedimentos aprovados
   const approvedProcedures = doctorData.patients.reduce((sum, patient) => 
-    sum + patient.procedures.filter(proc => proc.approval_status === 'approved').length, 0
+    sum + patient.procedures.filter(proc => 
+      proc.approval_status === 'approved' && 
+      shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+    ).length, 0
   );
   const approvalRate = totalProcedures > 0 ? (approvedProcedures / totalProcedures) * 100 : 0;
   
   // 🆕 CALCULAR valores específicos dos procedimentos médicos ("04") COM REGRAS DE PAGAMENTO
+  // 🚫 EXCLUIR ANESTESISTAS 04.xxx dos procedimentos médicos (03.xxx são permitidos)
   const medicalProceduresCount = doctorData.patients.reduce((sum, patient) => 
-    sum + patient.procedures.filter(proc => isMedicalProcedure(proc.procedure_code)).length, 0
+    sum + patient.procedures.filter(proc => 
+      isMedicalProcedure(proc.procedure_code) && 
+      shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+    ).length, 0
   );
   
   // 💰 CALCULAR VALOR TOTAL BASEADO NAS REGRAS DE PAGAMENTO ESPECÍFICAS
   let medicalProceduresValue = 0;
   let calculatedPaymentValue = 0;
   
-  // Calcular valor original de todos os procedimentos médicos
+  // Calcular valor original de todos os procedimentos médicos (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
   medicalProceduresValue = doctorData.patients.reduce((sum, patient) => 
     sum + patient.procedures
-      .filter(proc => isMedicalProcedure(proc.procedure_code))
+      .filter(proc => 
+        isMedicalProcedure(proc.procedure_code) && 
+        shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+      )
       .reduce((procSum, proc) => procSum + (proc.value_reais || 0), 0), 0
   );
   
   // 🎯 CALCULAR SOMA DOS VALORES DO DETALHAMENTO POR PROCEDIMENTO (POR PACIENTE)
   calculatedPaymentValue = doctorData.patients.reduce((totalSum, patient) => {
-    // Coletar procedimentos médicos deste paciente
+    // Coletar procedimentos médicos deste paciente (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
     const patientMedicalProcedures = patient.procedures
-      .filter(proc => isMedicalProcedure(proc.procedure_code))
+      .filter(proc => 
+        isMedicalProcedure(proc.procedure_code) && 
+        shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+      )
       .map(proc => ({
         procedure_code: proc.procedure_code,
         procedure_description: proc.procedure_description,
@@ -956,9 +977,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     const totalDoctors = doctors.length;
     const totalPatients = doctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
     
-    // Coletar todos os procedimentos
+    // Coletar todos os procedimentos (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
     const allProcedures = doctors.flatMap(doctor => 
-      doctor.patients.flatMap(patient => patient.procedures)
+      doctor.patients.flatMap(patient => 
+        patient.procedures.filter(filterCalculableProcedures)
+      )
     );
     
     const totalProcedures = allProcedures.length;
@@ -1007,9 +1030,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     const totalDoctors = filteredDoctors.length;
     const totalPatients = filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
     
-    // Coletar todos os procedimentos dos médicos filtrados
+    // Coletar todos os procedimentos dos médicos filtrados (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
     const allProcedures = filteredDoctors.flatMap(doctor => 
-      doctor.patients.flatMap(patient => patient.procedures)
+      doctor.patients.flatMap(patient => 
+        patient.procedures.filter(filterCalculableProcedures)
+      )
     );
     
     const totalProcedures = allProcedures.length;
@@ -1749,7 +1774,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             </div>
                                             <div className="text-right">
                                               <div className="font-bold text-lg text-slate-900">
-                                                {formatCurrency(patient.procedures.reduce((sum, proc) => sum + (proc.value_reais || 0), 0))}
+                                                {formatCurrency(patient.procedures
+                                                  .filter(filterCalculableProcedures) // 🚫 EXCLUIR ANESTESISTAS 04.xxx
+                                                  .reduce((sum, proc) => sum + (proc.value_reais || 0), 0))}
                                               </div>
                                               <div className="text-sm text-slate-600 mb-2">
                                                 {patient.procedures.length} procedimento(s)
@@ -1835,6 +1862,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                             🩺 Médico 04
                                                           </Badge>
                                                         )}
+                                                        {(() => {
+                                                          const anesthetistInfo = getAnesthetistProcedureType(procedure.cbo, procedure.procedure_code);
+                                                          if (anesthetistInfo.isAnesthetist) {
+                                                            return (
+                                                              <Badge 
+                                                                variant={anesthetistInfo.badgeVariant} 
+                                                                className={`${anesthetistInfo.badgeClass} text-xs ${anesthetistInfo.shouldCalculate ? '' : 'animate-pulse'}`}
+                                                              >
+                                                                {anesthetistInfo.badge}
+                                                              </Badge>
+                                                            );
+                                                          }
+                                                          return null;
+                                                        })()}
                                                         {procedure.sequence && procedure.sequence > 1 && (
                                                           <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 text-xs">
                                                             Seq. {procedure.sequence}
@@ -1892,11 +1933,32 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     </div>
                                                     
                                                     <div className="text-right ml-4">
-                                                      <div className={`text-xl font-bold ${
-                                                        isMedicalProcedure(procedure.procedure_code) ? 'text-emerald-700' : 'text-slate-900'
-                                                      }`}>
-                                                        {formatCurrency(procedure.value_reais)}
-                                                      </div>
+                                                      {(() => {
+                                                        const anesthetistInfo = getAnesthetistProcedureType(procedure.cbo, procedure.procedure_code);
+                                                        
+                                                        if (anesthetistInfo.isAnesthetist && !anesthetistInfo.shouldCalculate) {
+                                                          // 🚫 ANESTESISTA 04.xxx: Mostrar "Controle por Quantidade"
+                                                          return (
+                                                            <div className="text-center py-2">
+                                                              <div className="text-sm font-medium text-red-600 mb-1">
+                                                                🚫 Sem valor monetário
+                                                              </div>
+                                                              <div className="text-xs text-red-500">
+                                                                {anesthetistInfo.message}
+                                                              </div>
+                                                            </div>
+                                                          );
+                                                        } else {
+                                                          // ✅ PROCEDIMENTO NORMAL OU ANESTESISTA 03.xxx: Mostrar valor
+                                                          return (
+                                                            <div className={`text-xl font-bold ${
+                                                              isMedicalProcedure(procedure.procedure_code) ? 'text-emerald-700' : 'text-slate-900'
+                                                            }`}>
+                                                              {formatCurrency(procedure.value_reais)}
+                                                            </div>
+                                                          );
+                                                        }
+                                                      })()}
                                                     </div>
                                                   </div>
                                                 </div>

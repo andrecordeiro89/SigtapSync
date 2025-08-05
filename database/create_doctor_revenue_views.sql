@@ -71,7 +71,7 @@ LEFT JOIN procedure_records pr ON (
   pr.professional = d.cns OR 
   pr.professional_cbo = d.cns OR
   pr.notes LIKE '%' || d.cns || '%'
-)
+) AND pr.professional_cbo != '225151' -- 🚫 EXCLUIR ANESTESISTAS (CBO 225151)
 WHERE d.is_active = true
 GROUP BY d.id, d.name, d.cns, d.crm, d.specialty, d.secondary_specialties, 
          d.email, d.phone, d.is_active, d.notes,
@@ -152,11 +152,13 @@ SELECT
   CASE 
     WHEN (SELECT MAX(pr.procedure_date) 
           FROM procedure_records pr 
-          WHERE pr.professional = d.cns OR pr.professional_cbo = d.cns
+          WHERE (pr.professional = d.cns OR pr.professional_cbo = d.cns) 
+      AND pr.professional_cbo != '225151' -- 🚫 EXCLUIR ANESTESISTAS
          ) >= NOW() - INTERVAL '30 days' THEN 'ATIVO'
     WHEN (SELECT MAX(pr.procedure_date) 
           FROM procedure_records pr 
-          WHERE pr.professional = d.cns OR pr.professional_cbo = d.cns
+          WHERE (pr.professional = d.cns OR pr.professional_cbo = d.cns) 
+      AND pr.professional_cbo != '225151' -- 🚫 EXCLUIR ANESTESISTAS
          ) >= NOW() - INTERVAL '90 days' THEN 'POUCO_ATIVO'
     ELSE 'INATIVO'
   END as activity_status
