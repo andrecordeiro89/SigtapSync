@@ -12,6 +12,7 @@ import React from 'react';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import { DollarSign, Calculator, AlertTriangle, CheckCircle } from 'lucide-react';
+import { shouldCalculateAnesthetistProcedure } from '../utils/anesthetistLogic';
 
 // ================================================================
 // TIPOS E INTERFACES

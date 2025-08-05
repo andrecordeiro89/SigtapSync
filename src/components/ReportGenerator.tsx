@@ -15,6 +15,7 @@ import { calculateDoctorPayment } from './DoctorPaymentRules';
 import { ptBR } from 'date-fns/locale';
 import { ProcedureRecordsService } from '@/services/simplifiedProcedureService';
 import { isMedicalProcedure } from '@/config/susCalculationRules';
+import { shouldCalculateAnesthetistProcedure } from '../utils/anesthetistLogic';
 
 interface ReportGeneratorProps {
   onClose?: () => void;
@@ -678,7 +679,11 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
     
     // Calcular procedimentos médicos (código '04')
     const medicalProcedures = doctorData.patients.flatMap(patient => 
-      patient.procedures.filter(proc => proc.procedure_code && proc.procedure_code.startsWith('04'))
+      patient.procedures.filter(proc => 
+        proc.procedure_code && 
+        proc.procedure_code.startsWith('04') && 
+        shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+      )
     );
     
     const medicalProceduresCount = medicalProcedures.length;

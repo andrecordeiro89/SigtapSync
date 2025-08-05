@@ -1967,14 +1967,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           )}
                                           
                                           {/* 🆕 COMPONENTE DE REGRAS DE PAGAMENTO ESPECÍFICAS */}
-                                          {patient.procedures.length > 0 && (
+                                          {patient.procedures.filter(proc => 
+                                            isMedicalProcedure(proc.procedure_code) && 
+                                            shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+                                          ).length > 0 && (
                                             <DoctorPaymentRules
                                               doctorName={doctor.doctor_info.name}
-                                              procedures={patient.procedures.map(proc => ({
-                                                procedure_code: proc.procedure_code,
-                                                procedure_description: proc.procedure_description,
-                                                value_reais: proc.value_reais || 0
-                                              }))}
+                                              procedures={patient.procedures
+                                                .filter(proc => 
+                                                  isMedicalProcedure(proc.procedure_code) && 
+                                                  shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+                                                )
+                                                .map(proc => ({
+                                                  procedure_code: proc.procedure_code,
+                                                  procedure_description: proc.procedure_description,
+                                                  value_reais: proc.value_reais || 0
+                                                }))}
                                               className="mt-5"
                                             />
                                           )}
