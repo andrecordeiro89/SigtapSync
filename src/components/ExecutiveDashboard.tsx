@@ -829,30 +829,39 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               />
             </div>
             
-            {/* BUSCA E FILTROS EM LINHA */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* FILTROS COMPACTOS EM LINHA */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
               {/* BUSCA RÁPIDA */}
               <div>
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">Busca Rápida</label>
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Busca Rápida</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     placeholder="Nome, CNS, CRM..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
+                    className="pl-10 h-9 border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 text-sm"
                   />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      title="Limpar busca"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               </div>
               
               {/* FILTRO DE CARÁTER DE ATENDIMENTO */}
               <div>
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">Caráter de Atendimento</label>
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Caráter de Atendimento</label>
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedCareCharacter}
                     onChange={(e) => setSelectedCareCharacter(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-10"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-9"
                   >
                     <option value="all">Todos</option>
                     <option value="1">Eletivo</option>
@@ -872,6 +881,75 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
+              {/* HOSPITAIS DROPDOWN */}
+              <div>
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Hospitais</label>
+                <Select
+                  value={selectedHospitals.includes('all') ? 'all' : selectedHospitals.join(',')}
+                  onValueChange={(value) => {
+                    if (value === 'all') {
+                      setSelectedHospitals(['all']);
+                      console.log('🏥 Filtro de hospital resetado para "Todos"');
+                    } else {
+                      const hospitalId = value;
+                      if (selectedHospitals.includes('all')) {
+                        setSelectedHospitals([hospitalId]);
+                      } else {
+                        const newSelection = selectedHospitals.includes(hospitalId)
+                          ? selectedHospitals.filter(id => id !== hospitalId)
+                          : [...selectedHospitals, hospitalId];
+                        
+                        if (newSelection.length === 0) {
+                          setSelectedHospitals(['all']);
+                        } else {
+                          setSelectedHospitals(newSelection);
+                        }
+                      }
+                      console.log('🏥 Filtro de hospital alterado:', hospitalStats.find(h => h.id === hospitalId)?.name);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue>
+                      {selectedHospitals.includes('all') ? (
+                        <div className="flex items-center">
+                          <Hospital className="h-3 w-3 mr-2" />
+                          <span className="text-sm">Todos os Hospitais</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center">
+                          <Hospital className="h-3 w-3 mr-2" />
+                          <span className="text-sm">
+                            {selectedHospitals.length === 1 
+                              ? hospitalStats.find(h => h.id === selectedHospitals[0])?.name || 'Hospital'
+                              : `${selectedHospitals.length} hospitais`
+                            }
+                          </span>
+                        </div>
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      <div className="flex items-center">
+                        <Hospital className="h-3 w-3 mr-2" />
+                        <span>Todos os Hospitais</span>
+                      </div>
+                    </SelectItem>
+                    {hospitalStats.map((hospital) => (
+                      <SelectItem key={hospital.id} value={hospital.id}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{hospital.name}</span>
+                          {selectedHospitals.includes(hospital.id) && !selectedHospitals.includes('all') && (
+                            <CheckCircle className="h-3 w-3 text-green-600 ml-2" />
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* BOTÃO LIMPAR FILTROS */}
               <div className="flex items-end">
                 <button
@@ -880,72 +958,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     setSelectedCareCharacter('all');
                     setSelectedHospitals(['all']);
                   }}
-                  className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors h-10 border border-gray-200"
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors h-9 border border-gray-200 w-full flex items-center justify-center gap-1"
                   title="Limpar todos os filtros"
                 >
-                  Limpar Filtros
+                  <Filter className="h-3 w-3" />
+                  <span>Limpar</span>
                 </button>
               </div>
-            </div>
-            
-            {/* FILTROS DE HOSPITAL */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">Hospitais</label>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={selectedHospitals.includes('all') ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => {
-                    setSelectedHospitals(['all']);
-                    console.log('🏥 Filtro de hospital resetado para "Todos"');
-                  }}
-                  className="h-8"
-                >
-                  <Hospital className="h-3 w-3 mr-1" />
-                  Todos
-                </Button>
-                {hospitalStats.map((hospital) => (
-                  <Button
-                    key={hospital.id}
-                    variant={selectedHospitals.includes(hospital.id) && !selectedHospitals.includes('all') ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      if (selectedHospitals.includes('all')) {
-                        setSelectedHospitals([hospital.id]);
-                      } else {
-                        const newSelection = selectedHospitals.includes(hospital.id)
-                          ? selectedHospitals.filter(id => id !== hospital.id)
-                          : [...selectedHospitals, hospital.id];
-                        
-                        if (newSelection.length === 0) {
-                          setSelectedHospitals(['all']);
-                        } else {
-                          setSelectedHospitals(newSelection);
-                        }
-                      }
-                      console.log('🏥 Filtro de hospital alterado:', hospital.name);
-                    }}
-                    className="h-8 text-xs"
-                  >
-                    {hospital.name}
-                  </Button>
-                ))}
-              </div>
-              {!selectedHospitals.includes('all') && selectedHospitals.length > 0 && (
-                <div className="flex items-center gap-2 mt-2">
-                  <Badge variant="outline" className="text-xs">
-                    {selectedHospitals.length} hospital(is) selecionado(s)
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedHospitals(['all'])}
-                    className="h-6 px-2 text-xs text-blue-600 hover:text-blue-800"
-                  >
-                    Limpar filtros
-                  </Button>
-                </div>
-              )}
             </div>
 
             {/* INDICADORES DE FILTROS ATIVOS */}
