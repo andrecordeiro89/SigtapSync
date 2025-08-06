@@ -99,6 +99,15 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
     ).length, 0
   );
   
+  // 🆕 CALCULAR QUANTIDADE DE PROCEDIMENTOS DE ANESTESISTAS INICIADOS EM '04' POR MÉDICO
+  const anesthetistProcedures04Count = doctorData.patients.reduce((sum, patient) => 
+    sum + patient.procedures.filter(proc => 
+      proc.cbo === '225151' && // É anestesista
+      proc.procedure_code?.startsWith('04') && // Procedimento inicia com '04'
+      proc.procedure_code !== '04.17.01.001-0' // Excluir cesariana (que é calculada)
+    ).length, 0
+  );
+  
   // 💰 CALCULAR VALOR TOTAL BASEADO NAS REGRAS DE PAGAMENTO ESPECÍFICAS
   let medicalProceduresValue = 0;
   let calculatedPaymentValue = 0;
@@ -158,7 +167,8 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
     approvalRate,
     medicalProceduresValue,
     medicalProceduresCount,
-    calculatedPaymentValue // 🆕 Valor calculado baseado nas regras
+    calculatedPaymentValue, // 🆕 Valor calculado baseado nas regras
+    anesthetistProcedures04Count // 🆕 Quantidade de procedimentos de anestesistas iniciados em '04'
   };
 };
 
@@ -1014,6 +1024,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       )
     );
     
+    // Calcular total de procedimentos de anestesistas iniciados em '04' (excluindo cesarianas)
+    const totalAnesthetistProcedures04 = doctors.reduce((total, doctor) => {
+      const doctorStats = calculateDoctorStats(doctor);
+      return total + doctorStats.anesthetistProcedures04Count;
+    }, 0);
+    
     const totalProcedures = allProcedures.length;
     const totalRevenue = allProcedures.reduce((sum, proc) => sum + (proc.value_reais || 0), 0);
     const avgTicket = totalPatients > 0 ? totalRevenue / totalPatients : 0;
@@ -1051,6 +1067,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       rejectedProcedures,
       approvalRate,
       mostCommonProcedures,
+      totalAnesthetistProcedures04,
       isDemoData
     };
   }, [doctors]);
@@ -1235,6 +1252,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           </div>
         </div>
       )}
+
+
 
 
 
@@ -1460,6 +1479,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         })()} {doctor.doctor_info.specialty}
                                       </Badge>
                                     )}
+                                    
+                                    {/* BADGE ANESTESISTA - AO LADO DA ESPECIALIDADE */}
+                                    {doctorStats.anesthetistProcedures04Count > 0 && (
+                                      <Badge 
+                                        variant="outline" 
+                                        className="bg-blue-900/10 text-blue-900 border-blue-900/30 font-medium px-2 py-1 text-xs"
+                                      >
+                                        💉 Anestesista: {doctorStats.anesthetistProcedures04Count}
+                                      </Badge>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -1538,6 +1567,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   }
                 </div>
               </div>
+              
+
                             </div>
                           </div>
                         </div>
