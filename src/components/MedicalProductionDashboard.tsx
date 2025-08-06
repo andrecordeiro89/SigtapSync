@@ -1865,8 +1865,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           </Badge>
                                                         )}
                                                         {pending > 0 && (
-                                                          <Badge variant="secondary" className="bg-amber-100 text-amber-700 text-xs px-2 py-1 border-amber-200">
-                                                            ⏳{pending}
+                                                          <Badge variant="default" className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 border-emerald-200">
+                                                            ✓{pending}
                                                           </Badge>
                                                         )}
                                                         {rejected > 0 && (
