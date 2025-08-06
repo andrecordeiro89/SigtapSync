@@ -390,20 +390,24 @@ interface MedicalProductionDashboardProps {
   }) => void;
   dateRange?: DateRange;
   onDateRangeChange?: (range: DateRange) => void;
+  selectedHospitals?: string[]; // 🆕 FILTROS GLOBAIS DE HOSPITAL
+  searchTerm?: string; // 🆕 BUSCA GLOBAL
+  selectedCareCharacter?: string; // 🆕 FILTRO GLOBAL DE CARÁTER DE ATENDIMENTO
 }
 
 // ✅ COMPONENTE PRINCIPAL
 const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({ 
   onStatsUpdate, 
   dateRange, 
-  onDateRangeChange 
+  onDateRangeChange,
+  selectedHospitals = ['all'], // 🆕 FILTROS GLOBAIS DE HOSPITAL
+  searchTerm = '', // 🆕 BUSCA GLOBAL
+  selectedCareCharacter = 'all' // 🆕 FILTRO GLOBAL DE CARÁTER DE ATENDIMENTO
 }) => {
   const { user, canAccessAllHospitals, hasFullAccess } = useAuth();
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
   const [filteredDoctors, setFilteredDoctors] = useState<DoctorWithPatients[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedHospital, setSelectedHospital] = useState<string>('all'); // 🆕 FILTRO DE HOSPITAL
-  const [selectedCareCharacter, setSelectedCareCharacter] = useState<string>('all'); // 🆕 FILTRO DE CARÁTER DE ATENDIMENTO
+  // searchTerm e selectedCareCharacter agora são controlados globalmente via props
   const [availableHospitals, setAvailableHospitals] = useState<Array<{id: string, name: string}>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
@@ -915,13 +919,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   useEffect(() => {
     let filtered = doctors;
     
-    // Filtrar por hospital se não for "all"
-    if (selectedHospital !== 'all') {
+    // 🏥 FILTRAR POR HOSPITAL USANDO FILTROS GLOBAIS
+    if (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) {
       filtered = filtered.filter(doctor => {
         return doctor.hospitals?.some(hospital =>
-          hospital.hospital_id === selectedHospital
+          selectedHospitals.includes(hospital.hospital_id)
         );
       });
+      console.log('🏥 Aplicando filtros globais de hospital na aba Médicos:', selectedHospitals);
     }
     
     // 🆕 FILTRAR POR PERÍODO (DateRange)
@@ -973,7 +978,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     // Reset da página atual quando filtros são aplicados
     setCurrentDoctorPage(1);
-  }, [searchTerm, doctors, selectedHospital, selectedCareCharacter, dateRange]);
+  }, [searchTerm, doctors, selectedHospitals, selectedCareCharacter, dateRange]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
   const toggleDoctorExpansion = (doctorCns: string) => {
@@ -1116,7 +1121,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         <CleuezaDebugComponent />
       )}
 
-      {/* 🚀 SOLUÇÃO IMEDIATA IMPLEMENTADA */}
+      {/* 🚀 SOLUÇÃO IMEDIATA IMPLEMENTADA - SEÇÃO OCULTADA */}
+      {/* 
       <Card className="border-2 border-green-200 bg-green-50/30 mb-4">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -1138,8 +1144,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           </div>
         </CardContent>
       </Card>
+      */}
 
-      {/* 🔧 PAINEL DE DIAGNÓSTICOS */}
+      {/* 🔧 PAINEL DE DIAGNÓSTICOS - SEÇÃO OCULTADA */}
+      {/* 
       <Card className="border-2 border-dashed border-blue-200 bg-blue-50/30">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -1209,6 +1217,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           </div>
         </CardContent>
       </Card>
+      */}
 
       {/* ⚠️ AVISO DE DADOS DE DEMONSTRAÇÃO */}
       {globalStats.isDemoData && (
@@ -1247,149 +1256,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* 🔍 BUSCA E FILTROS - VERSÃO COMPACTA E ELEGANTE */}
-          <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm space-y-4">
-            {/* HEADER DO CARD */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Search className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-semibold text-gray-700">Busca e Filtros</span>
-              </div>
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800 px-3 py-2 font-medium">
-                {filteredDoctors.length} médicos
-              </Badge>
-            </div>
-            
-            {/* FILTROS DE PERÍODO - VERSÃO COMPACTA */}
-            {onDateRangeChange && (
-              <div className="pb-3 border-b border-gray-100">
-                <ExecutiveDateFilters
-                  onDateRangeChange={onDateRangeChange}
-                  onRefresh={() => {}}
-                  isLoading={isLoading}
-                  title=""
-                  subtitle=""
-                  showExport={false}
-                  compact={true}
-                  defaultPreset="7d"
-                />
-              </div>
-            )}
-            
-            {/* BUSCA E FILTROS EM LINHA */}
-            <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
-              {/* BUSCA RÁPIDA */}
-              <div className="lg:col-span-2">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">Busca Rápida</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Nome, CNS, CRM ou especialidade..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 h-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500/20"
-                  />
-                </div>
-              </div>
-              
-              {/* FILTRO DE HOSPITAL */}
-              <div className="lg:col-span-2">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">Hospital</label>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={selectedHospital}
-                    onChange={(e) => setSelectedHospital(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-10"
-                  >
-                    <option value="all">Todos</option>
-                    {availableHospitals.map((hospital) => (
-                      <option key={hospital.id} value={hospital.id}>
-                        {hospital.name}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedHospital !== 'all' && (
-                    <button
-                      onClick={() => setSelectedHospital('all')}
-                      className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                      title="Limpar filtro de hospital"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </div>
-              
-              {/* FILTRO DE CARÁTER DE ATENDIMENTO */}
-              <div className="lg:col-span-2">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">Caráter de Atendimento</label>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={selectedCareCharacter}
-                    onChange={(e) => setSelectedCareCharacter(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-10"
-                  >
-                    <option value="all">Todos</option>
-                    <option value="1">Eletivo</option>
-                    <option value="2">Urgência/Emergência</option>
-                    <option value="3">Acidente no Trabalho</option>
-                    <option value="4">Acidente de Trânsito</option>
-                  </select>
-                  {selectedCareCharacter !== 'all' && (
-                    <button
-                      onClick={() => setSelectedCareCharacter('all')}
-                      className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                      title="Limpar filtro de caráter de atendimento"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            {/* INDICADORES DE FILTROS ATIVOS */}
-            {(searchTerm || selectedHospital !== 'all' || selectedCareCharacter !== 'all' || dateRange) && (
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                <div className="flex items-center gap-2">
-                  {searchTerm && (
-                    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                      🔍 Busca
-                    </Badge>
-                  )}
-                  {selectedHospital !== 'all' && (
-                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                      🏥 Hospital
-                    </Badge>
-                  )}
-                  {selectedCareCharacter !== 'all' && (
-                    <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
-                      🎯 Caráter
-                    </Badge>
-                  )}
-                  {dateRange && (
-                    <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                      📅 Período
-                    </Badge>
-                  )}
-                  <span className="text-xs text-gray-500">
-                    {filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0)} pacientes filtrados
-                  </span>
-                </div>
-                <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setSelectedHospital('all');
-                    setSelectedCareCharacter('all');
-                  }}
-                  className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-                  title="Limpar todos os filtros"
-                >
-                  Limpar
-                </button>
-              </div>
-            )}
-          </div>
+
 
           {/* ✅ LISTA DE MÉDICOS COM PAGINAÇÃO */}
           <div className="space-y-4">
