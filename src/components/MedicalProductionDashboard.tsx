@@ -100,13 +100,18 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   );
   
   // 🆕 CALCULAR QUANTIDADE DE PROCEDIMENTOS DE ANESTESISTAS INICIADOS EM '04' POR MÉDICO
-  const anesthetistProcedures04Count = doctorData.patients.reduce((sum, patient) => 
-    sum + patient.procedures.filter(proc => 
+  // ✅ NOVA LÓGICA: Agrupar por paciente e contar apenas 1 procedimento por grupo de anestesia
+  const anesthetistProcedures04Count = doctorData.patients.reduce((sum, patient) => {
+    // Verificar se o paciente tem pelo menos 1 procedimento de anestesia 04.xxx
+    const hasAnesthesiaProcedures = patient.procedures.some(proc => 
       proc.cbo === '225151' && // É anestesista
       proc.procedure_code?.startsWith('04') && // Procedimento inicia com '04'
       proc.procedure_code !== '04.17.01.001-0' // Excluir cesariana (que é calculada)
-    ).length, 0
-  );
+    );
+    
+    // Se tem procedimentos de anestesia, conta apenas 1 (uma anestesia contempla todos os outros)
+    return sum + (hasAnesthesiaProcedures ? 1 : 0);
+  }, 0);
   
   // 💰 CALCULAR VALOR TOTAL BASEADO NAS REGRAS DE PAGAMENTO ESPECÍFICAS
   let medicalProceduresValue = 0;
