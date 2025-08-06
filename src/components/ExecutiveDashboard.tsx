@@ -624,14 +624,14 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       // ✅ TAMBÉM ATUALIZAR O ESTADO DOS DADOS DOS MÉDICOS PARA SINCRONIZAÇÃO
       setDoctorsData(doctorsResult.doctors);
       
-      // ✅ ATUALIZAR STATS DOS MÉDICOS SEM AFETAR O CABEÇALHO
-      const medicalStats = {
-        totalRevenue: 0, // Não usado mais no cabeçalho
+      // ✅ INICIALIZAR STATS DOS MÉDICOS APENAS SE NÃO EXISTIR
+      // Evita sobrescrever dados que vêm do MedicalProductionDashboard
+      setMedicalProductionStats(prev => prev || {
+        totalRevenue: 0,
         totalDoctors: activeDoctors,
-        totalPatients: 0, // Não usado mais no cabeçalho
-        totalProcedures: 0 // Não usado mais no cabeçalho
-      };
-      setMedicalProductionStats(medicalStats);
+        totalPatients: 0,
+        totalProcedures: 0
+      });
 
       // Converter dados dos hospitais para o formato atual com valores normalizados
       const hospitalStatsConverted: HospitalStats[] = hospitalsData.map(hospital => ({
