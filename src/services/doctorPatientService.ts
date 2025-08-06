@@ -36,6 +36,7 @@ export interface PatientWithProcedures {
     admission_date: string;
     discharge_date?: string;
     aih_number: string;
+    care_character?: string;
   };
   total_value_reais: number;
   procedures: ProcedureDetail[];
@@ -161,7 +162,8 @@ export class DoctorPatientService {
               aih_info: {
                 admission_date: aih.admission_date,
                 discharge_date: aih.discharge_date,
-                aih_number: aih.aih_number
+                aih_number: aih.aih_number,
+                care_character: aih.care_character
               },
               total_value_reais: 0,
               procedures: [],
@@ -516,6 +518,7 @@ export class DoctorPatientService {
           total_procedures,
           approved_procedures,
           source_file,
+          care_character,
           patients (
             id,
             name,
@@ -664,7 +667,8 @@ export class DoctorPatientService {
               aih_info: {
                 admission_date: aih.admission_date,
                 discharge_date: aih.discharge_date,
-                aih_number: aih.aih_number
+                aih_number: aih.aih_number,
+                care_character: aih.care_character
               },
               total_value_reais: (aih.calculated_total_value || 0) / 100, // ✅ USAR VALOR REAL DA AIH, NÃO DOS PROCEDIMENTOS
               procedures: [], // ✅ INICIALIZAR COMO ARRAY VAZIO

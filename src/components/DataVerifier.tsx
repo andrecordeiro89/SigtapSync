@@ -4,12 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Database, Search, Users, FileText } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import { CareCharacterUtils } from '../config/careCharacterCodes';
 
 const DataVerifier = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<{
     patients: any[];
     aihs: any[];
+    aihsWithPatients: any[];
     totalPatients: number;
     totalAIHs: number;
   } | null>(null);
@@ -23,17 +25,42 @@ const DataVerifier = () => {
       
       // Importar serviços
       const { PatientService, AIHService } = await import('../services/supabaseService');
+      const { supabase } = await import('../lib/supabase');
       
-      // Buscar dados
+      // Buscar dados dos pacientes através das AIHs (incluindo care_character)
+      const { data: aihsWithPatients, error: aihError } = await supabase
+        .from('aihs')
+        .select(`
+          id,
+          aih_number,
+          care_character,
+          admission_date,
+          patients (
+            id,
+            name,
+            cns,
+            birth_date,
+            gender,
+            medical_record
+          )
+        `)
+        .order('admission_date', { ascending: false })
+        .limit(5);
+      
+      if (aihError) throw aihError;
+      
+      // Buscar dados gerais
       const patients = await PatientService.getPatients();
       const aihs = await AIHService.getAIHs();
       
       console.log('👤 Pacientes encontrados:', patients.length);
       console.log('📄 AIHs encontradas:', aihs.length);
+      console.log('🏥 AIHs com pacientes e care_character:', aihsWithPatients?.length || 0);
       
       setData({
         patients: patients.slice(0, 5), // Primeiros 5
         aihs: aihs.slice(0, 5), // Primeiras 5
+        aihsWithPatients: aihsWithPatients || [], // AIHs com dados dos pacientes e care_character
         totalPatients: patients.length,
         totalAIHs: aihs.length
       });
@@ -106,14 +133,17 @@ const DataVerifier = () => {
                   </div>
                   <p className="text-sm text-blue-600">Total no banco</p>
                   
-                  {data.patients.length > 0 && (
+                  {data.aihsWithPatients.length > 0 && (
                     <div className="mt-3 space-y-2">
-                      <p className="text-xs font-medium text-blue-800">Últimos cadastrados:</p>
-                      {data.patients.map((patient, index) => (
-                        <div key={patient.id} className="bg-white p-2 rounded text-xs">
-                          <div className="font-medium">{patient.name}</div>
-                          <div className="text-gray-600">CNS: {patient.cns}</div>
-                          <div className="text-gray-500">ID: {patient.id.substring(0, 8)}...</div>
+                      <p className="text-xs font-medium text-blue-800">Últimas AIHs com pacientes:</p>
+                      {data.aihsWithPatients.map((aih, index) => (
+                        <div key={aih.id} className="bg-white p-2 rounded text-xs">
+                          <div className="font-medium">{aih.patients?.name || 'Nome não disponível'}</div>
+                          <div className="text-gray-600">CNS: {aih.patients?.cns || 'N/A'}</div>
+                          <div className="text-gray-500">AIH: {aih.aih_number}</div>
+                          <div className={`text-sm font-medium px-2 py-1 rounded-md border inline-block ${aih.care_character ? CareCharacterUtils.getStyleClasses(aih.care_character) : 'text-gray-600 bg-gray-100 border-gray-200'}`}>
+                            {aih.care_character ? CareCharacterUtils.formatForDisplay(aih.care_character) : 'N/A'}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -178,4 +208,4 @@ const DataVerifier = () => {
   );
 };
 
-export default DataVerifier; 
+export default DataVerifier;

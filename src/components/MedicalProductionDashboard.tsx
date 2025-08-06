@@ -37,6 +37,7 @@ import DoctorPaymentRules, { calculateDoctorPayment, calculatePercentagePayment 
 import ProcedurePatientDiagnostic from './ProcedurePatientDiagnostic';
 import CleuezaDebugComponent from './CleuezaDebugComponent';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
+import { CareCharacterUtils } from '../config/careCharacterCodes';
 import { 
   shouldCalculateAnesthetistProcedure, 
   getAnesthetistProcedureType,
@@ -402,6 +403,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [filteredDoctors, setFilteredDoctors] = useState<DoctorWithPatients[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHospital, setSelectedHospital] = useState<string>('all'); // 🆕 FILTRO DE HOSPITAL
+  const [selectedCareCharacter, setSelectedCareCharacter] = useState<string>('all'); // 🆕 FILTRO DE CARÁTER DE ATENDIMENTO
   const [availableHospitals, setAvailableHospitals] = useState<Array<{id: string, name: string}>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
@@ -909,7 +911,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     loadDoctorsData();
   }, [user, canAccessAllHospitals, hasFullAccess]);
 
-  // ✅ FILTRAR MÉDICOS BASEADO NO TERMO DE BUSCA, HOSPITAL E DATAS
+  // ✅ FILTRAR MÉDICOS BASEADO NO TERMO DE BUSCA, HOSPITAL, CARÁTER DE ATENDIMENTO E DATAS
   useEffect(() => {
     let filtered = doctors;
     
@@ -945,6 +947,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       })).filter(doctor => doctor.patients.length > 0); // Remover médicos sem pacientes após filtro
     }
     
+    // 🆕 FILTRAR POR CARÁTER DE ATENDIMENTO
+    if (selectedCareCharacter !== 'all') {
+      filtered = filtered.map(doctor => ({
+        ...doctor,
+        patients: doctor.patients.filter(patient => {
+          if (!patient.aih_info || !patient.aih_info.care_character) return false;
+          return patient.aih_info.care_character.toString() === selectedCareCharacter;
+        })
+      })).filter(doctor => doctor.patients.length > 0); // Remover médicos sem pacientes após filtro
+    }
+    
     // Filtrar por termo de busca
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
@@ -960,7 +973,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     // Reset da página atual quando filtros são aplicados
     setCurrentDoctorPage(1);
-  }, [searchTerm, doctors, selectedHospital, dateRange]);
+  }, [searchTerm, doctors, selectedHospital, selectedCareCharacter, dateRange]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
   const toggleDoctorExpansion = (doctorCns: string) => {
@@ -1263,8 +1276,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               </div>
             )}
             
-            {/* BUSCA E HOSPITAL EM LINHA */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* BUSCA E FILTROS EM LINHA */}
+            <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
               {/* BUSCA RÁPIDA */}
               <div className="lg:col-span-2">
                 <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">Busca Rápida</label>
@@ -1280,7 +1293,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               </div>
               
               {/* FILTRO DE HOSPITAL */}
-              <div>
+              <div className="lg:col-span-2">
                 <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">Hospital</label>
                 <div className="flex items-center gap-2">
                   <select
@@ -1306,10 +1319,37 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   )}
                 </div>
               </div>
+              
+              {/* FILTRO DE CARÁTER DE ATENDIMENTO */}
+              <div className="lg:col-span-2">
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">Caráter de Atendimento</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedCareCharacter}
+                    onChange={(e) => setSelectedCareCharacter(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-10"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="1">Eletivo</option>
+                    <option value="2">Urgência/Emergência</option>
+                    <option value="3">Acidente no Trabalho</option>
+                    <option value="4">Acidente de Trânsito</option>
+                  </select>
+                  {selectedCareCharacter !== 'all' && (
+                    <button
+                      onClick={() => setSelectedCareCharacter('all')}
+                      className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                      title="Limpar filtro de caráter de atendimento"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
             
             {/* INDICADORES DE FILTROS ATIVOS */}
-            {(searchTerm || selectedHospital !== 'all' || dateRange) && (
+            {(searchTerm || selectedHospital !== 'all' || selectedCareCharacter !== 'all' || dateRange) && (
               <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                 <div className="flex items-center gap-2">
                   {searchTerm && (
@@ -1320,6 +1360,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   {selectedHospital !== 'all' && (
                     <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
                       🏥 Hospital
+                    </Badge>
+                  )}
+                  {selectedCareCharacter !== 'all' && (
+                    <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
+                      🎯 Caráter
                     </Badge>
                   )}
                   {dateRange && (
@@ -1335,9 +1380,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   onClick={() => {
                     setSearchTerm('');
                     setSelectedHospital('all');
+                    setSelectedCareCharacter('all');
                   }}
                   className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-                  title="Limpar filtros de busca e hospital"
+                  title="Limpar todos os filtros"
                 >
                   Limpar
                 </button>
@@ -1557,7 +1603,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                    {formatCurrency(doctorStats.totalValue)}
                                  </div>
                                  <div className="text-sm text-slate-600 font-medium">
-                                   {doctorStats.approvalRate.toFixed(1)}% aprovação
+                                   Total das AIHs do médico
                                  </div>
                                </div>
                             </div>
@@ -1782,6 +1828,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     <span>• Alta: {new Date(patient.aih_info.discharge_date).toLocaleDateString('pt-BR')}</span>
                                                   )}
                                                 </div>
+                                                {patient.aih_info.care_character && (
+                                                  <div className={`text-sm font-medium px-2 py-1 rounded-md border inline-block ${CareCharacterUtils.getStyleClasses(patient.aih_info.care_character)}`}>
+                                                    {CareCharacterUtils.formatForDisplay(patient.aih_info.care_character)}
+                                                  </div>
+                                                )}
                                               </div>
                                             </div>
                                             <div className="text-right">

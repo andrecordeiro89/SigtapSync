@@ -14,6 +14,7 @@ import AIHExecutiveSummary from './AIHExecutiveSummary';
 import ProcedureInlineCard from './ProcedureInlineCard';
 import { formatCurrency as baseCurrency } from '../utils/validation';
 import { useToast } from '@/hooks/use-toast';
+import { CareCharacterUtils } from '../config/careCharacterCodes';
 
 // 🔧 CORREÇÃO: Função para formatar valores que vêm em centavos
 const formatCurrency = (value: number | undefined | null): string => {
@@ -966,7 +967,9 @@ const PatientManagement = () => {
                             </div>
                             <div>
                               <span className="text-gray-500">Caráter:</span>
-                              <p className="font-medium text-gray-900">{item.care_character || 'N/A'}</p>
+                              <div className={`text-sm font-medium px-2 py-1 rounded-md border inline-block mt-1 ${item.care_character ? CareCharacterUtils.getStyleClasses(item.care_character) : 'text-gray-600 bg-gray-100 border-gray-200'}`}>
+                                {item.care_character ? CareCharacterUtils.formatForDisplay(item.care_character) : 'N/A'}
+                              </div>
                             </div>
                             {item.specialty && (
                               <div className="col-span-2">
