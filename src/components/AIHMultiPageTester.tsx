@@ -2466,6 +2466,11 @@ const AIHMultiPageTester = () => {
           description: "Dados disponíveis para consulta e relatórios!",
           duration: 3000
         });
+
+        // ✅ Rolagem automática para o topo (área de upload) após salvar
+        try {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch {}
         
       } else {
         throw new Error(result.message);
