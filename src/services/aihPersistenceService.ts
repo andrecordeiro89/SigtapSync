@@ -680,64 +680,97 @@ export class AIHPersistenceService {
         source_file: sourceFile
       };
       
-      // 🆕 CAMPOS EXPANDIDOS COMPLETOS (todos os 14 novos campos)
-      const expandedAihData = {
-        // Campos de situação e tipo
-        situacao: aih.situacao || null,                          // Novo: situação da AIH
-        tipo: aih.tipo || null,                                  // Novo: tipo da AIH
-        
-        // Datas importantes
-        data_autorizacao: aih.dataAutorizacao || null,           // Novo: data de autorização
-        
-        // CNS dos profissionais
-        cns_autorizador: aih.cnsAutorizador || null,             // Novo: CNS do autorizador
-        cns_solicitante: aih.cnsSolicitante || null,             // Novo: CNS do solicitante
-        cns_responsavel: aih.cnsResponsavel || null,             // Novo: CNS do responsável
-        
-        // AIHs relacionadas
-        aih_anterior: aih.aihAnterior || null,                   // Novo: AIH anterior
-        aih_posterior: aih.aihPosterior || null,                 // Novo: AIH posterior
-        
-        // Procedimento e mudanças
-        procedure_requested: aih.procedimentoSolicitado || null,  // Novo: procedimento solicitado
-        procedure_changed: aih.mudancaProc || false,             // Novo: houve mudança de procedimento
-        
-        // Encerramento
-        discharge_reason: aih.motivoEncerramento || null,        // Novo: motivo do encerramento
-        
-        // Classificações de atendimento
-        specialty: aih.especialidade || null,                    // Novo: especialidade
-        care_modality: aih.modalidade || null,                   // Novo: modalidade de atendimento
-        care_character: aih.caracterAtendimento || null,         // Novo: caráter do atendimento
-        
-        // Estimativas financeiras
-        estimated_original_value: aih.estimatedOriginalValue || null  // Novo: valor original estimado
-      };
-      
-      // Tentar com campos expandidos primeiro
-      let aihData = { ...basicAihData, ...expandedAihData };
-      let useExpandedSchema = true;
-      let createdAIH;
+      // 🆕 CAMPOS EXPANDIDOS COMPLETOS – preparos em PT e EN
+      // Preferimos os nomes PT do seu schema; se falhar, tentamos EN como fallback.
+      const expandedAihDataPT = {
+        // Campos de situação e tipo (PT)
+        situacao: aih.situacao || null,
+        tipo: aih.tipo || null,
 
+        // Datas importantes (PT)
+        data_autorizacao: aih.dataAutorizacao || null,
+
+        // CNS dos profissionais (PT)
+        cns_autorizador: aih.cnsAutorizador || null,
+        cns_solicitante: aih.cnsSolicitante || null,
+        cns_responsavel: aih.cnsResponsavel || null,
+
+        // AIHs relacionadas (PT)
+        aih_anterior: aih.aihAnterior || null,
+        aih_posterior: aih.aihPosterior || null,
+
+        // Procedimento e mudanças (PT)
+        procedimento_solicitado: aih.procedimentoSolicitado || null,
+        mudanca_procedimento: aih.mudancaProc || false,
+
+        // Encerramento (PT)
+        motivo_encerramento: aih.motivoEncerramento || null,
+
+        // Classificações de atendimento (PT)
+        especialidade: aih.especialidade || null,
+        modalidade: aih.modalidade || null,
+        caracter_atendimento: aih.caracterAtendimento || null,
+
+        // Estimativa financeira (PT – ajuste se sua coluna tiver outro nome)
+        valor_original_estimado: (aih as any).estimatedOriginalValue ?? null
+      } as Record<string, any>;
+
+      // Versão EN (mantida para ambientes com colunas em inglês)
+      const expandedAihDataEN = {
+        situacao: aih.situacao || null,
+        tipo: aih.tipo || null,
+        data_autorizacao: aih.dataAutorizacao || null,
+        cns_autorizador: aih.cnsAutorizador || null,
+        cns_solicitante: aih.cnsSolicitante || null,
+        cns_responsavel: aih.cnsResponsavel || null,
+        aih_anterior: aih.aihAnterior || null,
+        aih_posterior: aih.aihPosterior || null,
+        procedure_requested: aih.procedimentoSolicitado || null,
+        procedure_changed: aih.mudancaProc || false,
+        discharge_reason: aih.motivoEncerramento || null,
+        specialty: aih.especialidade || null,
+        care_modality: aih.modalidade || null,
+        care_character: aih.caracterAtendimento || null,
+        estimated_original_value: (aih as any).estimatedOriginalValue ?? null
+      } as Record<string, any>;
+      
+      // Tentar com campos expandidos primeiro (PT), depois EN, e por último básico
+      let createdAIH: any;
+      let usedVariant: 'PT' | 'EN' | 'BASIC' = 'PT';
       try {
-        console.log('💾 Tentando criar AIH com schema expandido...');
-        createdAIH = await AIHService.createAIH(aihData);
-        console.log('✅ AIH criada com schema expandido!');
-      } catch (expandedError) {
-        console.warn('⚠️ Erro com schema expandido, tentando schema básico...', expandedError);
-        
-                 // Se falhou, tentar apenas com campos básicos
-         try {
-           console.log('💾 Tentando criar AIH com schema básico...');
-           aihData = basicAihData as any; // Cast para evitar erro TypeScript
-           useExpandedSchema = false;
-           createdAIH = await AIHService.createAIH(aihData);
-           console.log('✅ AIH criada com schema básico!');
-           console.log('📋 DICA: Execute a migração do schema para salvar todos os campos extraídos');
-         } catch (basicError) {
-           console.error('❌ Erro mesmo com schema básico:', basicError);
-           throw basicError;
-         }
+        console.log('💾 Tentando criar AIH com schema expandido (PT)...');
+        createdAIH = await AIHService.createAIH({ ...basicAihData, ...expandedAihDataPT } as any);
+        console.log('✅ AIH criada com schema expandido (PT)!');
+      } catch (ptError) {
+        console.warn('⚠️ Falhou expandido (PT). Tentando expandido (EN)...', ptError);
+        try {
+          usedVariant = 'EN';
+          createdAIH = await AIHService.createAIH({ ...basicAihData, ...expandedAihDataEN } as any);
+          console.log('✅ AIH criada com schema expandido (EN)!');
+        } catch (enError) {
+          console.warn('⚠️ Falhou expandido (EN). Tentando schema básico...', enError);
+          try {
+            usedVariant = 'BASIC';
+            createdAIH = await AIHService.createAIH(basicAihData as any);
+            console.log('✅ AIH criada com schema básico!');
+            console.log('📋 DICA: Ajuste o mapeamento PT/EN para salvar todos os campos.');
+          } catch (basicError) {
+            console.error('❌ Erro mesmo com schema básico:', basicError);
+            throw basicError;
+          }
+        }
+      }
+
+      // Garantir preenchimento de cns_responsavel mesmo que tenha caído em variantes sem a coluna
+      try {
+        if (aih.cnsResponsavel && typeof aih.cnsResponsavel === 'string' && aih.cnsResponsavel.trim() !== '') {
+          await supabase
+            .from('aihs')
+            .update({ cns_responsavel: aih.cnsResponsavel })
+            .eq('id', createdAIH.id);
+        }
+      } catch (updateCnsErr) {
+        console.warn('⚠️ Não foi possível atualizar cns_responsavel pós-inserção (coluna pode não existir neste schema):', updateCnsErr);
       }
 
       // ️✅ GARANTIR RESTRIÇÃO: Médico responsável/solicitante/autorizador vinculados ao hospital
@@ -754,7 +787,7 @@ export class AIHPersistenceService {
       return {
         success: true,
         aihId: createdAIH.id,
-        message: `AIH ${aih.numeroAIH} criada com sucesso ${useExpandedSchema ? '(schema expandido)' : '(schema básico - considere migração)'}`,
+        message: `AIH ${aih.numeroAIH} criada com sucesso (${usedVariant === 'PT' ? 'schema expandido PT' : usedVariant === 'EN' ? 'schema expandido EN' : 'schema básico'})`,
       };
 
     } catch (error) {
