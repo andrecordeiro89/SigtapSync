@@ -137,6 +137,108 @@ export interface ProcessedAIHResult {
 
 export class AIHPersistenceService {
   /**
+   * Garante que o médico exista e esteja vinculado ao hospital (doctor_hospital)
+   * Retorna o doctor_id quando conseguir garantir o vínculo
+   */
+  private static async ensureDoctorAndHospitalLink(
+    cns: string | null | undefined,
+    hospitalId: string,
+    roleLabel?: 'Responsável' | 'Solicitante' | 'Autorizador'
+  ): Promise<string | null> {
+    try {
+      if (!cns || cns.trim() === '' || cns === 'N/A') return null;
+
+      // 1) Buscar (ou criar) o médico por CNS
+      let doctorId: string | null = null;
+      const { data: existingDoctor, error: doctorQueryError } = await supabase
+        .from('doctors')
+        .select('id, cns, name, is_active')
+        .eq('cns', cns)
+        .single();
+
+      if (!doctorQueryError && existingDoctor) {
+        doctorId = existingDoctor.id;
+      } else if (doctorQueryError && doctorQueryError.code !== 'PGRST116') {
+        // Erro real
+        console.warn('⚠️ Erro ao consultar doctors por CNS:', doctorQueryError.message);
+      }
+
+      if (!doctorId) {
+        // Criar médico mínimo
+        const { data: newDoctor, error: createDoctorError } = await supabase
+          .from('doctors')
+          .insert([
+            {
+              id: crypto.randomUUID(),
+              cns,
+              name: `Dr(a). CNS ${cns}`,
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+          ])
+          .select('id')
+          .single();
+
+        if (createDoctorError) {
+          console.error('❌ Falha ao criar médico por CNS:', cns, createDoctorError.message);
+          return null;
+        }
+        doctorId = newDoctor.id;
+      }
+
+      // 2) Garantir vínculo doctor_hospital
+      const { data: existingLink, error: linkQueryError } = await supabase
+        .from('doctor_hospital')
+        .select('id, is_active')
+        .eq('doctor_id', doctorId)
+        .eq('hospital_id', hospitalId)
+        .single();
+
+      if (!linkQueryError && existingLink) {
+        if (existingLink.is_active !== true) {
+          // Reativar vínculo
+          await supabase
+            .from('doctor_hospital')
+            .update({ is_active: true, updated_at: new Date().toISOString() })
+            .eq('id', existingLink.id);
+        }
+        return doctorId;
+      }
+
+      if (linkQueryError && linkQueryError.code !== 'PGRST116') {
+        console.warn('⚠️ Erro ao consultar doctor_hospital:', linkQueryError.message);
+      }
+
+      const { error: createLinkError } = await supabase
+        .from('doctor_hospital')
+        .insert([
+          {
+            id: crypto.randomUUID(),
+            doctor_id: doctorId,
+            doctor_cns: cns,
+            hospital_id: hospitalId,
+            role: roleLabel || null,
+            is_active: true,
+            is_primary_hospital: false,
+            start_date: new Date().toISOString().slice(0, 10),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ]);
+
+      if (createLinkError) {
+        console.error('❌ Falha ao criar vínculo doctor_hospital:', createLinkError.message);
+        return null;
+      }
+
+      return doctorId;
+    } catch (error) {
+      console.error('❌ ensureDoctorAndHospitalLink error:', error);
+      return null;
+    }
+  }
+  /**
    * Diagnóstico completo do sistema antes de persistir
    */
   static async diagnoseSystem(hospitalId: string): Promise<void> {
@@ -638,10 +740,21 @@ export class AIHPersistenceService {
          }
       }
 
+      // ️✅ GARANTIR RESTRIÇÃO: Médico responsável/solicitante/autorizador vinculados ao hospital
+      try {
+        await Promise.all([
+          this.ensureDoctorAndHospitalLink(aih.cnsResponsavel || null, hospitalId, 'Responsável'),
+          this.ensureDoctorAndHospitalLink(aih.cnsSolicitante || null, hospitalId, 'Solicitante'),
+          this.ensureDoctorAndHospitalLink(aih.cnsAutorizador || null, hospitalId, 'Autorizador'),
+        ]);
+      } catch (guardError) {
+        console.warn('⚠️ Aviso: não foi possível garantir todos os vínculos médico-hospital:', guardError);
+      }
+
       return {
         success: true,
         aihId: createdAIH.id,
-        message: `AIH ${aih.numeroAIH} criada com sucesso ${useExpandedSchema ? '(schema expandido)' : '(schema básico - considere migração)'}`
+        message: `AIH ${aih.numeroAIH} criada com sucesso ${useExpandedSchema ? '(schema expandido)' : '(schema básico - considere migração)'}`,
       };
 
     } catch (error) {

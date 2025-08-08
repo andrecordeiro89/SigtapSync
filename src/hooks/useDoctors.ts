@@ -72,7 +72,6 @@ export function useDoctors(): UseDoctorsReturn {
           specialty,
           crm,
           crm_state,
-          hospital_id,
           doctor_hospital!inner (
             hospital_id
           )
