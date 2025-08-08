@@ -6,16 +6,19 @@
 -- Funcionalidade: Permite usar nomes de médicos automaticamente nos relatórios
 
 -- ==============================================
--- 1. VIEW: Procedimentos com Nomes de Médicos
--- ==============================================
-CREATE OR REPLACE VIEW v_procedures_with_doctors AS
+-- Remover views existentes para evitar conflitos de coluna
+DROP VIEW IF EXISTS v_procedures_detailed_status CASCADE;
+DROP VIEW IF EXISTS v_doctor_procedure_summary CASCADE;
+DROP VIEW IF EXISTS v_procedures_with_doctors CASCADE;
+
+CREATE VIEW v_procedures_with_doctors AS
 SELECT 
     pr.*,
     -- Dados do médico responsável
-    d.name as doctor_name,
-    d.crm as doctor_crm,
-    d.specialty as doctor_specialty,
-    d.is_active as doctor_active,
+    COALESCE(d_dh.name, d_direct.name, d_prdoc.name)                 as responsible_doctor_name,
+    COALESCE(d_dh.crm,  d_direct.crm,  d_prdoc.crm)                  as responsible_doctor_crm,
+    COALESCE(d_dh.specialty, d_direct.specialty, d_prdoc.specialty)  as responsible_doctor_specialty,
+    COALESCE(d_dh.is_active, d_direct.is_active, d_prdoc.is_active)  as responsible_doctor_active,
     
     -- Dados do paciente
     p.name as patient_name,
@@ -36,16 +39,21 @@ SELECT
     h.cnpj as hospital_cnpj
     
 FROM procedure_records pr
-LEFT JOIN patients p ON pr.patient_id = p.id
-LEFT JOIN aihs a ON pr.aih_id = a.id
-LEFT JOIN hospitals h ON pr.hospital_id = h.id
-LEFT JOIN doctor_hospital dh ON (dh.hospital_id = pr.hospital_id AND dh.doctor_cns = pr.documento_profissional)
-LEFT JOIN doctors d ON dh.doctor_id = d.id;
+LEFT JOIN patients p      ON pr.patient_id = p.id
+LEFT JOIN aihs a          ON pr.aih_id = a.id
+LEFT JOIN hospitals h     ON pr.hospital_id = h.id
+-- 1) Vincular pelo relacionamento oficial no hospital usando o CNS RESPONSÁVEL da AIH
+LEFT JOIN doctor_hospital dh_resp ON (dh_resp.hospital_id = pr.hospital_id AND dh_resp.doctor_cns = a.cns_responsavel)
+LEFT JOIN doctors d_dh            ON dh_resp.doctor_id = d_dh.id
+-- 2) Fallback direto: se não houver vínculo, buscar médico diretamente pelo CNS responsável
+LEFT JOIN doctors d_direct        ON d_direct.cns = a.cns_responsavel
+-- 3) Último fallback: tentar resolver pelo documento do procedimento (quando for o CNS)
+LEFT JOIN doctors d_prdoc         ON d_prdoc.cns = pr.documento_profissional;
 
 -- ==============================================
 -- 2. VIEW: Resumo de Procedimentos por Médico
 -- ==============================================
-CREATE OR REPLACE VIEW v_doctor_procedure_summary AS
+CREATE VIEW v_doctor_procedure_summary AS
 SELECT 
     pr.hospital_id,
     h.name as hospital_name,
@@ -68,11 +76,27 @@ GROUP BY pr.hospital_id, h.name, pr.documento_profissional, d.name, d.crm, d.spe
 ORDER BY total_value_cents DESC;
 
 -- ==============================================
--- 3. VIEW: AIHs Completas com Médicos
--- ==============================================
-CREATE OR REPLACE VIEW v_aihs_with_doctors AS
+-- Para alterar colunas com segurança, dropar a view antes de recriar
+DROP VIEW IF EXISTS v_aihs_with_doctors CASCADE;
+CREATE VIEW v_aihs_with_doctors AS
 SELECT 
-    a.*,
+    -- Campos base da AIH (mantendo compatibilidade de nomes)
+    a.id as aih_id,
+    a.aih_number,
+    a.hospital_id,
+    a.patient_id,
+    a.admission_date,
+    a.discharge_date,
+    a.main_cid,
+    a.calculated_total_value,
+    a.processing_status,
+    a.cns_responsavel,
+    a.cns_solicitante,
+    a.cns_autorizador,
+    a.total_procedures        as aih_total_procedures,
+    a.approved_procedures     as aih_approved_procedures,
+    a.source_file,
+    a.care_character,
     -- Paciente
     p.name as patient_name,
     p.cns as patient_cns,
@@ -82,24 +106,27 @@ SELECT
     h.name as hospital_name,
     
     -- Médico Autorizador
+    d_auth.id as cns_autorizador_doctor_id,
     d_auth.name as cns_autorizador_name,
     d_auth.crm as cns_autorizador_crm,
     
     -- Médico Solicitante
+    d_solic.id as cns_solicitante_doctor_id,
     d_solic.name as cns_solicitante_name,
     d_solic.crm as cns_solicitante_crm,
     d_solic.specialty as cns_solicitante_specialty,
     
     -- Médico Responsável
+    d_resp.id as cns_responsavel_doctor_id,
     d_resp.name as cns_responsavel_name,
     d_resp.crm as cns_responsavel_crm,
     d_resp.specialty as cns_responsavel_specialty,
     
-    -- Estatísticas de procedimentos
-    (SELECT COUNT(*) FROM procedure_records WHERE aih_id = a.id) as total_procedures,
-    (SELECT COUNT(*) FROM procedure_records WHERE aih_id = a.id AND aprovado = true) as approved_procedures,
-    (SELECT SUM(total_value) FROM procedure_records WHERE aih_id = a.id) as total_value_cents,
-    ROUND((SELECT SUM(total_value) FROM procedure_records WHERE aih_id = a.id) / 100.0, 2) as total_value_reais
+    -- Estatísticas de procedimentos (derivadas)
+    (SELECT COUNT(*) FROM procedure_records WHERE aih_id = a.id)                           as derived_total_procedures,
+    (SELECT COUNT(*) FROM procedure_records WHERE aih_id = a.id AND aprovado = true)       as derived_approved_procedures,
+    (SELECT SUM(total_value) FROM procedure_records WHERE aih_id = a.id)                   as derived_total_value_cents,
+    ROUND((SELECT SUM(total_value) FROM procedure_records WHERE aih_id = a.id) / 100.0, 2) as derived_total_value_reais
     
 FROM aihs a
 LEFT JOIN patients p ON a.patient_id = p.id
@@ -117,7 +144,8 @@ LEFT JOIN doctors d_resp ON dh_resp.doctor_id = d_resp.id;
 -- ==============================================
 -- 4. VIEW: Dashboard de Médicos por Hospital
 -- ==============================================
-CREATE OR REPLACE VIEW v_hospital_doctors_dashboard AS
+DROP VIEW IF EXISTS v_hospital_doctors_dashboard CASCADE;
+CREATE VIEW v_hospital_doctors_dashboard AS
 SELECT 
     h.id as hospital_id,
     h.name as hospital_name,
@@ -149,14 +177,14 @@ ORDER BY h.name, d.name;
 -- ==============================================
 -- 5. VIEW: Procedimentos com Status Detalhado
 -- ==============================================
-CREATE OR REPLACE VIEW v_procedures_detailed_status AS
+CREATE VIEW v_procedures_detailed_status AS
 SELECT 
     pr.*,
     p.name as patient_name,
     a.aih_number,
     h.name as hospital_name,
-    d.name as doctor_name,
-    d.crm as doctor_crm,
+    d.name as responsible_doctor_name,
+    d.crm as responsible_doctor_crm,
     
     -- Análise de status
     CASE 

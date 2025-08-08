@@ -129,7 +129,8 @@ export class DoctorPatientService {
       const { data: aihsData, error: aihsError } = await supabase
         .from('v_aihs_with_doctors')
         .select('*')
-        .or(`cns_responsavel.eq.${doctorCns},cns_solicitante.eq.${doctorCns},cns_autorizador.eq.${doctorCns}`)
+        // ✅ Usar a chave forte quando disponível: doctor_id da view
+        .eq('cns_responsavel_doctor_id', doctorData.id)
         .order('admission_date', { ascending: false });
 
       if (aihsError) {
@@ -546,23 +547,12 @@ export class DoctorPatientService {
       // ✅ PROCEDIMENTOS AGORA SÃO GERENCIADOS PELO SimplifiedProcedureService
       console.log(`🔄 Procedimentos para ${aihsData.length} AIHs serão carregados pelo SimplifiedProcedureService`);
 
-      // 3. ✅ CRIAR MAPA DE MÉDICOS COM FALLBACK INTELIGENTE
+      // 3. ✅ CRIAR MAPA DE MÉDICOS (apenas RESPONSÁVEL)
       const allDoctorsCns = new Set<string>();
       
       aihsData.forEach(aih => {
-        // Prioridade: Responsável > Solicitante > Autorizador > Não Identificado
         if (aih.cns_responsavel) {
           allDoctorsCns.add(aih.cns_responsavel);
-        } else if (aih.cns_solicitante) {
-          allDoctorsCns.add(aih.cns_solicitante);
-          console.log(`⚠️ AIH ${aih.aih_number}: Usando CNS SOLICITANTE como responsável`);
-        } else if (aih.cns_autorizador) {
-          allDoctorsCns.add(aih.cns_autorizador);
-          console.log(`⚠️ AIH ${aih.aih_number}: Usando CNS AUTORIZADOR como responsável`);
-        } else {
-          // Criar médico "Não Identificado" para AIHs sem nenhum CNS
-          allDoctorsCns.add('NAO_IDENTIFICADO');
-          console.log(`❌ AIH ${aih.aih_number}: SEM nenhum CNS - usando médico 'Não Identificado'`);
         }
       });
       
@@ -622,7 +612,7 @@ export class DoctorPatientService {
         const doctor = doctorsMap.get(doctorCns)!;
         const patientsMap = new Map<string, PatientWithProcedures>();
 
-        // 4.1. ✅ ENCONTRAR AIHs ASSOCIADAS A ESTE MÉDICO (COM FALLBACK)
+      // 4.1. ✅ ENCONTRAR AIHs ASSOCIADAS A ESTE MÉDICO (APENAS RESPONSÁVEL)
         console.log(`\n👨‍⚕️ Processando médico: ${doctor.doctor_info.name} (CNS: ${doctorCns})`);
         
         // 🔍 LOG ESPECÍFICO PARA MÉDICO DA CLEUZA
@@ -632,18 +622,7 @@ export class DoctorPatientService {
           console.log(`   Nome: ${doctor.doctor_info.name}`);
         }
         
-        const aihsForThisDoctor = aihsData.filter(aih => {
-          // ✅ LÓGICA DE FALLBACK PARA ASSOCIAR AIH AO MÉDICO
-          if (doctorCns === 'NAO_IDENTIFICADO') {
-            // AIHs sem nenhum CNS
-            return !aih.cns_responsavel && !aih.cns_solicitante && !aih.cns_autorizador;
-          } else {
-            // AIHs onde este CNS aparece (responsável, solicitante ou autorizador)
-            return aih.cns_responsavel === doctorCns || 
-                   (!aih.cns_responsavel && aih.cns_solicitante === doctorCns) ||
-                   (!aih.cns_responsavel && !aih.cns_solicitante && aih.cns_autorizador === doctorCns);
-          }
-        });
+        const aihsForThisDoctor = aihsData.filter(aih => aih.cns_responsavel === doctorCns);
         
         console.log(`   📋 ${aihsForThisDoctor.length} AIHs associadas a este médico`);
         
@@ -1426,10 +1405,10 @@ export class DoctorPatientService {
     try {
       console.log(`🔍 Buscando dados reais de ${cnsList.length} médicos com hospitais...`);
 
-      // 1. Buscar médicos da tabela doctors
+      // 1. Buscar médicos da tabela doctors (inclui id para usar como chave de relacionamento)
       const { data: doctorsTableData, error: doctorsTableError } = await supabase
         .from('doctors')
-        .select('cns, name, crm, specialty')
+        .select('id, cns, name, crm, specialty')
         .in('cns', cnsList);
 
       if (doctorsTableError) {
@@ -1442,7 +1421,7 @@ export class DoctorPatientService {
         console.log(`✅ Encontrados ${doctorsTableData.length} médicos na tabela doctors`);
         
         for (const doctor of doctorsTableData) {
-          // Buscar hospitais associados ao médico
+          // Buscar hospitais associados ao médico (AGORA por doctor_id, não mais por doctor_cns)
           const { data: hospitalData, error: hospitalError } = await supabase
             .from('doctor_hospital')
             .select(`
@@ -1457,7 +1436,7 @@ export class DoctorPatientService {
                 cnpj
               )
             `)
-            .eq('doctor_cns', doctor.cns)
+            .eq('doctor_id', doctor.id)
             .eq('is_active', true);
 
           const hospitals: DoctorHospital[] = [];
