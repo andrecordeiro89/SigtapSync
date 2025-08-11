@@ -51,7 +51,6 @@ import {
   isInstrument04Procedure,     // ✅ NOVA função para Instrumento 04
   debugInstrument04Detection,  // ✅ NOVA função de debug
   classifyProcedures,          // ✅ NOVA função de classificação
-  isMedicalProcedure,          // ✅ NOVA função para identificar procedimentos médicos
   calculateMedicalPayment      // ✅ NOVA função para calcular pagamento médico
 } from '../config/susCalculationRules';
 
@@ -1299,27 +1298,6 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                             {procedure.sequencia === 1 && (
                               <Badge variant="default" className="text-xs bg-green-600 text-white px-2 py-0.5">
                                 Principal
-                              </Badge>
-                            )}
-                            {/* ✅ NOVO: Badge refinado para anestesistas baseado no código */}
-                            {(() => {
-                              const anesthetistInfo = getAnesthetistProcedureType(procedure.cbo, procedure.procedimento);
-                              if (anesthetistInfo.isAnesthetist) {
-                                return (
-                                  <Badge 
-                                    variant={anesthetistInfo.badgeVariant} 
-                                    className={`${anesthetistInfo.badgeClass} text-xs px-2 py-0.5 ${anesthetistInfo.shouldCalculate ? '' : 'animate-pulse'}`}
-                                  >
-                                    {anesthetistInfo.badge}
-                                  </Badge>
-                                );
-                              }
-                              return null;
-                            })()}
-                            {/* ✅ NOVO: Badge para pagamento médico */}
-                            {isMedicalProcedure(procedure.procedimento) && (
-                              <Badge variant="outline" className="text-xs px-2 py-0.5 bg-green-100 text-green-800 border-green-300">
-                                💰 Pagamento Médico
                               </Badge>
                             )}
                           </div>
