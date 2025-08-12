@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
@@ -46,6 +47,7 @@ import {
   getAnesthetistProcedureType,
   filterCalculableProcedures 
 } from '../utils/anesthetistLogic';
+import ReportGenerator from './ReportGenerator';
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -444,6 +446,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [refreshTick, setRefreshTick] = useState(0);
   const realtimeDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
+  // 🆕 MODAL RELATÓRIO SUS
+  const [reportModalOpen, setReportModalOpen] = useState<boolean>(false);
+  const [reportPreset, setReportPreset] = useState<{ hospitalId?: string; doctorName?: string } | null>(null);
   // 🆕 ESTADOS PARA PAGINAÇÃO DE PACIENTES
   const [currentPatientPage, setCurrentPatientPage] = useState<Map<string, number>>(new Map());
   const [patientSearchTerm, setPatientSearchTerm] = useState<Map<string, string>>(new Map());
@@ -1641,6 +1646,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                  <div className="text-sm text-slate-600 font-medium">
                                    Total das AIHs do médico
                                  </div>
+                                 {/* Botão Relatório SUS */}
+                                 <div className="mt-3">
+                                   <Button
+                                     type="button"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       const h = doctor.hospitals?.[0]?.hospital_id || '';
+                                       setReportPreset({ hospitalId: h, doctorName: doctor.doctor_info.name });
+                                       setReportModalOpen(true);
+                                     }}
+                                     className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-4 py-2 rounded-md text-sm"
+                                   >
+                                     Gerar Relatório SUS
+                                   </Button>
+                                 </div>
                                </div>
                             </div>
                             
@@ -2204,6 +2224,26 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           </div>
         </CardContent>
       </Card>
+      {/* Modal: Report Generator (SUS) */}
+      <Dialog open={reportModalOpen} onOpenChange={setReportModalOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Relatório SUS</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">
+            <ReportGenerator
+              preset={{
+                type: 'sus-report',
+                hospitalId: reportPreset?.hospitalId,
+                doctorName: reportPreset?.doctorName,
+                lock: true
+              }}
+              onClose={() => setReportModalOpen(false)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 };

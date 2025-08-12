@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
 import { Calendar, Download, FileText, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -17,8 +19,18 @@ import { ProcedureRecordsService } from '@/services/simplifiedProcedureService';
 import { isMedicalProcedure } from '@/config/susCalculationRules';
 import { shouldCalculateAnesthetistProcedure } from '../utils/anesthetistLogic';
 
+interface ReportPreset {
+  type?: 'sus-report';
+  hospitalId?: string;
+  doctorName?: string;
+  lock?: boolean;
+  startDate?: Date;
+  endDate?: Date;
+}
+
 interface ReportGeneratorProps {
   onClose?: () => void;
+  preset?: ReportPreset;
 }
 
 interface FinancialData {
@@ -39,14 +51,16 @@ interface DoctorData {
   hospital_name: string;
 }
 
-const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
-  const [reportType, setReportType] = useState<string>('');
+const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) => {
+  const [reportType, setReportType] = useState<string>(preset?.type || '');
   const [period, setPeriod] = useState<string>('30');
+  const [customMode, setCustomMode] = useState<boolean>(Boolean(preset?.startDate && preset?.endDate));
+  const [customRange, setCustomRange] = useState<{ startDate: Date | null; endDate: Date | null }>({ startDate: preset?.startDate || null, endDate: preset?.endDate || null });
   const [isGenerating, setIsGenerating] = useState(false);
   
   // Estados para seleção SUS
-  const [selectedHospital, setSelectedHospital] = useState<string>('');
-  const [selectedDoctor, setSelectedDoctor] = useState<string>('');
+  const [selectedHospital, setSelectedHospital] = useState<string>(preset?.hospitalId || '');
+  const [selectedDoctor, setSelectedDoctor] = useState<string>(preset?.doctorName || '');
   const [hospitals, setHospitals] = useState<Array<{id: string, name: string}>>([]);
   const [doctors, setDoctors] = useState<Array<{name: string, specialty: string}>>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
@@ -264,7 +278,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
       }
 
       // Buscar dados de AIHs para cálculos adicionais
-      const { data: aihsData, error: aihsError } = await supabase
+      let aihsQuery = supabase
         .from('aihs')
         .select(`
           id,
@@ -274,8 +288,17 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
           created_at,
           hospital_id,
           hospitals!inner(name)
-        `)
-        .gte('created_at', new Date(Date.now() - parseInt(period) * 24 * 60 * 60 * 1000).toISOString());
+        `);
+      if (customMode && customRange.startDate && customRange.endDate) {
+        const startISO = customRange.startDate.toISOString();
+        const end = new Date(customRange.endDate);
+        end.setHours(23, 59, 59, 999);
+        const endISO = end.toISOString();
+        aihsQuery = aihsQuery.gte('created_at', startISO).lte('created_at', endISO);
+      } else {
+        aihsQuery = aihsQuery.gte('created_at', new Date(Date.now() - parseInt(period) * 24 * 60 * 60 * 1000).toISOString());
+      }
+      const { data: aihsData, error: aihsError } = await aihsQuery;
 
       if (aihsError) {
         console.error('Erro ao buscar AIHs:', aihsError);
@@ -322,7 +345,10 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
       
       doc.setFontSize(12);
       doc.setTextColor(100, 100, 100);
-      doc.text(`Período: Últimos ${period} dias`, 20, 35);
+      const periodLabel = customMode && customRange.startDate && customRange.endDate
+        ? `${format(customRange.startDate, 'dd/MM/yyyy')} a ${format(customRange.endDate, 'dd/MM/yyyy')}`
+        : `Últimos ${period} dias`;
+      doc.text(`Período: ${periodLabel}`, 20, 35);
       doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`, 20, 42);
       doc.text(`Usuário: ${user?.email || 'N/A'}`, 20, 49);
       
@@ -462,7 +488,10 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
       
       doc.setFontSize(12);
       doc.setTextColor(100, 100, 100);
-      doc.text(`Período: Últimos ${period} dias`, 20, 35);
+      const doctorReportPeriod = customMode && customRange.startDate && customRange.endDate
+        ? `${format(customRange.startDate, 'dd/MM/yyyy')} a ${format(customRange.endDate, 'dd/MM/yyyy')}`
+        : `Últimos ${period} dias`;
+      doc.text(`Período: ${doctorReportPeriod}`, 20, 35);
       doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`, 20, 42);
       doc.text(`Usuário: ${user?.email || 'N/A'}`, 20, 49);
       
@@ -808,7 +837,10 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
       doc.setTextColor(60, 60, 60); // Cinza escuro
       
       // Coluna Esquerda
-      doc.text(`Período: Últimos ${period} dias`, 20, 55);
+      const medProdLabel = customMode && customRange.startDate && customRange.endDate
+        ? `${format(customRange.startDate, 'dd/MM/yyyy')} a ${format(customRange.endDate, 'dd/MM/yyyy')}`
+        : `Últimos ${period} dias`;
+      doc.text(`Período: ${medProdLabel}`, 20, 55);
       doc.text(`Usuário: ${user?.email || 'Não identificado'}`, 20, 62);
       
       // Coluna Direita  
@@ -1256,6 +1288,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {!preset?.lock && (
         <div className="space-y-2">
           <Label htmlFor="report-type">Tipo de Relatório</Label>
           <Select value={reportType} onValueChange={setReportType}>
@@ -1296,20 +1329,54 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
             </SelectContent>
           </Select>
         </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="period">Período de Análise</Label>
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Últimos 7 dias</SelectItem>
-              <SelectItem value="30">Últimos 30 dias</SelectItem>
-              <SelectItem value="90">Últimos 90 dias</SelectItem>
-              <SelectItem value="365">Último ano</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <Select value={period} onValueChange={setPeriod} disabled={customMode}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Últimos 7 dias</SelectItem>
+                <SelectItem value="30">Últimos 30 dias</SelectItem>
+                <SelectItem value="90">Últimos 90 dias</SelectItem>
+                <SelectItem value="365">Último ano</SelectItem>
+              </SelectContent>
+            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="justify-start" onClick={() => setCustomMode(true)}>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {customRange.startDate && customRange.endDate
+                    ? `${format(customRange.startDate, 'dd/MM/yyyy')} a ${format(customRange.endDate, 'dd/MM/yyyy')}`
+                    : 'Intervalo personalizado'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-2" align="start">
+                <div className="flex gap-2">
+                  <CalendarComponent
+                    mode="single"
+                    selected={customRange.startDate || undefined}
+                    onSelect={(date: any) => setCustomRange(prev => ({ ...prev, startDate: date }))}
+                  />
+                  <CalendarComponent
+                    mode="single"
+                    selected={customRange.endDate || undefined}
+                    onSelect={(date: any) => setCustomRange(prev => ({ ...prev, endDate: date }))}
+                  />
+                </div>
+                <div className="flex justify-end gap-2 mt-2">
+                  <Button variant="ghost" size="sm" onClick={() => { setCustomMode(false); setCustomRange({ startDate: null, endDate: null }); }}>Limpar</Button>
+                  <Button size="sm" onClick={() => setCustomMode(Boolean(customRange.startDate && customRange.endDate))}>Aplicar</Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+          {customMode && (
+            <div className="text-xs text-gray-600">Usando intervalo personalizado. Desative para voltar às opções rápidas.</div>
+          )}
         </div>
 
         {/* Campos específicos para Relatório SUS */}
@@ -1320,7 +1387,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
               <Select 
                 value={selectedHospital} 
                 onValueChange={setSelectedHospital}
-                disabled={isLoadingData}
+                disabled={isLoadingData || Boolean(preset?.lock)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={isLoadingData ? "Carregando hospitais..." : "Selecione o hospital"} />
@@ -1340,7 +1407,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose }) => {
               <Select 
                 value={selectedDoctor} 
                 onValueChange={setSelectedDoctor}
-                disabled={!selectedHospital || isLoadingData}
+                disabled={!selectedHospital || isLoadingData || Boolean(preset?.lock)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={
