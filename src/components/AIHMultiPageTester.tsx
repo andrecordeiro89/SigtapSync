@@ -2445,9 +2445,20 @@ const AIHMultiPageTester = () => {
           duration: 3000
         });
 
-        // ✅ Rolagem automática para o topo (área de upload) após salvar
+        // ✅ Rolagem automática para o topo (área de upload) e reset do formulário para novo documento
         try {
           window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch {}
+
+        // 🔄 RESET: limpar arquivo selecionado, estados de processamento e AIH carregada
+        try {
+          setSelectedFile(null as any);
+          setAihCompleta(null as any);
+          setResult(null as any);
+          setAihSaved(false);
+          // Opcional: limpar input file se existir no DOM
+          const fileInput = document.getElementById('pdf-upload') as HTMLInputElement | null;
+          if (fileInput) fileInput.value = '';
         } catch {}
         
       } else {
