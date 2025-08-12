@@ -57,6 +57,19 @@ export const SPECIAL_CALCULATION_RULES: SpecialCalculationRule[] = [
     lastUpdated: new Date().toISOString()
   },
   {
+    procedureCode: "04.15.03.001-3",
+    procedureName: "TRATAMENTO CIRURGICO EM POLITRAUMATIZADO",
+    description: "Procedimento com percentuais específicos por posição (politratumatizado)",
+    rule: {
+      type: 'multiple_surgery',
+      hospitalPercentages: [100, 100, 75, 75, 50], // 1º=100%, 2º=100%, 3º=75%, 4º=75%, 5º=50%
+      professionalPercentage: 100, // SP sempre 100%
+      maxProcedures: 5
+    },
+    notes: "SH: 1º=100%, 2º=100%, 3º=75%, 4º=75%, 5º=50%. SP: sempre 100%",
+    lastUpdated: new Date().toISOString()
+  },
+  {
     procedureCode: "04.15.02.003-4",
     procedureName: "Outros Procedimentos com Cirurgias Sequenciais",
     description: "Procedimentos sequenciais gerais com percentuais específicos para serviços hospitalares",
@@ -198,7 +211,8 @@ export function applySpecialCalculation(
       const calculatedValueHosp = proc.valueHosp; // 100%
       const calculatedValueProf = proc.valueProf; // 100%
       const calculatedValueAmb = proc.valueAmb;   // 100%
-      const calculatedTotal = calculatedValueHosp + calculatedValueProf + calculatedValueAmb;
+      // ⚠️ AIH fatura apenas SH + SP. SA é informativo e não compõe o total.
+      const calculatedTotal = calculatedValueHosp + calculatedValueProf;
       
       return {
         procedureCode: proc.procedureCode,
@@ -225,7 +239,8 @@ export function applySpecialCalculation(
       const calculatedValueHosp = (proc.valueHosp * hospPercentage) / 100;
       const calculatedValueProf = proc.valueProf; // SP sempre 100%
       const calculatedValueAmb = proc.valueAmb;   // SA sempre 100%
-      const calculatedTotal = calculatedValueHosp + calculatedValueProf + calculatedValueAmb;
+      // ⚠️ AIH fatura apenas SH + SP. SA é informativo e não compõe o total.
+      const calculatedTotal = calculatedValueHosp + calculatedValueProf;
       
       return {
         procedureCode: proc.procedureCode,
@@ -241,12 +256,14 @@ export function applySpecialCalculation(
       };
     }
     
-    // APLICAR LÓGICA PADRÃO DO SISTEMA (100% para principal, 70% para secundários)
-    const defaultHospPercentage = proc.sequenceOrder === 1 ? 100 : 70;
+  // APLICAR LÓGICA PADRÃO DO SISTEMA (100% principal; secundários com 70% por padrão)
+  // TODO: Ajustar se houver orientação SUS diferente (ex.: 100/50/30) para casos sem regra específica
+  const defaultHospPercentage = proc.sequenceOrder === 1 ? 100 : 70;
     const calculatedValueHosp = (proc.valueHosp * defaultHospPercentage) / 100;
     const calculatedValueProf = proc.valueProf; // SP sempre 100%
     const calculatedValueAmb = proc.valueAmb;   // SA sempre 100%
-    const calculatedTotal = calculatedValueHosp + calculatedValueProf + calculatedValueAmb;
+    // ⚠️ AIH fatura apenas SH + SP. SA é informativo e não compõe o total.
+    const calculatedTotal = calculatedValueHosp + calculatedValueProf;
     
     return {
       procedureCode: proc.procedureCode,

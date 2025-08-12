@@ -111,7 +111,17 @@ export class ProcedureRecordsService {
           notes
         `)
         .eq('patient_id', patientId)
-        // TEMP: desativar filtros de exclusão para debug
+        // Filtro de anestesista (ativo):
+        // Mantém:
+        // - Registros que não são anestesistas (professional_cbo != '225151' ou null)
+        // - Anestesista com procedimentos 03.%
+        // - Anestesista com cesariana 04.17.01.001-0
+        .or(
+          'professional_cbo.is.null,' +
+          'professional_cbo.neq.225151,' +
+          'and(professional_cbo.eq.225151,procedure_code.like.03%),' +
+          'and(professional_cbo.eq.225151,procedure_code.eq."04.17.01.001-0")'
+        )
         .order('procedure_date', { ascending: false });
 
       if (error) {
@@ -186,7 +196,13 @@ export class ProcedureRecordsService {
           notes
         `)
         .in('patient_id', patientIds)
-        // TEMP: desativar filtros de exclusão para debug
+        // Filtro de anestesista (ativo)
+        .or(
+          'professional_cbo.is.null,' +
+          'professional_cbo.neq.225151,' +
+          'and(professional_cbo.eq.225151,procedure_code.like.03%),' +
+          'and(professional_cbo.eq.225151,procedure_code.eq."04.17.01.001-0")'
+        )
         .order('procedure_date', { ascending: false });
 
       if (error) {
@@ -266,6 +282,13 @@ export class ProcedureRecordsService {
           professional_cbo
         `)
         .in('aih_id', aihIds)
+        // Filtro de anestesista (ativo)
+        .or(
+          'professional_cbo.is.null,' +
+          'professional_cbo.neq.225151,' +
+          'and(professional_cbo.eq.225151,procedure_code.like.03%),' +
+          'and(professional_cbo.eq.225151,procedure_code.eq."04.17.01.001-0")'
+        )
         .order('procedure_date', { ascending: false });
 
       if (error) {

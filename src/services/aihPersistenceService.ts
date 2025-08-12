@@ -137,6 +137,26 @@ export interface ProcessedAIHResult {
 
 export class AIHPersistenceService {
   /**
+   * Verifica se existe médico cadastrado para o CNS informado
+   */
+  private static async doctorExistsByCNS(cns?: string | null): Promise<boolean> {
+    if (!cns || typeof cns !== 'string' || cns.trim() === '' || cns === 'N/A') return false;
+    try {
+      const { data, error } = await supabase
+        .from('doctors')
+        .select('id')
+        .eq('cns', cns.trim())
+        .single();
+      if (error && (error as any).code !== 'PGRST116') {
+        console.warn('⚠️ Erro ao consultar médico por CNS:', error.message);
+      }
+      return Boolean(data && data.id);
+    } catch (e) {
+      console.warn('⚠️ Falha em doctorExistsByCNS:', e);
+      return false;
+    }
+  }
+  /**
    * Garante que o médico exista e esteja vinculado ao hospital (doctor_hospital)
    * Retorna o doctor_id quando conseguir garantir o vínculo
    */
@@ -346,6 +366,19 @@ export class AIHPersistenceService {
         nomePaciente: extractedAIH.nomePaciente,
         procedimento: extractedAIH.procedimentoPrincipal
       });
+
+      // 🚫 BLOQUEIO: Médico responsável deve existir previamente
+      const cnsResp = (extractedAIH.cnsResponsavel || '').trim();
+      if (cnsResp) {
+        const exists = await this.doctorExistsByCNS(cnsResp);
+        if (!exists) {
+          return {
+            success: false,
+            message: `Médico responsável (CNS ${cnsResp}) não encontrado. Cadastre o médico antes de salvar a AIH.`,
+            errors: ['doctor_not_found']
+          };
+        }
+      }
 
       // DIAGNÓSTICO ANTES DE PERSISTIR
       await this.diagnoseSystem(hospitalId);
@@ -1347,6 +1380,19 @@ export class AIHPersistenceService {
       console.log(`📄 AIH: ${aihCompleta.numeroAIH}`);
       console.log(`👤 Paciente: ${aihCompleta.nomePaciente}`);
       console.log(`📋 Procedimentos: ${aihCompleta.procedimentos?.length || 0}`);
+
+      // 🚫 BLOQUEIO: Médico responsável deve existir previamente
+      const cnsResp = (aihCompleta.cnsResponsavel || '').trim();
+      if (cnsResp) {
+        const exists = await this.doctorExistsByCNS(cnsResp);
+        if (!exists) {
+          return {
+            success: false,
+            message: `Médico responsável (CNS ${cnsResp}) não encontrado. Cadastre o médico antes de salvar a AIH.`,
+            errors: ['doctor_not_found']
+          };
+        }
+      }
 
       // ✅ VERIFICAÇÃO INTELIGENTE DE DUPLICATAS
       console.log('🔍 Verificando duplicatas com lógica inteligente...');

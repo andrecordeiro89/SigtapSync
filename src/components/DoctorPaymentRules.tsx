@@ -13,6 +13,7 @@ import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import { DollarSign, Calculator, AlertTriangle, CheckCircle } from 'lucide-react';
 import { shouldCalculateAnesthetistProcedure } from '../utils/anesthetistLogic';
+import { applySpecialCalculation, type ProcedureWithSigtap } from '../config/susCalculationRules';
 
 // ================================================================
 // TIPOS E INTERFACES
@@ -1121,6 +1122,18 @@ const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
   procedures,
   className = ''
 }) => {
+  // Aplicação informativa das regras SUS de múltiplas cirurgias (não altera valores deste componente)
+  try {
+    const mapped: ProcedureWithSigtap[] = procedures.map((p, idx) => ({
+      procedureCode: p.procedure_code,
+      sequenceOrder: idx + 1,
+      valueHosp: 0,
+      valueProf: p.value_reais || 0,
+      valueAmb: 0
+    }));
+    const calcPreview = applySpecialCalculation(mapped);
+    console.log('🧮 [SUS Preview] Regras múltiplas/sequenciais aplicadas (informativo):', calcPreview);
+  } catch {}
   const paymentCalculation = calculateDoctorPayment(doctorName, procedures);
   const hasSpecialRules = DOCTOR_PAYMENT_RULES[doctorName.toUpperCase()];
   
