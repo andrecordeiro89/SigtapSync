@@ -27,7 +27,7 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
   title = "Filtros Executivos",
   subtitle = "Selecione o período para análise",
   compact = false,
-  defaultPreset = '30d'
+  defaultPreset = 'custom'
 }) => {
   const [selectedPreset, setSelectedPreset] = useState<string>(defaultPreset);
   const [customStartDate, setCustomStartDate] = useState<string>('');
@@ -36,11 +36,8 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
 
   // Presets de período
   const presets = [
-    { value: '7d', label: '7 dias', icon: '📅' },
-    { value: '30d', label: '30 dias', icon: '📊' },
-    { value: '3m', label: '3 meses', icon: '📈' },
-    { value: '6m', label: '6 meses', icon: '🎯' },
-    { value: '1y', label: '1 ano', icon: '💎' },
+    { value: 'lastMonth', label: 'Último mês', icon: '🗓️' },
+    { value: 'last3m', label: 'Últimos 3 meses', icon: '📈' },
     { value: 'custom', label: 'Personalizado', icon: '⚙️' }
   ];
 
@@ -48,8 +45,27 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
   const getDateRangeFromPreset = (preset: string): DateRange => {
     const now = new Date();
     let startDate: Date;
+    let endDate: Date = now;
 
     switch (preset) {
+      case 'lastMonth': {
+        const firstDayPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDayPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        // incluir todo o último dia do mês anterior
+        lastDayPrevMonth.setHours(23, 59, 59, 999);
+        startDate = firstDayPrevMonth;
+        endDate = lastDayPrevMonth;
+        break;
+      }
+      case 'last3m': {
+        // Três meses completos anteriores ao mês atual
+        const firstDayThreeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+        const lastDayPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        lastDayPrevMonth.setHours(23, 59, 59, 999);
+        startDate = firstDayThreeMonthsAgo;
+        endDate = lastDayPrevMonth;
+        break;
+      }
       case '7d':
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         break;
@@ -69,7 +85,25 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
         startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     }
 
-    return { startDate, endDate: now };
+    return { startDate, endDate };
+  };
+
+  // Utilitário para exibir/editar datas sempre visíveis
+  const getInputDates = (): { start: string; end: string; disabled: boolean } => {
+    const isCustom = selectedPreset === 'custom';
+    if (isCustom) {
+      return {
+        start: customStartDate || '',
+        end: customEndDate || '',
+        disabled: false,
+      };
+    }
+    const range = getDateRangeFromPreset(selectedPreset);
+    return {
+      start: formatDateForInput(range.startDate),
+      end: formatDateForInput(range.endDate),
+      disabled: true,
+    };
   };
 
   // Função para aplicar filtros
@@ -93,6 +127,12 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
       applyFilters();
     } else {
       setIsCustomRange(true);
+      // Pré-preencher datas personalizadas com "Último mês" caso vazias
+      if (!customStartDate || !customEndDate) {
+        const lm = getDateRangeFromPreset('lastMonth');
+        setCustomStartDate(formatDateForInput(lm.startDate));
+        setCustomEndDate(formatDateForInput(lm.endDate));
+      }
     }
   }, [selectedPreset]);
 
@@ -105,7 +145,14 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
 
   // Inicializar com período padrão
   useEffect(() => {
-    applyFilters();
+    // Iniciar do primeiro dia do mês atual até hoje
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    setSelectedPreset('custom');
+    setIsCustomRange(true);
+    setCustomStartDate(formatDateForInput(startOfMonth));
+    setCustomEndDate(formatDateForInput(now));
+    onDateRangeChange({ startDate: startOfMonth, endDate: now });
   }, []);
 
   const formatDateForInput = (date: Date): string => {
@@ -146,6 +193,7 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
 
   // Versão compacta
   if (compact) {
+    const inputDates = getInputDates();
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -164,16 +212,16 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
           </Badge>
         </div>
         
-        <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {presets.map((preset) => (
             <Button
               key={preset.value}
               variant={selectedPreset === preset.value ? "default" : "outline"}
               size="sm"
-              className={`text-xs px-2 py-1 h-8 ${
+              className={`text-xs px-2 py-1 h-8 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${
                 selectedPreset === preset.value 
                   ? 'bg-blue-600 text-white border-blue-600' 
-                  : 'hover:bg-blue-50 hover:border-blue-300'
+                  : 'bg-white hover:bg-blue-50 hover:border-blue-300'
               }`}
               onClick={() => setSelectedPreset(preset.value)}
             >
@@ -183,33 +231,35 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
           ))}
         </div>
 
-        {/* Datas Personalizadas - Versão Compacta */}
-        {isCustomRange && (
-          <div className="grid grid-cols-2 gap-2 p-2 bg-gray-50 rounded">
-            <Input
-              type="date"
-              value={customStartDate}
-              onChange={(e) => setCustomStartDate(e.target.value)}
-              className="text-xs h-8"
-              placeholder="Data inicial"
-            />
-            <Input
-              type="date"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
-              className="text-xs h-8"
-              max={formatDateForInput(new Date())}
-              placeholder="Data final"
-            />
-          </div>
-        )}
+        {/* Datepickers sempre visíveis (desabilitados quando preset ≠ custom) */}
+        <div className="grid grid-cols-2 gap-2 p-2 bg-gray-50 rounded">
+          <Input
+            type="date"
+            value={inputDates.start}
+            onChange={(e) => setCustomStartDate(e.target.value)}
+            className="text-xs h-8"
+            placeholder="Data inicial"
+            disabled={inputDates.disabled}
+            title={inputDates.disabled ? "Selecione 'Personalizado' para editar" : ''}
+          />
+          <Input
+            type="date"
+            value={inputDates.end}
+            onChange={(e) => setCustomEndDate(e.target.value)}
+            className="text-xs h-8"
+            max={formatDateForInput(new Date())}
+            placeholder="Data final"
+            disabled={inputDates.disabled}
+            title={inputDates.disabled ? "Selecione 'Personalizado' para editar" : ''}
+          />
+        </div>
       </div>
     );
   }
 
   // Versão completa
   return (
-    <Card className="border-2 border-blue-100 bg-gradient-to-r from-blue-50 to-purple-50">
+    <Card className="border border-blue-100 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -228,63 +278,73 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
         )}
       </CardHeader>
       
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
         {/* Seletor de Período */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700">Período de Análise</label>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 md:grid-cols-3 gap-2">
             {presets.map((preset) => (
               <Button
                 key={preset.value}
                 variant={selectedPreset === preset.value ? "default" : "outline"}
-                className={`text-xs px-3 py-2 h-auto flex-col space-y-1 ${
+                className={`text-xs px-3 py-2 h-10 flex-row items-center justify-center gap-1 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${
                   selectedPreset === preset.value 
                     ? 'bg-blue-600 text-white border-blue-600' 
-                    : 'hover:bg-blue-50 hover:border-blue-300'
+                    : 'bg-white hover:bg-blue-50 hover:border-blue-300'
                 }`}
                 onClick={() => setSelectedPreset(preset.value)}
               >
-                <span className="text-lg">{preset.icon}</span>
-                <span>{preset.label}</span>
+                <span className="text-sm">{preset.icon}</span>
+                <span className="font-medium">{preset.label}</span>
               </Button>
             ))}
           </div>
         </div>
 
-        {/* Datas Personalizadas */}
-        {isCustomRange && (
-          <div className="space-y-3 p-4 bg-white rounded-lg border border-gray-200">
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4 text-gray-600" />
-              <span className="text-sm font-medium text-gray-700">Período Personalizado</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">
-                  Data Inicial
-                </label>
-                <Input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="w-full"
-                />
+        {/* Datepickers sempre visíveis (desabilitados quando preset ≠ custom) */}
+        {(() => {
+          const inputDates = getInputDates();
+          return (
+            <div className="space-y-2 p-3 bg-white rounded-lg border border-gray-200">
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-4 w-4 text-gray-600" />
+                <span className="text-sm font-medium text-gray-700">Período Selecionado</span>
+                {inputDates.disabled && (
+                  <span className="text-xs text-gray-500">(edite em "Personalizado")</span>
+                )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">
-                  Data Final
-                </label>
-                <Input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="w-full"
-                  max={formatDateForInput(new Date())}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Data Inicial
+                  </label>
+                  <Input
+                    type="date"
+                    value={inputDates.start}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-full h-9 text-sm"
+                    disabled={inputDates.disabled}
+                    title={inputDates.disabled ? "Selecione 'Personalizado' para editar" : ''}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Data Final
+                  </label>
+                  <Input
+                    type="date"
+                    value={inputDates.end}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-full h-9 text-sm"
+                    max={formatDateForInput(new Date())}
+                    disabled={inputDates.disabled}
+                    title={inputDates.disabled ? "Selecione 'Personalizado' para editar" : ''}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Ações */}
         <div className="flex items-center justify-between pt-2">

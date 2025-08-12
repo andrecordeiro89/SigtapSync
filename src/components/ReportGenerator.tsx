@@ -241,7 +241,13 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
   // Effect para carregar hospitais quando SUS é selecionado
   useEffect(() => {
     if (reportType === 'sus-report') {
-      loadHospitals();
+      loadHospitals().then(() => {
+        // Se preset trouxer hospital + médico e lock, manter ambos
+        if (preset?.lock) {
+          if (preset.hospitalId) setSelectedHospital(prev => prev || preset.hospitalId!);
+          if (preset.doctorName) setSelectedDoctor(prev => prev || preset.doctorName!);
+        }
+      });
     } else {
       setSelectedHospital('');
       setSelectedDoctor('');
@@ -254,11 +260,18 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
   // Effect para carregar médicos quando hospital muda
   useEffect(() => {
     if (selectedHospital && reportType === 'sus-report') {
-      loadDoctorsByHospital(selectedHospital);
-      setSelectedDoctor(''); // Reset doctor selection
+      loadDoctorsByHospital(selectedHospital).then(() => {
+        // Se vier preset travado, manter/forçar o médico do preset
+        if (preset?.lock && preset?.doctorName) {
+          setSelectedDoctor(prev => prev || preset.doctorName!);
+        } else {
+          // Caso normal: resetar seleção ao trocar hospital
+          setSelectedDoctor('');
+        }
+      });
     } else {
       setDoctors([]);
-      setSelectedDoctor('');
+      if (!preset?.lock) setSelectedDoctor('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedHospital, reportType]);
@@ -1333,49 +1346,61 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
 
         <div className="space-y-2">
           <Label htmlFor="period">Período de Análise</Label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <Select value={period} onValueChange={setPeriod} disabled={customMode}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Últimos 7 dias</SelectItem>
-                <SelectItem value="30">Últimos 30 dias</SelectItem>
-                <SelectItem value="90">Últimos 90 dias</SelectItem>
-                <SelectItem value="365">Último ano</SelectItem>
-              </SelectContent>
-            </Select>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-start" onClick={() => setCustomMode(true)}>
-                  <Calendar className="mr-2 h-4 w-4" />
-                  {customRange.startDate && customRange.endDate
-                    ? `${format(customRange.startDate, 'dd/MM/yyyy')} a ${format(customRange.endDate, 'dd/MM/yyyy')}`
-                    : 'Intervalo personalizado'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-2" align="start">
-                <div className="flex gap-2">
-                  <CalendarComponent
-                    mode="single"
-                    selected={customRange.startDate || undefined}
-                    onSelect={(date: any) => setCustomRange(prev => ({ ...prev, startDate: date }))}
-                  />
-                  <CalendarComponent
-                    mode="single"
-                    selected={customRange.endDate || undefined}
-                    onSelect={(date: any) => setCustomRange(prev => ({ ...prev, endDate: date }))}
-                  />
-                </div>
-                <div className="flex justify-end gap-2 mt-2">
-                  <Button variant="ghost" size="sm" onClick={() => { setCustomMode(false); setCustomRange({ startDate: null, endDate: null }); }}>Limpar</Button>
-                  <Button size="sm" onClick={() => setCustomMode(Boolean(customRange.startDate && customRange.endDate))}>Aplicar</Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-          {customMode && (
-            <div className="text-xs text-gray-600">Usando intervalo personalizado. Desative para voltar às opções rápidas.</div>
+          {preset?.startDate && preset?.endDate ? (
+            <div className="grid grid-cols-1">
+              <Button variant="outline" className="justify-start" disabled>
+                <Calendar className="mr-2 h-4 w-4" />
+                {`${format(preset.startDate, 'dd/MM/yyyy')} a ${format(preset.endDate, 'dd/MM/yyyy')}`}
+              </Button>
+              <div className="text-xs text-gray-600">Usando intervalo do filtro global.</div>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <Select value={period} onValueChange={setPeriod} disabled={customMode}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">Últimos 7 dias</SelectItem>
+                    <SelectItem value="30">Últimos 30 dias</SelectItem>
+                    <SelectItem value="90">Últimos 90 dias</SelectItem>
+                    <SelectItem value="365">Último ano</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="justify-start" onClick={() => setCustomMode(true)}>
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {customRange.startDate && customRange.endDate
+                        ? `${format(customRange.startDate, 'dd/MM/yyyy')} a ${format(customRange.endDate, 'dd/MM/yyyy')}`
+                        : 'Intervalo personalizado'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-2" align="start">
+                    <div className="flex gap-2">
+                      <CalendarComponent
+                        mode="single"
+                        selected={customRange.startDate || undefined}
+                        onSelect={(date: any) => setCustomRange(prev => ({ ...prev, startDate: date }))}
+                      />
+                      <CalendarComponent
+                        mode="single"
+                        selected={customRange.endDate || undefined}
+                        onSelect={(date: any) => setCustomRange(prev => ({ ...prev, endDate: date }))}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 mt-2">
+                      <Button variant="ghost" size="sm" onClick={() => { setCustomMode(false); setCustomRange({ startDate: null, endDate: null }); }}>Limpar</Button>
+                      <Button size="sm" onClick={() => setCustomMode(Boolean(customRange.startDate && customRange.endDate))}>Aplicar</Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              {customMode && (
+                <div className="text-xs text-gray-600">Usando intervalo personalizado. Desative para voltar às opções rápidas.</div>
+              )}
+            </>
           )}
         </div>
 

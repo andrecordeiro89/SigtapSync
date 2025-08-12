@@ -1653,7 +1653,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                      onClick={(e) => {
                                        e.stopPropagation();
                                        const h = doctor.hospitals?.[0]?.hospital_id || '';
-                                       setReportPreset({ hospitalId: h, doctorName: doctor.doctor_info.name });
+                                       setReportPreset({
+                                         hospitalId: h,
+                                         doctorName: doctor.doctor_info.name,
+                                         // Passar período global quando disponível
+                                         startDate: dateRange?.startDate,
+                                         endDate: dateRange?.endDate
+                                       } as any);
                                        setReportModalOpen(true);
                                      }}
                                      className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-4 py-2 rounded-md text-sm"
@@ -2236,6 +2242,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 type: 'sus-report',
                 hospitalId: reportPreset?.hospitalId,
                 doctorName: reportPreset?.doctorName,
+                startDate: (reportPreset as any)?.startDate,
+                endDate: (reportPreset as any)?.endDate,
                 lock: true
               }}
               onClose={() => setReportModalOpen(false)}
