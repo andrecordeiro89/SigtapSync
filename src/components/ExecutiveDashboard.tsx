@@ -5,7 +5,6 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 import {
@@ -20,7 +19,6 @@ import {
   Clock,
   Activity,
   Stethoscope,
-  Target,
   Award,
   ChevronLeft,
   ChevronRight,
@@ -37,7 +35,7 @@ import HospitalRevenueDashboard from './HospitalRevenueDashboard';
 import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
 import MedicalProductionDashboard from './MedicalProductionDashboard';
 import MedicalStaffDashboard from './MedicalStaffDashboard';
-import ReportGenerator from './ReportGenerator';
+// import ReportGenerator from './ReportGenerator';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
 
 // ✅ FUNÇÃO OTIMIZADA PARA FORMATAR VALORES MONETÁRIOS
@@ -273,7 +271,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [activeTab, setActiveTab] = useState('doctors');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  const [showReportGenerator, setShowReportGenerator] = useState(false);
+  // const [showReportGenerator, setShowReportGenerator] = useState(false);
   
   // Data States
   const [kpiData, setKpiData] = useState<KPIData>({
@@ -778,7 +776,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 bg-blue-100">
+        <TabsList className="grid w-full grid-cols-3 bg-blue-100">
           <TabsTrigger value="doctors" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <Users className="h-4 w-4 mr-2" />
             Médicos
@@ -791,10 +789,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             <Users className="h-4 w-4 mr-2" />
             Corpo Médico
           </TabsTrigger>
-          <TabsTrigger value="reports" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            <Target className="h-4 w-4 mr-2" />
-            Relatórios
-          </TabsTrigger>
+          {/* Relatórios aba removida */}
         </TabsList>
 
         {/* 🔍 FILTROS EXECUTIVOS GLOBAIS - LOGO ABAIXO DAS ABAS */}
@@ -1120,81 +1115,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           </div>
         </TabsContent>
 
-        {/* TAB: RELATÓRIOS */}
-        <TabsContent value="reports" className="space-y-6">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-purple-600" />
-                Gerador de Relatórios Executivos
-              </CardTitle>
-              <CardDescription>
-                Crie relatórios customizados para suas necessidades de gestão
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Button 
-                  className="h-24 flex flex-col items-center justify-center bg-green-600 hover:bg-green-700"
-                  onClick={() => setShowReportGenerator(true)}
-                >
-                  <FileText className="h-6 w-6 mb-2" />
-                  <div className="text-center">
-                    <div className="font-semibold">Relatório Financeiro</div>
-                    <div className="text-xs opacity-90">Faturamento e performance</div>
-                  </div>
-                </Button>
-                
-                <Button 
-                  className="h-24 flex flex-col items-center justify-center bg-blue-600 hover:bg-blue-700"
-                  onClick={() => setShowReportGenerator(true)}
-                >
-                  <Users className="h-6 w-6 mb-2" />
-                  <div className="text-center">
-                    <div className="font-semibold">Relatório de Médicos</div>
-                    <div className="text-xs opacity-90">Performance por profissional</div>
-                  </div>
-                </Button>
-                
-                <Button 
-                  className="h-24 flex flex-col items-center justify-center bg-purple-600 hover:bg-purple-700"
-                  onClick={() => setShowReportGenerator(true)}
-                >
-                  <Hospital className="h-6 w-6 mb-2" />
-                  <div className="text-center">
-                    <div className="font-semibold">Relatório Hospitalar</div>
-                    <div className="text-xs opacity-90">Comparação entre unidades</div>
-                  </div>
-                </Button>
-
-                <Button 
-                  className="h-24 flex flex-col items-center justify-center bg-red-600 hover:bg-red-700"
-                  onClick={() => setShowReportGenerator(true)}
-                >
-                  <FileText className="h-6 w-6 mb-2" />
-                  <div className="text-center">
-                    <div className="font-semibold">Relatório SUS</div>
-                    <div className="text-xs opacity-90">Médico + Pacientes + Valores</div>
-                  </div>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        {/* Aba Relatórios removida */}
       </Tabs>
       
-      {/* Dialog do Gerador de Relatórios */}
-      <Dialog open={showReportGenerator} onOpenChange={setShowReportGenerator}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby="report-generator-description">
-          <DialogHeader>
-            <DialogTitle>Gerador de Relatórios PDF</DialogTitle>
-            <p id="report-generator-description" className="text-sm text-muted-foreground">
-              Gere relatórios detalhados em PDF com dados financeiros, médicos e hospitalares.
-            </p>
-          </DialogHeader>
-          <ReportGenerator onClose={() => setShowReportGenerator(false)} />
-        </DialogContent>
-      </Dialog>
+      {/* Gerador de Relatórios removido com a aba */}
     </div>
   );
 };

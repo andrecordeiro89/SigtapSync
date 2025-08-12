@@ -32,7 +32,7 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
   const [selectedPreset, setSelectedPreset] = useState<string>(defaultPreset);
   const [customStartDate, setCustomStartDate] = useState<string>('');
   const [customEndDate, setCustomEndDate] = useState<string>('');
-  const [isCustomRange, setIsCustomRange] = useState(false);
+  // "custom" é derivado do preset selecionado; evitamos race conditions
 
   // Presets de período
   const presets = [
@@ -106,42 +106,37 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
     };
   };
 
-  // Função para aplicar filtros
+  // Função para aplicar filtros (sem depender de estado derivado)
   const applyFilters = () => {
-    if (isCustomRange && customStartDate && customEndDate) {
-      const range: DateRange = {
-        startDate: new Date(customStartDate),
-        endDate: new Date(customEndDate)
-      };
-      onDateRangeChange(range);
-    } else {
-      const range = getDateRangeFromPreset(selectedPreset);
-      onDateRangeChange(range);
+    const isCustom = selectedPreset === 'custom';
+    if (isCustom) {
+      if (customStartDate && customEndDate) {
+        onDateRangeChange({
+          startDate: new Date(customStartDate),
+          endDate: new Date(customEndDate)
+        });
+      }
+      return;
     }
+    const range = getDateRangeFromPreset(selectedPreset);
+    onDateRangeChange(range);
   };
 
-  // Aplicar filtros quando preset muda
+  // Aplicar filtros quando preset ou datas mudam
   useEffect(() => {
-    if (selectedPreset !== 'custom') {
-      setIsCustomRange(false);
-      applyFilters();
+    // Pré-preencher datas personalizadas com "Último mês" caso vazias
+    if (selectedPreset === 'custom' && (!customStartDate || !customEndDate)) {
+      const lm = getDateRangeFromPreset('lastMonth');
+      setCustomStartDate(formatDateForInput(lm.startDate));
+      setCustomEndDate(formatDateForInput(lm.endDate));
+      // Após preencher, não retorna; o próximo efeito de dependência acionará apply
     } else {
-      setIsCustomRange(true);
-      // Pré-preencher datas personalizadas com "Último mês" caso vazias
-      if (!customStartDate || !customEndDate) {
-        const lm = getDateRangeFromPreset('lastMonth');
-        setCustomStartDate(formatDateForInput(lm.startDate));
-        setCustomEndDate(formatDateForInput(lm.endDate));
-      }
-    }
-  }, [selectedPreset]);
-
-  // Aplicar filtros quando datas customizadas mudam
-  useEffect(() => {
-    if (isCustomRange && customStartDate && customEndDate) {
       applyFilters();
     }
-  }, [customStartDate, customEndDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPreset, customStartDate, customEndDate]);
+
+  // Removido efeito separado para datas; consolidado acima
 
   // Inicializar com período padrão
   useEffect(() => {
@@ -149,7 +144,6 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     setSelectedPreset('custom');
-    setIsCustomRange(true);
     setCustomStartDate(formatDateForInput(startOfMonth));
     setCustomEndDate(formatDateForInput(now));
     onDateRangeChange({ startDate: startOfMonth, endDate: now });
@@ -177,7 +171,7 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
       }
     }
     
-    if (isCustomRange && customStartDate && customEndDate) {
+    if (selectedPreset === 'custom' && customStartDate && customEndDate) {
       const start = new Date(customStartDate).toLocaleDateString('pt-BR');
       const end = new Date(customEndDate).toLocaleDateString('pt-BR');
       
@@ -201,7 +195,7 @@ const ExecutiveDateFilters: React.FC<ExecutiveDateFiltersProps> = ({
             <Calendar className="h-4 w-4 text-gray-600" />
             <span className="text-sm font-medium text-gray-700">Período</span>
             {/* Indicador do preset selecionado */}
-            {!isCustomRange && (
+            {selectedPreset !== 'custom' && (
               <span className="text-xs text-gray-500">
                 ({presets.find(p => p.value === selectedPreset)?.label})
               </span>
