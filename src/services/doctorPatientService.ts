@@ -20,11 +20,11 @@ export interface DoctorHospital {
   hospital_cnpj?: string;
   role?: string;
   department?: string;
-  is_primary_hospital: boolean;
   is_active: boolean;
 }
 
 export interface PatientWithProcedures {
+  patient_id?: string; // 🆕 ID real do paciente (UUID da tabela patients) para associar procedimentos
   patient_info: {
     name: string;
     cns: string;
@@ -37,6 +37,7 @@ export interface PatientWithProcedures {
     discharge_date?: string;
     aih_number: string;
     care_character?: string;
+    hospital_id?: string;
   };
   total_value_reais: number;
   procedures: ProcedureDetail[];
@@ -98,6 +99,169 @@ export interface DoctorSearchFilters {
 }
 
 export class DoctorPatientService {
+  /**
+   * 🔄 NOVO CAMINHO EFICIENTE: Buscar Médicos → Pacientes → Procedimentos direto da view v_procedures_with_doctors
+   * Filtros opcionais por hospital e período; agrupa por médico (responsável), depois por paciente.
+   */
+  static async getDoctorsWithPatientsFromProceduresView(options?: {
+    hospitalIds?: string[];
+    dateFromISO?: string;
+    dateToISO?: string;
+  }): Promise<DoctorWithPatients[]> {
+    try {
+      console.log('📥 [TABELAS] Carregando dados diretamente de aihs + patients + procedure_records...', options);
+
+      // 1) AIHs com join de paciente (fonte do vínculo Médico → Paciente)
+      let aihsQuery = supabase
+        .from('aihs')
+        .select(`
+          id,
+          aih_number,
+          hospital_id,
+          patient_id,
+          admission_date,
+          discharge_date,
+          care_character,
+          calculated_total_value,
+          cns_responsavel,
+          patients (
+            id,
+            name,
+            cns,
+            birth_date,
+            gender,
+            medical_record
+          )
+        `);
+
+      if (options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all')) {
+        aihsQuery = aihsQuery.in('hospital_id', options.hospitalIds);
+      }
+      if (options?.dateFromISO) {
+        aihsQuery = aihsQuery.gte('admission_date', options.dateFromISO);
+      }
+      if (options?.dateToISO) {
+        aihsQuery = aihsQuery.lte('admission_date', options.dateToISO);
+      }
+
+      const { data: aihs, error: aihsError } = await aihsQuery.order('admission_date', { ascending: false });
+      if (aihsError) {
+        console.error('❌ [TABELAS] Erro ao consultar AIHs:', aihsError);
+        return [];
+      }
+      if (!aihs || aihs.length === 0) return [];
+
+      // 2) Montar mapa de médicos (CNS responsável)
+      const doctorMap = new Map<string, DoctorWithPatients & { key: string; hospitalIds: Set<string> }>();
+
+      // 2.1) Pré-carregar procedimentos em lote
+      const patientIds = Array.from(new Set(aihs.map(a => a.patient_id).filter(Boolean)));
+      const aihIds = Array.from(new Set(aihs.map(a => a.id).filter(Boolean)));
+      const { ProcedureRecordsService } = await import('./simplifiedProcedureService');
+      const [procsResult, procsByAih] = await Promise.all([
+        ProcedureRecordsService.getProceduresByPatientIds(patientIds),
+        ProcedureRecordsService.getProceduresByAihIds(aihIds)
+      ]);
+      const procsByPatient = procsResult.success ? procsResult.proceduresByPatientId : new Map<string, any[]>();
+
+      for (const aih of aihs as any[]) {
+        const doctorCns = aih.cns_responsavel || 'NAO_IDENTIFICADO';
+        const doctorKey = doctorCns;
+        const hospitalId = aih.hospital_id;
+
+        if (!doctorMap.has(doctorKey)) {
+          doctorMap.set(doctorKey, {
+            key: doctorKey,
+            doctor_info: {
+              name: `Dr(a). ${doctorCns}`,
+              cns: doctorCns,
+              crm: '',
+              specialty: ''
+            },
+            hospitals: hospitalId ? [{ hospital_id: hospitalId, hospital_name: '', is_active: true } as any] : [],
+            patients: [],
+            hospitalIds: new Set(hospitalId ? [hospitalId] : [])
+          } as any);
+        } else if (hospitalId) {
+          const d = doctorMap.get(doctorKey)! as any;
+          d.hospitalIds.add(hospitalId);
+        }
+
+        const doctor = doctorMap.get(doctorKey)! as any;
+        // Garantir hospitais únicos
+        doctor.hospitals = Array.from(doctor.hospitalIds).map((hid: string) => ({ hospital_id: hid, hospital_name: '', is_active: true }));
+
+        // Paciente
+        const patientId = aih.patient_id;
+        let patient = (doctor.patients as any[]).find(p => p.patient_id === patientId);
+        if (!patient) {
+          patient = {
+            patient_id: patientId,
+            patient_info: {
+              name: aih.patients?.name || 'Paciente sem nome',
+              cns: aih.patients?.cns || '',
+              birth_date: aih.patients?.birth_date || '',
+              gender: aih.patients?.gender || '',
+              medical_record: aih.patients?.medical_record || ''
+            },
+            aih_info: {
+              admission_date: aih.admission_date,
+              discharge_date: aih.discharge_date,
+              aih_number: aih.aih_number,
+              care_character: aih.care_character,
+              hospital_id: aih.hospital_id
+            },
+            total_value_reais: (aih.calculated_total_value || 0) / 100,
+            procedures: [],
+            total_procedures: 0,
+            approved_procedures: 0
+          };
+          (doctor.patients as any[]).push(patient);
+        }
+
+        // Procedimentos deste paciente
+        // Tentar por patient_id; se vazio, usar fallback por aih_id
+        let procs = procsByPatient.get(patientId) || [];
+        if (procs.length === 0 && aih.id) {
+          procs = (procsByAih.success ? (procsByAih.proceduresByAihId.get(aih.id) || []) : []);
+        }
+        const mapped = procs.map((p: any) => ({
+          procedure_id: p.id,
+          procedure_code: p.procedure_code,
+          procedure_description: p.procedure_description || p.procedure_name || 'Descrição não disponível',
+          procedure_date: p.procedure_date,
+          value_reais: typeof p.total_value === 'number' ? p.total_value / 100 : 0,
+          value_cents: typeof p.total_value === 'number' ? p.total_value : 0,
+          approved: p.billing_status === 'approved' || p.match_status === 'approved' || p.billing_status === 'paid',
+          approval_status: p.billing_status || p.match_status,
+          sequence: p.sequencia,
+          aih_id: p.aih_id,
+          match_confidence: p.match_confidence || 0,
+          sigtap_description: p.procedure_description,
+          complexity: p.complexity,
+          professional_name: p.professional_name,
+          cbo: p.professional_cbo,
+          participation: 'Responsável'
+        }));
+        patient.procedures = mapped.sort((a: any, b: any) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime());
+        patient.total_procedures = patient.procedures.length;
+        patient.approved_procedures = patient.procedures.filter((pp: any) => pp.approved).length;
+      }
+
+      const result = Array.from(doctorMap.values()).map((d: any) => ({
+        doctor_info: d.doctor_info,
+        hospitals: d.hospitals,
+        patients: d.patients
+      })) as DoctorWithPatients[];
+
+      console.log(`✅ [TABELAS] Montados ${result.length} médicos a partir de aihs + patients + procedure_records`);
+      return result;
+
+    } catch (e) {
+      console.error('💥 [TABELAS] Erro inesperado ao montar dados:', e);
+      return [];
+    }
+  }
   
   /**
    * 🔍 BUSCAR MÉDICO POR CNS E OBTER TODOS OS PACIENTES ATENDIDOS
@@ -164,7 +328,8 @@ export class DoctorPatientService {
                 admission_date: aih.admission_date,
                 discharge_date: aih.discharge_date,
                 aih_number: aih.aih_number,
-                care_character: aih.care_character
+                care_character: aih.care_character,
+                hospital_id: aih.hospital_id
               },
               total_value_reais: 0,
               procedures: [],
@@ -206,8 +371,52 @@ export class DoctorPatientService {
         });
       }
 
-      // ✅ PROCEDIMENTOS INDIVIDUAIS AGORA SÃO GERENCIADOS PELO SimplifiedProcedureService
-      console.log('🔄 Procedimentos individuais serão carregados separadamente');
+      // ✅ CARREGAR PROCEDIMENTOS POR PACIENTE A PARTIR DA TABELA procedure_records
+      try {
+        const allPatientIds = Array.from(patientsMap.keys());
+        if (allPatientIds.length > 0) {
+          const { getProceduresByPatientIds } = await import('./simplifiedProcedureService');
+          const procResult = await getProceduresByPatientIds(allPatientIds);
+          if (procResult.success) {
+            // Distribuir procedimentos para cada paciente e enriquecer
+            for (const [pid, procs] of procResult.proceduresByPatientId.entries()) {
+              const patient = patientsMap.get(pid);
+              if (!patient) continue;
+              
+              // Converter centavos para reais e mapear campos
+              patient.procedures = procs.map(p => ({
+                procedure_id: p.id,
+                procedure_code: p.procedure_code,
+                procedure_description: p.procedure_description || 'Descrição não disponível',
+                procedure_date: p.procedure_date,
+                value_reais: typeof p.total_value === 'number' ? p.total_value / 100 : 0,
+                value_cents: typeof p.total_value === 'number' ? p.total_value : 0,
+                approved: p.billing_status === 'approved' || p.match_status === 'approved',
+                approval_status: p.billing_status || p.match_status,
+                sequence: p.sequencia,
+                aih_id: p.aih_id,
+                match_confidence: p.match_confidence || 0,
+                sigtap_description: p.procedure_description,
+                complexity: p.complexity,
+                professional_name: p.professional_name,
+                cbo: p.professional_cbo,
+                participation: 'Responsável'
+              }));
+              
+              // Enriquecer descrições com SIGTAP quando necessário
+              patient.procedures = await DoctorPatientService.enrichProceduresWithSigtap(patient.procedures);
+              
+              // Atualizar contadores do paciente
+              patient.total_procedures = patient.procedures.length;
+              patient.approved_procedures = patient.procedures.filter(pp => pp.approved).length;
+            }
+          } else {
+            console.warn('⚠️ Falha ao buscar procedimentos por paciente:', procResult.error);
+          }
+        }
+      } catch (procErr) {
+        console.warn('⚠️ Erro ao carregar procedimentos por paciente:', procErr);
+      }
 
       // 6. ORDENAR PROCEDIMENTOS POR DATA (MAIS RECENTE PRIMEIRO)
       Array.from(patientsMap.values()).forEach(patient => {
@@ -636,6 +845,7 @@ export class DoctorPatientService {
           // ✅ GARANTIR 1 AIH = 1 PACIENTE (sem duplicatas)
           if (patient && patientId && !patientsMap.has(patientId) && !globalPatientsProcessed.has(patientId)) {
             patientsMap.set(patientId, {
+              patient_id: patientId,
               patient_info: {
                 name: patient.name,
                 cns: patient.cns,
@@ -647,7 +857,8 @@ export class DoctorPatientService {
                 admission_date: aih.admission_date,
                 discharge_date: aih.discharge_date,
                 aih_number: aih.aih_number,
-                care_character: aih.care_character
+                care_character: aih.care_character,
+                hospital_id: aih.hospital_id
               },
               total_value_reais: (aih.calculated_total_value || 0) / 100, // ✅ USAR VALOR REAL DA AIH, NÃO DOS PROCEDIMENTOS
               procedures: [], // ✅ INICIALIZAR COMO ARRAY VAZIO
@@ -687,13 +898,10 @@ export class DoctorPatientService {
           });
         }
 
-        // ✅ PROCEDIMENTOS AGORA SÃO GERENCIADOS PELO SimplifiedProcedureService
-        console.log(`🔄 Procedimentos para ${doctor.doctor_info.name} serão carregados separadamente`);
-
         // 4.3. ✅ FINALIZAR DADOS DO MÉDICO - INCLUIR TODOS OS PACIENTES
         const allPatients = Array.from(patientsMap.values());
         
-        // ✅ INCLUIR TODOS OS PACIENTES (procedimentos serão adicionados pelo SimplifiedProcedureService)
+        // ✅ INCLUIR TODOS OS PACIENTES
         doctor.patients = allPatients;
 
         const totalRevenueThisDoctor = doctor.patients.reduce((sum, p) => sum + p.total_value_reais, 0);
@@ -716,6 +924,59 @@ export class DoctorPatientService {
           }
         });
       });
+
+      // 4.4. ✅ CARREGAR PROCEDIMENTOS EM LOTE PARA TODOS OS PACIENTES COLETADOS
+      try {
+        const allPatientIdsSet = new Set<string>();
+        Array.from(doctorsMap.values()).forEach(doc => {
+          (doc.patients || []).forEach(p => {
+            const pid = (p as any).patient_id;
+            if (pid) allPatientIdsSet.add(pid);
+          });
+        });
+        const allPatientIds = Array.from(allPatientIdsSet);
+        if (allPatientIds.length > 0) {
+          const { ProcedureRecordsService } = await import('./simplifiedProcedureService');
+          const procResult = await ProcedureRecordsService.getProceduresByPatientIds(allPatientIds);
+          if (procResult.success) {
+            Array.from(doctorsMap.values()).forEach(async (doc) => {
+              doc.patients = await Promise.all(doc.patients.map(async (patient: any) => {
+                const pid = patient.patient_id;
+                const procs = procResult.proceduresByPatientId.get(pid) || [];
+                let mapped = procs.map(p => ({
+                  procedure_id: p.id,
+                  procedure_code: p.procedure_code,
+                  procedure_description: p.procedure_description || 'Descrição não disponível',
+                  procedure_date: p.procedure_date,
+                  value_reais: typeof p.total_value === 'number' ? p.total_value / 100 : 0,
+                  value_cents: typeof p.total_value === 'number' ? p.total_value : 0,
+                  approved: p.billing_status === 'approved' || p.match_status === 'approved' || p.billing_status === 'paid',
+                  approval_status: p.billing_status || p.match_status,
+                  sequence: p.sequencia,
+                  aih_id: p.aih_id,
+                  match_confidence: p.match_confidence || 0,
+                  sigtap_description: p.procedure_description,
+                  complexity: p.complexity,
+                  professional_name: p.professional_name,
+                  cbo: p.professional_cbo,
+                  participation: 'Responsável'
+                }));
+                try {
+                  mapped = await DoctorPatientService.enrichProceduresWithSigtap(mapped);
+                } catch {}
+                patient.procedures = mapped.sort((a: any, b: any) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime());
+                patient.total_procedures = patient.procedures.length;
+                patient.approved_procedures = patient.procedures.filter((pp: any) => pp.approved).length;
+                return patient;
+              }));
+            });
+          } else {
+            console.warn('⚠️ Falha ao buscar procedimentos em lote:', procResult.error);
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Erro ao carregar procedimentos em lote:', err);
+      }
 
       // 5. ✅ RETORNAR APENAS MÉDICOS COM PACIENTES
       const doctorsWithPatients = Array.from(doctorsMap.values()).filter(doctor => 
@@ -1428,7 +1689,6 @@ export class DoctorPatientService {
               hospital_id,
               role,
               department,
-              is_primary_hospital,
               is_active,
               hospitals (
                 id,
@@ -1448,7 +1708,6 @@ export class DoctorPatientService {
               hospital_cnpj: (h.hospitals as any)?.cnpj,
               role: h.role,
               department: h.department,
-              is_primary_hospital: h.is_primary_hospital,
               is_active: h.is_active
             })));
           }
@@ -1481,7 +1740,6 @@ export class DoctorPatientService {
                 hospital_cnpj: hospitalInfo?.cnpj || '',
                 role: 'Médico Responsável',
                 department: 'Inferido por AIH',
-                is_primary_hospital: true,
                 is_active: true
               });
               
@@ -1494,7 +1752,6 @@ export class DoctorPatientService {
                 hospital_cnpj: '',
                 role: '',
                 department: '',
-                is_primary_hospital: true,
                 is_active: true
               });
               

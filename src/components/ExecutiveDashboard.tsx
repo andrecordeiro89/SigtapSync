@@ -854,7 +854,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
               
-              {/* FILTRO DE CARÁTER DE ATENDIMENTO */}
+              {/* FILTRO DE CARÁTER DE ATENDIMENTO (SUS: somente 1 e 2) */}
               <div>
                 <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Caráter de Atendimento</label>
                 <div className="flex items-center gap-2">
@@ -866,8 +866,6 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     <option value="all">Todos</option>
                     <option value="1">Eletivo</option>
                     <option value="2">Urgência/Emergência</option>
-                    <option value="3">Acidente no Trabalho</option>
-                    <option value="4">Acidente de Trânsito</option>
                   </select>
                   {selectedCareCharacter !== 'all' && (
                     <button
@@ -983,7 +981,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   )}
                   {selectedCareCharacter !== 'all' && (
                     <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
-                      🎯 Caráter: {selectedCareCharacter === '1' ? 'Eletivo' : selectedCareCharacter === '2' ? 'Urgência/Emergência' : selectedCareCharacter === '3' ? 'Acidente Trabalho' : 'Acidente Trânsito'}
+                      🎯 Caráter: {selectedCareCharacter === '1' ? 'Eletivo' : 'Urgência/Emergência'}
                     </Badge>
                   )}
                   <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">

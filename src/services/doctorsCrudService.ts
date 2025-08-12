@@ -92,15 +92,18 @@ export class DoctorsCrudService {
             name,
             cnpj
           )
-        `)
-        .eq('is_active', true); // Apenas associações ativas
+        `);
 
       // Aplicar filtros se necessário
+      if (filters?.isActive !== undefined) {
+        mainQuery = mainQuery.eq('is_active', filters.isActive);
+      }
       if (filters?.hospitalIds && filters.hospitalIds.length > 0 && !filters.hospitalIds.includes('ALL')) {
         mainQuery = mainQuery.in('hospital_id', filters.hospitalIds);
       }
 
-      const { data: doctorHospitalData, error } = await mainQuery.order('doctors(name)');
+      // Ordenar por uma coluna local para evitar erro de ordenação por relação
+      const { data: doctorHospitalData, error } = await mainQuery.order('doctor_cns');
 
       if (error) {
         console.error('❌ Erro ao buscar médicos da tabela doctor_hospital:', error);
@@ -110,19 +113,62 @@ export class DoctorsCrudService {
         };
       }
 
-      if (!doctorHospitalData || doctorHospitalData.length === 0) {
-        console.log('⚠️ Nenhum médico encontrado na tabela doctor_hospital');
-        return {
-          success: true,
-          data: [],
-          message: 'Nenhum médico encontrado'
-        };
+      // Fallback: se consulta direta não retornar dados úteis (join não resolvido), buscar via view agregada
+      let effectiveRows: any[] = doctorHospitalData || [];
+      const allRowsHaveNullDoctor = effectiveRows.length > 0 && effectiveRows.every(r => !(r as any).doctors);
+      if (!effectiveRows.length || allRowsHaveNullDoctor) {
+        console.warn('⚠️ Fallback: usando view doctor_hospital_info (join nativo indisponível)');
+        const { data: infoRows, error: infoError } = await supabase
+          .from('doctor_hospital_info')
+          .select('doctor_id, doctor_cns, doctor_crm, doctor_name, doctor_specialty, hospital_id, hospital_name')
+          .order('doctor_name');
+
+        if (infoError) {
+          console.error('❌ Erro ao buscar na doctor_hospital_info:', infoError);
+          return {
+            success: false,
+            error: infoError.message
+          };
+        }
+
+        if (!infoRows || infoRows.length === 0) {
+          console.log('⚠️ Nenhum médico encontrado nem em doctor_hospital_info');
+          return {
+            success: true,
+            data: [],
+            message: 'Nenhum médico encontrado'
+          };
+        }
+
+        // Adaptar formato para fluxo comum de agrupamento
+        effectiveRows = infoRows.map(r => ({
+          doctor_cns: r.doctor_cns,
+          hospital_id: r.hospital_id,
+          role: null,
+          department: null,
+          is_active: true,
+          doctors: {
+            id: r.doctor_id,
+            cns: r.doctor_cns,
+            crm: r.doctor_crm,
+            name: r.doctor_name,
+            specialty: r.doctor_specialty,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+          hospitals: {
+            id: r.hospital_id,
+            name: r.hospital_name,
+            cnpj: ''
+          }
+        }));
       }
 
       // 2. AGRUPAR MÉDICOS POR CNS (evitar duplicação)
-      const doctorsMap = new Map<string, MedicalDoctor & { hospitals: string[] }>();
+      const doctorsMap = new Map<string, MedicalDoctor & { hospitals: string[]; hospitalIds?: string[] }>();
 
-      doctorHospitalData.forEach(record => {
+      effectiveRows.forEach(record => {
         const doctor = record.doctors as any;
         const hospital = record.hospitals as any;
         
@@ -136,10 +182,10 @@ export class DoctorsCrudService {
           if (!existingDoctor.hospitals.includes(hospitalName)) {
             existingDoctor.hospitals.push(hospitalName);
           }
-          // Usar hospital primário se disponível
-          if (record.is_primary_hospital) {
-            existingDoctor.hospitalId = hospital?.id || '';
-            existingDoctor.hospitalName = hospitalName;
+          // Manter também a lista de IDs de hospitais para consumo posterior
+          if (!existingDoctor.hospitalIds) existingDoctor.hospitalIds = [];
+          if (hospital?.id && !existingDoctor.hospitalIds.includes(hospital.id)) {
+            existingDoctor.hospitalIds.push(hospital.id);
           }
         } else {
           // Primeiro registro do médico
@@ -152,6 +198,7 @@ export class DoctorsCrudService {
             hospitalId: hospital?.id || '',
             hospitalName: hospitalName,
             hospitals: [hospitalName],
+            hospitalIds: hospital?.id ? [hospital.id] : [],
             isActive: doctor.is_active !== false,
             createdAt: doctor.created_at || new Date().toISOString(),
             updatedAt: doctor.updated_at || new Date().toISOString()

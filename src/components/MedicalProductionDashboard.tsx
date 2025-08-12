@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
+import { Switch } from './ui/switch';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
@@ -31,6 +32,8 @@ import {
 } from 'lucide-react';
 
 import { DoctorPatientService, type DoctorWithPatients } from '../services/doctorPatientService';
+import { DoctorsHierarchyV2Service } from '../services/doctorsHierarchyV2';
+import { DoctorsCrudService } from '../services/doctorsCrudService';
 import { ProcedureRecordsService, type ProcedureRecord } from '../services/simplifiedProcedureService';
 import { DateRange } from '../types';
 import DoctorPaymentRules, { calculateDoctorPayment, calculatePercentagePayment } from './DoctorPaymentRules';
@@ -175,6 +178,13 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
     calculatedPaymentValue, // 🆕 Valor calculado baseado nas regras
     anesthetistProcedures04Count // 🆕 Quantidade de procedimentos de anestesistas iniciados em '04'
   };
+};
+
+// Chave única por cartão Médico×Hospital
+const getDoctorCardKey = (doctor: DoctorWithPatients): string => {
+  const cns = doctor.doctor_info.cns || 'NO_CNS';
+  const hospitalId = doctor.hospitals && doctor.hospitals.length > 0 ? (doctor.hospitals[0] as any).hospital_id || '' : '';
+  return `${cns}::${hospitalId}`;
 };
 
 // 🆕 INTERFACE PARA DIAGNÓSTICO DE DADOS
@@ -430,6 +440,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [showDiagnostic, setShowDiagnostic] = useState(false); // 🆕 ESTADO PARA MOSTRAR DIAGNÓSTICO
   const [showProcedureDiagnostic, setShowProcedureDiagnostic] = useState(false); // 🆕 DIAGNÓSTICO DE PROCEDIMENTOS
   const [showCleuezaDebug, setShowCleuezaDebug] = useState(false); // 🆕 DEBUG ESPECÍFICO CLEUZA
+  // 🆕 REFRESH CONTROL (manual e realtime)
+  const [refreshTick, setRefreshTick] = useState(0);
+  const realtimeDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   // 🆕 ESTADOS PARA PAGINAÇÃO DE PACIENTES
   const [currentPatientPage, setCurrentPatientPage] = useState<Map<string, number>>(new Map());
   const [patientSearchTerm, setPatientSearchTerm] = useState<Map<string, string>>(new Map());
@@ -888,35 +902,82 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         console.log('🔄 Carregando dados dos médicos...');
         console.log(`🔐 Modo de acesso: ${isAdminMode ? 'ADMINISTRADOR (todos os hospitais)' : `USUÁRIO (hospital: ${userHospitalId})`}`);
         
-        const doctorsData = await DoctorPatientService.getAllDoctorsWithPatients();
-        console.log('✅ Dados dos médicos carregados:', doctorsData);
+        // Para o teste solicitado: carregar TODOS os médicos que existem em doctor_hospital (sem filtros)
+        const doctorsList = await DoctorsCrudService.getAllDoctors();
+        const doctorsData = (doctorsList.success ? (doctorsList.data || []) : []).map(d => ({
+          doctor_info: {
+            name: d.name,
+            cns: d.cns,
+            crm: d.crm,
+            specialty: d.speciality,
+          },
+          // Construir hospitais com base na lista agregada presente em DoctorsCrudService
+          hospitals: (d as any).hospitals?.map((hospitalName: string, idx: number) => ({
+            hospital_id: (d as any).hospitalIds?.[idx] || '',
+            hospital_name: hospitalName,
+            hospital_cnpj: '',
+            role: undefined,
+            department: undefined,
+            is_active: true
+          })) || [],
+          // Para teste: iniciar pacientes vazio; procedimentos carregados depois se necessário
+          patients: []
+        })) as unknown as DoctorWithPatients[];
+        console.log('✅ Médicos carregados de doctor_hospital:', doctorsData.length);
         
-        // 🚀 SOLUÇÃO IMEDIATA: CARREGAR PROCEDIMENTOS SEPARADAMENTE
-        await loadProceduresForPatients(doctorsData);
-        
-        // ✅ CARREGAR LISTA DE HOSPITAIS DISPONÍVEIS
-        await loadAvailableHospitals(doctorsData);
-        
-        // ✅ FILTRAR MÉDICOS POR HOSPITAL (SE NÃO FOR ADMIN)
-        let filteredDoctorsData = doctorsData;
-        
-        if (!isAdminMode && userHospitalId && userHospitalId !== 'ALL') {
-          filteredDoctorsData = doctorsData.filter(doctor => {
-            // Verificar se o médico tem associação com o hospital do usuário
-            return doctor.hospitals?.some(hospital =>
-              hospital.hospital_id === userHospitalId
-            );
+        // ✅ CARREGAR PACIENTES VIA AIH PARA CADA MÉDICO (associação Médicos → Pacientes)
+        // Usa fonte real do banco (aihs + patients), via serviço agregador
+        let mergedDoctors = doctorsData;
+        try {
+          // NOVO: usar caminho direto nas tabelas (aihs + patients + procedure_records)
+          const dateFromISO = dateRange ? dateRange.startDate.toISOString() : undefined;
+          const dateToISO = dateRange ? dateRange.endDate.toISOString() : undefined;
+          const selectedHospitalIds = (selectedHospitals && !selectedHospitals.includes('all')) ? selectedHospitals : undefined;
+          const doctorsWithPatients = await DoctorsHierarchyV2Service.getDoctorsHierarchyV2({
+            hospitalIds: selectedHospitalIds,
+            dateFromISO,
+            dateToISO
           });
-          
-          console.log(`🏥 Filtrados ${filteredDoctorsData.length} médicos do hospital ${userHospitalId}`);
+          // Usar diretamente a fonte das tabelas, garantindo pacientes e procedimentos
+          mergedDoctors = doctorsWithPatients;
+          console.log('✅ Associação Médicos → Pacientes carregada direto das tabelas:', mergedDoctors.filter(d => d.patients.length > 0).length, 'médicos com pacientes');
+        } catch (assocErr) {
+          console.warn('⚠️ Falha ao carregar associação de pacientes; mantendo lista de médicos sem pacientes.', assocErr);
         }
+
+        // ✅ CARREGAR LISTA DE HOSPITAIS DISPONÍVEIS
+        await loadAvailableHospitals(mergedDoctors);
+
+        // ✅ DUPLICAR POR HOSPITAL: 1 card por par (médico, hospital)
+        const explodedByHospitalRaw: DoctorWithPatients[] = mergedDoctors.flatMap((doc) => {
+          const hospitals = doc.hospitals && doc.hospitals.length > 0 ? doc.hospitals : [{ hospital_id: '', hospital_name: 'Hospital não definido', is_active: true } as any];
+          return hospitals.map(h => ({
+            doctor_info: { ...doc.doctor_info },
+            hospitals: [h],
+            // Filtrar pacientes para o hospital quando possível
+            patients: doc.patients.filter(p => {
+              const patientHospitalId = (p as any).aih_info?.hospital_id;
+              if (!patientHospitalId) return true; // se não há hospital na AIH, não filtra
+              if (!h.hospital_id) return true;     // se o card não tem hospital_id, mantém
+              return patientHospitalId === h.hospital_id;
+            })
+          }));
+        });
+
+        // ✅ REMOVER DUPLICATAS POR (CNS::HOSPITAL_ID) AO VOLTAR À TELA
+        const dedupMap = new Map<string, DoctorWithPatients>();
+        for (const d of explodedByHospitalRaw) {
+          const key = getDoctorCardKey(d);
+          if (!dedupMap.has(key)) {
+            dedupMap.set(key, d);
+          }
+        }
+        const explodedByHospital = Array.from(dedupMap.values());
+
+        setDoctors(explodedByHospital);
+        setFilteredDoctors(explodedByHospital);
         
-        setDoctors(filteredDoctorsData);
-        setFilteredDoctors(filteredDoctorsData);
-        
-        const message = isAdminMode 
-          ? `${filteredDoctorsData.length} médicos carregados (todos os hospitais)`
-          : `${filteredDoctorsData.length} médicos carregados do seu hospital`;
+        const message = `${explodedByHospital.length} cartões (médico×hospital) carregados`;
         
         toast.success(message);
       } catch (error) {
@@ -928,7 +989,62 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     };
 
     loadDoctorsData();
-  }, [user, canAccessAllHospitals, hasFullAccess]);
+  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, dateRange, refreshTick]);
+
+  // 🆕 SUBSCRIÇÃO REALTIME: AIHs e PROCEDURE_RECORDS (apenas inserts)
+  useEffect(() => {
+    if (!autoRefresh) return; // não assinar realtime se desligado
+    const channel = supabase
+      .channel('medical-production-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'aihs' }, (payload) => {
+        // Filtrar por hospital e período ativos, quando possível
+        try {
+          const row: any = payload.new;
+          if (selectedHospitals && !selectedHospitals.includes('all')) {
+            if (!selectedHospitals.includes(row.hospital_id)) return;
+          }
+          if (dateRange) {
+            const adm = new Date(row.admission_date);
+            const start = dateRange.startDate;
+            const end = new Date(dateRange.endDate);
+            end.setHours(23, 59, 59, 999);
+            if (adm < start || adm > end) return;
+          }
+        } catch {}
+        if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
+        realtimeDebounceRef.current = setTimeout(() => setRefreshTick((t) => t + 1), 800);
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'procedure_records' }, (payload) => {
+        try {
+          // Se o insert não pertence aos filtros atuais, ignore
+          const row: any = payload.new;
+          if (selectedHospitals && !selectedHospitals.includes('all')) {
+            if (!selectedHospitals.includes(row.hospital_id)) return;
+          }
+          if (dateRange) {
+            const procDate = new Date(row.procedure_date);
+            const start = dateRange.startDate;
+            const end = new Date(dateRange.endDate);
+            end.setHours(23, 59, 59, 999);
+            if (procDate < start || procDate > end) return;
+          }
+        } catch {}
+        if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
+        realtimeDebounceRef.current = setTimeout(() => setRefreshTick((t) => t + 1), 800);
+      })
+      .subscribe();
+
+    return () => {
+      try { supabase.removeChannel(channel); } catch {}
+      if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
+    };
+  }, [autoRefresh, selectedHospitals, dateRange]);
+
+  // 🕒 POLLING DE BACKUP: desativado por padrão para evitar recargas
+  // useEffect(() => {
+  //   const id = setInterval(() => setRefreshTick(t => t + 1), 60000);
+  //   return () => clearInterval(id);
+  // }, []);
 
   // ✅ FILTRAR MÉDICOS BASEADO NO TERMO DE BUSCA, HOSPITAL, CARÁTER DE ATENDIMENTO E DATAS
   useEffect(() => {
@@ -964,7 +1080,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           
           return true; // Manter se não tem data de admissão
         })
-      })).filter(doctor => doctor.patients.length > 0); // Remover médicos sem pacientes após filtro
+      }));
+      // Remover médicos sem pacientes quando filtro de data está ativo
+      filtered = filtered.filter(d => d.patients.length > 0);
     }
     
     // 🆕 FILTRAR POR CARÁTER DE ATENDIMENTO
@@ -973,9 +1091,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         ...doctor,
         patients: doctor.patients.filter(patient => {
           if (!patient.aih_info || !patient.aih_info.care_character) return false;
-          return patient.aih_info.care_character.toString() === selectedCareCharacter;
+          const cc = typeof patient.aih_info.care_character === 'string' ? patient.aih_info.care_character.trim() : patient.aih_info.care_character;
+          return cc?.toString() === selectedCareCharacter;
         })
-      })).filter(doctor => doctor.patients.length > 0); // Remover médicos sem pacientes após filtro
+      }));
+      // Remover médicos sem pacientes quando filtro de caráter está ativo
+      filtered = filtered.filter(d => d.patients.length > 0);
     }
     
     // Filtrar por termo de busca
@@ -996,12 +1117,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   }, [searchTerm, doctors, selectedHospitals, selectedCareCharacter, dateRange]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
-  const toggleDoctorExpansion = (doctorCns: string) => {
+  const toggleDoctorExpansion = (doctorKey: string) => {
     const newExpanded = new Set(expandedDoctors);
-    if (newExpanded.has(doctorCns)) {
-      newExpanded.delete(doctorCns);
+    if (newExpanded.has(doctorKey)) {
+      newExpanded.delete(doctorKey);
     } else {
-      newExpanded.add(doctorCns);
+      newExpanded.add(doctorKey);
     }
     setExpandedDoctors(newExpanded);
   };
@@ -1269,13 +1390,26 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       {/* ✅ CONTROLES E FILTROS MODERNOS */}
       <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-blue-50/30">
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-              <Stethoscope className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h3 className="text-xl font-bold text-gray-900">Produção Médica - Médicos Responsáveis</h3>
-              <p className="text-sm text-gray-600 mt-1">Visualização hierárquica completa: Médicos → Pacientes → Procedimentos</p>
+          <CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                  <Stethoscope className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Produção Médica - Médicos Responsáveis</h3>
+                  <p className="text-sm text-gray-600 mt-1">Visualização hierárquica completa: Médicos → Pacientes → Procedimentos</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <span>Atualização automática</span>
+                  <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setRefreshTick(t => t + 1)}>
+                  <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
+                </Button>
+              </div>
             </div>
           </CardTitle>
         </CardHeader>
@@ -1356,7 +1490,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                     {/* Lista de médicos paginada */}
                     {paginatedDoctors.map((doctor, index) => {
                 const doctorStats = calculateDoctorStats(doctor);
-                const isExpanded = expandedDoctors.has(doctor.doctor_info.cns);
+                const cardKey = getDoctorCardKey(doctor);
+                const isExpanded = expandedDoctors.has(cardKey);
                 
                 // ✅ FUNÇÃO PARA MEDALHAS
                 const getRankingMedal = (position: number) => {
@@ -1369,12 +1504,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 };
                 
                 return (
-                  <Card key={doctor.doctor_info.cns} className="mb-6 border border-slate-200/60 bg-white/80 backdrop-blur-sm hover:shadow-lg hover:border-slate-300/60 transition-all duration-500 ease-out">
+                  <Card key={cardKey} className="mb-6 border border-slate-200/60 bg-white/80 backdrop-blur-sm hover:shadow-lg hover:border-slate-300/60 transition-all duration-500 ease-out">
                     <Collapsible>
                       <CollapsibleTrigger asChild>
                         <div 
                           className="w-full cursor-pointer hover:bg-slate-50/50 transition-all duration-300 ease-out"
-                          onClick={() => toggleDoctorExpansion(doctor.doctor_info.cns)}
+                          onClick={() => toggleDoctorExpansion(cardKey)}
                         >
                           <div className="p-6">
                             <div className="flex items-center justify-between mb-6">
@@ -1732,9 +1867,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   )}
                                                 </div>
                                                 {patient.aih_info.care_character && (
-                                                  <div className={`text-sm font-medium px-2 py-1 rounded-md border inline-block ${CareCharacterUtils.getStyleClasses(patient.aih_info.care_character)}`}>
-                                                    {CareCharacterUtils.formatForDisplay(patient.aih_info.care_character)}
-                                                  </div>
+                                                  <Badge
+                                                    variant="outline"
+                                                    className={`inline-flex items-center gap-1.5 rounded-md ${CareCharacterUtils.getStyleClasses(
+                                                      patient.aih_info.care_character
+                                                    )}`}
+                                                  >
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                                    {CareCharacterUtils.formatForDisplay(
+                                                      typeof patient.aih_info.care_character === 'string'
+                                                        ? patient.aih_info.care_character.trim()
+                                                        : String(patient.aih_info.care_character),
+                                                      false
+                                                    )}
+                                                  </Badge>
                                                 )}
                                               </div>
                                             </div>

@@ -111,7 +111,7 @@ export class ProcedureRecordsService {
           notes
         `)
         .eq('patient_id', patientId)
-        .or('professional_cbo.neq.225151,professional_cbo.is.null,and(professional_cbo.eq.225151,procedure_code.like.03%),and(professional_cbo.eq.225151,procedure_code.eq.04.17.01.001-0)') // 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
+        // TEMP: desativar filtros de exclusão para debug
         .order('procedure_date', { ascending: false });
 
       if (error) {
@@ -186,7 +186,7 @@ export class ProcedureRecordsService {
           notes
         `)
         .in('patient_id', patientIds)
-        .or('professional_cbo.neq.225151,professional_cbo.is.null,and(professional_cbo.eq.225151,procedure_code.like.03%),and(professional_cbo.eq.225151,procedure_code.eq.04.17.01.001-0)') // 🚫 EXCLUIR ANESTESISTAS 04.xxx (MANTER 03.xxx + CESARIANA)
+        // TEMP: desativar filtros de exclusão para debug
         .order('procedure_date', { ascending: false });
 
       if (error) {
@@ -230,6 +230,56 @@ export class ProcedureRecordsService {
         proceduresByPatientId: new Map(),
         error: error instanceof Error ? error.message : 'Erro desconhecido' 
       };
+    }
+  }
+
+  /**
+   * 🔍 BUSCAR PROCEDIMENTOS POR AIH_ID (fallback caso patient_id não esteja preenchido)
+   */
+  static async getProceduresByAihIds(aihIds: string[]): Promise<{
+    success: boolean;
+    proceduresByAihId: Map<string, ProcedureRecord[]>;
+    error?: string;
+  }> {
+    try {
+      if (!aihIds || aihIds.length === 0) {
+        return { success: true, proceduresByAihId: new Map() };
+      }
+      const { data, error } = await supabase
+        .from('procedure_records')
+        .select(`
+          id,
+          hospital_id,
+          patient_id,
+          aih_id,
+          procedure_date,
+          procedure_code,
+          procedure_name,
+          procedure_description,
+          total_value,
+          unit_value,
+          billing_status,
+          match_status,
+          match_confidence,
+          sequencia,
+          professional_name,
+          professional_cbo
+        `)
+        .in('aih_id', aihIds)
+        .order('procedure_date', { ascending: false });
+
+      if (error) {
+        return { success: false, proceduresByAihId: new Map(), error: error.message };
+      }
+      const map = new Map<string, ProcedureRecord[]>();
+      (data || []).forEach(p => {
+        const key = p.aih_id as any as string;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(p as any);
+      });
+      return { success: true, proceduresByAihId: map };
+    } catch (e) {
+      return { success: false, proceduresByAihId: new Map(), error: e instanceof Error ? e.message : 'Erro desconhecido' };
     }
   }
   
