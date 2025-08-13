@@ -1,0 +1,4 @@
+/* Utilitário para esconder barra de rolagem horizontal nas abas, mantendo scroll pelo mouse */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+

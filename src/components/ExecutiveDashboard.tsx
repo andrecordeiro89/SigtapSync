@@ -269,6 +269,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState('doctors');
+  const [activeHospitalTab, setActiveHospitalTab] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   // const [showReportGenerator, setShowReportGenerator] = useState(false);
@@ -423,6 +424,97 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     // Não depende mais dos dados dos médicos ou da aba ativa
     // Valores fixos: 818 AIHs + soma calculated_total_value
   };
+
+  // Abreviação elegante de nomes de hospitais para exibição nas abas
+  const abbreviateHospitalName = (name: string): string => {
+    try {
+      let short = name?.trim() || '';
+      // Regras comuns
+      short = short.replace(/^Hospital\s+/i, 'Hosp. ');
+      short = short.replace(/\bMunicipal\b/gi, 'Mun.');
+      short = short.replace(/\bMaternidade\b/gi, 'Matern.');
+      short = short.replace(/\bNossa\s+Senhora\b/gi, 'N.S');
+      // Espaços extras
+      short = short.replace(/\s{2,}/g, ' ').replace(/\s+\./g, '.');
+      return short;
+    } catch {
+      return name;
+    }
+  };
+
+  // Mapa de códigos por hospital (padrão executivo)
+  const HOSPITAL_CODE_MAP: Record<string, string> = {
+    'Hosp. Torao Tokuda': 'APU',
+    'Hosp. Mun. São José': 'CAR',
+    'Hosp. Mun. Juarez Barreto de Macedo': 'FAX',
+    'Hosp. N.S Aparecida': 'FOZ',
+    'HUOP': 'CAS',
+    'Hosp. Mun. Santa Alice': 'SM',
+    'Hosp. Mun. 18 de Dezembro': 'ARA',
+    'Hosp. Matern. N.S Aparecida': 'FRG',
+    'Hosp. Regional Centro Oeste': 'GUA'
+  };
+
+  const getHospitalTabLabel = (name: string): string => {
+    const abbr = abbreviateHospitalName(name);
+    return HOSPITAL_CODE_MAP[abbr] || abbr;
+  };
+
+  // Lista de hospitais ordenada alfabeticamente pela sigla exibida
+  const sortedHospitalStats = React.useMemo(() => {
+    try {
+      return [...hospitalStats].sort((a, b) =>
+        getHospitalTabLabel(a.name).localeCompare(getHospitalTabLabel(b.name), 'pt-BR')
+      );
+    } catch {
+      return hospitalStats;
+    }
+  }, [hospitalStats]);
+
+  // Sincronizar aba de hospitais com lista de hospitais carregados
+  useEffect(() => {
+    try {
+      if (hospitalStats && hospitalStats.length > 0) {
+        // Se a aba atual não é válida, selecionar o primeiro hospital
+        const exists = activeHospitalTab && hospitalStats.some(h => h.id === activeHospitalTab);
+        if (!exists) {
+          const firstHospitalId = hospitalStats[0].id;
+          setActiveHospitalTab(firstHospitalId);
+          // Forçar filtragem SEMPRE por hospital
+          setSelectedHospitals([firstHospitalId]);
+        }
+      }
+    } catch (e) {
+      // noop
+    }
+  }, [hospitalStats]);
+
+  // Trocar de hospital via abas
+  const handleHospitalTabChange = (hospitalId: string) => {
+    setActiveHospitalTab(hospitalId);
+    // Forçar modo por hospital único para a aba de Médicos
+    setSelectedHospitals([hospitalId]);
+    // Recarregar dados com o novo hospital aplicado
+    setIsLoading(true);
+    loadExecutiveData(selectedDateRange);
+  };
+
+  // Sincronizar dropdown de hospitais com a aba ativa (impede 'all')
+  useEffect(() => {
+    if (!hospitalStats || hospitalStats.length === 0) return;
+    const defaultId = activeHospitalTab || hospitalStats[0].id;
+    // Se usuário selecionar "all" no dropdown, manter aba ativa
+    if (selectedHospitals.includes('all')) {
+      if (selectedHospitals.length !== 1 || selectedHospitals[0] !== defaultId) {
+        setSelectedHospitals([defaultId]);
+      }
+      return;
+    }
+    // Se houver um único hospital selecionado diferente da aba, alinhar aba
+    if (selectedHospitals.length >= 1 && selectedHospitals[0] !== defaultId) {
+      setActiveHospitalTab(selectedHospitals[0]);
+    }
+  }, [selectedHospitals, activeHospitalTab, hospitalStats]);
 
 	// Utilitário para formatar datas no input date
 	const formatDateForInput = (date: Date): string => {
@@ -822,10 +914,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* FILTROS COMPACTOS EM LINHA */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-              {/* BUSCA RÁPIDA */}
-              <div>
+            {/* FILTROS EM LINHA (Busca maior) */}
+            <div className="flex flex-col md:flex-row md:items-end gap-3">
+              {/* BUSCA RÁPIDA (maior largura) */}
+              <div className="flex-1 min-w-[240px]">
                 <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Busca Rápida</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -846,15 +938,15 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   )}
                 </div>
               </div>
-              
-              {/* FILTRO DE CARÁTER DE ATENDIMENTO (SUS: somente 1 e 2) */}
-              <div>
+
+              {/* CARÁTER DE ATENDIMENTO */}
+              <div className="w-full md:w-[200px]">
                 <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Caráter de Atendimento</label>
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedCareCharacter}
                     onChange={(e) => setSelectedCareCharacter(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-9"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-9"
                   >
                     <option value="all">Todos</option>
                     <option value="1">Eletivo</option>
@@ -872,77 +964,41 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              {/* HOSPITAIS DROPDOWN */}
-              <div>
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Hospitais</label>
-                <Select
-                  value={selectedHospitals.includes('all') ? 'all' : selectedHospitals.join(',')}
-                  onValueChange={(value) => {
-                    if (value === 'all') {
-                      setSelectedHospitals(['all']);
-                      console.log('🏥 Filtro de hospital resetado para "Todos"');
-                    } else {
-                      const hospitalId = value;
-                      if (selectedHospitals.includes('all')) {
-                        setSelectedHospitals([hospitalId]);
-                      } else {
-                        const newSelection = selectedHospitals.includes(hospitalId)
-                          ? selectedHospitals.filter(id => id !== hospitalId)
-                          : [...selectedHospitals, hospitalId];
-                        
-                        if (newSelection.length === 0) {
-                          setSelectedHospitals(['all']);
-                        } else {
-                          setSelectedHospitals(newSelection);
-                        }
-                      }
-                      console.log('🏥 Filtro de hospital alterado:', hospitalStats.find(h => h.id === hospitalId)?.name);
-                    }
+              {/* DATA INICIAL */}
+              <div className="w-full md:w-[170px]">
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data Inicial</label>
+                <Input
+                  type="date"
+                  value={formatDateForInput(selectedDateRange.startDate)}
+                  onChange={(e) => {
+                    const newStart = new Date(e.target.value);
+                    const updated = { startDate: newStart, endDate: selectedDateRange.endDate };
+                    setSelectedDateRange(updated);
+                    handleDateRangeChange(updated);
                   }}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue>
-                      {selectedHospitals.includes('all') ? (
-                        <div className="flex items-center">
-                          <Hospital className="h-3 w-3 mr-2" />
-                          <span className="text-sm">Todos os Hospitais</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center">
-                          <Hospital className="h-3 w-3 mr-2" />
-                          <span className="text-sm">
-                            {selectedHospitals.length === 1 
-                              ? hospitalStats.find(h => h.id === selectedHospitals[0])?.name || 'Hospital'
-                              : `${selectedHospitals.length} hospitais`
-                            }
-                          </span>
-                        </div>
-                      )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">
-                      <div className="flex items-center">
-                        <Hospital className="h-3 w-3 mr-2" />
-                        <span>Todos os Hospitais</span>
-                      </div>
-                    </SelectItem>
-                    {hospitalStats.map((hospital) => (
-                      <SelectItem key={hospital.id} value={hospital.id}>
-                        <div className="flex items-center justify-between w-full">
-                          <span>{hospital.name}</span>
-                          {selectedHospitals.includes(hospital.id) && !selectedHospitals.includes('all') && (
-                            <CheckCircle className="h-3 w-3 text-green-600 ml-2" />
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  className="h-9"
+                />
+              </div>
+
+              {/* DATA FINAL */}
+              <div className="w-full md:w-[170px]">
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data Final</label>
+                <Input
+                  type="date"
+                  value={formatDateForInput(selectedDateRange.endDate)}
+                  max={formatDateForInput(new Date())}
+                  onChange={(e) => {
+                    const newEnd = new Date(e.target.value);
+                    const updated = { startDate: selectedDateRange.startDate, endDate: newEnd };
+                    setSelectedDateRange(updated);
+                    handleDateRangeChange(updated);
+                  }}
+                  className="h-9"
+                />
               </div>
 
               {/* BOTÃO LIMPAR FILTROS */}
-              <div className="flex items-end">
+              <div className="w-full md:w-[150px] flex items-end">
                 <button
                   onClick={() => {
                     setSearchTerm('');
@@ -958,38 +1014,32 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               </div>
             </div>
 
-				{/* DATEPICKERS DO PERÍODO (posicionados logo abaixo dos filtros compactos) */}
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-gray-100">
-					<div>
-						<label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data Inicial</label>
-						<Input
-							type="date"
-							value={formatDateForInput(selectedDateRange.startDate)}
-							onChange={(e) => {
-								const newStart = new Date(e.target.value);
-								const updated = { startDate: newStart, endDate: selectedDateRange.endDate };
-								setSelectedDateRange(updated);
-								handleDateRangeChange(updated);
-							}}
-							className="h-9"
-						/>
-					</div>
-					<div>
-						<label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data Final</label>
-						<Input
-							type="date"
-							value={formatDateForInput(selectedDateRange.endDate)}
-							max={formatDateForInput(new Date())}
-							onChange={(e) => {
-								const newEnd = new Date(e.target.value);
-								const updated = { startDate: selectedDateRange.startDate, endDate: newEnd };
-								setSelectedDateRange(updated);
-								handleDateRangeChange(updated);
-							}}
-							className="h-9"
-						/>
-					</div>
-				</div>
+            {/* Abas por Hospital (sempre separar médicos por hospital) */}
+            {hospitalStats && hospitalStats.length > 0 && (
+              <div className="pt-4 border-t border-gray-100">
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">
+                  Hospitais
+                </label>
+                <Tabs value={activeHospitalTab || hospitalStats[0]?.id} onValueChange={handleHospitalTabChange}>
+                  <TabsList
+                    className="w-full h-auto grid gap-0 bg-muted rounded-md p-1"
+                    style={{ gridTemplateColumns: `repeat(${sortedHospitalStats.length || 1}, minmax(0, 1fr))` }}
+                  >
+                    {sortedHospitalStats.map((h) => (
+                      <TabsTrigger
+                        key={h.id}
+                        value={h.id}
+                        title={h.name}
+                        className="justify-center text-center whitespace-nowrap text-[11px] leading-tight px-1.5 py-1 rounded-none first:rounded-l-md last:rounded-r-md data-[state=active]:bg-background data-[state=active]:text-foreground hover:bg-background/60 transition-colors min-h-[1.5rem] w-full"
+                        aria-label={`Selecionar ${h.name}`}
+                      >
+                        {getHospitalTabLabel(h.name)}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              </div>
+            )}
 
             {/* INDICADORES DE FILTROS ATIVOS */}
             {(searchTerm || selectedCareCharacter !== 'all' || !selectedHospitals.includes('all')) && (
