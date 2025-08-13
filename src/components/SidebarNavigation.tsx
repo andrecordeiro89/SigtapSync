@@ -17,9 +17,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarSeparator,
   SidebarTrigger,
 } from './ui/sidebar';
-import { Button } from './ui/button';
+ 
 
 // Estilos CSS personalizados para animações premium
 const premiumStyles = `
@@ -154,6 +155,8 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
     
     return allTabs
       .filter(tab => {
+        // Oculta a tab "Auditoria AIH" do sidebar sem remover funcionalidades
+        if (tab.id === 'audit-dashboard') return false;
         if (!tab.requiresAdmin && !tab.requiresAuditor && !tab.requiresDeveloper && !tab.requiresExecutive) return true;
         
         if (tab.requiresDeveloper) {
@@ -309,20 +312,29 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
               <div className="text-xs text-slate-600 mt-0.5 font-medium tracking-wide">
                 Billing Wizard v3.0
               </div>
+              
               {canAccessAllHospitals() && (
-                <Badge className="mt-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 text-xs px-3 py-1.5 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                <Badge className="mt-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 text-xs px-3 py-1.5 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group-data-[collapsible=icon]:hidden">
                   <Globe className="h-3 w-3 mr-1.5" />
                   ADMIN
                 </Badge>
               )}
             </div>
           </div>
+          {/* Toggle fixo no topo: abaixo do badge admin, canto inferior direito do header */}
+          <div className="absolute bottom-3 right-3">
+            <SidebarTrigger
+              className="h-8 w-8 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm"
+              aria-label="Expandir/Recolher menu"
+              title="Expandir/Recolher menu"
+            />
+          </div>
         </SidebarHeader>
 
         {/* CONTENT - Menu de Navegação com Design Premium */}
         <SidebarContent className="px-4 py-6 space-y-3 flex-1 overflow-y-auto">
           <SidebarGroup>
-            <SidebarGroupLabel className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/80 rounded-xl mb-4 border border-slate-200/60">
+            <SidebarGroupLabel className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/80 rounded-xl mb-4 border border-slate-200/60 group-data-[collapsible=icon]:hidden">
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-pulse"></div>
                 <span>Navegação</span>
@@ -361,7 +373,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                           <Icon className="h-4 w-4" />
                         </div>
                         
-                        <div className="flex-1 flex items-center">
+                        <div className="flex-1 flex items-center group-data-[collapsible=icon]:hidden">
                           <span className={`
                             font-medium text-sm leading-5
                             ${isActive 
@@ -395,63 +407,65 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+          
         </SidebarContent>
 
         {/* FOOTER - Informações do Usuário com Design Premium */}
         <SidebarFooter className="border-t border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50 px-4 py-6 backdrop-blur-sm mt-auto">
           <SidebarMenu>
             <SidebarMenuItem>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton className={`
-                    w-full transition-all duration-200 ease-out group/user-button
-                    data-[state=open]:bg-blue-100 data-[state=open]:text-blue-700
-                    hover:bg-slate-100
-                    rounded-lg px-4 py-4 border border-transparent hover:border-blue-200/50
-                    focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
-                    min-h-[4.5rem]
-                  `}>
-                    <div className="relative flex-shrink-0">
-                      <Avatar className="h-12 w-12 ring-2 ring-white shadow-lg">
-                        <AvatarFallback className={`text-sm font-bold ${
-                          canAccessAllHospitals() 
-                            ? 'bg-purple-500 text-white' 
-                            : 'bg-blue-500 text-white'
-                        }`}>
-                          {getInitials(user.full_name, user.email)}
-                        </AvatarFallback>
-                      </Avatar>
-                      {canAccessAllHospitals() && (
-                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white">
-                          <Crown className="h-3 w-3 text-white" />
-                        </div>
-                      )}
-                      {/* Indicador de status online */}
-                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white">
-                      </div>
-                    </div>
-                    <div className="group-data-[collapsible=icon]:hidden flex-1 text-left min-w-0 ml-4">
-                      <div className="text-sm font-semibold text-slate-900 truncate group-data-[state=open]/user-button:text-blue-700 transition-all duration-200">
-                        {user.full_name || user.email?.split('@')[0]}
-                      </div>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <div className="text-xs text-slate-600 truncate group-data-[state=open]/user-button:text-blue-600 transition-all duration-200 font-medium">
-                          {roleConfig?.label || 'Usuário'}
-                        </div>
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton className={`
+                      flex-1 transition-all duration-200 ease-out group/user-button
+                      data-[state=open]:bg-blue-100 data-[state=open]:text-blue-700
+                      hover:bg-slate-100
+                      rounded-lg px-4 py-4 border border-transparent hover:border-blue-200/50
+                      focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
+                      min-h-[4.5rem]
+                    `}>
+                      <div className="relative flex-shrink-0">
+                        <Avatar className="h-12 w-12 ring-2 ring-white shadow-lg">
+                          <AvatarFallback className={`text-sm font-bold ${
+                            canAccessAllHospitals() 
+                              ? 'bg-purple-500 text-white' 
+                              : 'bg-blue-500 text-white'
+                          }`}>
+                            {getInitials(user.full_name, user.email)}
+                          </AvatarFallback>
+                        </Avatar>
                         {canAccessAllHospitals() && (
-                          <Badge className="text-xs bg-purple-500 text-white border-0 px-2 py-0.5">
-                            ADMIN
-                          </Badge>
+                          <div className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white group-data-[collapsible=icon]:hidden">
+                            <Crown className="h-3 w-3 text-white" />
+                          </div>
                         )}
+                        {/* Indicador de status online */}
+                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white group-data-[collapsible=icon]:hidden">
+                        </div>
                       </div>
-                    </div>
-                    <div className="group-data-[collapsible=icon]:hidden opacity-60 group-hover/user-button:opacity-100 transition-all duration-200 flex-shrink-0">
-                      <Settings className="h-4 w-4 text-slate-400 group-data-[state=open]/user-button:text-blue-600 group-hover/user-button:text-blue-600" />
-                    </div>
-                  </SidebarMenuButton>
-                </DropdownMenuTrigger>
-                
-                <DropdownMenuContent className="w-80 max-h-[85vh] overflow-y-auto shadow-xl border-0 bg-white/95 backdrop-blur-xl rounded-2xl" align="end" forceMount>
+                      <div className="group-data-[collapsible=icon]:hidden flex-1 text-left min-w-0 ml-4">
+                        <div className="text-sm font-semibold text-slate-900 truncate group-data-[state=open]/user-button:text-blue-700 transition-all duration-200">
+                          {user.full_name || user.email?.split('@')[0]}
+                        </div>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <div className="text-xs text-slate-600 truncate group-data-[state=open]/user-button:text-blue-600 transition-all duration-200 font-medium">
+                            {roleConfig?.label || 'Usuário'}
+                          </div>
+                          {canAccessAllHospitals() && (
+                            <Badge className="text-xs bg-purple-500 text-white border-0 px-2 py-0.5">
+                              ADMIN
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="group-data-[collapsible=icon]:hidden opacity-60 group-hover/user-button:opacity-100 transition-all duration-200 flex-shrink-0">
+                        <Settings className="h-4 w-4 text-slate-400 group-data-[state=open]/user-button:text-blue-600 group-hover/user-button:text-blue-600" />
+                      </div>
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent className="w-80 max-h-[85vh] overflow-y-auto shadow-xl border-0 bg-white/95 backdrop-blur-xl rounded-2xl" align="end" forceMount>
                   {/* Informações do Usuário com Design Premium */}
                   <div className="relative flex items-center space-x-3 p-3 border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50">
                     <div className="relative">
@@ -664,10 +678,12 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                       </span>
                     </DropdownMenuItem>
                   </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </SidebarMenuItem>
           </SidebarMenu>
+          
         </SidebarFooter>
 
         <SidebarRail />

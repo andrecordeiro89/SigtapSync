@@ -11,9 +11,11 @@ import MedicalStaffDashboard from '../components/MedicalStaffDashboard';
 import AuditDashboard from './AuditDashboard';
 import ProcedureDebugger from '../components/ProcedureDebugger';
 import { SidebarProvider, SidebarInset } from '../components/ui/sidebar';
+import { useIsCompact } from '../hooks/use-compact';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const isCompact = useIsCompact();
 
   const renderContent = () => {
     switch (activeTab) {
@@ -49,8 +51,8 @@ const Index = () => {
       <SidebarNavigation activeTab={activeTab} onTabChange={setActiveTab} />
       <SidebarInset>
         {/* Conteúdo principal */}
-        <main className="flex-1 overflow-auto p-4 md:p-6 h-screen">
-          <div className="max-w-7xl mx-auto">
+        <main className={`flex-1 overflow-auto ${isCompact ? 'p-3' : 'p-4 md:p-6'} h-screen`}>
+          <div className={`${isCompact ? 'max-w-6xl' : 'max-w-7xl'} mx-auto`}>
             {renderContent()}
           </div>
         </main>
