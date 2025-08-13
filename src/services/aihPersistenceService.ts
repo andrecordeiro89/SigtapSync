@@ -1,4 +1,6 @@
 import { supabase, AIHDB, PatientDB } from '../lib/supabase';
+import { sanitizePatientName } from '../utils/patientName';
+import { buildAIHIdempotencyKey } from '../utils/idempotency';
 import { AIH } from '../types';
 import { PatientService, AIHService } from './supabaseService';
 
@@ -521,7 +523,7 @@ export class AIHPersistenceService {
     const patientData = {
       id: crypto.randomUUID(),
       hospital_id: hospitalId,
-      name: aih.nomePaciente || 'Nome não informado',
+      name: sanitizePatientName(aih.nomePaciente),
       cns: aih.cns || '',
       birth_date: aih.nascimento || null,
       gender: (aih.sexo === 'Masculino' ? 'M' : aih.sexo === 'Feminino' ? 'F' : aih.sexo) as 'M' | 'F',
@@ -651,7 +653,16 @@ export class AIHPersistenceService {
     sourceFile: string
   ): Promise<{success: boolean; aihId?: string; message: string; errors?: string[]}> {
     try {
-      console.log('📄 Criando registro AIH...');
+      // Chave leve para rastreio/idempotência (apenas logging)
+      const idemKey = buildAIHIdempotencyKey({
+        hospitalId,
+        aihNumber: aih.numeroAIH,
+        admissionDate: aih.dataInicio,
+        procedureCode: aih.procedimentoPrincipal,
+        patientId,
+        patientCns: aih.cns || undefined,
+      });
+      console.log('📄 Criando registro AIH...', { idemKey });
 
       // ✅ VERIFICAÇÃO INTELIGENTE DE DUPLICATAS
       if (aih.numeroAIH === "-") {
@@ -674,6 +685,35 @@ export class AIHPersistenceService {
           });
         }
         
+        // Verificação adicional leve por data (mesmo dia) + procedimento
+        try {
+          const start = new Date(aih.dataInicio);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(aih.dataInicio);
+          end.setHours(23, 59, 59, 999);
+
+          const { data: possibleDup, error: dupErr } = await supabase
+            .from('aihs')
+            .select('id, admission_date, procedure_code')
+            .eq('hospital_id', hospitalId)
+            .eq('patient_id', patientId)
+            .eq('procedure_code', aih.procedimentoPrincipal)
+            .gte('admission_date', start.toISOString())
+            .lte('admission_date', end.toISOString())
+            .limit(1);
+
+          if (!dupErr && possibleDup && possibleDup.length > 0) {
+            console.log('⚠️ Possível duplicata de AIH sem número detectada no mesmo dia e procedimento. idemKey:', idemKey);
+            return {
+              success: false,
+              message: 'Possível duplicata de AIH sem número para o mesmo paciente (mesmo dia e procedimento).',
+              errors: ['possible_duplicate_without_number']
+            };
+          }
+        } catch (dupCheckErr) {
+          console.warn('⚠️ Falha na verificação leve de duplicata de AIH sem número:', dupCheckErr);
+        }
+
         console.log('✅ Permitindo inserção de nova AIH com "-" (sem bloqueio)');
       } else {
         // 🔄 LÓGICA NORMAL PARA AIHs COM NÚMERO
@@ -771,21 +811,21 @@ export class AIHPersistenceService {
       let createdAIH: any;
       let usedVariant: 'PT' | 'EN' | 'BASIC' = 'PT';
       try {
-        console.log('💾 Tentando criar AIH com schema expandido (PT)...');
+      console.log('💾 Tentando criar AIH com schema expandido (PT)...', { idemKey });
         createdAIH = await AIHService.createAIH({ ...basicAihData, ...expandedAihDataPT } as any);
-        console.log('✅ AIH criada com schema expandido (PT)!');
+      console.log('✅ AIH criada com schema expandido (PT)!', { aihId: createdAIH.id, idemKey });
       } catch (ptError) {
         console.warn('⚠️ Falhou expandido (PT). Tentando expandido (EN)...', ptError);
         try {
           usedVariant = 'EN';
           createdAIH = await AIHService.createAIH({ ...basicAihData, ...expandedAihDataEN } as any);
-          console.log('✅ AIH criada com schema expandido (EN)!');
+          console.log('✅ AIH criada com schema expandido (EN)!', { aihId: createdAIH.id, idemKey });
         } catch (enError) {
           console.warn('⚠️ Falhou expandido (EN). Tentando schema básico...', enError);
           try {
             usedVariant = 'BASIC';
             createdAIH = await AIHService.createAIH(basicAihData as any);
-            console.log('✅ AIH criada com schema básico!');
+            console.log('✅ AIH criada com schema básico!', { aihId: createdAIH.id, idemKey });
             console.log('📋 DICA: Ajuste o mapeamento PT/EN para salvar todos os campos.');
           } catch (basicError) {
             console.error('❌ Erro mesmo com schema básico:', basicError);

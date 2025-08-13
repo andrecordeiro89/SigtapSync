@@ -1846,7 +1846,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               </div>
                                               <div className="space-y-1">
                                                 <div className="font-semibold text-base text-slate-900">
-                                                  {patient.patient_info.name}
+                                                  {(/procedimento/i.test(patient.patient_info.name) || /\b\d{2}\.\d{2}\.\d{2}\.\d{3}-\d\b/.test(patient.patient_info.name)) ? 'Nome não disponível' : patient.patient_info.name}
                                                 </div>
                                                 <div className="text-sm text-slate-600 font-medium">
                                                   CNS: {patient.patient_info.cns}
