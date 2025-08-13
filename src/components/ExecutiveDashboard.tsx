@@ -36,7 +36,7 @@ import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
 import MedicalProductionDashboard from './MedicalProductionDashboard';
 import MedicalStaffDashboard from './MedicalStaffDashboard';
 // import ReportGenerator from './ReportGenerator';
-import ExecutiveDateFilters from './ExecutiveDateFilters';
+// import ExecutiveDateFilters from './ExecutiveDateFilters';
 
 // ✅ FUNÇÃO OTIMIZADA PARA FORMATAR VALORES MONETÁRIOS
 const formatCurrency = (value: number | null | undefined): string => {
@@ -423,6 +423,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     // Não depende mais dos dados dos médicos ou da aba ativa
     // Valores fixos: 818 AIHs + soma calculated_total_value
   };
+
+	// Utilitário para formatar datas no input date
+	const formatDateForInput = (date: Date): string => {
+		return date.toISOString().split('T')[0];
+	};
   
 
 
@@ -736,41 +741,47 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
-      {/* CABEÇALHO */}
-      <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-purple-800 text-white p-6 rounded-xl shadow-lg">
-        <div className="flex items-center justify-between">
+      {/* CABEÇALHO (Premium) */}
+      <div className="relative overflow-hidden rounded-2xl shadow-2xl border border-white/10 bg-gradient-to-br from-blue-900 via-blue-800 to-purple-900 text-white p-6">
+        {/* Background decorativo */}
+        <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl"></div>
+        <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-purple-500/20 blur-3xl"></div>
+
+        <div className="relative flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-              <BarChart4 className="h-8 w-8" />
-              Dashboard Executivo
-            </h1>
-            <p className="text-blue-100">
-              Central de Inteligência e Relatórios para Diretoria
-            </p>
-            <div className="flex items-center gap-4 mt-3">
-              <Badge className="bg-blue-700 text-white">
+            <div className="flex items-center gap-3 mb-1.5">
+              <BarChart4 className="h-9 w-9 md:h-10 md:w-10 drop-shadow-sm" />
+              <h1 className="text-3xl md:text-4xl font-black tracking-tight">Dashboard Executivo</h1>
+            </div>
+            <p className="text-blue-100 text-sm md:text-base">Central de Análises e Relatórios</p>
+            <div className="flex items-center gap-3 mt-3">
+              <Badge className="bg-blue-700 text-white px-3 py-1 text-xs md:text-sm shadow-md">
                 <Award className="h-4 w-4 mr-1" />
                 {user?.role?.toUpperCase()}
               </Badge>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white/90 text-xs md:text-sm backdrop-blur-sm shadow-md">
+                <TrendingUp className="h-3 w-3" />
+                <span className="font-medium">Indicador Executivo</span>
+              </div>
             </div>
           </div>
           <div className="text-right">
             {/* ✅ DADOS DIRETOS DA TABELA AIHS */}
-            <div className="text-3xl font-bold">
+            <div className="text-sm text-blue-200 mb-1">Faturamento Total</div>
+            <div className="text-3xl md:text-4xl font-extrabold drop-shadow-sm">
               {isLoading ? '...' : formatCurrency(kpiData.totalRevenue)}
             </div>
-            <div className="text-blue-200 text-lg">Faturamento Total</div>
-            <div className="text-blue-300 text-sm mt-1">
-              {isLoading ? '...' : formatNumber(kpiData.totalAIHs)} AIHs Processadas
-            </div>
             {lastUpdate && (
-              <div className="text-xs text-blue-300 mt-2 flex items-center justify-end gap-1">
+              <div className="text-xs text-blue-200/90 mt-2 flex items-center justify-end gap-1">
                 <Clock className="h-3 w-3" />
                 Atualizado: {lastUpdate.toLocaleTimeString('pt-BR')}
               </div>
             )}
           </div>
         </div>
+
+        {/* Divisor sutil */}
+        <div className="relative mt-4 h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
       </div>
 
 
@@ -811,19 +822,6 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* FILTROS DE PERÍODO */}
-            <div className="pb-3 border-b border-gray-100">
-              <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">Período de Análise</label>
-              <ExecutiveDateFilters
-                onDateRangeChange={handleDateRangeChange}
-                onRefresh={() => loadExecutiveData(selectedDateRange)}
-                isLoading={isLoading}
-                compact={true}
-                title=""
-                subtitle=""
-              />
-            </div>
-            
             {/* FILTROS COMPACTOS EM LINHA */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
               {/* BUSCA RÁPIDA */}
@@ -959,6 +957,39 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </button>
               </div>
             </div>
+
+				{/* DATEPICKERS DO PERÍODO (posicionados logo abaixo dos filtros compactos) */}
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-gray-100">
+					<div>
+						<label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data Inicial</label>
+						<Input
+							type="date"
+							value={formatDateForInput(selectedDateRange.startDate)}
+							onChange={(e) => {
+								const newStart = new Date(e.target.value);
+								const updated = { startDate: newStart, endDate: selectedDateRange.endDate };
+								setSelectedDateRange(updated);
+								handleDateRangeChange(updated);
+							}}
+							className="h-9"
+						/>
+					</div>
+					<div>
+						<label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data Final</label>
+						<Input
+							type="date"
+							value={formatDateForInput(selectedDateRange.endDate)}
+							max={formatDateForInput(new Date())}
+							onChange={(e) => {
+								const newEnd = new Date(e.target.value);
+								const updated = { startDate: selectedDateRange.startDate, endDate: newEnd };
+								setSelectedDateRange(updated);
+								handleDateRangeChange(updated);
+							}}
+							className="h-9"
+						/>
+					</div>
+				</div>
 
             {/* INDICADORES DE FILTROS ATIVOS */}
             {(searchTerm || selectedCareCharacter !== 'all' || !selectedHospitals.includes('all')) && (
