@@ -471,6 +471,17 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     }
   }, [hospitalStats]);
 
+  // Nome completo do hospital selecionado para exibição no cabeçalho
+  const currentHospitalFullName = React.useMemo(() => {
+    try {
+      if (!activeHospitalTab) return null;
+      const h = hospitalStats.find((hs) => hs.id === activeHospitalTab);
+      return h?.name || null;
+    } catch {
+      return null;
+    }
+  }, [activeHospitalTab, hospitalStats]);
+
   // Sincronizar aba de hospitais com lista de hospitais carregados
   useEffect(() => {
     try {
@@ -863,6 +874,12 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             <div className="text-3xl md:text-4xl font-extrabold drop-shadow-sm">
               {isLoading ? '...' : formatCurrency(kpiData.totalRevenue)}
             </div>
+            {currentHospitalFullName && (
+              <div className="text-xs md:text-sm text-blue-100 mt-1 font-medium flex items-center justify-end gap-1">
+                <Hospital className="h-3 w-3" />
+                {currentHospitalFullName}
+              </div>
+            )}
             {lastUpdate && (
               <div className="text-xs text-blue-200/90 mt-2 flex items-center justify-end gap-1">
                 <Clock className="h-3 w-3" />
