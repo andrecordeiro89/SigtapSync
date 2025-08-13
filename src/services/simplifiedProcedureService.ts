@@ -67,7 +67,7 @@ export class ProcedureRecordsService {
    * 🔍 BUSCAR PROCEDIMENTOS POR PATIENT_ID 
    * (100% baseado na tabela procedure_records)
    */
-  static async getProceduresByPatientId(patientId: string): Promise<{
+  static async getProceduresByPatientId(patientId: string, options?: { auditMode?: boolean }): Promise<{
     success: boolean;
     procedures: ProcedureRecord[];
     error?: string;
@@ -75,7 +75,7 @@ export class ProcedureRecordsService {
     try {
       console.log('🔍 [PROCEDURE_RECORDS] Buscando procedimentos para patient_id:', patientId);
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('procedure_records')
         .select(`
           id,
@@ -111,18 +111,19 @@ export class ProcedureRecordsService {
           notes
         `)
         .eq('patient_id', patientId)
-        // Filtro de anestesista (ativo):
-        // Mantém:
-        // - Registros que não são anestesistas (professional_cbo != '225151' ou null)
-        // - Anestesista com procedimentos 03.%
-        // - Anestesista com cesariana 04.17.01.001-0
-        .or(
+        .order('procedure_date', { ascending: false });
+
+      // Quando NÃO estiver em modo auditoria, manter filtro de anestesistas para evitar duplicidades
+      if (!options?.auditMode) {
+        query = query.or(
           'professional_cbo.is.null,' +
           'professional_cbo.neq.225151,' +
           'and(professional_cbo.eq.225151,procedure_code.like.03%),' +
           'and(professional_cbo.eq.225151,procedure_code.eq."04.17.01.001-0")'
-        )
-        .order('procedure_date', { ascending: false });
+        );
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('❌ [PROCEDURE_RECORDS] Erro ao buscar procedimentos:', error);
@@ -150,7 +151,7 @@ export class ProcedureRecordsService {
   /**
    * 🔍 BUSCAR PROCEDIMENTOS POR MÚLTIPLOS PATIENT_IDs
    */
-  static async getProceduresByPatientIds(patientIds: string[]): Promise<{
+  static async getProceduresByPatientIds(patientIds: string[], options?: { auditMode?: boolean }): Promise<{
     success: boolean;
     procedures: ProcedureRecord[];
     proceduresByPatientId: Map<string, ProcedureRecord[]>;
@@ -160,7 +161,7 @@ export class ProcedureRecordsService {
       console.log(`🔍 [PROCEDURE_RECORDS] Buscando procedimentos para ${patientIds.length} pacientes`);
       console.log('🔍 [PROCEDURE_RECORDS] Patient IDs (primeiros 3):', patientIds.slice(0, 3));
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('procedure_records')
         .select(`
           id,
@@ -196,14 +197,18 @@ export class ProcedureRecordsService {
           notes
         `)
         .in('patient_id', patientIds)
-        // Filtro de anestesista (ativo)
-        .or(
+        .order('procedure_date', { ascending: false });
+
+      if (!options?.auditMode) {
+        query = query.or(
           'professional_cbo.is.null,' +
           'professional_cbo.neq.225151,' +
           'and(professional_cbo.eq.225151,procedure_code.like.03%),' +
           'and(professional_cbo.eq.225151,procedure_code.eq."04.17.01.001-0")'
-        )
-        .order('procedure_date', { ascending: false });
+        );
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('❌ [PROCEDURE_RECORDS] Erro ao buscar procedimentos múltiplos:', error);
@@ -252,7 +257,7 @@ export class ProcedureRecordsService {
   /**
    * 🔍 BUSCAR PROCEDIMENTOS POR AIH_ID (fallback caso patient_id não esteja preenchido)
    */
-  static async getProceduresByAihIds(aihIds: string[]): Promise<{
+  static async getProceduresByAihIds(aihIds: string[], options?: { auditMode?: boolean }): Promise<{
     success: boolean;
     proceduresByAihId: Map<string, ProcedureRecord[]>;
     error?: string;
@@ -261,7 +266,7 @@ export class ProcedureRecordsService {
       if (!aihIds || aihIds.length === 0) {
         return { success: true, proceduresByAihId: new Map() };
       }
-      const { data, error } = await supabase
+      let query = supabase
         .from('procedure_records')
         .select(`
           id,
@@ -282,14 +287,18 @@ export class ProcedureRecordsService {
           professional_cbo
         `)
         .in('aih_id', aihIds)
-        // Filtro de anestesista (ativo)
-        .or(
+        .order('procedure_date', { ascending: false });
+
+      if (!options?.auditMode) {
+        query = query.or(
           'professional_cbo.is.null,' +
           'professional_cbo.neq.225151,' +
           'and(professional_cbo.eq.225151,procedure_code.like.03%),' +
           'and(professional_cbo.eq.225151,procedure_code.eq."04.17.01.001-0")'
-        )
-        .order('procedure_date', { ascending: false });
+        );
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         return { success: false, proceduresByAihId: new Map(), error: error.message };

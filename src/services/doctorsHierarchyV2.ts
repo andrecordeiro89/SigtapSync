@@ -73,9 +73,10 @@ export class DoctorsHierarchyV2Service {
     // 3) Pré-carregar procedimentos por paciente e fallback por AIH
     const patientIds = Array.from(new Set((aihs as any[]).map(a => a.patient_id).filter(Boolean)));
     const aihIds = Array.from(new Set((aihs as any[]).map(a => a.id).filter(Boolean)));
+    // Auditoria: carregar procedimentos SEM filtros de anestesista
     const [procsByPatientRes, procsByAihRes] = await Promise.all([
-      ProcedureRecordsService.getProceduresByPatientIds(patientIds),
-      ProcedureRecordsService.getProceduresByAihIds(aihIds)
+      ProcedureRecordsService.getProceduresByPatientIds(patientIds, { auditMode: true }),
+      ProcedureRecordsService.getProceduresByAihIds(aihIds, { auditMode: true })
     ]);
     const procsByPatient = procsByPatientRes.success ? procsByPatientRes.proceduresByPatientId : new Map<string, any[]>();
     const procsByAih = procsByAihRes.success ? procsByAihRes.proceduresByAihId : new Map<string, any[]>();
@@ -144,24 +145,31 @@ export class DoctorsHierarchyV2Service {
         procs = procsByAih.get(aih.id) || [];
       }
       if (Array.isArray(procs) && procs.length > 0) {
-        const mapped: ProcedureDetail[] = procs.map((p: any) => ({
-          procedure_id: p.id,
-          procedure_code: p.procedure_code,
-          procedure_description: p.procedure_description || p.procedure_name || 'Descrição não disponível',
-          procedure_date: p.procedure_date,
-          value_reais: typeof p.total_value === 'number' ? p.total_value / 100 : 0,
-          value_cents: typeof p.total_value === 'number' ? p.total_value : 0,
-          approved: p.billing_status === 'approved' || p.match_status === 'approved' || p.billing_status === 'paid',
-          approval_status: p.billing_status || p.match_status,
-          sequence: p.sequencia,
-          aih_id: p.aih_id,
-          match_confidence: p.match_confidence || 0,
-          sigtap_description: p.procedure_description,
-          complexity: p.complexity,
-          professional_name: p.professional_name,
-          cbo: p.professional_cbo,
-          participation: 'Responsável'
-        }));
+        const mapped: ProcedureDetail[] = procs.map((p: any) => {
+          const code = p.procedure_code || '';
+          const cbo = p.professional_cbo || '';
+          const isAnesthetist04 = cbo === '225151' && typeof code === 'string' && code.startsWith('04') && code !== '04.17.01.001-0';
+          const rawCents = typeof p.total_value === 'number' ? p.total_value : 0;
+          const value_cents = isAnesthetist04 ? 0 : rawCents;
+          return {
+            procedure_id: p.id,
+            procedure_code: code,
+            procedure_description: p.procedure_description || p.procedure_name || 'Descrição não disponível',
+            procedure_date: p.procedure_date,
+            value_reais: value_cents / 100,
+            value_cents,
+            approved: p.billing_status === 'approved' || p.match_status === 'approved' || p.billing_status === 'paid',
+            approval_status: p.billing_status || p.match_status,
+            sequence: p.sequencia,
+            aih_id: p.aih_id,
+            match_confidence: p.match_confidence || 0,
+            sigtap_description: p.procedure_description,
+            complexity: p.complexity,
+            professional_name: p.professional_name,
+            cbo,
+            participation: isAnesthetist04 ? 'Anestesia (qtd)' : 'Responsável',
+          } as ProcedureDetail & { is_anesthetist_04?: boolean; quantity?: number };
+        });
         patient.procedures = mapped.sort((a: any, b: any) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime());
         patient.total_procedures = patient.procedures.length;
         patient.approved_procedures = patient.procedures.filter(pp => pp.approved).length;
