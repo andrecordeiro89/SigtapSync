@@ -46,8 +46,7 @@ export class DoctorsHierarchyV2Service {
       aihsQuery = aihsQuery.lte('admission_date', end.toISOString());
     }
 
-    // SUS: somente care_character 1 (Eletivo) e 2 (Urgência/Emergência)
-    aihsQuery = aihsQuery.in('care_character', [1, 2]);
+    // Auditoria: incluir TODOS os caracteres de atendimento (sem filtro)
 
     const { data: aihs, error: aihsError } = await aihsQuery.order('admission_date', { ascending: false });
     if (aihsError) {
@@ -128,7 +127,7 @@ export class DoctorsHierarchyV2Service {
             admission_date: aih.admission_date,
             discharge_date: aih.discharge_date,
             aih_number: aih.aih_number,
-            care_character: [1, '1'].includes(aih.care_character) ? 1 : [2, '2'].includes(aih.care_character) ? 2 : null,
+            care_character: aih.care_character, // manter valor original para auditoria
             hospital_id: aih.hospital_id
           },
           total_value_reais: (aih.calculated_total_value || 0) / 100,

@@ -1065,44 +1065,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       console.log('🏥 Aplicando filtros globais de hospital na aba Médicos:', selectedHospitals);
     }
     
-    // 🆕 FILTRAR POR PERÍODO (DateRange)
-    if (dateRange) {
-      const startDate = dateRange.startDate;
-      const endDate = new Date(dateRange.endDate);
-      endDate.setHours(23, 59, 59, 999); // Incluir todo o último dia
-      
-      filtered = filtered.map(doctor => ({
-        ...doctor,
-        patients: doctor.patients.filter(patient => {
-          if (!patient.aih_info) return true; // Manter pacientes sem info de AIH
-          
-          const admissionDate = patient.aih_info.admission_date ? new Date(patient.aih_info.admission_date) : null;
-          
-          // Filtrar pela data de admissão dentro do período
-          if (admissionDate) {
-            return admissionDate >= startDate && admissionDate <= endDate;
-          }
-          
-          return true; // Manter se não tem data de admissão
-        })
-      }));
-      // Remover médicos sem pacientes quando filtro de data está ativo
-      filtered = filtered.filter(d => d.patients.length > 0);
-    }
+    // Auditoria: NÃO remover pacientes por período; manter todos os pacientes associados ao médico
     
-    // 🆕 FILTRAR POR CARÁTER DE ATENDIMENTO
-    if (selectedCareCharacter !== 'all') {
-      filtered = filtered.map(doctor => ({
-        ...doctor,
-        patients: doctor.patients.filter(patient => {
-          if (!patient.aih_info || !patient.aih_info.care_character) return false;
-          const cc = typeof patient.aih_info.care_character === 'string' ? patient.aih_info.care_character.trim() : patient.aih_info.care_character;
-          return cc?.toString() === selectedCareCharacter;
-        })
-      }));
-      // Remover médicos sem pacientes quando filtro de caráter está ativo
-      filtered = filtered.filter(d => d.patients.length > 0);
-    }
+    // Auditoria: NÃO filtrar pacientes por caráter de atendimento; manter todos
     
     // Filtrar por termo de busca
     if (searchTerm.trim()) {
