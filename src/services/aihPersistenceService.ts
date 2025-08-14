@@ -1430,6 +1430,38 @@ export class AIHPersistenceService {
         patientsCountQuery
       ]);
 
+      // Calcular número de hospitais com AIHs processadas (modo admin)
+      let processedHospitalsCount: number | undefined = undefined;
+      if (isAdminMode) {
+        try {
+          const { data: hospitalAgg } = await supabase
+            .from('v_aih_stats_by_hospital')
+            .select('hospital_id, total_aihs');
+          processedHospitalsCount = (hospitalAgg || []).filter((h: any) => (h.total_aihs || 0) > 0).length;
+          // Fallback: se view estiver vazia/indisponível, contar DISTINCT hospital_id diretamente na tabela aihs
+          if (!processedHospitalsCount || processedHospitalsCount === 0) {
+            const { data: distinctHospitals } = await supabase
+              .from('aihs')
+              .select('distinct hospital_id')
+              .not('hospital_id', 'is', null);
+            processedHospitalsCount = distinctHospitals ? distinctHospitals.length : 0;
+          }
+        } catch (e) {
+          console.warn('⚠️ Falha ao obter hospitais processados pela view v_aih_stats_by_hospital:', e);
+          // Fallback direto em caso de erro
+          try {
+            const { data: distinctHospitals } = await supabase
+              .from('aihs')
+              .select('distinct hospital_id')
+              .not('hospital_id', 'is', null);
+            processedHospitalsCount = distinctHospitals ? distinctHospitals.length : 0;
+          } catch (e2) {
+            console.warn('⚠️ Falha no fallback em aihs para contar hospitais distintos:', e2);
+            processedHospitalsCount = 0;
+          }
+        }
+      }
+
       // Nota: total_value/average_value não são usados no Dashboard. Mantemos 0 por enquanto.
       const stats = {
         total_aihs: totalAIHs || 0,
@@ -1438,7 +1470,7 @@ export class AIHPersistenceService {
         total_patients: patientsCount || 0,
         total_value: 0,
         average_value: 0,
-        hospitals_count: isAdminMode ? undefined : 1,
+        hospitals_count: isAdminMode ? (processedHospitalsCount ?? 0) : 1,
         is_admin_mode: isAdminMode
       };
 

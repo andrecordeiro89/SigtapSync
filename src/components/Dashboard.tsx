@@ -148,6 +148,21 @@ const Dashboard = () => {
 
         setRecentActivity(processedActivity);
         setRecentAuditLogs(processedActivity);
+
+        // 🔎 Diagnóstico: contagem de hospitais únicos na coluna "Hospital" da Atividade Recente
+        try {
+          const uniqueHospitalNames = new Set(
+            processedActivity.map((a: any) => a.hospital_name).filter(Boolean)
+          );
+          const uniqueHospitalIds = new Set(
+            (recentAIHs || []).map((aih: any) => aih.hospital_id).filter(Boolean)
+          );
+          console.log(
+            `🏥 Hospitais únicos na Atividade Recente — por nome: ${uniqueHospitalNames.size}, por ID: ${uniqueHospitalIds.size}`
+          );
+        } catch (diagErr) {
+          console.warn('⚠️ Falha ao calcular hospitais únicos na Atividade Recente:', diagErr);
+        }
         console.log(`✅ Dados ${isAdminMode ? 'de TODOS os hospitais' : 'do hospital específico'} carregados:`, realStats);
 
       } catch (error) {
@@ -335,12 +350,7 @@ const Dashboard = () => {
                 <div className="flex-1">
                   <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total de AIHs</p>
                   <p className="text-2xl font-bold text-gray-900">{loading ? '...' : stats.totalAIHs}</p>
-                  <p className="text-xs text-blue-600 mt-1">
-                    {stats.is_admin_mode 
-                      ? `Em ${stats.hospitals_count || 8} hospitais` 
-                      : (stats.totalAIHs > 0 ? 'Registradas no sistema' : 'Nenhuma AIH registrada')
-                    }
-                  </p>
+                  {/* Indicador de hospitais removido a pedido: manter apenas o total de AIHs */}
                 </div>
               </div>
             </CardContent>
