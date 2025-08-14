@@ -1673,6 +1673,43 @@ export class AIHPersistenceService {
       }
     }
 
+    // 🎯 Resolver médico: tentar vincular a doctors e usar nome real
+    let resolvedProfessionalName: string | undefined = data.professional_name;
+    let resolvedDoctorId: string | null = null;
+    try {
+      const cnsRaw = (data.professional_document || data.professional_cns || '').toString().trim();
+      const crmRaw = (data.professional_code || '').toString().trim();
+      if (cnsRaw) {
+        const { data: docByCNS } = await supabase
+          .from('doctors')
+          .select('id, name')
+          .eq('cns', cnsRaw)
+          .single();
+        if (docByCNS?.id) {
+          resolvedDoctorId = docByCNS.id;
+          resolvedProfessionalName = docByCNS.name || resolvedProfessionalName;
+        }
+      }
+      if (!resolvedDoctorId && crmRaw) {
+        const { data: docByCRM } = await supabase
+          .from('doctors')
+          .select('id, name')
+          .eq('crm', crmRaw)
+          .single();
+        if (docByCRM?.id) {
+          resolvedDoctorId = docByCRM.id;
+          resolvedProfessionalName = docByCRM.name || resolvedProfessionalName;
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Falha ao resolver médico por CNS/CRM, seguindo com fallback:', e);
+    }
+
+    // Fallback: usar requesting_physician da AIH se disponível via data.aih_requesting_physician
+    if (!resolvedProfessionalName && data.aih_requesting_physician) {
+      resolvedProfessionalName = data.aih_requesting_physician;
+    }
+
     // 🎯 MAPEAMENTO ROBUSTO - Usando nomes EXATOS do schema do usuário
     const basicRecord: any = {
       id: crypto.randomUUID(),
@@ -1686,7 +1723,7 @@ export class AIHPersistenceService {
       procedure_date: data.procedure_date ? convertBrazilianDateToISO(data.procedure_date) : new Date().toISOString().split('T')[0],  // Nome correto!
       
       // Profissional responsável  
-      professional_name: data.professional_name || 'PROFISSIONAL NÃO INFORMADO',
+      professional_name: resolvedProfessionalName || 'PROFISSIONAL NÃO INFORMADO',
       professional_cbo: data.cbo || 'N/A',
       professional_cns: data.professional_document || 'N/A',
       
@@ -1728,6 +1765,10 @@ export class AIHPersistenceService {
     // Adicionar procedure_id apenas se encontrado
     if (procedureId) {
       basicRecord.procedure_id = procedureId;
+    }
+    // Adicionar doctor_id se resolvido
+    if (resolvedDoctorId) {
+      basicRecord.doctor_id = resolvedDoctorId;
     }
 
     // 🆕 CAMPOS EXPANDIDOS - Usando nomes EXATOS do schema

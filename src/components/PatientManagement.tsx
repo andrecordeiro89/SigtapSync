@@ -940,6 +940,12 @@ const PatientManagement = () => {
                                 <span className="text-gray-500">Gênero:</span>
                                 <p className="font-medium text-gray-900">{(item.patient || item.patients).gender === 'M' ? 'Masculino' : 'Feminino'}</p>
                               </div>
+                              {(item.requesting_physician || (proceduresData[item.id]?.[0]?.professional_name)) && (
+                                <div className="col-span-2">
+                                  <span className="text-gray-500">Médico:</span>
+                                  <p className="font-medium text-gray-900">{item.requesting_physician || proceduresData[item.id]?.[0]?.professional_name}</p>
+                                </div>
+                              )}
                               {(item.patient || item.patients).medical_record && (
                                 <div className="col-span-2">
                                   <span className="text-gray-500">Prontuário:</span>
