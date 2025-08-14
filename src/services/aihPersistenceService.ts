@@ -1357,6 +1357,43 @@ export class AIHPersistenceService {
   }
 
   /**
+   * Conta AIHs de um hospital (ou de todos, se admin) com filtros – usa count exato sem limite de 1000
+   */
+  async countAIHs(hospitalId: string, filters?: {
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }): Promise<number> {
+    try {
+      const isAdminMode = !hospitalId || hospitalId === 'ALL' || hospitalId === 'undefined';
+      let query = supabase
+        .from('aihs')
+        .select('id', { count: 'exact', head: true });
+
+      if (!isAdminMode) {
+        query = query.eq('hospital_id', hospitalId);
+      }
+
+      if (filters?.status) {
+        query = query.eq('processing_status', filters.status);
+      }
+      if (filters?.dateFrom) {
+        query = query.gte('admission_date', filters.dateFrom);
+      }
+      if (filters?.dateTo) {
+        query = query.lte('admission_date', filters.dateTo);
+      }
+
+      const { count, error } = await query;
+      if (error) throw error;
+      return count || 0;
+    } catch (error) {
+      console.error('❌ Erro ao contar AIHs:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Busca estatísticas do hospital (ou de todos os hospitais se for admin)
    */
   async getHospitalStats(hospitalId: string) {
@@ -1364,38 +1401,44 @@ export class AIHPersistenceService {
       // ✅ MODO ADMINISTRADOR: Se hospitalId for "ALL", undefined ou inválido, agregar todos os hospitais
       const isAdminMode = !hospitalId || hospitalId === 'ALL' || hospitalId === 'undefined';
       
-      let aihQuery = supabase
-        .from('aihs')
-        .select('processing_status, calculated_total_value, hospital_id');
-      
-      let patientsQuery = supabase
-        .from('patients')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true);
+      // Base queries (aplicando filtro por hospital quando necessário)
+      const baseAIHFilter = (q: any) => isAdminMode ? q : q.eq('hospital_id', hospitalId);
 
-      if (!isAdminMode) {
-        // Modo usuário normal: filtrar por hospital específico
-        aihQuery = aihQuery.eq('hospital_id', hospitalId);
-        patientsQuery = patientsQuery.eq('hospital_id', hospitalId);
-      }
+      // ✅ Contagens robustas sem limite de 1000 (usa count exato com head=true)
+      const totalCountQuery = baseAIHFilter(
+        supabase.from('aihs').select('id', { count: 'exact', head: true })
+      );
+      const pendingCountQuery = baseAIHFilter(
+        supabase.from('aihs').select('id', { count: 'exact', head: true }).eq('processing_status', 'pending')
+      );
+      const completedCountQuery = baseAIHFilter(
+        supabase.from('aihs').select('id', { count: 'exact', head: true }).eq('processing_status', 'completed')
+      );
+      const patientsCountQuery = baseAIHFilter(
+        supabase.from('patients').select('id', { count: 'exact', head: true }).eq('is_active', true)
+      );
 
-      // Buscar estatísticas de AIHs
-      const { data: aihStats } = await aihQuery;
+      const [
+        { count: totalAIHs },
+        { count: pendingAIHs },
+        { count: completedAIHs },
+        { count: patientsCount }
+      ] = await Promise.all([
+        totalCountQuery,
+        pendingCountQuery,
+        completedCountQuery,
+        patientsCountQuery
+      ]);
 
-      // Buscar contagem de pacientes
-      const { count: patientsCount } = await patientsQuery;
-
-      // Calcular estatísticas
+      // Nota: total_value/average_value não são usados no Dashboard. Mantemos 0 por enquanto.
       const stats = {
-        total_aihs: aihStats?.length || 0,
-        pending_aihs: aihStats?.filter(a => a.processing_status === 'pending').length || 0,
-        completed_aihs: aihStats?.filter(a => a.processing_status === 'completed').length || 0,
+        total_aihs: totalAIHs || 0,
+        pending_aihs: pendingAIHs || 0,
+        completed_aihs: completedAIHs || 0,
         total_patients: patientsCount || 0,
-        total_value: aihStats?.reduce((sum, aih) => sum + (aih.calculated_total_value || 0), 0) || 0,
-        average_value: aihStats?.length ? 
-          (aihStats.reduce((sum, aih) => sum + (aih.calculated_total_value || 0), 0) / aihStats.length) : 0,
-        // ✅ ADICIONAR: Estatísticas por hospital (só para admins)
-        hospitals_count: isAdminMode ? new Set(aihStats?.map(a => a.hospital_id)).size : 1,
+        total_value: 0,
+        average_value: 0,
+        hospitals_count: isAdminMode ? undefined : 1,
         is_admin_mode: isAdminMode
       };
 

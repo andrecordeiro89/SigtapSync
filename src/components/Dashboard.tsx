@@ -84,7 +84,7 @@ const Dashboard = () => {
         console.log('🔄 Carregando dados do dashboard...');
 
         // ✅ MODO ADMINISTRADOR: Detectar se usuário tem acesso total
-        const isAdminMode = canAccessAllHospitals || user.full_access || user.hospital_id === 'ALL';
+        const isAdminMode = canAccessAllHospitals() || user.full_access || user.hospital_id === 'ALL';
         const hospitalId = isAdminMode ? 'ALL' : user.hospital_id;
         
         console.log(`🔐 Modo de acesso: ${isAdminMode ? 'ADMINISTRADOR (todos os hospitais)' : `USUÁRIO (hospital: ${hospitalId})`}`);
@@ -98,10 +98,10 @@ const Dashboard = () => {
         // Calcular AIHs processadas hoje (filtrar por data de criação no sistema)
         const today = new Date().toISOString().split('T')[0];
         
-        // Buscar AIHs criadas hoje no sistema usando query direta
+        // Buscar contagem de AIHs criadas hoje no sistema (usa count exato para evitar limite de linhas)
         let todayQuery = supabase
           .from('aihs')
-          .select('id')
+          .select('id', { count: 'exact', head: true })
           .gte('created_at', `${today}T00:00:00`)
           .lt('created_at', `${today}T23:59:59`);
           
@@ -110,12 +110,12 @@ const Dashboard = () => {
           todayQuery = todayQuery.eq('hospital_id', hospitalId);
         }
         
-        const { data: todayAIHs, error: todayError } = await todayQuery;
+        const { count: todayCount, error: todayError } = await todayQuery;
         
         if (todayError) {
           console.error('Erro ao buscar AIHs de hoje:', todayError);
         } else {
-          console.log(`📊 AIHs processadas hoje (${today}):`, (todayAIHs || []).length);
+          console.log(`📊 AIHs processadas hoje (${today}):`, todayCount || 0);
         }
 
         // Buscar atividades recentes (AIHs criadas recentemente)
@@ -126,7 +126,7 @@ const Dashboard = () => {
         // Processar dados para os cards
         setStats({
           totalAIHs: realStats.total_aihs,
-          processedToday: (todayAIHs || []).length,
+          processedToday: todayCount || 0,
           hospitals_count: realStats.hospitals_count,
           is_admin_mode: realStats.is_admin_mode
         });

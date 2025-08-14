@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity, CreditCard, Stethoscope } from 'lucide-react';
+import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity, CreditCard, Stethoscope, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
 
@@ -111,6 +111,7 @@ const PatientManagement = () => {
   // Estados principais
   const [patients, setPatients] = useState<Patient[]>([]);
   const [aihs, setAIHs] = useState<AIH[]>([]);
+  const [totalAIHsCount, setTotalAIHsCount] = useState<number>(0);
   const [stats, setStats] = useState<HospitalStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -178,9 +179,10 @@ const PatientManagement = () => {
     }
   }, [currentHospitalId]);
 
-  // Resetar página quando filtros mudarem
+  // Resetar página quando filtros mudarem + atualizar contagem
   useEffect(() => {
     setCurrentPage(0);
+    loadAIHsCount();
   }, [globalSearch, startDate, endDate]);
 
   const loadAllData = async () => {
@@ -228,6 +230,25 @@ const PatientManagement = () => {
         description: "Falha ao carregar lista de AIHs",
         variant: "destructive"
       });
+    }
+  };
+
+  // Contagem exata de AIHs (sem limite de 1000)
+  const loadAIHsCount = async () => {
+    try {
+      let dateFromISO: string | undefined = undefined;
+      let dateToISO: string | undefined = undefined;
+      if (startDate) dateFromISO = `${startDate}T00:00:00`;
+      if (endDate) dateToISO = `${endDate}T23:59:59.999`;
+
+      const count = await persistenceService.countAIHs(currentHospitalId || 'ALL', {
+        dateFrom: dateFromISO,
+        dateTo: dateToISO
+      });
+      setTotalAIHsCount(count);
+      console.log('🧮 Contagem exata de AIHs (back-end):', count);
+    } catch (error) {
+      console.error('❌ Erro ao contar AIHs:', error);
     }
   };
 
@@ -740,10 +761,6 @@ const PatientManagement = () => {
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Limpar
               </Button>
-              
-              <Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 border-blue-300 px-3 py-1.5 font-medium">
-                {filteredData.length} AIH{filteredData.length !== 1 ? 's' : ''} encontrada{filteredData.length !== 1 ? 's' : ''}
-              </Badge>
             </div>
           </div>
         </CardContent>
@@ -754,7 +771,7 @@ const PatientManagement = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <FileText className="w-5 h-5" />
-            <span>AIHs Processadas ({filteredData.length})</span>
+            <span>AIHs Processadas ({totalAIHsCount})</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -827,25 +844,24 @@ const PatientManagement = () => {
                                 <span className="truncate">{item.specialty}</span>
                               </div>
                             )}
+                            {item.hospitals?.name && (
+                              <div className="flex items-center space-x-1">
+                                <Building2 className="w-3 h-3" />
+                                <span className="truncate">{item.hospitals?.name}</span>
+                              </div>
+                            )}
+                            {item.requesting_physician && (
+                              <div className="flex items-center space-x-1">
+                                <User className="w-3 h-3" />
+                                <span className="truncate">{item.requesting_physician}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
 
                       {/* Lado Direito: Badges Organizados */}
                       <div className="flex items-center space-x-3">
-                        {/* Badge do Valor Faturável */}
-                        {(aihTotalValues[item.id] !== undefined || item.calculated_total_value) && (
-                          <Badge variant="outline" className="bg-gradient-to-r from-green-500 to-emerald-600 text-white border-green-400 hover:from-green-600 hover:to-emerald-700 px-3 py-1 shadow-sm">
-                            <DollarSign className="w-3 h-3 mr-1" />
-                            <span className="font-semibold">
-                              {formatCurrency(aihTotalValues[item.id] !== undefined ? aihTotalValues[item.id] : item.calculated_total_value)}
-                            </span>
-                            {aihTotalValues[item.id] !== undefined && (
-                              <span className="ml-1 text-xs opacity-90">●</span>
-                            )}
-                          </Badge>
-                        )}
-
                         {/* Badge do Operador */}
                         <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100">
                           <User className="w-3 h-3 mr-1" />
@@ -899,7 +915,7 @@ const PatientManagement = () => {
                       {/* Grid Compacto de Informações */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                         {/* Informações do Paciente */}
-                        {item.patient && (
+                        {(item.patient || item.patients) && (
                           <div className="bg-white rounded-lg border border-blue-200 p-3">
                             <div className="flex items-center space-x-2 mb-2">
                               <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -910,24 +926,24 @@ const PatientManagement = () => {
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                               <div>
                                 <span className="text-gray-500">Nome:</span>
-                                <p className="font-medium text-gray-900 truncate">{item.patient.name}</p>
+                                <p className="font-medium text-gray-900 truncate">{(item.patient || item.patients).name}</p>
                               </div>
                               <div>
                                 <span className="text-gray-500">CNS:</span>
-                                <p className="font-medium text-gray-900">{item.patient.cns}</p>
+                                <p className="font-medium text-gray-900">{(item.patient || item.patients).cns}</p>
                               </div>
                               <div>
                                 <span className="text-gray-500">Nascimento:</span>
-                                <p className="font-medium text-gray-900">{formatDate(item.patient.birth_date)}</p>
+                                <p className="font-medium text-gray-900">{(item.patient || item.patients).birth_date ? formatDate((item.patient || item.patients).birth_date) : 'N/A'}</p>
                               </div>
                               <div>
                                 <span className="text-gray-500">Gênero:</span>
-                                <p className="font-medium text-gray-900">{item.patient.gender === 'M' ? 'Masculino' : 'Feminino'}</p>
+                                <p className="font-medium text-gray-900">{(item.patient || item.patients).gender === 'M' ? 'Masculino' : 'Feminino'}</p>
                               </div>
-                              {item.patient.medical_record && (
+                              {(item.patient || item.patients).medical_record && (
                                 <div className="col-span-2">
                                   <span className="text-gray-500">Prontuário:</span>
-                                  <p className="font-medium text-gray-900">{item.patient.medical_record}</p>
+                                  <p className="font-medium text-gray-900">{(item.patient || item.patients).medical_record}</p>
                                 </div>
                               )}
                             </div>
@@ -975,6 +991,30 @@ const PatientManagement = () => {
                               <div className="col-span-2">
                                 <span className="text-gray-500">Especialidade:</span>
                                 <p className="font-medium text-gray-900">{item.specialty}</p>
+                              </div>
+                            )}
+                            {item.hospitals?.name && (
+                              <div className="col-span-2">
+                                <span className="text-gray-500">Hospital:</span>
+                                <p className="font-medium text-gray-900">{item.hospitals?.name}</p>
+                              </div>
+                            )}
+                            {item.requesting_physician && (
+                              <div className="col-span-2">
+                                <span className="text-gray-500">Médico Solicitante:</span>
+                                <p className="font-medium text-gray-900">{item.requesting_physician}</p>
+                              </div>
+                            )}
+                            {item.professional_cbo && (
+                              <div>
+                                <span className="text-gray-500">CBO:</span>
+                                <p className="font-medium text-gray-900">{item.professional_cbo}</p>
+                              </div>
+                            )}
+                            {item.care_modality && (
+                              <div>
+                                <span className="text-gray-500">Modalidade:</span>
+                                <p className="font-medium text-gray-900">{item.care_modality}</p>
                               </div>
                             )}
                           </div>
