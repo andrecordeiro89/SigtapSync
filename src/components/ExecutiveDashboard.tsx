@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Switch } from './ui/switch';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 import {
@@ -23,7 +24,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  Search
+  Search,
+  Building2
 } from 'lucide-react';
 
 // Services
@@ -272,6 +274,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [activeHospitalTab, setActiveHospitalTab] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [showAllHospitalsRevenue, setShowAllHospitalsRevenue] = useState(false);
+  const [allHospitalsKPIs, setAllHospitalsKPIs] = useState<KPIData | null>(null);
   // const [showReportGenerator, setShowReportGenerator] = useState(false);
   
   // Data States
@@ -482,23 +486,40 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     }
   }, [activeHospitalTab, hospitalStats]);
 
-  // Sincronizar aba de hospitais com lista de hospitais carregados
+  // Sincronizar aba de hospitais com lista de hospitais carregados (usa a mesma ordem das abas exibidas)
   useEffect(() => {
     try {
-      if (hospitalStats && hospitalStats.length > 0) {
-        // Se a aba atual não é válida, selecionar o primeiro hospital
+      if (sortedHospitalStats && sortedHospitalStats.length > 0) {
+        // Debug: Log da ordenação dos hospitais
+        console.log('🏥 Hospitais ordenados:', sortedHospitalStats.map(h => ({ 
+          id: h.id, 
+          name: h.name, 
+          label: getHospitalTabLabel(h.name) 
+        })));
+        
+        // Se a aba atual não é válida, selecionar o primeiro da ordenação visual (ex.: APU)
         const exists = activeHospitalTab && hospitalStats.some(h => h.id === activeHospitalTab);
         if (!exists) {
-          const firstHospitalId = hospitalStats[0].id;
+          // Procurar APU primeiro, caso contrário usar o primeiro da lista ordenada
+          const apuHospital = sortedHospitalStats.find(h => getHospitalTabLabel(h.name) === 'APU');
+          const firstHospitalId = apuHospital ? apuHospital.id : sortedHospitalStats[0].id;
+          
+          console.log('🎯 Selecionando hospital padrão:', {
+            apuFound: !!apuHospital,
+            selectedId: firstHospitalId,
+            selectedName: sortedHospitalStats.find(h => h.id === firstHospitalId)?.name,
+            selectedLabel: getHospitalTabLabel(sortedHospitalStats.find(h => h.id === firstHospitalId)?.name || '')
+          });
+          
           setActiveHospitalTab(firstHospitalId);
           // Forçar filtragem SEMPRE por hospital
           setSelectedHospitals([firstHospitalId]);
         }
       }
     } catch (e) {
-      // noop
+      console.error('Erro ao sincronizar abas de hospital:', e);
     }
-  }, [hospitalStats]);
+  }, [sortedHospitalStats, hospitalStats, activeHospitalTab]);
 
   // Trocar de hospital via abas
   const handleHospitalTabChange = (hospitalId: string) => {
@@ -513,19 +534,36 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   // Sincronizar dropdown de hospitais com a aba ativa (impede 'all')
   useEffect(() => {
     if (!hospitalStats || hospitalStats.length === 0) return;
-    const defaultId = activeHospitalTab || hospitalStats[0].id;
+    const defaultId = activeHospitalTab || sortedHospitalStats[0]?.id;
+    
+    console.log('🔄 Sincronizando dropdown:', {
+      activeHospitalTab,
+      selectedHospitals,
+      defaultId,
+      hospitalStatsLength: hospitalStats.length
+    });
+    
     // Se usuário selecionar "all" no dropdown, manter aba ativa
     if (selectedHospitals.includes('all')) {
       if (selectedHospitals.length !== 1 || selectedHospitals[0] !== defaultId) {
+        console.log('📝 Ajustando selectedHospitals para:', [defaultId]);
         setSelectedHospitals([defaultId]);
       }
       return;
     }
     // Se houver um único hospital selecionado diferente da aba, alinhar aba
     if (selectedHospitals.length >= 1 && selectedHospitals[0] !== defaultId) {
+      console.log('🏥 Mudando activeHospitalTab para:', selectedHospitals[0]);
       setActiveHospitalTab(selectedHospitals[0]);
     }
-  }, [selectedHospitals, activeHospitalTab, hospitalStats]);
+  }, [selectedHospitals, activeHospitalTab, hospitalStats, sortedHospitalStats]);
+
+  // Carregar dados consolidados quando toggle for ativado
+  useEffect(() => {
+    if (showAllHospitalsRevenue) {
+      loadAllHospitalsKPIs(selectedDateRange);
+    }
+  }, [showAllHospitalsRevenue, selectedDateRange]);
 
 	// Utilitário para formatar datas no input date
 	const formatDateForInput = (date: Date): string => {
@@ -533,6 +571,90 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 	};
   
 
+
+  // Função para carregar KPIs de todos os hospitais
+  const loadAllHospitalsKPIs = async (dateRange?: DateRange) => {
+    const currentDateRange = dateRange || selectedDateRange;
+    
+    try {
+      console.log('🏥 Carregando KPIs de TODOS os hospitais (ignorando filtros)...');
+      
+      const startDateISO = currentDateRange.startDate.toISOString();
+      const endDateISO = currentDateRange.endDate.toISOString();
+      
+      console.log('📅 Período para dados consolidados:', {
+        inicio: startDateISO,
+        fim: endDateISO
+      });
+      
+      // Query EXPLICITAMENTE SEM qualquer filtro de hospital (todos os hospitais)
+      const [aihsDataResult, aihsCountResult] = await Promise.all([
+        supabase
+          .from('aihs')
+          .select('calculated_total_value, hospital_id, admission_date')
+          .not('calculated_total_value', 'is', null)
+          .gte('admission_date', startDateISO)
+          .lte('admission_date', endDateISO),
+        supabase
+          .from('aihs')
+          .select('*', { count: 'exact', head: true })
+          .gte('admission_date', startDateISO)
+          .lte('admission_date', endDateISO)
+      ]);
+      
+      if (aihsDataResult.error) {
+        console.error('❌ Erro na query de dados consolidados:', aihsDataResult.error);
+        return;
+      }
+      
+      if (aihsCountResult.error) {
+        console.error('❌ Erro na query de contagem consolidada:', aihsCountResult.error);
+        return;
+      }
+      
+      console.log('📊 Dados brutos consolidados:', {
+        registrosEncontrados: aihsDataResult.data?.length || 0,
+        totalAIHsCount: aihsCountResult.count || 0,
+        primeiroRegistro: aihsDataResult.data?.[0]
+      });
+      
+      // Aplicar safeValue para tratar valores suspeitos em centavos
+      const totalRevenue = aihsDataResult.data?.reduce((sum, aih) => {
+        const value = safeValue(aih.calculated_total_value || 0);
+        return sum + value;
+      }, 0) || 0;
+      
+      const totalAIHs = aihsCountResult.count || 0;
+      
+      // Contar hospitais únicos
+      const uniqueHospitals = new Set(aihsDataResult.data?.map(aih => aih.hospital_id) || []);
+      
+      const consolidatedKPIs: KPIData = {
+        totalRevenue,
+        totalAIHs,
+        averageTicket: totalAIHs > 0 ? totalRevenue / totalAIHs : 0,
+        approvalRate: 0,
+        activeHospitals: uniqueHospitals.size,
+        activeDoctors: 0,
+        processingTime: 0,
+        monthlyGrowth: 0
+      };
+      
+      setAllHospitalsKPIs(consolidatedKPIs);
+      
+      console.log('✅ KPIs consolidados processados:', {
+        totalRevenue: formatCurrency(totalRevenue),
+        totalAIHs,
+        averageTicket: formatCurrency(consolidatedKPIs.averageTicket),
+        hospitaisUnicos: uniqueHospitals.size,
+        valorBruto: aihsDataResult.data?.reduce((sum, aih) => sum + (aih.calculated_total_value || 0), 0) || 0
+      });
+      
+    } catch (error) {
+      console.error('❌ Erro ao carregar KPIs consolidados:', error);
+      toast.error('Erro ao carregar faturamento consolidado');
+    }
+  };
 
   // Load Data
   const loadExecutiveData = async (dateRange?: DateRange) => {
@@ -872,13 +994,24 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {/* ✅ DADOS DIRETOS DA TABELA AIHS */}
             <div className="text-sm text-blue-200 mb-1">Faturamento Total</div>
             <div className="text-3xl md:text-4xl font-extrabold drop-shadow-sm">
-              {isLoading ? '...' : formatCurrency(kpiData.totalRevenue)}
+              {isLoading ? '...' : formatCurrency(
+                showAllHospitalsRevenue && allHospitalsKPIs 
+                  ? allHospitalsKPIs.totalRevenue 
+                  : kpiData.totalRevenue
+              )}
             </div>
-            {currentHospitalFullName && (
+            {showAllHospitalsRevenue ? (
               <div className="text-xs md:text-sm text-blue-100 mt-1 font-medium flex items-center justify-end gap-1">
-                <Hospital className="h-3 w-3" />
-                {currentHospitalFullName}
+                <Building2 className="h-3 w-3" />
+                Todos os Hospitais
               </div>
+            ) : (
+              currentHospitalFullName && (
+                <div className="text-xs md:text-sm text-blue-100 mt-1 font-medium flex items-center justify-end gap-1">
+                  <Hospital className="h-3 w-3" />
+                  {currentHospitalFullName}
+                </div>
+              )
             )}
             {lastUpdate && (
               <div className="text-xs text-blue-200/90 mt-2 flex items-center justify-end gap-1">
@@ -925,10 +1058,30 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <p className="text-sm text-gray-600 mt-1">Configure filtros aplicados a todas as abas</p>
                 </div>
               </div>
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800 px-3 py-2 font-medium">
-                {medicalProductionStats ? `${medicalProductionStats.totalPatients} pacientes` : 'Carregando...'}
-              </Badge>
+              <div className="flex items-center gap-3">
+                {/* Toggle para Faturamento Consolidado */}
+                <div className="flex items-center gap-2">
+                  <Switch 
+                    checked={showAllHospitalsRevenue}
+                    onCheckedChange={setShowAllHospitalsRevenue}
+                  />
+                  <label 
+                    className="text-sm font-medium text-gray-700 cursor-pointer whitespace-nowrap"
+                    onClick={() => setShowAllHospitalsRevenue(!showAllHospitalsRevenue)}
+                  >
+                    📊 Consolidado
+                  </label>
+                </div>
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800 px-3 py-2 font-medium">
+                  {medicalProductionStats ? `${medicalProductionStats.totalPatients} pacientes` : 'Carregando...'}
+                </Badge>
+              </div>
             </div>
+            {showAllHospitalsRevenue && (
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                Exibindo faturamento consolidado de todos os hospitais no período selecionado
+              </p>
+            )}
           </CardHeader>
           <CardContent className="space-y-6">
             {/* FILTROS EM LINHA (Busca maior) */}
@@ -1037,7 +1190,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">
                   Hospitais
                 </label>
-                <Tabs value={activeHospitalTab || hospitalStats[0]?.id} onValueChange={handleHospitalTabChange}>
+                <Tabs value={activeHospitalTab || sortedHospitalStats[0]?.id} onValueChange={handleHospitalTabChange}>
                   <TabsList
                     className="w-full h-auto grid gap-0 bg-muted rounded-md p-1"
                     style={{ gridTemplateColumns: `repeat(${sortedHospitalStats.length || 1}, minmax(0, 1fr))` }}
