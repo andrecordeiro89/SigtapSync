@@ -36,19 +36,20 @@ export class DoctorsHierarchyV2Service {
     if (filters.hospitalIds && filters.hospitalIds.length > 0 && !filters.hospitalIds.includes('all')) {
       aihsQuery = aihsQuery.in('hospital_id', filters.hospitalIds);
     }
+    // Regra SUS: produção conta pela data de alta (discharge_date)
     if (filters.dateFromISO) {
-      aihsQuery = aihsQuery.gte('admission_date', filters.dateFromISO);
+      aihsQuery = aihsQuery.gte('discharge_date', filters.dateFromISO);
     }
     if (filters.dateToISO) {
       // Incluir o último dia completo
       const end = new Date(filters.dateToISO);
       end.setHours(23, 59, 59, 999);
-      aihsQuery = aihsQuery.lte('admission_date', end.toISOString());
+      aihsQuery = aihsQuery.lte('discharge_date', end.toISOString());
     }
 
     // Auditoria: incluir TODOS os caracteres de atendimento (sem filtro)
 
-    const { data: aihs, error: aihsError } = await aihsQuery.order('admission_date', { ascending: false });
+    const { data: aihs, error: aihsError } = await aihsQuery.order('discharge_date', { ascending: false });
     if (aihsError) {
       console.error('[V2] Erro AIHs:', aihsError);
       return [];

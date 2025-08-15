@@ -102,8 +102,8 @@ const getRealAIHData = async (dateRange?: DateRange) => {
       });
       
       query = query
-        .gte('admission_date', startDateISO)
-        .lte('admission_date', endDateISO);
+        .gte('discharge_date', startDateISO)
+        .lte('discharge_date', endDateISO);
     }
     
     const { data: aihs, error: aihsError } = await query;
@@ -591,15 +591,15 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       const [aihsDataResult, aihsCountResult] = await Promise.all([
         supabase
           .from('aihs')
-          .select('calculated_total_value, hospital_id, admission_date')
+          .select('calculated_total_value, hospital_id, discharge_date')
           .not('calculated_total_value', 'is', null)
-          .gte('admission_date', startDateISO)
-          .lte('admission_date', endDateISO),
+          .gte('discharge_date', startDateISO)
+          .lte('discharge_date', endDateISO),
         supabase
           .from('aihs')
           .select('*', { count: 'exact', head: true })
-          .gte('admission_date', startDateISO)
-          .lte('admission_date', endDateISO)
+          .gte('discharge_date', startDateISO)
+          .lte('discharge_date', endDateISO)
       ]);
       
       if (aihsDataResult.error) {
@@ -772,14 +772,14 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         .from('aihs')
         .select('calculated_total_value, hospital_id')
         .not('calculated_total_value', 'is', null)
-        .gte('admission_date', startDateISO)
-        .lte('admission_date', endDateISO);
+        .gte('discharge_date', startDateISO)
+        .lte('discharge_date', endDateISO);
       
       let aihsCountQuery = supabase
         .from('aihs')
         .select('*', { count: 'exact', head: true })
-        .gte('admission_date', startDateISO)
-        .lte('admission_date', endDateISO);
+        .gte('discharge_date', startDateISO)
+        .lte('discharge_date', endDateISO);
       
       // Aplicar filtro de hospital se não for "all"
       if (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) {

@@ -1800,10 +1800,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 const filteredPatients = doctor.patients.filter(patient => 
                                   patient.patient_info.name.toLowerCase().includes(searchTerm.toLowerCase())
                                 );
+                                // Ordenar por data mais recente primeiro (Alta SUS; fallback para Admissão)
+                                const sortedPatients = [...filteredPatients].sort((a, b) => {
+                                  const aDate = new Date(a.aih_info.discharge_date || a.aih_info.admission_date);
+                                  const bDate = new Date(b.aih_info.discharge_date || b.aih_info.admission_date);
+                                  return bDate.getTime() - aDate.getTime();
+                                });
                                 const currentPage = currentPatientPage.get(doctorKey) || 1;
                                 const startIndex = (currentPage - 1) * PATIENTS_PER_PAGE;
                                 const endIndex = startIndex + PATIENTS_PER_PAGE;
-                                const paginatedPatients = filteredPatients.slice(startIndex, endIndex);
+                                const paginatedPatients = sortedPatients.slice(startIndex, endIndex);
                                 const totalPages = Math.ceil(filteredPatients.length / PATIENTS_PER_PAGE);
                                 
                                 return (
@@ -1853,8 +1859,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 </div>
                                                 <div className="text-sm text-slate-500 flex items-center gap-2">
                                                   <span>Admissão: {new Date(patient.aih_info.admission_date).toLocaleDateString('pt-BR')}</span>
-                                                  {patient.aih_info.discharge_date && (
-                                                    <span>• Alta: {new Date(patient.aih_info.discharge_date).toLocaleDateString('pt-BR')}</span>
+                                                  {patient.aih_info.discharge_date ? (
+                                                    <Badge
+                                                      variant="outline"
+                                                      className="ml-1 bg-blue-50 text-blue-700 border-blue-200 text-[11px] px-2 py-0.5 inline-flex items-center gap-1"
+                                                      title="Filtrando pela Data de Alta (SUS)"
+                                                    >
+                                                      Alta: {new Date(patient.aih_info.discharge_date).toLocaleDateString('pt-BR')}
+                                                    </Badge>
+                                                  ) : (
+                                                    <Badge
+                                                      variant="outline"
+                                                      className="ml-1 bg-amber-50 text-amber-700 border-amber-200 text-[11px] px-2 py-0.5 inline-flex items-center gap-1"
+                                                      title="Sem data de alta; período considera apenas internação"
+                                                    >
+                                                      Alta: —
+                                                    </Badge>
                                                   )}
                                                 </div>
                                                 {patient.aih_info.care_character && (

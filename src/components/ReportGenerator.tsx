@@ -18,6 +18,7 @@ import { ptBR } from 'date-fns/locale';
 import { ProcedureRecordsService } from '@/services/simplifiedProcedureService';
 import { isMedicalProcedure } from '@/config/susCalculationRules';
 import { shouldCalculateAnesthetistProcedure } from '../utils/anesthetistLogic';
+import { getDoctorPatientReport, type DoctorPatientReport } from '@/services/doctorReportService';
 
 interface ReportPreset {
   type?: 'sus-report';
@@ -946,7 +947,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     }
   };
 
-  // Função para gerar relatório específico SUS
+  // Função para gerar relatório específico SUS usando a MESMA rotina de cálculo da tela
   const generateSUSReport = async (): Promise<void> => {
     try {
       // Validações específicas para relatório SUS
@@ -974,60 +975,37 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
         description: `Coletando dados do Dr(a). ${selectedDoctor}...`,
       });
 
-      // Buscar dados completos dos médicos com pacientes
-      const doctorsData = await DoctorPatientService.getAllDoctorsWithPatients();
-      
-      if (!doctorsData || doctorsData.length === 0) {
-        toast({
-          title: "Nenhum dado encontrado",
-          description: "Não foram encontrados dados de médicos para o relatório.",
-          variant: "destructive",
-        });
-        return;
+      // Montar filtros iguais aos utilizados na tela
+      let dateFromISO: string | undefined;
+      let dateToISO: string | undefined;
+      if (customMode && customRange.startDate && customRange.endDate) {
+        const start = new Date(customRange.startDate);
+        const end = new Date(customRange.endDate);
+        end.setHours(23,59,59,999);
+        dateFromISO = start.toISOString();
+        dateToISO = end.toISOString();
+      } else if (preset?.startDate && preset?.endDate) {
+        const start = new Date(preset.startDate);
+        const end = new Date(preset.endDate);
+        end.setHours(23,59,59,999);
+        dateFromISO = start.toISOString();
+        dateToISO = end.toISOString();
+      } else {
+        const periodDays = parseInt(period);
+        const start = new Date();
+        start.setDate(start.getDate() - periodDays);
+        dateFromISO = start.toISOString();
+        dateToISO = new Date().toISOString();
       }
 
-      console.log('🔍 DEBUG - Dados dos médicos carregados:', doctorsData.length);
-
-      // Encontrar o médico selecionado
-      const selectedDoctorData = doctorsData.find(doctor => 
-        doctor.doctor_info.name === selectedDoctor
-      );
-
-      if (!selectedDoctorData) {
-        toast({
-          title: "Médico não encontrado",
-          description: "Não foram encontrados dados para o médico selecionado.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Filtrar dados por período
-      const periodDays = parseInt(period);
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - periodDays);
-
-      let filteredDoctorData = {
-        ...selectedDoctorData,
-        patients: selectedDoctorData.patients.filter(patient => {
-          const admissionDate = new Date(patient.aih_info.admission_date);
-          return admissionDate >= cutoffDate;
-        })
-      };
-
-      console.log(`🔍 DEBUG - Pacientes filtrados: ${filteredDoctorData.patients.length}`);
-
-      // 💚 USAR APENAS AS REGRAS DEFINIDAS - SEM BUSCAR PROCEDIMENTOS
-      console.log('💚 USANDO REGRAS DIRETAS POR MÉDICO - SEM PROCEDIMENTOS');
-
-      // 🔄 ORDENAR PACIENTES POR DATA (MAIS ANTIGO PARA MAIS RECENTE)
-      filteredDoctorData.patients.sort((a, b) => {
-        const dateA = new Date(a.aih_info.admission_date);
-        const dateB = new Date(b.aih_info.admission_date);
-        return dateA.getTime() - dateB.getTime(); // Crescente (mais antigo primeiro)
+      // Obter relatório consolidado por médico (rotina compartilhada com a tela)
+      const report = await getDoctorPatientReport(selectedDoctor, {
+        hospitalIds: [selectedHospital],
+        dateFromISO,
+        dateToISO,
       });
 
-      if (filteredDoctorData.patients.length === 0) {
+      if (!report || !report.items || report.items.length === 0) {
         toast({
           title: "Nenhum paciente encontrado",
           description: `O Dr(a). ${selectedDoctor} não possui pacientes no período selecionado.`,
@@ -1040,8 +1018,8 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
       const selectedHospitalData = hospitals.find(h => h.id === selectedHospital);
       const hospitalName = selectedHospitalData?.name || 'Hospital não informado';
 
-      // Gerar relatório para o médico selecionado
-      await generateDoctorSUSReport(filteredDoctorData, periodDays, hospitalName);
+      // Gerar PDF a partir do relatório consolidado (mesma rotina de cálculo)
+      await renderDoctorSUSPdfFromReport(report, hospitalName, dateFromISO, dateToISO);
 
       toast({
         title: "Relatório SUS gerado com sucesso!",
@@ -1058,6 +1036,135 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Renderiza o PDF SUS a partir do relatório consolidado (mesma rotina da tela)
+  const renderDoctorSUSPdfFromReport = async (
+    report: DoctorPatientReport,
+    hospitalName?: string,
+    dateFromISO?: string,
+    dateToISO?: string
+  ): Promise<void> => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Cabeçalho
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(41, 128, 185);
+    doc.text('SIGTAP Sync', pageWidth / 2, 25, { align: 'center' });
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('RELATÓRIO SUS - PRODUÇÃO MÉDICA', pageWidth / 2, 35, { align: 'center' });
+
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.5);
+    doc.line(20, 42, 190, 42);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+
+    // Período label
+    let periodLabel = '';
+    if (dateFromISO && dateToISO) {
+      periodLabel = `${format(new Date(dateFromISO), 'dd/MM/yyyy')} a ${format(new Date(dateToISO), 'dd/MM/yyyy')}`;
+    }
+
+    // Coluna Esquerda
+    doc.text(`Médico: ${report.doctorName}`, 20, 55);
+    doc.text(`Hospital: ${hospitalName || 'Hospital não informado'}`, 20, 62);
+
+    // Coluna Direita
+    doc.text(`Período: ${periodLabel || '—'}`, 120, 55);
+    doc.text(`Data: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`, 120, 62);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(100, 100, 100);
+    doc.text('Relatório baseado nos dados do SUS e regras do médico.', 120, 69);
+
+    doc.setDrawColor(41, 128, 185);
+    doc.setLineWidth(1);
+    doc.line(20, 80, 190, 80);
+
+    // Tabela de pacientes
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('LISTA DE PACIENTES - VALORES CALCULADOS:', 20, 95);
+
+    const tableData = report.items.map((item, index) => [
+      (index + 1).toString(),
+      item.patientName || 'Nome não informado',
+      item.dischargeDateISO ? format(new Date(item.dischargeDateISO), 'dd/MM/yyyy') : (item.admissionDateISO ? format(new Date(item.admissionDateISO), 'dd/MM/yyyy') : '—'),
+      formatCurrency(item.aihTotalReais),
+      formatCurrency(item.doctorReceivableReais),
+    ]);
+
+    autoTable(doc, {
+      head: [['#', 'Nome do Paciente', 'Data Alta (SUS)', 'Valor Total', 'Valor Médico']],
+      body: tableData,
+      startY: 105,
+      headStyles: { fillColor: [41, 128, 185] },
+      styles: { fontSize: 9 },
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 70 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 35 },
+        4: { cellWidth: 35 },
+      },
+    });
+
+    // Totais
+    const finalY = (doc as any).lastAutoTable?.finalY || 180;
+    const totalsStartY = finalY + 20;
+
+    doc.setFillColor(248, 249, 250);
+    doc.setDrawColor(41, 128, 185);
+    doc.setLineWidth(1.5);
+    doc.roundedRect(20, totalsStartY, 170, 45, 3, 3, 'FD');
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(41, 128, 185);
+    doc.text('RESUMO FINANCEIRO', 25, totalsStartY + 12);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    doc.text('Total de Pacientes:', 25, totalsStartY + 25);
+    doc.text('Valor Total SUS:', 25, totalsStartY + 35);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${report.totals.patients}`, 85, totalsStartY + 25);
+    doc.text(`${formatCurrency(report.totals.aihTotalReais)}`, 85, totalsStartY + 35);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(41, 128, 185);
+    doc.text('Valor de Produção:', 125, totalsStartY + 28);
+
+    doc.setFontSize(13);
+    doc.setTextColor(0, 128, 0);
+    doc.text(`${formatCurrency(report.totals.doctorReceivableReais)}`, 125, totalsStartY + 38);
+
+    // Rodapé
+    const pageHeight = doc.internal.pageSize.height;
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.3);
+    doc.line(20, pageHeight - 20, 190, pageHeight - 20);
+    doc.text('SIGTAP Sync - Sistema de Gestão SUS', 20, pageHeight - 12);
+    doc.text(`Usuário: ${user?.email || 'Não identificado'} | Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`, 20, pageHeight - 7);
+
+    const fileName = `Relatorio_SUS_${report.doctorName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`;
+    doc.save(fileName);
   };
 
   // 💚 FUNÇÃO INTELIGENTE - SIMULA AS REGRAS REAIS DO DR. HUMBERTO
