@@ -301,6 +301,24 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [hospitalStats, setHospitalStats] = useState<HospitalStats[]>([]);
   const [doctorStats, setDoctorStats] = useState<DoctorStats[]>([]);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  // Competência (mês de alta)
+  const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
+  const [availableCompetencies, setAvailableCompetencies] = useState<Array<{ value: string; label: string }>>([]);
+  const showCompetencyTabs = false;
+
+  // Intervalo efetivo para a TABELA de Produção Médica (Médicos) — filtra por mês da alta
+  const productionEffectiveDateRange: DateRange = React.useMemo(() => {
+    if (!selectedCompetency || selectedCompetency === 'all') return selectedDateRange;
+    const [yearStr, monthStr] = selectedCompetency.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    if (!year || !month) return selectedDateRange;
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 0);
+    // Garantir fim do dia
+    end.setHours(23, 59, 59, 999);
+    return { startDate: start, endDate: end };
+  }, [selectedCompetency, selectedDateRange]);
 
   // Estados para dados reais das views
   const [doctorsData, setDoctorsData] = useState<DoctorAggregated[]>([]);
@@ -419,6 +437,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       loadExecutiveData(range);
     }
   }, [hasExecutiveAccess]);
+
+  
   
     // Função para lidar com mudança de aba
   const handleTabChange = (tabValue: string) => {
@@ -944,7 +964,50 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     if (hasExecutiveAccess) {
       loadExecutiveData(selectedDateRange);
     }
-  }, [selectedTimeRange, selectedHospitals, selectedDateRange, hasExecutiveAccess]);
+  }, [selectedTimeRange, selectedHospitals, selectedDateRange, selectedCompetency, hasExecutiveAccess]);
+
+  // Carregar TODAS as competências disponíveis (mês da alta) conforme hospitais selecionados
+  useEffect(() => {
+    if (!showCompetencyTabs) {
+      setAvailableCompetencies([]);
+      return;
+    }
+    (async () => {
+      try {
+        let q = supabase
+          .from('aihs')
+          .select('discharge_date,hospital_id');
+        if (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) {
+          q = q.in('hospital_id', selectedHospitals);
+        }
+        const { data, error } = await q;
+        if (error) {
+          console.warn('⚠️ Erro ao carregar competências:', error);
+          setAvailableCompetencies([]);
+          return;
+        }
+        const setYM = new Set<string>();
+        (data || []).forEach((row: any) => {
+          const ref = row.discharge_date;
+          if (!ref) return;
+          const d = new Date(ref);
+          const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          setYM.add(ym);
+        });
+        const arr = Array.from(setYM).sort((a, b) => (a < b ? 1 : -1));
+        const formatted = arr.map((ym) => {
+          const [y, m] = ym.split('-');
+          const d = new Date(Number(y), Number(m) - 1, 1);
+          const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
+          return { value: ym, label };
+        });
+        setAvailableCompetencies(formatted);
+      } catch (e) {
+        console.warn('⚠️ Falha ao montar competências:', e);
+        setAvailableCompetencies([]);
+      }
+    })();
+  }, [selectedHospitals]);
 
   // Access Control Render
   if (!hasExecutiveAccess) {
@@ -1082,6 +1145,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 Exibindo faturamento consolidado de todos os hospitais no período selecionado
               </p>
             )}
+
+            {/* Abas de competência removidas conforme solicitação */}
           </CardHeader>
           <CardContent className="space-y-6">
             {/* FILTROS EM LINHA (Busca maior) */}
@@ -1184,6 +1249,33 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               </div>
             </div>
 
+            {/* Abas de Competência (mês da alta) — logo abaixo dos filtros */}
+            {showCompetencyTabs && availableCompetencies.length > 0 && (
+              <div className="pt-3">
+                <Tabs value={selectedCompetency} onValueChange={setSelectedCompetency}>
+                  <TabsList className="w-full h-auto flex flex-wrap gap-1 bg-muted rounded-md p-1">
+                    <TabsTrigger
+                      value="all"
+                      className="text-xs px-2 py-1 rounded data-[state=active]:bg-background data-[state=active]:text-foreground"
+                      title="Todas as competências"
+                    >
+                      Todas
+                    </TabsTrigger>
+                    {availableCompetencies.map((c) => (
+                      <TabsTrigger
+                        key={c.value}
+                        value={c.value}
+                        className="text-xs px-2 py-1 rounded data-[state=active]:bg-background data-[state=active]:text-foreground"
+                        title={`Competência ${c.label}`}
+                      >
+                        {c.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              </div>
+            )}
+
             {/* Abas por Hospital (sempre separar médicos por hospital) */}
             {hospitalStats && hospitalStats.length > 0 && (
               <div className="pt-4 border-t border-gray-100">
@@ -1210,6 +1302,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </Tabs>
               </div>
             )}
+
+            {/* Abas de Competência duplicadas removidas */}
 
             {/* INDICADORES DE FILTROS ATIVOS */}
             {(searchTerm || selectedCareCharacter !== 'all' || !selectedHospitals.includes('all')) && (
@@ -1248,7 +1342,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         <TabsContent value="doctors" className="space-y-6">
           <MedicalProductionDashboard 
             onStatsUpdate={updateMedicalProductionStats}
-            dateRange={selectedDateRange}
+            dateRange={productionEffectiveDateRange}
             onDateRangeChange={handleDateRangeChange}
             selectedHospitals={selectedHospitals}
             searchTerm={searchTerm}
