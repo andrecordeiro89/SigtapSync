@@ -15,6 +15,9 @@ import ProcedureInlineCard from './ProcedureInlineCard';
 import { formatCurrency as baseCurrency } from '../utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import { CareCharacterUtils } from '../config/careCharacterCodes';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 // 🔧 CORREÇÃO: Função para formatar valores que vêm em centavos
 const formatCurrency = (value: number | undefined | null): string => {
@@ -150,6 +153,33 @@ const PatientManagement = () => {
   // NOVOS ESTADOS: Filtros por data
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // 🗓️ Competência (mês da alta) — 'all' ou 'YYYY-MM'
+  const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
+
+  // Lista de competências disponíveis com base nas AIHs (mês da alta; fallback para admissão)
+  const availableCompetencies = React.useMemo(() => {
+    try {
+      const setYM = new Set<string>();
+      aihs.forEach((aih) => {
+        const ref = aih.discharge_date || aih.admission_date;
+        if (!ref) return;
+        const d = new Date(ref);
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        setYM.add(ym);
+      });
+      const arr = Array.from(setYM);
+      arr.sort((a, b) => (a < b ? 1 : -1)); // Descendente (mais recente primeiro)
+      return arr.map((ym) => {
+        const [y, m] = ym.split('-');
+        const dateObj = new Date(Number(y), Number(m) - 1, 1);
+        const label = `${format(dateObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dateObj, 'yy', { locale: ptBR })}`;
+        return { value: ym, label };
+      });
+    } catch {
+      return [] as Array<{ value: string; label: string }>;
+    }
+  }, [aihs]);
 
   // 🎯 NOVA FUNÇÃO: Recalcular valor total da AIH baseado nos procedimentos ativos
   const recalculateAIHTotal = (aihId: string, procedures: any[]) => {
@@ -521,8 +551,19 @@ const PatientManagement = () => {
         matchesDateRange = matchesDateRange && admissionDate <= end;
       }
     }
+
+    // 🗓️ Filtro por competência (mês da alta; fallback admissão)
+    let matchesCompetency = true;
+    if (selectedCompetency && selectedCompetency !== 'all') {
+      const ref = item.discharge_date || item.admission_date;
+      if (ref) {
+        const d = new Date(ref);
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        matchesCompetency = ym === selectedCompetency;
+      }
+    }
     
-    return matchesSearch && matchesDateRange;
+    return matchesSearch && matchesDateRange && matchesCompetency;
   });
 
   // Paginação unificada
@@ -688,9 +729,9 @@ const PatientManagement = () => {
             <h3 className="text-lg font-semibold text-gray-900">Filtros de Pesquisa</h3>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="flex flex-col md:flex-row md:items-end gap-3">
             {/* Campo de Busca */}
-            <div className="space-y-3">
+            <div className="space-y-3 flex-1 min-w-[240px]">
               <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
                 <div className="p-1 bg-blue-100 rounded">
                   <Search className="w-3 h-3 text-blue-600" />
@@ -703,10 +744,11 @@ const PatientManagement = () => {
                 onChange={(e) => setGlobalSearch(e.target.value)}
                 className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white/80 hover:bg-white transition-colors"
               />
+              {/* espaço vazio para manter espaçamento vertical uniforme no mobile */}
             </div>
 
             {/* Data Início */}
-            <div className="space-y-3">
+            <div className="space-y-3 w-full md:w-[170px]">
               <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
                 <div className="p-1 bg-green-100 rounded">
                   <Calendar className="w-3 h-3 text-green-600" />
@@ -722,7 +764,7 @@ const PatientManagement = () => {
             </div>
 
             {/* Data Fim */}
-            <div className="space-y-3">
+            <div className="space-y-3 w-full md:w-[170px]">
               <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
                 <div className="p-1 bg-purple-100 rounded">
                   <Calendar className="w-3 h-3 text-purple-600" />
@@ -736,18 +778,9 @@ const PatientManagement = () => {
                 className="w-full border-gray-300 focus:border-purple-500 focus:ring-purple-500 bg-white/80 hover:bg-white transition-colors"
               />
             </div>
-          </div>
 
-          {/* Botões de Ação dos Filtros */}
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200/60">
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <div className="p-1 bg-gray-100 rounded">
-                <Info className="w-3 h-3 text-gray-600" />
-              </div>
-              <span>Use os filtros para refinar sua pesquisa por período</span>
-            </div>
-            
-            <div className="flex items-center space-x-3">
+            {/* Botão Limpar */}
+            <div className="w-full md:w-[150px] flex items-end">
               <Button
                 variant="outline"
                 size="sm"
@@ -755,21 +788,52 @@ const PatientManagement = () => {
                   setGlobalSearch('');
                   setStartDate('');
                   setEndDate('');
+                  setSelectedCompetency('all');
                 }}
-                className="text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-gray-300 transition-colors"
+                className="h-9 text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-gray-300 transition-colors w-full md:w-auto"
+                title="Limpar filtros"
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Limpar
               </Button>
             </div>
           </div>
+
+          {/* 🗓️ Abas de Competência (mês da alta) — posicionadas abaixo dos filtros */}
+          {availableCompetencies.length > 0 && (
+            <div className="mt-6">
+              <Tabs value={selectedCompetency} onValueChange={setSelectedCompetency}>
+                <TabsList className="w-full h-auto flex flex-wrap gap-1 bg-muted rounded-md p-1">
+                  <TabsTrigger
+                    value="all"
+                    className="text-xs px-2 py-1 rounded data-[state=active]:bg-background data-[state=active]:text-foreground"
+                    title="Todas as competências"
+                  >
+                    Todos
+                  </TabsTrigger>
+                  {availableCompetencies.map((c) => (
+                    <TabsTrigger
+                      key={c.value}
+                      value={c.value}
+                      className="text-xs px-2 py-1 rounded data-[state=active]:bg-background data-[state=active]:text-foreground"
+                      title={`Competência ${c.label}`}
+                    >
+                      {c.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+          )}
+
+          {/* Rodapé dos filtros removido conforme solicitação */}
         </CardContent>
       </Card>
 
       {/* Lista Unificada de AIHs */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
+          <CardTitle className="flex items-center space-x-2 text-xl">
             <FileText className="w-5 h-5" />
             <span>AIHs Processadas ({totalAIHsCount})</span>
           </CardTitle>
@@ -787,9 +851,9 @@ const PatientManagement = () => {
           ) : (
             <div className="space-y-4">
               {paginatedData.map((item) => (
-                <div key={item.id} className="border border-gray-200 rounded-xl bg-white hover:shadow-lg transition-all duration-300 hover:border-blue-300 overflow-hidden">
+                <div key={item.id} className="border border-gray-200 rounded-xl bg-white hover:shadow-lg transition-all duration-300 hover:border-blue-300 overflow-hidden min-h-[120px]">
                   {/* Header Compacto */}
-                  <div className="bg-gradient-to-r from-slate-50 to-gray-50 p-4 border-b border-gray-100">
+                  <div className="bg-gradient-to-r from-slate-50 to-gray-50 p-5 border-b border-gray-100">
                     <div className="flex items-center justify-between">
                       {/* Lado Esquerdo: Info Principal */}
                       <div className="flex items-center space-x-4 flex-1">
@@ -807,73 +871,75 @@ const PatientManagement = () => {
 
                         <div className="flex-1 min-w-0">
                           {/* Nome do Paciente */}
-                          <div className="flex items-center space-x-2 mb-1">
+                          <div className="flex items-center space-x-2 mb-2">
                             <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                               <User className="w-4 h-4 text-blue-600" />
                             </div>
                             <h3 className="font-semibold text-gray-900 truncate text-lg">
                               {item.patients?.name || 'Paciente não identificado'}
                             </h3>
-                            <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700 text-xs">
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              Processada
-                            </Badge>
+                            {item.hospitals?.name && (
+                              <Badge variant="outline" className="bg-teal-50 border-teal-200 text-teal-700 text-[11px]">
+                                <Building2 className="w-3 h-3 mr-1" />
+                                {item.hospitals?.name}
+                              </Badge>
+                            )}
+                            {item.discharge_date && (
+                              <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 text-[11px]">
+                                Competência: {format(new Date(item.discharge_date), 'MMM/yy', { locale: ptBR }).replace('.', '')}
+                              </Badge>
+                            )}
                           </div>
 
-                          {/* Info Row Compacta */}
-                          <div className="flex items-center space-x-6 text-sm text-gray-600">
-                            <div className="flex items-center space-x-1">
-                              <FileText className="w-3 h-3" />
-                              <span className="font-medium">{item.aih_number}</span>
+                          {/* Info em colunas (organizado) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+                            {/* Coluna 1: AIH, CNS, CID */}
+                            <div className="space-y-2">
+                              <Badge variant="outline" className="flex w-full justify-start bg-sky-50 border-sky-200 text-sky-700 px-2 py-0.5">
+                                <FileText className="w-3 h-3 mr-1" />
+                                AIH {item.aih_number}
+                              </Badge>
+                              <Badge variant="outline" className="flex w-full justify-start bg-slate-50 border-slate-200 text-slate-700 px-2 py-0.5">
+                                <CreditCard className="w-3 h-3 mr-1" />
+                                CNS: {item.patients?.cns || 'N/A'}
+                              </Badge>
+                              <Badge variant="outline" className="flex w-full justify-start bg-violet-50 border-violet-200 text-violet-700 px-2 py-0.5">
+                                <Activity className="w-3 h-3 mr-1" />
+                                CID: {item.main_cid}
+                              </Badge>
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="w-3 h-3" />
-                              <span>{formatDate(item.admission_date)}</span>
+                            {/* Coluna 2: Admissão, Alta, Outro (Especialidade ou Médico) */}
+                            <div className="space-y-2">
+                              <Badge variant="outline" className="flex w-full justify-start bg-slate-50 border-slate-200 text-slate-700 px-2 py-0.5">
+                                <Calendar className="w-3 h-3 mr-1" />
+                                Admissão: {formatDate(item.admission_date)}
+                              </Badge>
+                              {item.discharge_date && (
+                                <Badge variant="outline" className="flex w-full justify-start bg-blue-50 border-blue-200 text-blue-700 px-2 py-0.5">
+                                  <Calendar className="w-3 h-3 mr-1" />
+                                  Alta: {formatDate(item.discharge_date)}
+                                </Badge>
+                              )}
+                              {item.specialty ? (
+                                <Badge variant="outline" className="flex w-full justify-start bg-indigo-50 border-indigo-200 text-indigo-700 px-2 py-0.5">
+                                  <Stethoscope className="w-3 h-3 mr-1" />
+                                  {item.specialty}
+                                </Badge>
+                              ) : (
+                                item.requesting_physician && (
+                                  <Badge variant="outline" className="flex w-full justify-start bg-amber-50 border-amber-200 text-amber-700 px-2 py-0.5">
+                                    <User className="w-3 h-3 mr-1" />
+                                    {item.requesting_physician}
+                                  </Badge>
+                                )
+                              )}
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <Activity className="w-3 h-3" />
-                              <span>{item.main_cid}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <CreditCard className="w-3 h-3" />
-                              <span>CNS: {item.patients?.cns || 'N/A'}</span>
-                            </div>
-                            {item.specialty && (
-                              <div className="flex items-center space-x-1">
-                                <Stethoscope className="w-3 h-3" />
-                                <span className="truncate">{item.specialty}</span>
-                              </div>
-                            )}
-                            {item.hospitals?.name && (
-                              <div className="flex items-center space-x-1">
-                                <Building2 className="w-3 h-3" />
-                                <span className="truncate">{item.hospitals?.name}</span>
-                              </div>
-                            )}
-                            {item.requesting_physician && (
-                              <div className="flex items-center space-x-1">
-                                <User className="w-3 h-3" />
-                                <span className="truncate">{item.requesting_physician}</span>
-                              </div>
-                            )}
                           </div>
                         </div>
                       </div>
 
-                      {/* Lado Direito: Badges Organizados */}
+                      {/* Lado Direito: Ações */}
                       <div className="flex items-center space-x-3">
-                        {/* Badge do Operador */}
-                        <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100">
-                          <User className="w-3 h-3 mr-1" />
-                          <span>{item.processed_by_name || 'Sistema'}</span>
-                        </Badge>
-                        
-                        {/* Badge da Data de Processamento */}
-                        <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100">
-                          <Calendar className="w-3 h-3 mr-1" />
-                          <span>{item.processed_at_formatted}</span>
-                        </Badge>
-                        
                         {/* Botão de Exclusão */}
                         {(() => {
                           const userRole = user?.role as string;
@@ -1171,6 +1237,22 @@ const PatientManagement = () => {
                       )}
                     </div>
                   )}
+
+                  {/* Rodapé: dados de processamento no canto inferior direito */}
+                  <div className="px-5 py-2 border-t border-gray-100">
+                    <div className="flex justify-end">
+                      <div className="text-xs text-slate-600 text-right">
+                        <div className="flex items-center gap-1 justify-end">
+                          <User className="w-3 h-3" />
+                          <span>{item.processed_by_name || 'Sistema'}</span>
+                        </div>
+                        <div className="flex items-center gap-1 justify-end">
+                          <Calendar className="w-3 h-3" />
+                          <span>{item.processed_at_formatted}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
