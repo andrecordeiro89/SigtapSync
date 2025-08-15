@@ -70,13 +70,13 @@ export class DoctorsHierarchyV2Service {
     const doctorByCns = new Map<string, any>((doctors || []).map(d => [d.cns, d]));
     const hospitalById = new Map<string, any>((hospitals || []).map(h => [h.id, h]));
 
-    // 3) Pré-carregar procedimentos por paciente e fallback por AIH
+    // 3) Pré-carregar procedimentos por paciente e fallback por AIH (SEM filtro: garantir TODOS os procedimentos)
     const patientIds = Array.from(new Set((aihs as any[]).map(a => a.patient_id).filter(Boolean)));
     const aihIds = Array.from(new Set((aihs as any[]).map(a => a.id).filter(Boolean)));
     // Auditoria: carregar procedimentos SEM filtros de anestesista
     const [procsByPatientRes, procsByAihRes] = await Promise.all([
-      ProcedureRecordsService.getProceduresByPatientIds(patientIds, { auditMode: true }),
-      ProcedureRecordsService.getProceduresByAihIds(aihIds, { auditMode: true })
+      ProcedureRecordsService.getProceduresByPatientIds(patientIds),
+      ProcedureRecordsService.getProceduresByAihIds(aihIds)
     ]);
     const procsByPatient = procsByPatientRes.success ? procsByPatientRes.proceduresByPatientId : new Map<string, any[]>();
     const procsByAih = procsByAihRes.success ? procsByAihRes.proceduresByAihId : new Map<string, any[]>();

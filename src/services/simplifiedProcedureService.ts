@@ -67,7 +67,7 @@ export class ProcedureRecordsService {
    * 🔍 BUSCAR PROCEDIMENTOS POR PATIENT_ID 
    * (100% baseado na tabela procedure_records)
    */
-  static async getProceduresByPatientId(patientId: string, options?: { auditMode?: boolean }): Promise<{
+  static async getProceduresByPatientId(patientId: string, options?: { auditMode?: boolean; excludeAnesthetist?: boolean }): Promise<{
     success: boolean;
     procedures: ProcedureRecord[];
     error?: string;
@@ -113,8 +113,8 @@ export class ProcedureRecordsService {
         .eq('patient_id', patientId)
         .order('procedure_date', { ascending: false });
 
-      // Quando NÃO estiver em modo auditoria, manter filtro de anestesistas para evitar duplicidades
-      if (!options?.auditMode) {
+      // Opcional: filtrar anestesistas (CBO 225151) conforme regra anterior
+      if (options?.excludeAnesthetist) {
         query = query.or(
           'professional_cbo.is.null,' +
           'professional_cbo.neq.225151,' +
@@ -151,7 +151,7 @@ export class ProcedureRecordsService {
   /**
    * 🔍 BUSCAR PROCEDIMENTOS POR MÚLTIPLOS PATIENT_IDs
    */
-  static async getProceduresByPatientIds(patientIds: string[], options?: { auditMode?: boolean }): Promise<{
+  static async getProceduresByPatientIds(patientIds: string[], options?: { auditMode?: boolean; excludeAnesthetist?: boolean }): Promise<{
     success: boolean;
     procedures: ProcedureRecord[];
     proceduresByPatientId: Map<string, ProcedureRecord[]>;
@@ -199,7 +199,7 @@ export class ProcedureRecordsService {
         .in('patient_id', patientIds)
         .order('procedure_date', { ascending: false });
 
-      if (!options?.auditMode) {
+      if (options?.excludeAnesthetist) {
         query = query.or(
           'professional_cbo.is.null,' +
           'professional_cbo.neq.225151,' +
@@ -257,7 +257,7 @@ export class ProcedureRecordsService {
   /**
    * 🔍 BUSCAR PROCEDIMENTOS POR AIH_ID (fallback caso patient_id não esteja preenchido)
    */
-  static async getProceduresByAihIds(aihIds: string[], options?: { auditMode?: boolean }): Promise<{
+  static async getProceduresByAihIds(aihIds: string[], options?: { auditMode?: boolean; excludeAnesthetist?: boolean }): Promise<{
     success: boolean;
     proceduresByAihId: Map<string, ProcedureRecord[]>;
     error?: string;
@@ -289,7 +289,7 @@ export class ProcedureRecordsService {
         .in('aih_id', aihIds)
         .order('procedure_date', { ascending: false });
 
-      if (!options?.auditMode) {
+      if (options?.excludeAnesthetist) {
         query = query.or(
           'professional_cbo.is.null,' +
           'professional_cbo.neq.225151,' +
