@@ -268,6 +268,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [selectedHospitals, setSelectedHospitals] = useState<string[]>(['all']);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCareCharacter, setSelectedCareCharacter] = useState('all');
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
+  const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState('doctors');
@@ -706,6 +708,12 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       
       // Atualizar estados com dados reais
       setSpecialtyStats(specialtiesData);
+      try {
+        const specialties = Array.from(
+          new Set((specialtiesData || []).map(s => s.doctor_specialty).filter(Boolean))
+        ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        setAvailableSpecialties(specialties);
+      } catch {}
       setHospitalRevenueStats(hospitalsData);
       setBillingStats(billingStatsData);
       
@@ -1122,29 +1130,12 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                {/* Toggle para Faturamento Consolidado */}
-                <div className="flex items-center gap-2">
-                  <Switch 
-                    checked={showAllHospitalsRevenue}
-                    onCheckedChange={setShowAllHospitalsRevenue}
-                  />
-                  <label 
-                    className="text-sm font-medium text-gray-700 cursor-pointer whitespace-nowrap"
-                    onClick={() => setShowAllHospitalsRevenue(!showAllHospitalsRevenue)}
-                  >
-                    📊 Consolidado
-                  </label>
-                </div>
                 <Badge variant="secondary" className="bg-blue-100 text-blue-800 px-3 py-2 font-medium">
                   {medicalProductionStats ? `${medicalProductionStats.totalPatients} pacientes` : 'Carregando...'}
                 </Badge>
               </div>
             </div>
-            {showAllHospitalsRevenue && (
-              <p className="text-xs text-gray-500 mt-2 text-center">
-                Exibindo faturamento consolidado de todos os hospitais no período selecionado
-              </p>
-            )}
+            {/* Indicador de consolidado oculto */}
 
             {/* Abas de competência removidas conforme solicitação */}
           </CardHeader>
@@ -1199,6 +1190,32 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
+              {/* ESPECIALIDADE DO MÉDICO */}
+              <div className="w-full md:w-[220px]">
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Especialidade</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedSpecialty}
+                    onChange={(e) => setSelectedSpecialty(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-9"
+                  >
+                    <option value="all">Todas</option>
+                    {availableSpecialties.map(spec => (
+                      <option key={spec} value={spec}>{spec}</option>
+                    ))}
+                  </select>
+                  {selectedSpecialty !== 'all' && (
+                    <button
+                      onClick={() => setSelectedSpecialty('all')}
+                      className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                      title="Limpar filtro de especialidade"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* DATA INICIAL */}
               <div className="w-full md:w-[170px]">
                 <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data Inicial</label>
@@ -1239,6 +1256,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     setSearchTerm('');
                     setSelectedCareCharacter('all');
                     setSelectedHospitals(['all']);
+                    setSelectedSpecialty('all');
                   }}
                   className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors h-9 border border-gray-200 w-full flex items-center justify-center gap-1"
                   title="Limpar todos os filtros"
@@ -1306,7 +1324,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {/* Abas de Competência duplicadas removidas */}
 
             {/* INDICADORES DE FILTROS ATIVOS */}
-            {(searchTerm || selectedCareCharacter !== 'all' || !selectedHospitals.includes('all')) && (
+            {(searchTerm || selectedCareCharacter !== 'all' || selectedSpecialty !== 'all' || !selectedHospitals.includes('all')) && (
               <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                 <div className="flex items-center gap-2">
                   {searchTerm && (
@@ -1322,6 +1340,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   {selectedCareCharacter !== 'all' && (
                     <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
                       🎯 Caráter: {selectedCareCharacter === '1' ? 'Eletivo' : 'Urgência/Emergência'}
+                    </Badge>
+                  )}
+                  {selectedSpecialty !== 'all' && (
+                    <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                      🩺 Especialidade: {selectedSpecialty}
                     </Badge>
                   )}
                   <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
@@ -1347,6 +1370,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             selectedHospitals={selectedHospitals}
             searchTerm={searchTerm}
             selectedCareCharacter={selectedCareCharacter}
+            selectedSpecialty={selectedSpecialty}
           />
           {/* ⚠️ NOTA: onStatsUpdate agora apenas atualiza activeDoctors, não afeta faturamento/AIHs */}
         </TabsContent>

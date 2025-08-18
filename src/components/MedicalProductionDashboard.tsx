@@ -420,6 +420,7 @@ interface MedicalProductionDashboardProps {
   selectedHospitals?: string[]; // 🆕 FILTROS GLOBAIS DE HOSPITAL
   searchTerm?: string; // 🆕 BUSCA GLOBAL
   selectedCareCharacter?: string; // 🆕 FILTRO GLOBAL DE CARÁTER DE ATENDIMENTO
+  selectedSpecialty?: string; // 🆕 FILTRO GLOBAL DE ESPECIALIDADE
 }
 
 // ✅ COMPONENTE PRINCIPAL
@@ -429,7 +430,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   onDateRangeChange,
   selectedHospitals = ['all'], // 🆕 FILTROS GLOBAIS DE HOSPITAL
   searchTerm = '', // 🆕 BUSCA GLOBAL
-  selectedCareCharacter = 'all' // 🆕 FILTRO GLOBAL DE CARÁTER DE ATENDIMENTO
+  selectedCareCharacter = 'all', // 🆕 FILTRO GLOBAL DE CARÁTER DE ATENDIMENTO
+  selectedSpecialty = 'all' // 🆕 FILTRO GLOBAL DE ESPECIALIDADE
 }) => {
   const { user, canAccessAllHospitals, hasFullAccess } = useAuth();
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
@@ -1080,11 +1082,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       });
     }
 
+    // Filtrar por especialidade (global)
+    if (selectedSpecialty && selectedSpecialty !== 'all') {
+      const sel = selectedSpecialty.toLowerCase();
+      filtered = filtered.filter(doctor => (doctor.doctor_info.specialty || '').toLowerCase() === sel);
+    }
+
     setFilteredDoctors(filtered);
     
     // Reset da página atual quando filtros são aplicados
     setCurrentDoctorPage(1);
-  }, [searchTerm, doctors, selectedHospitals, selectedCareCharacter, dateRange]);
+  }, [searchTerm, selectedSpecialty, doctors, selectedHospitals, selectedCareCharacter, dateRange]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
   const toggleDoctorExpansion = (doctorKey: string) => {
