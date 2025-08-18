@@ -59,6 +59,8 @@ import {
   HospitalMedicalStats
 } from '../types';
 import { toast } from './ui/use-toast';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // ================================================================
 // TIPOS E INTERFACES
@@ -282,11 +284,25 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     });
   };
 
-  // 📄 LÓGICA DE PAGINAÇÃO
-  const totalPages = Math.ceil(filteredDoctors.length / itemsPerPage);
+  // 🔁 ORDENAR POR HOSPITAL (primário) E PROFISSIONAL (secundário), 1 linha por vínculo
+  const sortedDoctorRows = React.useMemo(() => {
+    const rows = (filteredDoctors || []).map(d => ({
+      doctor: d,
+      hospital: d.hospitalName || (d.hospitals && d.hospitals[0]) || ''
+    }));
+    rows.sort((a, b) => {
+      const hospCmp = (a.hospital || '').localeCompare(b.hospital || '', 'pt-BR', { sensitivity: 'base' });
+      if (hospCmp !== 0) return hospCmp;
+      return (a.doctor.name || '').localeCompare(b.doctor.name || '', 'pt-BR', { sensitivity: 'base' });
+    });
+    return rows;
+  }, [filteredDoctors]);
+
+  // 📄 LÓGICA DE PAGINAÇÃO (por vínculo)
+  const totalPages = Math.ceil(sortedDoctorRows.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentDoctors = filteredDoctors.slice(startIndex, endIndex);
+  const currentDoctors = sortedDoctorRows.slice(startIndex, endIndex);
 
   // Reset página quando filtros mudarem
   useEffect(() => {
@@ -331,11 +347,87 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     });
   };
 
-  const handleExport = () => {
-    toast({
-      title: "Exportação",
-      description: "Exportando dados dos profissionais..."
-    });
+  const handleExport = async () => {
+    try {
+      // Usar exatamente o que está na tela (filtros e ordenação aplicados)
+      const rows = (sortedDoctorRows || []).map(({ doctor: d, hospital }) => ({
+        name: d.name || 'Médico não informado',
+        specialty: d.speciality || 'Não informado',
+        hospital: hospital || 'Não informado',
+      }));
+
+      if (rows.length === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Sem dados para exportar',
+          description: 'Nenhum profissional encontrado para o relatório.'
+        });
+        return;
+      }
+
+      // A ordem já segue a tela: Hospital (A→Z) e, dentro, Profissional (A→Z)
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      // Header modernizado
+      doc.setFillColor(41, 128, 185);
+      doc.rect(0, 0, pageWidth, 28, 'F');
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.text('SIGTAP Sync', 14, 18);
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.text('RELATÓRIO SUS - CORPO MÉDICO', pageWidth - 14, 18, { align: 'right' });
+
+      // Barra separadora
+      doc.setDrawColor(41, 128, 185);
+      doc.setLineWidth(0.8);
+      doc.line(14, 32, pageWidth - 14, 32);
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      doc.text(`Total de vínculos médico-hospital: ${rows.length}`, 14, 40);
+      doc.text(`Data: ${new Date().toLocaleString('pt-BR')}`, pageWidth - 14, 40, { align: 'right' });
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(100, 100, 100);
+      doc.text('Relatório baseado no padrão SUS.', pageWidth - 14, 46, { align: 'right' });
+
+      doc.setDrawColor(230, 230, 230);
+      doc.setLineWidth(0.6);
+      doc.line(14, 52, pageWidth - 14, 52);
+
+      const tableBody = rows.map(r => [r.name, r.specialty, r.hospital]);
+
+      autoTable(doc, {
+        head: [['Médico', 'Especialidade', 'Hospital']],
+        body: tableBody,
+        startY: 58,
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [41, 128, 185], textColor: [255, 255, 255], fontStyle: 'bold' },
+      });
+
+      const fileName = `Relatorio_SUS_Corpo_Medico_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,'')}.pdf`;
+      doc.save(fileName);
+
+      toast({
+        title: 'Relatório gerado com sucesso!',
+        description: `${fileName} foi baixado.`
+      });
+    } catch (error) {
+      console.error('Erro ao exportar relatório de profissionais:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao exportar',
+        description: 'Ocorreu um erro ao gerar o PDF. Tente novamente.'
+      });
+    }
   };
 
   // Função removida - não mais necessária
@@ -613,7 +705,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
               <Users className="h-5 w-5 text-gray-600" />
               <span className="font-medium text-gray-900">Lista de Profissionais</span>
               <Badge variant="secondary">
-                {isLoading ? '...' : `${filteredDoctors.length} profissionais`}
+                {isLoading ? '...' : `${sortedDoctorRows.length} vínculos`}
               </Badge>
               {totalPages > 1 && (
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
@@ -762,7 +854,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                       </TableCell>
                     </TableRow>
                   ) : (
-                    currentDoctors.map((doctor) => {
+                    currentDoctors.map(({ doctor, hospital }) => {
                       try {
                         // Proteção adicional contra dados inválidos
                         if (!doctor || !doctor.id) {
@@ -814,9 +906,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                             )}
                           </TableCell>
                           <TableCell>
-                            <div className="text-sm font-medium text-gray-700">
-                              {doctor.hospitalName || (doctor.hospitals && doctor.hospitals[0]) || 'Não informado'}
-                            </div>
+                            <div className="text-sm font-medium text-gray-700">{hospital || 'Não informado'}</div>
                           </TableCell>
                         </TableRow>
                         {isExpanded && (
@@ -889,7 +979,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             <div className="p-4 border-t bg-gray-50">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-gray-600">
-                  Mostrando {startIndex + 1} a {Math.min(endIndex, filteredDoctors.length)} de {filteredDoctors.length} profissionais
+                  Mostrando {startIndex + 1} a {Math.min(endIndex, sortedDoctorRows.length)} de {sortedDoctorRows.length} vínculos
                 </div>
                 
                 <div className="flex items-center gap-2">
