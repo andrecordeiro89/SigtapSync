@@ -1576,6 +1576,24 @@ export class AIHPersistenceService {
         for (const procedure of aihCompleta.procedimentos) {
           try {
             console.log(`🔍 PROCEDIMENTO ${procedure.sequencia}: quantity=${procedure.quantity} (tipo: ${typeof procedure.quantity})`);
+            // Resolver nome do profissional priorizando cadastro do médico
+            let resolvedProfessionalName: string | undefined = procedure.nomeProfissional;
+            try {
+              // 1) Tentar via doctors por CNS do responsável da AIH
+              if (!resolvedProfessionalName && aihCompleta?.cnsResponsavel) {
+                const { data: docData } = await supabase
+                  .from('doctors')
+                  .select('name')
+                  .eq('cns', aihCompleta.cnsResponsavel)
+                  .single();
+                if (docData?.name) resolvedProfessionalName = docData.name;
+              }
+              // 2) Tentar via médico solicitante na própria AIH
+              if (!resolvedProfessionalName && aihCompleta?.medicoSolicitante) {
+                resolvedProfessionalName = aihCompleta.medicoSolicitante;
+              }
+            } catch {}
+
             // Salvar procedimento na tabela procedure_records - MAPEAMENTO CORRIGIDO
             const procedureRecord = await this.saveProcedureRecordFixed({
               hospital_id: hospitalId,
@@ -1585,7 +1603,7 @@ export class AIHPersistenceService {
               procedure_description: procedure.descricao || '',
               sequencia: procedure.sequencia, // ✅ CAMPO CORRETO
               professional_document: procedure.documentoProfissional,
-              professional_name: procedure.nomeProfissional || 'MÉDICO RESPONSÁVEL',
+              professional_name: resolvedProfessionalName || 'MÉDICO RESPONSÁVEL',
               cbo: procedure.cbo,
               participation: procedure.participacao,
               cnes: procedure.cnes,

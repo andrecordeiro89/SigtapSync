@@ -30,7 +30,7 @@ import {
 
 // Services
 import { DoctorsRevenueService, type DoctorAggregated, type SpecialtyStats, type HospitalStats as HospitalRevenueStats } from '../services/doctorsRevenueService';
-import { AIHBillingService, type CompleteBillingStats } from '../services/aihBillingService';
+import { AIHBillingService, type CompleteBillingStats, type AIHBillingByProcedure } from '../services/aihBillingService';
 import { supabase } from '../lib/supabase';
 import { DateRange } from '../types';
 import HospitalRevenueDashboard from './HospitalRevenueDashboard';
@@ -327,14 +327,20 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [specialtyStats, setSpecialtyStats] = useState<SpecialtyStats[]>([]);
   const [hospitalRevenueStats, setHospitalRevenueStats] = useState<HospitalRevenueStats[]>([]);
   const [billingStats, setBillingStats] = useState<CompleteBillingStats | null>(null);
+  // Filtro local da aba Procedimentos
+  const [proceduresHospitalId, setProceduresHospitalId] = useState<string>('all');
+  const [proceduresData, setProceduresData] = useState<AIHBillingByProcedure[]>([]);
+  const [includeAnesthesia, setIncludeAnesthesia] = useState<boolean>(true);
   
 
 
   // Authentication
   const { user, isDirector, isAdmin, isCoordinator, isTI, hasPermission } = useAuth();
 
-  // Paginação
-  const procedures = billingStats?.byProcedure || [];
+  // Paginação (usa dados locais filtrados por hospital quando aplicável)
+  const procedures = (proceduresData && proceduresData.length > 0)
+    ? proceduresData
+    : (billingStats?.byProcedure || []);
   const totalPages = Math.ceil(procedures.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -1128,8 +1134,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <Filter className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">Filtros da Aba Médicos</h3>
-                  <p className="text-sm text-gray-600 mt-1">Configure filtros aplicados somente à aba Médicos</p>
+                  <h3 className="text-xl font-bold text-gray-900">Filtros de Produção Médica</h3>
+                  <p className="text-sm text-gray-600 mt-1">Ajuste os filtros para análise da produção médica</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -1404,9 +1410,82 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       </p>
                   </div>
                 </div>
-                <div className="bg-gray-100 px-2 py-1 rounded-full">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-600">Incluir Anestesia</label>
+                    <input
+                      type="checkbox"
+                      checked={includeAnesthesia}
+                      onChange={async (e) => {
+                        const checked = e.target.checked;
+                        setIncludeAnesthesia(checked);
+                        setCurrentPage(1);
+                        try {
+                          const hospitalFilter = proceduresHospitalId !== 'all' ? [proceduresHospitalId] : undefined;
+                          const data = await AIHBillingService.getBillingByProcedure(undefined, selectedDateRange, hospitalFilter, !checked);
+                          setProceduresData(data.length ? data : (billingStats?.byProcedure || []));
+                        } catch (err) {
+                          console.error('Erro ao aplicar filtro de anestesia:', err);
+                          toast.error('Erro ao aplicar filtro de anestesia');
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-600">Hospital</label>
+                    <select
+                      value={proceduresHospitalId}
+                      onChange={async (e) => {
+                        const value = e.target.value;
+                        setProceduresHospitalId(value);
+                        setCurrentPage(1);
+                        try {
+                          if (value && value !== 'all') {
+                            // Buscar procedimentos filtrados por hospital
+                            const data = await AIHBillingService.getBillingByProcedure(undefined, selectedDateRange, [value], !includeAnesthesia);
+                            setProceduresData(data);
+                          } else {
+                            // Sem filtro: usar dados globais já carregados
+                            const data = await AIHBillingService.getBillingByProcedure(undefined, selectedDateRange, undefined, !includeAnesthesia);
+                            setProceduresData(data.length ? data : (billingStats?.byProcedure || []));
+                          }
+                        } catch (err) {
+                          console.error('Erro ao filtrar procedimentos por hospital:', err);
+                          toast.error('Erro ao filtrar por hospital');
+                        }
+                      }}
+                      className="px-2 py-1.5 text-sm border border-gray-200 rounded-md bg-white"
+                    >
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-gray-600">Incluir Anestesia</label>
+                    <input
+                      type="checkbox"
+                      checked={includeAnesthesia}
+                      onChange={async (e) => {
+                        const checked = e.target.checked;
+                        setIncludeAnesthesia(checked);
+                        setCurrentPage(1);
+                        try {
+                          const hospitalFilter = proceduresHospitalId !== 'all' ? [proceduresHospitalId] : undefined;
+                          const data = await AIHBillingService.getBillingByProcedure(undefined, selectedDateRange, hospitalFilter, !checked);
+                          setProceduresData(data.length ? data : (billingStats?.byProcedure || []));
+                        } catch (err) {
+                          console.error('Erro ao aplicar filtro de anestesia:', err);
+                          toast.error('Erro ao aplicar filtro de anestesia');
+                        }
+                      }}
+                    />
+                  </div>
+                      <option value="all">Todos</option>
+                      {[...hospitalRevenueStats].sort((a, b) => a.hospital_name.localeCompare(b.hospital_name, 'pt-BR')).map(h => (
+                        <option key={h.hospital_id} value={h.hospital_id}>{h.hospital_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="bg-gray-100 px-2 py-1 rounded-full">
                     <span className="text-xs font-medium text-gray-700">{procedures.length} itens</span>
                   </div>
+                </div>
               </div>
             </div>
             
@@ -1435,22 +1514,22 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                             </h4>
                             
                             <div className="grid grid-cols-2 gap-3">
-                               <div className="bg-blue-50 p-2 rounded-md border border-blue-100">
-                                 <div className="flex items-center mb-1">
-                                   <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1.5"></div>
-                                   <span className="text-xs font-medium text-blue-700">AIHs Total</span>
-                                 </div>
-                                 <div className="text-sm font-bold text-blue-900">{formatNumber(procedure.total_aihs)}</div>
-                               </div>
-                               
-                               <div className="bg-green-50 p-2 rounded-md border border-green-100">
-                                 <div className="flex items-center mb-1">
-                                   <div className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5"></div>
-                                   <span className="text-xs font-medium text-green-700">Valor Unitário</span>
-                                 </div>
-                                 <div className="text-sm font-bold text-green-900">{formatCurrency(safeValue(procedure.avg_value_per_aih))}</div>
-                               </div>
-                             </div>
+                                <div className="bg-blue-50 p-2 rounded-md border border-blue-100">
+                                  <div className="flex items-center mb-1">
+                                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mr-1.5"></div>
+                                    <span className="text-xs font-medium text-blue-700">Procedimentos (Qtde)</span>
+                                  </div>
+                                  <div className="text-sm font-bold text-blue-900">{formatNumber((procedure as any).total_procedures ?? procedure.total_aihs)}</div>
+                                </div>
+                                
+                                <div className="bg-green-50 p-2 rounded-md border border-green-100">
+                                  <div className="flex items-center mb-1">
+                                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5"></div>
+                                    <span className="text-xs font-medium text-green-700">Valor Unitário</span>
+                                  </div>
+                                  <div className="text-sm font-bold text-green-900">{formatCurrency(safeValue(procedure.avg_value_per_aih))}</div>
+                                </div>
+                              </div>
                           </div>
                           
                           <div className="text-right">
@@ -1460,10 +1539,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                                  Valor Total
                                </div>
                                <div className="text-lg font-bold text-slate-800 mb-1">
-                                 {formatCurrency(procedure.total_aihs * safeValue(procedure.avg_value_per_aih))}
+                                 {formatCurrency(((procedure as any).total_procedures ?? procedure.total_aihs) * safeValue(procedure.avg_value_per_aih))}
                                </div>
                                <div className="text-xs text-slate-600 bg-white/60 px-2 py-0.5 rounded-full">
-                                 {formatNumber(procedure.total_aihs)} × {formatCurrency(safeValue(procedure.avg_value_per_aih))}
+                                 {formatNumber((procedure as any).total_procedures ?? procedure.total_aihs)} × {formatCurrency(safeValue(procedure.avg_value_per_aih))}
                                </div>
                              </div>
                           </div>

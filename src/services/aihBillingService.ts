@@ -80,6 +80,7 @@ export interface AIHBillingByProcedure {
   procedure_code: string;
   procedure_description: string;
   total_aihs: number;
+  total_procedures?: number;
   total_value: number;
   avg_value_per_aih: number;
   approved_aihs: number;
@@ -290,25 +291,228 @@ export class AIHBillingService {
   /**
    * Busca dados de faturamento por procedimento
    */
-  static async getBillingByProcedure(limit: number = 30, dateRange?: DateRange): Promise<AIHBillingByProcedure[]> {
+  static async getBillingByProcedure(limit?: number, dateRange?: DateRange, hospitalIds?: string[], excludeAnesthesia?: boolean): Promise<AIHBillingByProcedure[]> {
     try {
-      console.log(`🩺 Buscando faturamento por procedimento (top ${limit})...`);
+      console.log(`🩺 Buscando faturamento por procedimento${limit && limit > 0 ? ` (top ${limit})` : ' (sem limite)' }${hospitalIds && hospitalIds.length > 0 ? ` | filtro hospitais (${hospitalIds.length})` : ''}${excludeAnesthesia ? ' | excluindo anestesia' : ''}...`);
       
-      const { data, error } = await supabase
+      // Se houver filtro de hospital, usar view por hospital para manter descrições e valores corretos
+      if (hospitalIds && hospitalIds.length > 0 && !hospitalIds.includes('all')) {
+        let q = supabase
+          .from('v_procedure_summary_by_hospital')
+          .select('hospital_id, hospital_name, procedure_code, procedure_description, total_count, total_value, avg_value_per_procedure, approved_count, rejected_count, pending_count');
+        q = q.in('hospital_id', hospitalIds);
+        const { data, error } = await q;
+        if (error) {
+          console.error('❌ Erro na view v_procedure_summary_by_hospital:', error);
+          return [];
+        }
+        let mapped: AIHBillingByProcedure[] = (data || []).map((row: any) => ({
+          procedure_code: row.procedure_code,
+          procedure_description: row.procedure_description,
+          total_aihs: row.unique_aihs_count ?? 0,
+          total_procedures: row.total_count ?? 0,
+          total_value: Number(row.total_value) || 0,
+          avg_value_per_aih: Number(row.avg_value_per_procedure) || 0,
+          approved_aihs: row.approved_count ?? 0,
+          approved_value: 0,
+          rejected_aihs: row.rejected_count ?? 0,
+          rejected_value: 0,
+          pending_aihs: row.pending_count ?? 0,
+          pending_value: 0,
+          avg_length_of_stay: 3.5,
+          unique_specialties: 0,
+          unique_hospitals: 1,
+          unique_doctors: 0,
+        }));
+
+        // Excluir anestesia apenas filtrando os itens
+        if (excludeAnesthesia) {
+          mapped = mapped.filter(p => !((p.procedure_description || '').toUpperCase().includes('ANESTES')));
+        }
+        // Ordenar e aplicar limite
+        mapped.sort((a, b) => (b.total_value || 0) - (a.total_value || 0));
+        if (limit && limit > 0) mapped = mapped.slice(0, limit);
+        return mapped;
+      }
+      
+      let query = supabase
         .from('v_aih_billing_by_procedure')
         .select('*')
-        .order('total_value', { ascending: false })
-        .limit(limit);
+        .order('total_value', { ascending: false });
+
+      if (limit && limit > 0) {
+        query = query.limit(limit);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('❌ Erro ao buscar dados por procedimento:', error);
         return [];
       }
 
-      console.log(`✅ Dados de ${data?.length || 0} procedimentos obtidos`);
-      return data || [];
+      let result = (data || []) as AIHBillingByProcedure[];
+      // Excluir anestesia apenas filtrando os itens (sem recomputar valores)
+      if (excludeAnesthesia) {
+        result = result.filter(p => !((p.procedure_description || '').toUpperCase().includes('ANESTES')));
+      }
+      console.log(`✅ Dados de ${result.length} procedimentos obtidos${excludeAnesthesia ? ' (anestesia excluída)' : ''}`);
+      return result;
     } catch (error) {
       console.error('❌ Erro na consulta por procedimento:', error);
+      return [];
+    }
+  }
+
+  // Agregação client-side quando é necessário filtrar por hospitais
+  private static async getBillingByProcedureFromRecords(
+    hospitalIds?: string[],
+    dateRange?: DateRange,
+    limit?: number,
+    excludeAnesthesia?: boolean
+  ): Promise<AIHBillingByProcedure[]> {
+    try {
+      let anesthesiaCodes = new Set<string>();
+      if (excludeAnesthesia) {
+        try {
+          const { data: anesthesiaRows } = await supabase
+            .from('sigtap_procedures')
+            .select('code')
+            .ilike('description', '%ANESTES%');
+          (anesthesiaRows || []).forEach(r => {
+            if (r && (r as any).code) anesthesiaCodes.add((r as any).code);
+          });
+        } catch {}
+      }
+
+      let q = supabase
+        .from('procedure_records')
+        .select('procedure_code, value_charged, billing_status, aih_id, hospital_id, professional_name, professional_cbo, procedure_date');
+      
+      if (hospitalIds && hospitalIds.length > 0) {
+        q = q.in('hospital_id', hospitalIds);
+      }
+      if (dateRange) {
+        q = q.gte('procedure_date', dateRange.startDate.toISOString())
+             .lte('procedure_date', dateRange.endDate.toISOString());
+      }
+
+      const { data, error } = await q;
+      if (error) {
+        console.error('❌ Erro ao buscar procedure_records para filtro de hospitais:', error);
+        return [];
+      }
+
+      const byCode: Record<string, {
+        procedure_code: string;
+        total_value_cents: number;
+        count: number;
+        aihSet: Set<string>;
+        approvedAihSet: Set<string>;
+        rejectedAihSet: Set<string>;
+        pendingAihSet: Set<string>;
+        hospitalsSet: Set<string>;
+        doctorsSet: Set<string>;
+      }> = {};
+
+      for (const row of (data || [])) {
+        if (!row.procedure_code) continue;
+        const code = row.procedure_code as string;
+        if (excludeAnesthesia && anesthesiaCodes.has(code)) {
+          continue; // pular linhas de procedimentos de anestesia
+        }
+        if (!byCode[code]) {
+          byCode[code] = {
+            procedure_code: code,
+            total_value_cents: 0,
+            count: 0,
+            aihSet: new Set(),
+            approvedAihSet: new Set(),
+            rejectedAihSet: new Set(),
+            pendingAihSet: new Set(),
+            hospitalsSet: new Set(),
+            doctorsSet: new Set(),
+          };
+        }
+        const bucket = byCode[code];
+        const aihId = (row.aih_id || '') as string;
+        const hospitalId = (row.hospital_id || '') as string;
+        const professionalName = (row.professional_name || '') as string;
+        const valueCents = Number(row.value_charged) || 0;
+        bucket.total_value_cents += valueCents;
+        bucket.count += 1;
+        if (aihId) bucket.aihSet.add(aihId);
+        if (hospitalId) bucket.hospitalsSet.add(hospitalId);
+        if (professionalName) bucket.doctorsSet.add(professionalName);
+        const status = (row.billing_status || '').toString();
+        if (status === 'approved' || status === 'paid') bucket.approvedAihSet.add(aihId);
+        else if (status === 'rejected') bucket.rejectedAihSet.add(aihId);
+        else if (status === 'pending' || status === 'submitted') bucket.pendingAihSet.add(aihId);
+      }
+
+      // Buscar descrições dos códigos
+      const codes = Object.keys(byCode);
+      let descriptions: Record<string, string> = {};
+      if (codes.length > 0) {
+        const { data: sigtapRows, error: sigtapError } = await supabase
+          .from('sigtap_procedures')
+          .select('code, description')
+          .in('code', codes);
+        if (!sigtapError) {
+          descriptions = (sigtapRows || []).reduce((acc: Record<string, string>, r: any) => {
+            acc[r.code] = r.description;
+            return acc;
+          }, {});
+        }
+        // Fallback: tentar tabela oficial se ainda faltarem descrições
+        const missingCodes = codes.filter(c => !descriptions[c]);
+        if (missingCodes.length > 0) {
+          try {
+            const { data: officialRows } = await supabase
+              .from('sigtap_procedimentos_oficial')
+              .select('code, description')
+              .in('code', missingCodes);
+            (officialRows || []).forEach((r: any) => {
+              if (r && r.code && r.description && !descriptions[r.code]) {
+                descriptions[r.code] = r.description;
+              }
+            });
+          } catch {}
+        }
+      }
+
+      // Montar resposta
+      let result: AIHBillingByProcedure[] = codes.map(code => {
+        const b = byCode[code];
+        const totalAihs = b.aihSet.size;
+        const totalValueReais = Math.round((b.total_value_cents / 100) * 100) / 100;
+        const avgValue = totalAihs > 0 ? Math.round(((b.total_value_cents / 100) / totalAihs) * 100) / 100 : 0;
+        return {
+          procedure_code: code,
+          procedure_description: descriptions[code] || '',
+          total_aihs: totalAihs,
+          total_procedures: b.count,
+          total_value: totalValueReais,
+          avg_value_per_aih: avgValue,
+          approved_aihs: b.approvedAihSet.size,
+          approved_value: 0, // não calculado aqui
+          rejected_aihs: b.rejectedAihSet.size,
+          rejected_value: 0, // não calculado aqui
+          pending_aihs: b.pendingAihSet.size,
+          pending_value: 0, // não calculado aqui
+          avg_length_of_stay: 3.5,
+          unique_specialties: 0,
+          unique_hospitals: b.hospitalsSet.size,
+          unique_doctors: b.doctorsSet.size,
+        };
+      });
+
+      // Ordenar por total_value desc e aplicar limite
+      result.sort((a, b) => (b.total_value || 0) - (a.total_value || 0));
+      if (limit && limit > 0) result = result.slice(0, limit);
+      return result;
+    } catch (e) {
+      console.error('❌ Erro ao agregar procedimentos por hospitais:', e);
       return [];
     }
   }
@@ -348,6 +552,7 @@ export class AIHBillingService {
       specialty?: string; // doctor_specialty
       careCharacter?: string; // '1' | '2' | '3' | '4' | 'all'
       searchTerm?: string;
+      procedureLimit?: number; // quando ausente ou <= 0, retorna todos
     }
   ): Promise<CompleteBillingStats> {
     try {
@@ -373,7 +578,7 @@ export class AIHBillingService {
         this.getBillingByHospital(dateRange),
         this.getBillingByMonth(dateRange),
         this.getBillingByDoctor(50, dateRange),
-        this.getBillingByProcedure(30, dateRange),
+        this.getBillingByProcedure(options?.procedureLimit, dateRange),
         this.getBillingByHospitalSpecialty(dateRange)
       ]);
 
