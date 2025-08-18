@@ -145,8 +145,9 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
 
       console.log('🔍 Filtros aplicados:', filters);
 
+      // Usar linhas 1:1 de doctor_hospital para garantir 100% dos vínculos
       const [doctorsResult, specialtiesResult, hospitalStatsResult] = await Promise.all([
-        DoctorsCrudService.getAllDoctors(filters),
+        DoctorsCrudService.getAllDoctorHospitalRaw(),
         DoctorsCrudService.getMedicalSpecialties(),
         DoctorsCrudService.getHospitalMedicalStats()
       ]);
@@ -216,34 +217,8 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
       if (!doctors || !Array.isArray(doctors)) {
         return [];
       }
-
-      // 📋 AGRUPAR MÉDICOS POR CNS (evitar duplicação por hospital)
-      const doctorsGrouped = new Map<string, MedicalDoctor>();
-
-      doctors.forEach(doctor => {
-        if (!doctor?.cns) return; // Pular médicos sem CNS
-
-        const existingDoctor = doctorsGrouped.get(doctor.cns);
-        
-        if (existingDoctor) {
-          // Médico já existe, adicionar hospital se não estiver na lista
-          if (doctor.hospitalName && existingDoctor.hospitals && !existingDoctor.hospitals.includes(doctor.hospitalName)) {
-            existingDoctor.hospitals.push(doctor.hospitalName);
-          }
-        } else {
-          // Primeiro registro do médico
-          doctorsGrouped.set(doctor.cns, {
-            ...doctor,
-            hospitals: doctor.hospitalName ? [doctor.hospitalName] : []
-          });
-        }
-      });
-
-      // 🔍 FILTRAR MÉDICOS AGRUPADOS
-      const groupedArray = Array.from(doctorsGrouped.values());
-      console.log(`📋 Médicos agrupados: ${doctors.length} registros → ${groupedArray.length} médicos únicos`);
-      
-      const filteredArray = groupedArray.filter(doctor => {
+      // 🔁 USAR LINHAS 1:1 (cada item já representa um vínculo médico↔hospital)
+      const filteredArray = doctors.filter(doctor => {
         try {
           // Proteção contra campos undefined/null
           const doctorName = doctor?.name || '';
@@ -256,9 +231,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             doctorSpecialty.toLowerCase().includes(searchTerm.toLowerCase());
           
           // 🏥 FILTRO DE HOSPITAL - Verifica se médico atende no hospital selecionado
-          const matchesHospital = selectedHospital === 'all' || 
-            (doctor.hospitals && doctor.hospitals.includes(selectedHospital)) ||
-            (doctor.hospitalName === selectedHospital);
+          const matchesHospital = selectedHospital === 'all' || (doctor.hospitalName === selectedHospital);
           
           // 🩺 FILTRO DE ESPECIALIDADE
           const matchesSpecialty = selectedSpecialty === 'all' || 
@@ -274,13 +247,11 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
           return false;
         }
       });
-      
-      // Log apenas quando há filtros ativos
-      if (searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') {
-        console.log(`🔍 Filtragem: ${groupedArray.length} → ${filteredArray.length} médicos`);
-      }
-      
-      return filteredArray;
+
+      // 🔠 ORDENAR POR NOME DO PROFISSIONAL (A→Z)
+      const sorted = [...filteredArray].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' }));
+
+      return sorted;
     } catch (error) {
       console.error('❌ Erro crítico na filtragem:', error);
       return []; // Retornar array vazio em caso de erro
@@ -802,7 +773,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                     const isExpanded = expandedRows.has(doctor.id);
                     
                     return (
-                      <React.Fragment key={doctor.id}>
+                      <React.Fragment key={`${doctor.id}::${doctor.hospitalName || ''}`}>
                         <TableRow className={isExpanded ? 'bg-slate-50' : 'hover:bg-gray-50'}>
                           <TableCell className="w-12">
                             <Button
@@ -843,28 +814,8 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                             )}
                           </TableCell>
                           <TableCell>
-                            <div className="text-sm">
-                              {doctor.hospitals && doctor.hospitals.length > 0 ? (
-                                <div className="space-y-1">
-                                  {doctor.hospitals.slice(0, 2).map((hospital: string, index: number) => (
-                                    <div key={index} className="text-gray-700 font-medium">
-                                      {hospital}
-                                    </div>
-                                  ))}
-                                  {doctor.hospitals.length > 2 && (
-                                    <div className="text-xs text-gray-500">
-                                      +{doctor.hospitals.length - 2} outros hospitais
-                                    </div>
-                                  )}
-                                  {doctor.hospitals.length > 1 && (
-                                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                                      {doctor.hospitals.length} hospitais
-                                    </Badge>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400">Não informado</span>
-                              )}
+                            <div className="text-sm font-medium text-gray-700">
+                              {doctor.hospitalName || (doctor.hospitals && doctor.hospitals[0]) || 'Não informado'}
                             </div>
                           </TableCell>
                         </TableRow>

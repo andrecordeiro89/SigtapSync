@@ -113,56 +113,37 @@ export class DoctorsCrudService {
         };
       }
 
-      // Fallback: se consulta direta não retornar dados úteis (join não resolvido), buscar via view agregada
+      // Se o join aninhado não veio (FK não configurada no PostgREST), fazer "join manual" usando as tabelas base
       let effectiveRows: any[] = doctorHospitalData || [];
       const allRowsHaveNullDoctor = effectiveRows.length > 0 && effectiveRows.every(r => !(r as any).doctors);
-      if (!effectiveRows.length || allRowsHaveNullDoctor) {
-        console.warn('⚠️ Fallback: usando view doctor_hospital_info (join nativo indisponível)');
-        const { data: infoRows, error: infoError } = await supabase
-          .from('doctor_hospital_info')
-          .select('doctor_id, doctor_cns, doctor_crm, doctor_name, doctor_specialty, hospital_id, hospital_name')
-          .order('doctor_name');
+      if (effectiveRows.length > 0 && allRowsHaveNullDoctor) {
+        console.warn('ℹ️ Join aninhado indisponível. Fazendo join manual com as tabelas doctors/hospitals.');
 
-        if (infoError) {
-          console.error('❌ Erro ao buscar na doctor_hospital_info:', infoError);
+        const doctorCnsSet = Array.from(new Set((effectiveRows as any[]).map(r => r.doctor_cns).filter(Boolean)));
+        const hospitalIdSet = Array.from(new Set((effectiveRows as any[]).map(r => r.hospital_id).filter(Boolean)));
+
+        const [doctorsRes, hospitalsRes] = await Promise.all([
+          supabase.from('doctors').select('id, cns, crm, name, specialty, is_active, created_at, updated_at').in('cns', doctorCnsSet),
+          supabase.from('hospitals').select('id, name, cnpj').in('id', hospitalIdSet)
+        ]);
+
+        const doctorsByCns = new Map<string, any>((doctorsRes.data || []).map(d => [d.cns, d]));
+        const hospitalsById = new Map<string, any>((hospitalsRes.data || []).map(h => [h.id, h]));
+
+        effectiveRows = effectiveRows.map((r: any) => {
+          const d = doctorsByCns.get(r.doctor_cns);
+          const h = hospitalsById.get(r.hospital_id);
           return {
-            success: false,
-            error: infoError.message
+            ...r,
+            doctors: d ? d : null,
+            hospitals: h ? h : null
           };
-        }
+        }).filter((r: any) => r.doctors && r.hospitals);
 
-        if (!infoRows || infoRows.length === 0) {
-          console.log('⚠️ Nenhum médico encontrado nem em doctor_hospital_info');
-          return {
-            success: true,
-            data: [],
-            message: 'Nenhum médico encontrado'
-          };
+        if (effectiveRows.length === 0) {
+          console.warn('⚠️ Join manual não encontrou correspondências. Retornando lista vazia.');
+          return { success: true, data: [], message: 'Nenhum médico encontrado' };
         }
-
-        // Adaptar formato para fluxo comum de agrupamento
-        effectiveRows = infoRows.map(r => ({
-          doctor_cns: r.doctor_cns,
-          hospital_id: r.hospital_id,
-          role: null,
-          department: null,
-          is_active: true,
-          doctors: {
-            id: r.doctor_id,
-            cns: r.doctor_cns,
-            crm: r.doctor_crm,
-            name: r.doctor_name,
-            specialty: r.doctor_specialty,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          hospitals: {
-            id: r.hospital_id,
-            name: r.hospital_name,
-            cnpj: ''
-          }
-        }));
       }
 
       // 2. AGRUPAR MÉDICOS POR CNS (evitar duplicação)
@@ -249,6 +230,67 @@ export class DoctorsCrudService {
         success: false,
         error: `Erro inesperado: ${error}`
       };
+    }
+  }
+
+  /**
+   * Retorna TODAS as linhas de doctor_hospital sem agrupamento (1 linha por vínculo médico↔hospital)
+   * Garante que o total retornado == total de registros em doctor_hospital, mesmo se faltarem FKs
+   */
+  static async getAllDoctorHospitalRaw(): Promise<CrudResult<MedicalDoctor[]>> {
+    try {
+      console.log('📋 [REAL] Buscando linhas brutas de doctor_hospital (sem agrupamento)...');
+
+      // 1) Buscar linhas base sem relações para não perder registros
+      const { data: baseRows, error: baseErr } = await supabase
+        .from('doctor_hospital')
+        .select('doctor_cns,hospital_id,role,department,is_primary_hospital,is_active,doctor_id')
+        .order('doctor_cns');
+
+      if (baseErr) {
+        return { success: false, error: baseErr.message };
+      }
+      const rows = baseRows || [];
+      if (rows.length === 0) {
+        return { success: true, data: [], message: 'Sem vínculos médico-hospital' };
+      }
+
+      // 2) Carregar mapas auxiliares (opcional) para enriquecer nomes
+      const doctorCnsSet = Array.from(new Set(rows.map(r => r.doctor_cns).filter(Boolean)));
+      const hospitalIdSet = Array.from(new Set(rows.map(r => r.hospital_id).filter(Boolean)));
+
+      const [{ data: doctors }, { data: hospitals }] = await Promise.all([
+        supabase.from('doctors').select('id,cns,crm,name,specialty').in('cns', doctorCnsSet),
+        supabase.from('hospitals').select('id,name').in('id', hospitalIdSet)
+      ]);
+
+      const byCns = new Map<string, any>((doctors || []).map(d => [d.cns, d]));
+      const byHosp = new Map<string, any>((hospitals || []).map(h => [h.id, h]));
+
+      // 3) Mapear cada linha para um registro exibível (1:1)
+      const result: MedicalDoctor[] = rows.map((r: any) => {
+        const d = byCns.get(r.doctor_cns);
+        const h = byHosp.get(r.hospital_id);
+        return {
+          id: d?.id || `${r.doctor_cns || 'NO_CNS'}::${r.hospital_id || 'NO_HOSP'}`,
+          cns: r.doctor_cns || '',
+          crm: d?.crm || '',
+          name: d?.name || r.doctor_cns || 'Médico não identificado',
+          speciality: d?.specialty || '',
+          hospitalId: r.hospital_id || '',
+          hospitalName: h?.name || r.hospital_id || 'Hospital não identificado',
+          hospitals: [h?.name || r.hospital_id || 'Hospital não identificado'],
+          isActive: r.is_primary_hospital != null ? r.is_primary_hospital : true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        } as MedicalDoctor;
+      });
+
+      console.log(`✅ doctor_hospital raw: ${rows.length} vínculos → ${result.length} linhas para exibição`);
+      return { success: true, data: result, message: `${result.length} vínculos` };
+    } catch (error) {
+      console.error('❌ Erro em getAllDoctorHospitalRaw:', error);
+      return { success: false, error: `Erro inesperado: ${error}` };
     }
   }
 

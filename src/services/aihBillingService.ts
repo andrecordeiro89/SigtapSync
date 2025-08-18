@@ -341,7 +341,15 @@ export class AIHBillingService {
   /**
    * Busca todos os dados consolidados para o dashboard
    */
-  static async getCompleteBillingStats(dateRange?: DateRange): Promise<CompleteBillingStats> {
+  static async getCompleteBillingStats(
+    dateRange?: DateRange,
+    options?: {
+      hospitalIds?: string[];
+      specialty?: string; // doctor_specialty
+      careCharacter?: string; // '1' | '2' | '3' | '4' | 'all'
+      searchTerm?: string;
+    }
+  ): Promise<CompleteBillingStats> {
     try {
       console.log('🔄 Carregando dados completos de billing...');
       
@@ -369,16 +377,92 @@ export class AIHBillingService {
         this.getBillingByHospitalSpecialty(dateRange)
       ]);
 
-      // Calcular métricas derivadas
-      const metrics = this.calculateMetrics(summary, byHospital, byMonth, byDoctor, byProcedure);
+      // Aplicar filtros globais (client-side quando views não suportam filtros diretos)
+      const filteredByHospital = (() => {
+        if (options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all')) {
+          const set = new Set(options.hospitalIds);
+          return byHospital.filter(h => set.has(h.hospital_id));
+        }
+        return byHospital;
+      })();
+
+      const filteredByDoctor = (() => {
+        let arr = byDoctor;
+        if (options?.specialty && options.specialty !== 'all') {
+          arr = arr.filter(d => (d.doctor_specialty || '').toLowerCase() === options.specialty!.toLowerCase());
+        }
+        if (options?.searchTerm && options.searchTerm.trim()) {
+          const s = options.searchTerm.toLowerCase();
+          arr = arr.filter(d => (d.doctor_name || '').toLowerCase().includes(s) || (d.doctor_crm || '').toLowerCase().includes(s) || (d.doctor_specialty || '').toLowerCase().includes(s));
+        }
+        // Hospital filter indisponível nesta view (não há hospital_id); manter sem filtro por hospital
+        return arr;
+      })();
+
+      const filteredByHospitalSpecialty = (() => {
+        let arr = byHospitalSpecialty;
+        if (options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all')) {
+          const set = new Set(options.hospitalIds);
+          arr = arr.filter(row => set.has(row.hospital_id));
+        }
+        if (options?.specialty && options.specialty !== 'all') {
+          arr = arr.filter(row => (row.doctor_specialty || '').toLowerCase() === options.specialty!.toLowerCase());
+        }
+        return arr;
+      })();
+
+      // Filtrar summary por hospitalIds/careCharacter usando tabela aihs, se filtros presentes
+      let filteredSummary = summary;
+      if (dateRange && (options?.hospitalIds || (options?.careCharacter && options.careCharacter !== 'all'))) {
+        try {
+          const startDateISO = dateRange.startDate.toISOString();
+          const endDateISO = dateRange.endDate.toISOString();
+          let q = supabase
+            .from('aihs')
+            .select('calculated_total_value, processing_status, admission_date, discharge_date, care_character, hospital_id')
+            .gte('admission_date', startDateISO)
+            .lte('admission_date', endDateISO);
+          if (options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all')) {
+            q = q.in('hospital_id', options.hospitalIds);
+          }
+          if (options?.careCharacter && options.careCharacter !== 'all') {
+            q = q.eq('care_character', options.careCharacter);
+          }
+          const { data, error } = await q;
+          if (!error && data) {
+            const totalAihs = data.length;
+            const totalValue = data.reduce((sum, aih: any) => sum + (aih.calculated_total_value || 0), 0);
+            const approvedAihs = data.filter((aih: any) => aih.processing_status === 'approved' || aih.processing_status === 'matched').length;
+            const approvedValue = data.filter((aih: any) => aih.processing_status === 'approved' || aih.processing_status === 'matched')
+              .reduce((sum, aih: any) => sum + (aih.calculated_total_value || 0), 0);
+            filteredSummary = {
+              total_aihs: totalAihs,
+              total_value: totalValue / 100,
+              avg_value_per_aih: totalAihs > 0 ? (totalValue / 100) / totalAihs : 0,
+              approved_aihs: approvedAihs,
+              approved_value: approvedValue / 100,
+              rejected_aihs: 0,
+              rejected_value: 0,
+              pending_aihs: totalAihs - approvedAihs,
+              pending_value: (totalValue - approvedValue) / 100,
+              earliest_date: dateRange.startDate.toISOString(),
+              latest_date: dateRange.endDate.toISOString(),
+              avg_length_of_stay: 3.5
+            };
+          }
+        } catch {}
+      }
+
+      // Calcular métricas com arrays filtrados
+      const metrics = this.calculateMetrics(filteredSummary, filteredByHospital, byMonth, filteredByDoctor, byProcedure);
 
       const result: CompleteBillingStats = {
-        summary,
-        byHospital,
+        summary: filteredSummary,
+        byHospital: filteredByHospital,
         byMonth,
-        byDoctor,
+        byDoctor: filteredByDoctor,
         byProcedure,
-        byHospitalSpecialty,
+        byHospitalSpecialty: filteredByHospitalSpecialty,
         metrics
       };
 

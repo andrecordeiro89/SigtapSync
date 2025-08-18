@@ -943,7 +943,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           const doctorsWithPatients = await DoctorsHierarchyV2Service.getDoctorsHierarchyV2({
             hospitalIds: selectedHospitalIds,
             dateFromISO,
-            dateToISO
+            dateToISO,
+            careCharacter: selectedCareCharacter
           });
           // Usar diretamente a fonte das tabelas, garantindo pacientes e procedimentos
           mergedDoctors = doctorsWithPatients;

@@ -692,6 +692,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       // ✅ PRIMEIRO: Tentar carregar das views, se falhar usar dados reais das tabelas
       let billingStatsData = null;
       try {
+        // Filtros executivos aplicam somente à aba Médicos.
+        // Para billing/KPIs e demais abas, não aplicar filtros globais aqui.
         billingStatsData = await AIHBillingService.getCompleteBillingStats(currentDateRange);
         console.log('✅ Dados carregados das views de billing');
       } catch (error) {
@@ -1116,7 +1118,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           {/* Relatórios aba removida */}
         </TabsList>
 
-        {/* 🔍 FILTROS EXECUTIVOS GLOBAIS - LOGO ABAIXO DAS ABAS */}
+        {/* 🔍 FILTROS EXECUTIVOS GLOBAIS - VISÍVEIS APENAS NA ABA MÉDICOS */}
+        {activeTab === 'doctors' && (
         <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-blue-50/30">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
@@ -1125,8 +1128,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <Filter className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-gray-900">Filtros Executivos Globais</h3>
-                  <p className="text-sm text-gray-600 mt-1">Configure filtros aplicados a todas as abas</p>
+                  <h3 className="text-xl font-bold text-gray-900">Filtros da Aba Médicos</h3>
+                  <p className="text-sm text-gray-600 mt-1">Configure filtros aplicados somente à aba Médicos</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -1177,6 +1180,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     <option value="all">Todos</option>
                     <option value="1">Eletivo</option>
                     <option value="2">Urgência/Emergência</option>
+                    <option value="3">Acidente no Trabalho</option>
+                    <option value="4">Acidente de Trânsito</option>
                   </select>
                   {selectedCareCharacter !== 'all' && (
                     <button
@@ -1358,6 +1363,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             )}
           </CardContent>
         </Card>
+        )}
 
 
 

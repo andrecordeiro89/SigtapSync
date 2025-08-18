@@ -6,6 +6,7 @@ export interface HierarchyFilters {
   hospitalIds?: string[];
   dateFromISO?: string;
   dateToISO?: string;
+  careCharacter?: string; // '1' | '2' | '3' | '4' | 'all'
 }
 
 export class DoctorsHierarchyV2Service {
@@ -47,7 +48,10 @@ export class DoctorsHierarchyV2Service {
       aihsQuery = aihsQuery.lte('discharge_date', end.toISOString());
     }
 
-    // Auditoria: incluir TODOS os caracteres de atendimento (sem filtro)
+    // Filtro por caráter de atendimento, se informado
+    if (filters.careCharacter && filters.careCharacter !== 'all') {
+      aihsQuery = aihsQuery.eq('care_character', filters.careCharacter);
+    }
 
     const { data: aihs, error: aihsError } = await aihsQuery.order('discharge_date', { ascending: false });
     if (aihsError) {
