@@ -1,3 +1,33 @@
+-- ================================================================
+-- RPC: get_hospital_kpis
+-- Retorna faturamento total e quantidade de AIHs para um hospital
+-- no intervalo [p_start, p_end]
+-- ================================================================
+
+CREATE OR REPLACE FUNCTION public.get_hospital_kpis(
+  p_hospital_id uuid,
+  p_start timestamptz,
+  p_end timestamptz
+) RETURNS TABLE (
+  total_revenue numeric,
+  total_aihs integer
+) LANGUAGE plpgsql AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    COALESCE(SUM(aih.calculated_total_value), 0)::numeric AS total_revenue,
+    COUNT(*)::int AS total_aihs
+  FROM public.aihs aih
+  WHERE aih.hospital_id = p_hospital_id
+    AND aih.discharge_date >= p_start
+    AND aih.discharge_date <= p_end
+    AND aih.calculated_total_value IS NOT NULL;
+END;
+$$;
+
+COMMENT ON FUNCTION public.get_hospital_kpis(uuid, timestamptz, timestamptz)
+  IS 'KPIs do hospital: soma de calculated_total_value e count de AIHs no período.';
+
 -- ================================================
 -- FUNÇÕES DE SINCRONIZAÇÃO - SIGTAP OFICIAL
 -- Sincroniza dados oficiais com a tabela principal

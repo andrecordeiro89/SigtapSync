@@ -24,8 +24,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  Search,
-  Building2
+  Search
 } from 'lucide-react';
 
 // Services
@@ -276,8 +275,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [activeHospitalTab, setActiveHospitalTab] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  const [showAllHospitalsRevenue, setShowAllHospitalsRevenue] = useState(false);
-  const [allHospitalsKPIs, setAllHospitalsKPIs] = useState<KPIData | null>(null);
+  // Removido: consolidado de todos os hospitais — fonte única: tabela AIHs filtrada por hospital
   // const [showReportGenerator, setShowReportGenerator] = useState(false);
   
   // Data States
@@ -586,12 +584,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     }
   }, [selectedHospitals, activeHospitalTab, hospitalStats, sortedHospitalStats]);
 
-  // Carregar dados consolidados quando toggle for ativado
-  useEffect(() => {
-    if (showAllHospitalsRevenue) {
-      loadAllHospitalsKPIs(selectedDateRange);
-    }
-  }, [showAllHospitalsRevenue, selectedDateRange]);
+  // Removido: efeito de carregamento de consolidação de todos os hospitais
 
 	// Utilitário para formatar datas no input date
 	const formatDateForInput = (date: Date): string => {
@@ -600,89 +593,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   
 
 
-  // Função para carregar KPIs de todos os hospitais
-  const loadAllHospitalsKPIs = async (dateRange?: DateRange) => {
-    const currentDateRange = dateRange || selectedDateRange;
-    
-    try {
-      console.log('🏥 Carregando KPIs de TODOS os hospitais (ignorando filtros)...');
-      
-      const startDateISO = currentDateRange.startDate.toISOString();
-      const endDateISO = currentDateRange.endDate.toISOString();
-      
-      console.log('📅 Período para dados consolidados:', {
-        inicio: startDateISO,
-        fim: endDateISO
-      });
-      
-      // Query EXPLICITAMENTE SEM qualquer filtro de hospital (todos os hospitais)
-      const [aihsDataResult, aihsCountResult] = await Promise.all([
-        supabase
-          .from('aihs')
-          .select('calculated_total_value, hospital_id, discharge_date')
-          .not('calculated_total_value', 'is', null)
-          .gte('discharge_date', startDateISO)
-          .lte('discharge_date', endDateISO),
-        supabase
-          .from('aihs')
-          .select('*', { count: 'exact', head: true })
-          .gte('discharge_date', startDateISO)
-          .lte('discharge_date', endDateISO)
-      ]);
-      
-      if (aihsDataResult.error) {
-        console.error('❌ Erro na query de dados consolidados:', aihsDataResult.error);
-        return;
-      }
-      
-      if (aihsCountResult.error) {
-        console.error('❌ Erro na query de contagem consolidada:', aihsCountResult.error);
-        return;
-      }
-      
-      console.log('📊 Dados brutos consolidados:', {
-        registrosEncontrados: aihsDataResult.data?.length || 0,
-        totalAIHsCount: aihsCountResult.count || 0,
-        primeiroRegistro: aihsDataResult.data?.[0]
-      });
-      
-      // Aplicar safeValue para tratar valores suspeitos em centavos
-      const totalRevenue = aihsDataResult.data?.reduce((sum, aih) => {
-        const value = safeValue(aih.calculated_total_value || 0);
-        return sum + value;
-      }, 0) || 0;
-      
-      const totalAIHs = aihsCountResult.count || 0;
-      
-      // Contar hospitais únicos
-      const uniqueHospitals = new Set(aihsDataResult.data?.map(aih => aih.hospital_id) || []);
-      
-      const consolidatedKPIs: KPIData = {
-        totalRevenue,
-        totalAIHs,
-        averageTicket: totalAIHs > 0 ? totalRevenue / totalAIHs : 0,
-        approvalRate: 0,
-        activeHospitals: uniqueHospitals.size,
-        activeDoctors: 0,
-        processingTime: 0,
-        monthlyGrowth: 0
-      };
-      
-      setAllHospitalsKPIs(consolidatedKPIs);
-      
-      console.log('✅ KPIs consolidados processados:', {
-        totalRevenue: formatCurrency(totalRevenue),
-        totalAIHs,
-        averageTicket: formatCurrency(consolidatedKPIs.averageTicket),
-        hospitaisUnicos: uniqueHospitals.size,
-        valorBruto: aihsDataResult.data?.reduce((sum, aih) => sum + (aih.calculated_total_value || 0), 0) || 0
-      });
-      
-    } catch (error) {
-      console.error('❌ Erro ao carregar KPIs consolidados:', error);
-      toast.error('Erro ao carregar faturamento consolidado');
-    }
-  };
+  // Removido: função de faturamento consolidado de todos os hospitais
 
   // Load Data
   const loadExecutiveData = async (dateRange?: DateRange) => {
@@ -791,75 +702,43 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
       const activeDoctors = doctorsResult.doctors.filter(d => d.activity_status === 'ATIVO').length;
       
-      // ✅ CARREGAR DADOS DIRETOS DA TABELA AIHS PARA O CABEÇALHO COM FILTROS DE DATA
-      console.log('🔄 Carregando dados diretos da tabela aihs com filtros de período...');
-      
-      // Converter datas para formato ISO para o Supabase
+      // ✅ CABEÇALHO: usar RPC get_hospital_kpis (fonte única e agregada no banco)
       const startDateISO = currentDateRange.startDate.toISOString();
       const endDateISO = currentDateRange.endDate.toISOString();
-      
-      console.log('📅 Aplicando filtros de data:', {
-        inicio: startDateISO,
-        fim: endDateISO
-      });
-      
-          // ✅ APLICAR FILTROS DE HOSPITAL SE SELECIONADOS
-      let aihsDataQuery = supabase
-        .from('aihs')
-        .select('calculated_total_value, hospital_id')
-        .not('calculated_total_value', 'is', null)
-        .gte('discharge_date', startDateISO)
-        .lte('discharge_date', endDateISO);
-      
-      let aihsCountQuery = supabase
-        .from('aihs')
-        .select('*', { count: 'exact', head: true })
-        .gte('discharge_date', startDateISO)
-        .lte('discharge_date', endDateISO);
-      
-      // Aplicar filtro de hospital se não for "all"
-      if (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) {
-        console.log('🏥 Aplicando filtros de hospital aos KPIs:', selectedHospitals);
-        aihsDataQuery = aihsDataQuery.in('hospital_id', selectedHospitals);
-        aihsCountQuery = aihsCountQuery.in('hospital_id', selectedHospitals);
-      }
-      
-      // Query otimizada: buscar dados + count em paralelo com filtros de data e hospital
-      const [aihsDataResult, aihsCountResult] = await Promise.all([
-        aihsDataQuery,
-        aihsCountQuery
-      ]);
+
+      // Garantir hospital ativo (fallback para aba atual)
+      const activeHospitalId = (selectedHospitals.length > 0 && !selectedHospitals.includes('all'))
+        ? selectedHospitals[0]
+        : (activeHospitalTab || sortedHospitalStats[0]?.id || null);
 
       let aihsTotalRevenue = 0;
       let aihsCount = 0;
 
-      if (aihsDataResult.error || aihsCountResult.error) {
-        console.error('❌ Erro ao carregar dados da tabela aihs:', 
-          aihsDataResult.error || aihsCountResult.error);
-        // Fallback para dados de médicos em caso de erro
-        const doctorsRevenue = doctorsResult.doctors.reduce((sum, doctor) => 
-          sum + safeValue(doctor.total_revenue_12months_reais || 0), 0
-        );
-        const doctorsProcedures = doctorsResult.doctors.reduce((sum, doctor) => 
-          sum + (doctor.total_procedures_12months || 0), 0
-        );
-        aihsTotalRevenue = doctorsRevenue;
-        aihsCount = Math.round(doctorsProcedures / 3);
-        
-        console.log('⚠️ Usando fallback de médicos por erro na consulta AIHs');
-      } else {
-        // ✅ USAR DADOS DIRETOS DA TABELA AIHS
-        aihsCount = aihsCountResult.count || 0;
-        aihsTotalRevenue = aihsDataResult.data?.reduce((sum, aih) => {
-          const value = aih.calculated_total_value || 0;
-          return sum + safeValue(value);
-        }, 0) || 0;
-        
-        console.log('✅ Dados diretos da tabela aihs carregados:', {
-          totalAIHs: aihsCount,
-          totalRevenue: formatCurrency(aihsTotalRevenue),
-          aihsComValor: aihsDataResult.data?.length || 0
-        });
+      if (activeHospitalId) {
+        const { data: kpis, error: kpisError } = await supabase
+          .rpc('get_hospital_kpis', {
+            p_hospital_id: activeHospitalId,
+            p_start: startDateISO,
+            p_end: endDateISO
+          });
+
+        if (kpisError) {
+          console.warn('⚠️ Falha na RPC get_hospital_kpis, aplicando fallback por tabela:', kpisError);
+          const { data: sumRows, error: sumErr } = await supabase
+            .from('aihs')
+            .select('calculated_total_value', { count: 'exact', head: false })
+            .eq('hospital_id', activeHospitalId)
+            .not('calculated_total_value', 'is', null)
+            .gte('discharge_date', startDateISO)
+            .lte('discharge_date', endDateISO);
+          if (!sumErr) {
+            aihsTotalRevenue = (sumRows || []).reduce((s, r: any) => s + safeValue(r.calculated_total_value || 0), 0);
+            aihsCount = (sumRows || []).length;
+          }
+        } else if (Array.isArray(kpis) && kpis.length > 0) {
+          aihsTotalRevenue = Number(kpis[0].total_revenue) || 0;
+          aihsCount = Number(kpis[0].total_aihs) || 0;
+        }
       }
 
       // ✅ AGUARDAR UM MOMENTO PARA GARANTIR QUE OUTRAS OPERAÇÕES TERMINEM
@@ -1073,24 +952,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {/* ✅ DADOS DIRETOS DA TABELA AIHS */}
             <div className="text-sm text-blue-200 mb-1">Faturamento Total</div>
             <div className="text-3xl md:text-4xl font-extrabold drop-shadow-sm">
-              {isLoading ? '...' : formatCurrency(
-                showAllHospitalsRevenue && allHospitalsKPIs 
-                  ? allHospitalsKPIs.totalRevenue 
-                  : kpiData.totalRevenue
-              )}
+              {isLoading ? '...' : formatCurrency(kpiData.totalRevenue)}
             </div>
-            {showAllHospitalsRevenue ? (
+            {currentHospitalFullName && (
               <div className="text-xs md:text-sm text-blue-100 mt-1 font-medium flex items-center justify-end gap-1">
-                <Building2 className="h-3 w-3" />
-                Todos os Hospitais
+                <Hospital className="h-3 w-3" />
+                {currentHospitalFullName}
               </div>
-            ) : (
-              currentHospitalFullName && (
-                <div className="text-xs md:text-sm text-blue-100 mt-1 font-medium flex items-center justify-end gap-1">
-                  <Hospital className="h-3 w-3" />
-                  {currentHospitalFullName}
-                </div>
-              )
             )}
             {lastUpdate && (
               <div className="text-xs text-blue-200/90 mt-2 flex items-center justify-end gap-1">
