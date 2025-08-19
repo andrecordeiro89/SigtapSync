@@ -415,6 +415,31 @@ export class AIHPersistenceService {
       console.log(`📄 AIH ID: ${aihResult.aihId}`);
       console.log(`👤 Paciente ID: ${patientResult.patientId}`);
 
+      // ETAPA 3 (Seguro): Persistir procedimentos (procedure_records) se fornecidos e ainda não existirem
+      try {
+        const hasProcedures = Array.isArray((extractedAIH as any).procedimentosRealizados) && (extractedAIH as any).procedimentosRealizados.length > 0;
+        if (aihResult.aihId && hasProcedures) {
+          const { data: existingForAIH } = await supabase
+            .from('procedure_records')
+            .select('id')
+            .eq('aih_id', aihResult.aihId)
+            .limit(1);
+
+          if (!existingForAIH || existingForAIH.length === 0) {
+            await this.createProcedureRecordsForAIH({
+              aihId: aihResult.aihId,
+              hospitalId,
+              patientId: patientResult.patientId!,
+              procedimentos: (extractedAIH as any).procedimentosRealizados as Array<any>
+            });
+          } else {
+            console.log('ℹ️ Procedimentos já existem para esta AIH. Pulando inserção de procedure_records.');
+          }
+        }
+      } catch (procErr) {
+        console.warn('⚠️ Falha ao persistir procedimentos (procedure_records). AIH salva normalmente.', procErr);
+      }
+
       return {
         success: true,
         aihId: aihResult.aihId,
@@ -429,6 +454,144 @@ export class AIHPersistenceService {
         message: `Erro interno: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
         errors: [error instanceof Error ? error.message : 'Erro desconhecido']
       };
+    }
+  }
+
+  /**
+   * Cria registros em procedure_records para uma AIH, com inserção em lote e fallback seguro.
+   * Não sobrescreve registros existentes; deduplica por (aih_id, sequencia) quando possível.
+   */
+  private static async createProcedureRecordsForAIH(args: {
+    aihId: string;
+    hospitalId: string;
+    patientId: string;
+    procedimentos: Array<{
+      linha: number;
+      codigo: string;
+      descricao?: string;
+      profissionais?: Array<{ documento?: string; cbo?: string; participacao?: string; cnes?: string }>;
+      quantidade?: number;
+      dataRealizacao?: string;
+    }>;
+  }): Promise<void> {
+    const { aihId, hospitalId, patientId, procedimentos } = args;
+    if (!procedimentos || procedimentos.length === 0) return;
+
+    console.log(`🧾 Inserindo ${procedimentos.length} procedimentos para AIH ${aihId}...`);
+
+    // Buscar sequências já existentes para evitar duplicidade
+    const { data: existingRows } = await supabase
+      .from('procedure_records')
+      .select('sequencia')
+      .eq('aih_id', aihId);
+
+    const existingSeq = new Set<number>((existingRows || []).map(r => (r as any).sequencia).filter((v: any) => typeof v === 'number'));
+
+    // Buscar nomes de médicos por CNS (documento) em lote
+    let doctorNameByCns = new Map<string, string>();
+    try {
+      const cnsList = Array.from(new Set(
+        procedimentos.map(p => {
+          const prof = Array.isArray(p.profissionais) && p.profissionais.length > 0 ? p.profissionais[0] : undefined;
+          const doc = prof?.documento ? String(prof.documento).trim() : '';
+          return doc || null;
+        }).filter(Boolean) as string[]
+      ));
+      if (cnsList.length > 0) {
+        const { data: doctors } = await supabase
+          .from('doctors')
+          .select('cns, name')
+          .in('cns', cnsList);
+        doctorNameByCns = new Map<string, string>((doctors || []).map((d: any) => [String(d.cns).trim(), d.name]));
+      }
+    } catch (e) {
+      console.warn('⚠️ Falha ao buscar nomes de médicos por CNS. Continuando sem nome.', e);
+    }
+
+    const rows = procedimentos
+      .filter(p => typeof p.linha === 'number' && !existingSeq.has(p.linha))
+      .map(p => {
+        const prof = Array.isArray(p.profissionais) && p.profissionais.length > 0 ? p.profissionais[0] : undefined;
+        const profCns = prof?.documento ? String(prof.documento).trim() : null;
+        const procedureDateISO = (() => {
+          if (!p.dataRealizacao) return new Date().toISOString();
+          // aceitar ISO ou DD/MM/YYYY
+          if (/^\d{4}-\d{2}-\d{2}/.test(p.dataRealizacao)) return p.dataRealizacao;
+          if (/^\d{2}\/\d{2}\/\d{4}/.test(p.dataRealizacao)) {
+            const [d, m, y] = p.dataRealizacao.split('/');
+            return `${y}-${m}-${d}T00:00:00.000Z`;
+          }
+          return new Date(p.dataRealizacao).toISOString();
+        })();
+
+        return {
+          hospital_id: hospitalId,
+          patient_id: patientId,
+          aih_id: aihId,
+          procedure_code: p.codigo,
+          procedure_description: p.descricao || null,
+          procedure_date: procedureDateISO,
+          professional_name: profCns ? (doctorNameByCns.get(profCns) || null) : null,
+          professional_cns: profCns,
+          professional_cbo: prof?.cbo || null,
+          billing_status: 'pending',
+          match_status: 'pending',
+          quantity: p.quantidade || 1,
+          sequencia: p.linha,
+          value_charged: 0,
+          total_value: 0
+        } as Record<string, any>;
+      });
+
+    if (rows.length === 0) {
+      console.log('ℹ️ Nenhum novo procedimento para inserir (todos já existem por sequencia).');
+      return;
+    }
+
+    // Inserção em chunks com fallback linha a linha
+    const chunkSize = 300;
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const slice = rows.slice(i, i + chunkSize);
+      try {
+        const { error } = await supabase
+          .from('procedure_records')
+          .insert(slice);
+        if (error) throw error;
+      } catch (e) {
+        console.warn('⚠️ Falha no lote. Tentando inserção segura linha a linha...', e);
+        for (const row of slice) {
+          try {
+            const ok = await this.prototype.saveProcedureRecordFixed.call(this, row);
+            if (!ok) console.warn('⚠️ Falha ao salvar procedimento individual:', row.sequencia, row.procedure_code);
+          } catch (ie) {
+            console.warn('⚠️ Erro ao salvar procedimento individual:', ie);
+          }
+        }
+      }
+    }
+
+    // Atualizar contadores da AIH sem sobrescrever outros campos
+    try {
+      const { data: countsData } = await supabase
+        .from('procedure_records')
+        .select('id, match_status')
+        .eq('aih_id', aihId);
+
+      const total = (countsData || []).length;
+      const approved = (countsData || []).filter(r => (r as any).match_status === 'approved' || (r as any).billing_status === 'paid').length;
+      const rejected = (countsData || []).filter(r => (r as any).match_status === 'rejected').length;
+
+      await supabase
+        .from('aihs')
+        .update({
+          total_procedures: total,
+          approved_procedures: approved,
+          rejected_procedures: rejected,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', aihId);
+    } catch (ucErr) {
+      console.warn('⚠️ Não foi possível atualizar contadores de AIH após inserir procedimentos:', ucErr);
     }
   }
 
@@ -750,7 +913,8 @@ export class AIHPersistenceService {
         processing_status: 'pending',
         match_found: false,
         requires_manual_review: false,
-        source_file: sourceFile
+        source_file: sourceFile,
+        competencia: null as any
       };
       
       // 🆕 CAMPOS EXPANDIDOS COMPLETOS – preparos em PT e EN
@@ -834,16 +998,23 @@ export class AIHPersistenceService {
         }
       }
 
-      // Garantir preenchimento de cns_responsavel mesmo que tenha caído em variantes sem a coluna
+      // Garantir preenchimento de campos pós-inserção (cns_responsavel, competencia)
       try {
+        const updates: Record<string, any> = {};
         if (aih.cnsResponsavel && typeof aih.cnsResponsavel === 'string' && aih.cnsResponsavel.trim() !== '') {
+          updates.cns_responsavel = aih.cnsResponsavel;
+        }
+        if ((aih as any).competencia) {
+          updates.competencia = (aih as any).competencia; // esperado YYYY-MM-01
+        }
+        if (Object.keys(updates).length > 0) {
           await supabase
             .from('aihs')
-            .update({ cns_responsavel: aih.cnsResponsavel })
+            .update(updates)
             .eq('id', createdAIH.id);
         }
       } catch (updateCnsErr) {
-        console.warn('⚠️ Não foi possível atualizar cns_responsavel pós-inserção (coluna pode não existir neste schema):', updateCnsErr);
+        console.warn('⚠️ Não foi possível atualizar campos pós-inserção (coluna pode não existir neste schema):', updateCnsErr);
       }
 
       // ️✅ GARANTIR RESTRIÇÃO: Médico responsável/solicitante/autorizador vinculados ao hospital

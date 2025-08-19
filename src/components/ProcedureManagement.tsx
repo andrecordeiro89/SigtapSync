@@ -36,6 +36,23 @@ const ProcedureManagement = ({ aihCompleta, onUpdateAIH, sigtapProcedures = [] }
   const [filteredProcedures, setFilteredProcedures] = useState<ProcedureAIH[]>([]);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const { toast } = useToast();
+  // Competência (YYYY-MM-01)
+  const [competencia, setCompetencia] = useState<string>(() => {
+    const existing = (aihCompleta as any)?.competencia as string | undefined;
+    if (existing) return existing;
+    const ref = aihCompleta.dataFim || aihCompleta.dataInicio;
+    try {
+      const d = ref ? new Date(ref) : new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      return `${y}-${m}-01`;
+    } catch {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      return `${y}-${m}-01`;
+    }
+  });
 
   useEffect(() => {
     // Filtrar procedimentos baseado no termo de busca
@@ -273,6 +290,34 @@ const ProcedureManagement = ({ aihCompleta, onUpdateAIH, sigtapProcedures = [] }
           <CardTitle className="flex items-center justify-between">
             <span>Procedimentos Realizados</span>
             <div className="flex space-x-2">
+              {/* Competência */}
+              <div className="flex items-center space-x-2">
+                <label className="text-xs text-gray-600">Competência</label>
+                <select
+                  className="px-2 py-1.5 text-sm border border-gray-200 rounded-md bg-white"
+                  value={competencia.slice(0,7)}
+                  onChange={(e) => {
+                    const ym = e.target.value; // YYYY-MM
+                    const value = `${ym}-01`;
+                    setCompetencia(value);
+                    try {
+                      onUpdateAIH({ ...(aihCompleta as any), competencia: value } as any);
+                    } catch {}
+                  }}
+                >
+                  {(() => {
+                    const options: JSX.Element[] = [];
+                    const year = new Date().getFullYear();
+                    for (let m = 1; m <= 12; m++) {
+                      const d = new Date(year, m - 1, 1);
+                      const ym = `${year}-${String(m).padStart(2, '0')}`;
+                      const label = d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+                      options.push(<option key={ym} value={ym}>{label}</option>);
+                    }
+                    return options;
+                  })()}
+                </select>
+              </div>
               <Button
                 onClick={handleRecalculateValues}
                 disabled={isRecalculating}

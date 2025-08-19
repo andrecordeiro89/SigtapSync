@@ -93,6 +93,8 @@ export interface AIHBillingByProcedure {
   unique_specialties: number;
   unique_hospitals: number;
   unique_doctors: number;
+  // 🆕 Quantidade de ocorrências como Procedimento Principal (sequencia = 1)
+  principal_count?: number;
 }
 
 export interface AIHBillingByHospitalSpecialty {
@@ -293,14 +295,22 @@ export class AIHBillingService {
    */
   static async getBillingByProcedure(limit?: number, dateRange?: DateRange, hospitalIds?: string[], excludeAnesthesia?: boolean): Promise<AIHBillingByProcedure[]> {
     try {
-      console.log(`🩺 Buscando faturamento por procedimento${limit && limit > 0 ? ` (top ${limit})` : ' (sem limite)' }${hospitalIds && hospitalIds.length > 0 ? ` | filtro hospitais (${hospitalIds.length})` : ''}${excludeAnesthesia ? ' | excluindo anestesia' : ''}...`);
-      
-      // Se houver filtro de hospital, usar view por hospital para manter descrições e valores corretos
-      if (hospitalIds && hospitalIds.length > 0 && !hospitalIds.includes('all')) {
+      console.log(`🩺 Buscando faturamento por procedimento${limit && limit > 0 ? ` (top ${limit})` : ' (sem limite)' }${hospitalIds && hospitalIds.length > 0 ? ` | filtro hospitais (${hospitalIds.length})` : ''}${excludeAnesthesia ? ' | excluindo anestesia' : ''}${dateRange ? ' | com período' : ''}...`);
+
+      const hasHospitalFilter = hospitalIds && hospitalIds.length > 0 && !hospitalIds.includes('all');
+      const requiresRecordsFallback = Boolean(dateRange) || Boolean(excludeAnesthesia);
+
+      // Preferir agregação direta de procedure_records quando há período/anestesia
+      if (requiresRecordsFallback) {
+        return this.getBillingByProcedureFromRecords(hasHospitalFilter ? hospitalIds : undefined, dateRange, limit, excludeAnesthesia);
+      }
+
+      // Caso com filtro de hospital mas sem período/anestesia: usar view específica por hospital
+      if (hasHospitalFilter) {
         let q = supabase
           .from('v_procedure_summary_by_hospital')
           .select('hospital_id, hospital_name, procedure_code, procedure_description, total_count, total_value, avg_value_per_procedure, approved_count, rejected_count, pending_count');
-        q = q.in('hospital_id', hospitalIds);
+        q = q.in('hospital_id', hospitalIds!);
         const { data, error } = await q;
         if (error) {
           console.error('❌ Erro na view v_procedure_summary_by_hospital:', error);
@@ -323,18 +333,16 @@ export class AIHBillingService {
           unique_specialties: 0,
           unique_hospitals: 1,
           unique_doctors: 0,
+          principal_count: row.principal_count ?? undefined,
         }));
 
-        // Excluir anestesia apenas filtrando os itens
-        if (excludeAnesthesia) {
-          mapped = mapped.filter(p => !((p.procedure_description || '').toUpperCase().includes('ANESTES')));
-        }
         // Ordenar e aplicar limite
         mapped.sort((a, b) => (b.total_value || 0) - (a.total_value || 0));
         if (limit && limit > 0) mapped = mapped.slice(0, limit);
         return mapped;
       }
       
+      // Sem filtros: usar view global
       let query = supabase
         .from('v_aih_billing_by_procedure')
         .select('*')
@@ -352,11 +360,7 @@ export class AIHBillingService {
       }
 
       let result = (data || []) as AIHBillingByProcedure[];
-      // Excluir anestesia apenas filtrando os itens (sem recomputar valores)
-      if (excludeAnesthesia) {
-        result = result.filter(p => !((p.procedure_description || '').toUpperCase().includes('ANESTES')));
-      }
-      console.log(`✅ Dados de ${result.length} procedimentos obtidos${excludeAnesthesia ? ' (anestesia excluída)' : ''}`);
+      console.log(`✅ Dados de ${result.length} procedimentos obtidos`);
       return result;
     } catch (error) {
       console.error('❌ Erro na consulta por procedimento:', error);
@@ -385,9 +389,16 @@ export class AIHBillingService {
         } catch {}
       }
 
-      let q = supabase
-        .from('procedure_records')
-        .select('procedure_code, value_charged, billing_status, aih_id, hospital_id, professional_name, professional_cbo, procedure_date');
+      const pageSize = 2000;
+      let page = 0;
+      let hasMore = true;
+      let data: any[] = [];
+      while (hasMore) {
+        let q = supabase
+          .from('procedure_records')
+          .select('procedure_code, value_charged, billing_status, aih_id, hospital_id, professional_name, professional_cbo, procedure_date, sequencia')
+          .order('procedure_date', { ascending: false })
+          .range(page * pageSize, (page + 1) * pageSize - 1);
       
       if (hospitalIds && hospitalIds.length > 0) {
         q = q.in('hospital_id', hospitalIds);
@@ -397,10 +408,18 @@ export class AIHBillingService {
              .lte('procedure_date', dateRange.endDate.toISOString());
       }
 
-      const { data, error } = await q;
+        const { data: pageData, error } = await q;
       if (error) {
-        console.error('❌ Erro ao buscar procedure_records para filtro de hospitais:', error);
-        return [];
+          console.error('❌ Erro ao buscar procedure_records (paginado):', error);
+          break;
+        }
+        if (pageData && pageData.length > 0) {
+          data.push(...pageData);
+          hasMore = pageData.length === pageSize;
+          page += 1;
+        } else {
+          hasMore = false;
+        }
       }
 
       const byCode: Record<string, {
@@ -413,6 +432,7 @@ export class AIHBillingService {
         pendingAihSet: Set<string>;
         hospitalsSet: Set<string>;
         doctorsSet: Set<string>;
+        principalCount: number;
       }> = {};
 
       for (const row of (data || [])) {
@@ -432,6 +452,7 @@ export class AIHBillingService {
             pendingAihSet: new Set(),
             hospitalsSet: new Set(),
             doctorsSet: new Set(),
+            principalCount: 0,
           };
         }
         const bucket = byCode[code];
@@ -441,6 +462,9 @@ export class AIHBillingService {
         const valueCents = Number(row.value_charged) || 0;
         bucket.total_value_cents += valueCents;
         bucket.count += 1;
+        if ((row as any).sequencia === 1) {
+          bucket.principalCount += 1;
+        }
         if (aihId) bucket.aihSet.add(aihId);
         if (hospitalId) bucket.hospitalsSet.add(hospitalId);
         if (professionalName) bucket.doctorsSet.add(professionalName);
@@ -481,7 +505,7 @@ export class AIHBillingService {
         }
       }
 
-      // Montar resposta
+      // Montar resposta (incluir flag principal com base em sequencia = 1)
       let result: AIHBillingByProcedure[] = codes.map(code => {
         const b = byCode[code];
         const totalAihs = b.aihSet.size;
@@ -504,6 +528,7 @@ export class AIHBillingService {
           unique_specialties: 0,
           unique_hospitals: b.hospitalsSet.size,
           unique_doctors: b.doctorsSet.size,
+          principal_count: 0,
         };
       });
 
@@ -833,6 +858,73 @@ export class AIHBillingService {
     } catch (error) {
       console.error('❌ Erro ao buscar top médicos:', error);
       return [];
+    }
+  }
+
+  /**
+   * Lista detalhada de registros de procedure_records com paginação e filtros
+   */
+  static async getProcedureRecordsDetailed(options?: {
+    dateRange?: DateRange;
+    hospitalIds?: string[];
+    excludeAnesthesia?: boolean;
+    page?: number; // 1-based
+    pageSize?: number;
+  }): Promise<{ rows: any[]; total: number; }> {
+    const page = Math.max(1, options?.page || 1);
+    const pageSize = Math.max(1, Math.min(200, options?.pageSize || 20));
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+
+    try {
+      let q = supabase
+        .from('procedure_records')
+        .select(`
+          id,
+          hospital_id,
+          patient_id,
+          aih_id,
+          procedure_date,
+          procedure_code,
+          procedure_name,
+          procedure_description,
+          value_charged,
+          professional_name,
+          professional_cbo,
+          billing_status,
+          match_status,
+          sequencia
+        `, { count: 'exact' })
+        .order('procedure_date', { ascending: false })
+        .range(from, to);
+
+      if (options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all')) {
+        q = q.in('hospital_id', options.hospitalIds);
+      }
+      if (options?.dateRange) {
+        q = q
+          .gte('procedure_date', options.dateRange.startDate.toISOString())
+          .lte('procedure_date', options.dateRange.endDate.toISOString());
+      }
+      if (options?.excludeAnesthesia) {
+        q = q.or(
+          'professional_cbo.is.null,' +
+          'professional_cbo.neq.225151,' +
+          'and(professional_cbo.eq.225151,procedure_code.like.03%),' +
+          'and(professional_cbo.eq.225151,procedure_code.eq."04.17.01.001-0")'
+        );
+      }
+
+      const { data, error, count } = await q;
+      if (error) {
+        console.error('❌ Erro ao buscar procedure_records detalhado:', error);
+        return { rows: [], total: 0 };
+      }
+
+      return { rows: data || [], total: count || 0 };
+    } catch (e) {
+      console.error('❌ Erro inesperado em getProcedureRecordsDetailed:', e);
+      return { rows: [], total: 0 };
     }
   }
 } 

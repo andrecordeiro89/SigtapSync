@@ -1507,6 +1507,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                               <span className="font-mono text-sm text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg border">
                                 {procedure.procedure_code}
                               </span>
+                              {(procedure as any).principal_count > 0 && (
+                                <span className="ml-2 inline-flex items-center rounded-full border border-yellow-300 bg-yellow-50 px-2 py-0.5 text-[10px] font-medium text-yellow-700">
+                                  Principal
+                                </span>
+                              )}
                             </div>
                             
                             <h4 className="font-medium text-gray-900 mb-3 text-sm leading-relaxed group-hover:text-slate-700 transition-colors">
@@ -1530,6 +1535,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                                   <div className="text-sm font-bold text-green-900">{formatCurrency(safeValue(procedure.avg_value_per_aih))}</div>
                                 </div>
                               </div>
+                              {(procedure as any).principal_count > 0 && (
+                                <div className="mt-2 text-xs text-gray-600">
+                                  Principais: {(procedure as any).principal_count}
+                                </div>
+                              )}
                           </div>
                           
                           <div className="text-right">

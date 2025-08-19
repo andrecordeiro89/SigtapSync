@@ -1252,7 +1252,46 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       {/* TABELA DE PROCEDIMENTOS */}
       <Card>
         <CardHeader>
-          <CardTitle>📋 Procedimentos Realizados ({aihCompleta.procedimentos.length})</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>📋 Procedimentos Realizados ({aihCompleta.procedimentos.length})</CardTitle>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-600">Competência</label>
+              <select
+                className="px-2 py-1.5 text-sm border border-gray-200 rounded-md bg-white"
+                value={(() => {
+                  const comp = (aihCompleta as any)?.competencia as string | undefined;
+                  if (comp) return comp.slice(0,7);
+                  const ref = aihCompleta.dataFim || aihCompleta.dataInicio;
+                  try {
+                    const d = ref ? new Date(ref) : new Date();
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    return `${y}-${m}`;
+                  } catch {
+                    const now = new Date();
+                    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                  }
+                })()}
+                onChange={(e) => {
+                  const ym = e.target.value; // YYYY-MM
+                  const value = `${ym}-01`;
+                  onUpdateAIH({ ...(aihCompleta as any), competencia: value } as any);
+                }}
+              >
+                {(() => {
+                  const options: JSX.Element[] = [];
+                  const year = new Date().getFullYear();
+                  for (let m = 1; m <= 12; m++) {
+                    const d = new Date(year, m - 1, 1);
+                    const ym = `${year}-${String(m).padStart(2, '0')}`;
+                    const label = d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+                    options.push(<option key={ym} value={ym}>{label}</option>);
+                  }
+                  return options;
+                })()}
+              </select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
