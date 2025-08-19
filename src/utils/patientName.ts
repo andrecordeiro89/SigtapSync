@@ -16,8 +16,30 @@ export function sanitizePatientName(raw: string | null | undefined): string {
 	const trimmed = String(raw).trim();
 	if (!trimmed) return fallback;
 	if (isLikelyProcedureString(trimmed)) return fallback;
-	// Collapse inner whitespaces
-	return trimmed.replace(/\s{2,}/g, ' ');
+
+	// 1) Colapsar espaços internos
+	let cleaned = trimmed.replace(/\s{2,}/g, ' ');
+
+	// 2) Normalização Unicode (NFD) para separar diacríticos e remoção dos diacríticos
+	//    Mantém apenas letras, dígitos, espaços e pontuação básica
+	const withoutDiacritics = cleaned
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '');
+
+	// 3) Remover caracteres de controle e símbolos estranhos (exceto -' e .)
+	cleaned = withoutDiacritics.replace(/[^A-Za-z0-9ÁÉÍÓÚÂÊÎÔÛÃÕÄËÏÖÜÇáéíóúâêîôûãõäëïöüç\-\.\'\s]/g, '');
+
+	// 4) Trim final e colapso novamente se necessário
+	cleaned = cleaned.trim().replace(/\s{2,}/g, ' ');
+
+	// 5) Garantir capitalização simples (Opcional: apenas Primeira letra maiúscula por palavra)
+	//    Mantém siglas (CNS, SUS) como estão se forem completamente maiúsculas
+	cleaned = cleaned
+		.split(' ')
+		.map(token => (/^[A-Z]{2,}$/.test(token) ? token : token.charAt(0).toUpperCase() + token.slice(1).toLowerCase()))
+		.join(' ');
+
+	return cleaned || fallback;
 }
 
 

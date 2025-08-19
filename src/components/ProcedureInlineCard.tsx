@@ -15,6 +15,7 @@ import {
   Zap
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { getAnesthetistProcedureType } from '@/utils/anesthetistLogic';
 
 interface ProcedureData {
   id: string;
@@ -121,6 +122,7 @@ const ProcedureInlineCard = ({
   const config = getStatusConfig();
   const StatusIcon = config.icon;
   const isRejected = procedure.match_status === 'rejected';
+  const anesthInfo = getAnesthetistProcedureType(procedure.professional_cbo, procedure.procedure_code);
 
   // 🎯 CORREÇÃO DIRETA: Priorizar procedure_description do banco de dados
   const procedureDescription = (() => {
@@ -185,6 +187,13 @@ const ProcedureInlineCard = ({
                   <span className="text-xs">{(procedure.match_confidence * 100).toFixed(0)}%</span>
                 </Badge>
               )}
+
+              {/* Badge de anestesista: exibir apenas quando NÃO calculável (mantém visual normal quando calculável) */}
+              {anesthInfo.isAnesthetist && !anesthInfo.shouldCalculate && anesthInfo.badge && (
+                <Badge className={`flex items-center space-x-1 ${anesthInfo.badgeClass || ''}`} variant={anesthInfo.badgeVariant || 'secondary'}>
+                  <span className="text-xs">{anesthInfo.badge}</span>
+                </Badge>
+              )}
             </div>
 
             {/* 🎯 CÓDIGO E DESCRIÇÃO - FORMATO MELHORADO */}
@@ -212,14 +221,28 @@ const ProcedureInlineCard = ({
             )}
 
             {/* Valor */}
-            {procedure.value_charged && (
-              <div className="flex items-center space-x-1">
-                <DollarSign className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-semibold text-green-700">
-                  {formatCurrency(procedure.value_charged)}
-                </span>
-              </div>
-            )}
+            {(() => {
+              const showValue = !!procedure.value_charged && (!anesthInfo.isAnesthetist || anesthInfo.shouldCalculate);
+              if (showValue) {
+                return (
+                  <div className="flex items-center space-x-1">
+                    <DollarSign className="w-4 h-4 text-green-600" />
+                    <span className="text-sm font-semibold text-green-700">
+                      {formatCurrency(procedure.value_charged)}
+                    </span>
+                  </div>
+                );
+              }
+              // Sinalizar sem valor monetário para anestesista não calculável
+              if (anesthInfo.isAnesthetist && !anesthInfo.shouldCalculate) {
+                return (
+                  <div className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 inline-block px-2 py-1 rounded">
+                    Sem valor monetário
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
 
           {/* Ações */}

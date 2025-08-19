@@ -919,7 +919,15 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                 <div>
                   <label className="text-xs font-medium text-gray-600">Nome do Paciente</label>
                   <p className="text-gray-900 text-sm font-semibold bg-green-50 px-2 py-1 rounded">
-                    {aihCompleta.nomePaciente}
+                    {(() => {
+                      try {
+                        // Lazy import para evitar bundling circular
+                        const { sanitizePatientName } = require('../utils/patientName');
+                        return sanitizePatientName(aihCompleta.nomePaciente || '');
+                      } catch {
+                        return aihCompleta.nomePaciente || 'Nome não informado';
+                      }
+                    })()}
                   </p>
                 </div>
                 <div>
@@ -1200,7 +1208,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                 ✅ <strong>Todos os procedimentos foram extraídos</strong> - incluindo {aihCompleta.procedimentos.filter(p => p.isAnesthesiaProcedure).length} procedimento(s) de anestesia.
               </p>
               <p className="text-xs text-red-600 mt-1">
-                💡 Os procedimentos de anestesia estão marcados com margem vermelha. Use o botão 🗑️ para removê-los conforme necessário.
+                💡 Procedimentos de anestesia <strong>não cobrados</strong> ficam marcados com margem vermelha. Use o botão 🗑️ para removê-los conforme necessário.
               </p>
             </div>
           )}
@@ -1321,8 +1329,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                   <React.Fragment key={procedure.sequencia}>
                     <TableRow 
                       className={`hover:bg-gray-50 ${
-                        procedure.isAnesthesiaProcedure 
-                          ? 'border-l-4 border-red-500 bg-red-50' // 🚫 Margem vermelha para anestesistas
+                        (procedure.isAnesthesiaProcedure && !shouldCalculateAnesthetistProcedure(procedure.cbo, procedure.procedimento))
+                          ? 'border-l-4 border-red-500 bg-red-50' // 🚫 Vermelho apenas quando NÃO calculável
                           : ''
                       }`}
                     >

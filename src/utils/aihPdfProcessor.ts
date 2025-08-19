@@ -96,6 +96,18 @@ export class AIHPDFProcessor {
 
       // Converter para formato AIH padrão
       const aih = this.convertToStandardAIH(aihData, hospitalContext);
+
+      // ✅ Fallback extra: re-extrair nome do paciente se vier vazio ou parecer cabeçalho
+      try {
+        if (!aih.nomePaciente || /procedimento\s+solicitado/i.test(aih.nomePaciente)) {
+          const fallback = text.match(/Prontuário[:\s]*\d+\s*-\s*([^C\n\r]+?)(?=\s+CNS)/i);
+          if (fallback && fallback[1]) {
+            const rawName = fallback[1].trim();
+            const { sanitizePatientName } = await import('./patientName');
+            aih.nomePaciente = sanitizePatientName(rawName);
+          }
+        }
+      } catch {}
       
       // Validar AIH
       const validation = this.validateAIH(aih);
@@ -293,8 +305,8 @@ export class AIHPDFProcessor {
         nomePaciente: [
           /Prontuário[:\s]*\d+\s*-\s*([^C]+?)(?=\s+CNS)/i,
           /Prontuario[:\s]*\d+\s*-\s*([^C]+?)(?=\s+CNS)/i,
-          /-\s*([A-Z\s]+)\s+CNS/i,
-          /paciente[:\s]*([A-Z\s]+)/i
+          /-\s*([A-ZÁÉÍÓÚÂÊÎÔÛÃÕÄËÏÖÜÇ\s]+)\s+CNS/i,
+          /paciente[:\s]*([A-ZÁÉÍÓÚÂÊÎÔÛÃÕÄËÏÖÜÇ\s]+)/i
         ],
         cns: [
           /CNS[:\s]*([\d.]+)/i,

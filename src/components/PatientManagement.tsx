@@ -18,6 +18,7 @@ import { CareCharacterUtils } from '../config/careCharacterCodes';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { filterCalculableProcedures } from '../utils/anesthetistLogic';
 
 // 🔧 CORREÇÃO: Função para formatar valores que vêm em centavos
 const formatCurrency = (value: number | undefined | null): string => {
@@ -183,9 +184,10 @@ const PatientManagement = () => {
 
   // 🎯 NOVA FUNÇÃO: Recalcular valor total da AIH baseado nos procedimentos ativos
   const recalculateAIHTotal = (aihId: string, procedures: any[]) => {
-    // 🎯 CALCULAR APENAS PROCEDIMENTOS ATIVOS/APROVADOS
+    // 🎯 CALCULAR APENAS PROCEDIMENTOS ATIVOS/APROVADOS E EXCLUINDO ANESTESISTAS SEM VALOR
     const activeProcedures = procedures.filter(proc => 
-      proc.match_status === 'matched' || proc.match_status === 'manual' // ✅ VALORES CORRETOS DA CONSTRAINT
+      (proc.match_status === 'matched' || proc.match_status === 'manual') &&
+      filterCalculableProcedures({ cbo: proc.professional_cbo, procedure_code: proc.procedure_code })
     );
     
     const totalValue = activeProcedures.reduce((sum, proc) => {
@@ -1147,7 +1149,10 @@ const PatientManagement = () => {
                               </div>
                               <div className="flex items-center justify-between text-xs">
                                 {(() => {
-                                  const approved = proceduresData[item.id].filter(p => p.match_status === 'matched' || p.match_status === 'manual');
+                                  const approved = (proceduresData[item.id] || []).filter(
+                                    p => (p.match_status === 'matched' || p.match_status === 'manual') &&
+                                         filterCalculableProcedures({ cbo: p.professional_cbo, procedure_code: p.procedure_code })
+                                  );
                                   const approvedValue = approved.reduce((sum, p) => sum + (p.value_charged || p.sigtap_procedures?.value_hosp_total || 0), 0);
                                   
                                   return (
