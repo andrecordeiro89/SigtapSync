@@ -70,7 +70,12 @@ const PatientProceduresDropdown: React.FC<PatientProceduresDropdownProps> = ({
   
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('pt-BR');
+    try {
+      const { formatDate: fmt } = require('../utils/validation');
+      return fmt(dateString);
+    } catch {
+      return new Date(dateString).toLocaleDateString('pt-BR');
+    }
   };
   
   const getTotalValue = () => {

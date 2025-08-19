@@ -246,7 +246,12 @@ const AIHProcedureManager = ({
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('pt-BR');
+    try {
+      const { formatDate: fmt } = require('../utils/validation');
+      return fmt(date);
+    } catch {
+      return new Date(date).toLocaleDateString('pt-BR');
+    }
   };
 
   const toggleRowExpansion = (procedureId: string) => {

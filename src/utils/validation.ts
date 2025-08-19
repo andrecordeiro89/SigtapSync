@@ -30,9 +30,24 @@ export const formatCurrency = (value: number): string => {
 };
 
 export const formatDate = (date: string): string => {
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).format(new Date(date));
+  if (!date) return 'N/A';
+  // dd/MM/yyyy already
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(date)) return date;
+  // yyyy-MM-dd (date-only) → dd/MM/yyyy
+  const ymd = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) {
+    const [, y, m, d] = ymd;
+    return `${d}/${m}/${y}`;
+  }
+  // Fallback to Date parsing (may include timezone); avoid off-by-one by formatting UTC parts if available
+  try {
+    const d = new Date(date);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const yyyy = String(d.getUTCFullYear());
+      return `${dd}/${mm}/${yyyy}`;
+    }
+  } catch {}
+  return date;
 };

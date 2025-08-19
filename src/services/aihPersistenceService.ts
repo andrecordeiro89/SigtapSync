@@ -3,6 +3,7 @@ import { sanitizePatientName } from '../utils/patientName';
 import { buildAIHIdempotencyKey } from '../utils/idempotency';
 import { AIH } from '../types';
 import { PatientService, AIHService } from './supabaseService';
+import { parsePtDateToISO, normalizePtDate } from '../utils/date';
 
 // ================================================================
 // UTILIDADES DE CONVERSÃO
@@ -900,14 +901,27 @@ export class AIHPersistenceService {
         }
       }
 
+      // Normalizar datas string para exibição e converter para ISO (UTC) para persistência
+      const normalizedInicio = normalizePtDate(aih.dataInicio) || aih.dataInicio;
+      const normalizedFim = normalizePtDate(aih.dataFim) || aih.dataFim;
+      const normalizedAut = normalizePtDate(aih.dataAutorizacao) || aih.dataAutorizacao;
+      const admissionISO = parsePtDateToISO(normalizedInicio) || undefined;
+      const dischargeISO = parsePtDateToISO(normalizedFim) || undefined;
+      const authorizationISO = parsePtDateToISO(normalizedAut) || undefined;
+
+      aih.dataInicio = normalizedInicio as any;
+      aih.dataFim = normalizedFim as any;
+      aih.dataAutorizacao = normalizedAut as any;
+
       // Dados básicos (sempre funcionam)
       const basicAihData = {
         hospital_id: hospitalId,
         patient_id: patientId,
         aih_number: aih.numeroAIH,
         procedure_code: aih.procedimentoPrincipal,
-        admission_date: aih.dataInicio,
-        discharge_date: aih.dataFim || undefined,
+        admission_date: admissionISO,
+        discharge_date: dischargeISO,
+        authorization_date: authorizationISO,
         main_cid: aih.cidPrincipal || '',
         secondary_cid: [],
         processing_status: 'pending',
