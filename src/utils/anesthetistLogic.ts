@@ -50,6 +50,10 @@ export const shouldCalculateAnesthetistProcedure = (cbo?: string, procedureCode?
   if (code === '04.17.01.005-2') {
     return true;
   }
+  // ✅ EXCEÇÃO: Código 04.17.01.006-0 também deve ser cobrado
+  if (code === '04.17.01.006-0') {
+    return true;
+  }
   
   // 🚫 Outros procedimentos 04.xxx - ANESTESISTA NÃO RECEBE  
   if (code.startsWith('04')) {
@@ -122,6 +126,17 @@ export const getAnesthetistProcedureType = (cbo?: string, procedureCode?: string
       badgeClass: 'bg-green-100 text-green-700 border-green-300'
     };
   }
+  // ✅ EXCEÇÃO: 04.17.01.006-0 também calculado
+  if (code === '04.17.01.006-0') {
+    return {
+      isAnesthetist: true,
+      shouldCalculate: true,
+      badge: '💉 Exceção 04',
+      message: 'Procedimento de anestesia (04.17.01.006-0) calculado',
+      badgeVariant: 'default' as const,
+      badgeClass: 'bg-green-100 text-green-700 border-green-300'
+    };
+  }
   
   if (code.startsWith('04')) {
     return {
@@ -166,7 +181,8 @@ export const buildAnesthetistSQLCondition = (cboColumn: string = 'professional_c
     ${cboColumn} IS NULL OR
     (${cboColumn} = '225151' AND ${procedureCodeColumn} LIKE '03%') OR
     (${cboColumn} = '225151' AND ${procedureCodeColumn} = '04.17.01.001-0') OR
-    (${cboColumn} = '225151' AND ${procedureCodeColumn} = '04.17.01.005-2')
+    (${cboColumn} = '225151' AND ${procedureCodeColumn} = '04.17.01.005-2') OR
+    (${cboColumn} = '225151' AND ${procedureCodeColumn} = '04.17.01.006-0')
   )`;
 };
 
