@@ -19,7 +19,6 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { filterCalculableProcedures } from '../utils/anesthetistLogic';
-import { formatDate as formatDatePt } from '../utils/validation';
 
 // 🔧 CORREÇÃO: Função para formatar valores que vêm em centavos
 const formatCurrency = (value: number | undefined | null): string => {
@@ -522,10 +521,10 @@ const PatientManagement = () => {
 
   // Dados unificados: AIHs com informações dos pacientes
   const unifiedData: UnifiedAIHData[] = aihs.map(aih => {
+    const patient = patients.find(p => p.cns === aih.patients?.cns);
     return {
       ...aih,
-      // Preferir o paciente vindo do join da AIH (fonte de verdade)
-      patient: (aih as any).patients || null,
+      patient: patient || null,
       matches: aih.aih_matches || []
     };
   });
@@ -598,7 +597,9 @@ const PatientManagement = () => {
     return <Badge variant="destructive" className="text-xs">❌ {score}%</Badge>;
   };
 
-  const formatDate = (date: string) => formatDatePt(date);
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('pt-BR');
+  };
 
   // NOVA FUNÇÃO: Executar diagnóstico
   const handleRunDiagnostic = async () => {

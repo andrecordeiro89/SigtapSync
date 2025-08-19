@@ -105,12 +105,7 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
 
   // 📅 FORMATAR datas
   const formatDate = (dateString: string) => {
-    try {
-      const { formatDate: fmt } = require('../utils/validation');
-      return fmt(dateString);
-    } catch {
-      return new Date(dateString).toLocaleDateString('pt-BR');
-    }
+    return new Date(dateString).toLocaleDateString('pt-BR');
   };
 
   // 🎨 DEFINIR cor e ícone do status
