@@ -11,10 +11,8 @@ export interface HierarchyFilters {
 
 export class DoctorsHierarchyV2Service {
   static async getDoctorsHierarchyV2(filters: HierarchyFilters = {}): Promise<DoctorWithPatients[]> {
-    // 1) AIHs com paciente
-    let aihsQuery = supabase
-      .from('aihs')
-      .select(`
+    // 1) AIHs com paciente — paginação para evitar limite padrão (1000)
+    const baseSelect = `
         id,
         aih_number,
         hospital_id,
@@ -32,32 +30,54 @@ export class DoctorsHierarchyV2Service {
           gender,
           medical_record
         )
-      `);
+      `;
 
-    if (filters.hospitalIds && filters.hospitalIds.length > 0 && !filters.hospitalIds.includes('all')) {
-      aihsQuery = aihsQuery.in('hospital_id', filters.hospitalIds);
-    }
-    // Regra SUS: produção conta pela data de alta (discharge_date)
-    if (filters.dateFromISO) {
-      aihsQuery = aihsQuery.gte('discharge_date', filters.dateFromISO);
-    }
-    if (filters.dateToISO) {
-      // Incluir o último dia completo
-      const end = new Date(filters.dateToISO);
-      end.setHours(23, 59, 59, 999);
-      aihsQuery = aihsQuery.lte('discharge_date', end.toISOString());
+    const applyFilters = (q: any) => {
+      let query = q;
+      if (filters.hospitalIds && filters.hospitalIds.length > 0 && !filters.hospitalIds.includes('all')) {
+        query = query.in('hospital_id', filters.hospitalIds);
+      }
+      // Regra SUS: produção conta pela data de alta (discharge_date)
+      if (filters.dateFromISO) {
+        query = query.gte('discharge_date', filters.dateFromISO);
+      }
+      if (filters.dateToISO) {
+        const end = new Date(filters.dateToISO);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte('discharge_date', end.toISOString());
+      }
+      if (filters.careCharacter && filters.careCharacter !== 'all') {
+        query = query.eq('care_character', filters.careCharacter);
+      }
+      return query;
+    };
+
+    const pageSize = 1000;
+    let page = 0;
+    let hasMore = true;
+    const aihsAll: any[] = [];
+    while (hasMore) {
+      let pageQuery = supabase
+        .from('aihs')
+        .select(baseSelect)
+        .order('discharge_date', { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+      pageQuery = applyFilters(pageQuery);
+      const { data, error } = await pageQuery;
+      if (error) {
+        console.error('[V2] Erro AIHs (paginado):', error);
+        return [];
+      }
+      if (data && data.length > 0) {
+        aihsAll.push(...data);
+        hasMore = data.length === pageSize;
+        page += 1;
+      } else {
+        hasMore = false;
+      }
     }
 
-    // Filtro por caráter de atendimento, se informado
-    if (filters.careCharacter && filters.careCharacter !== 'all') {
-      aihsQuery = aihsQuery.eq('care_character', filters.careCharacter);
-    }
-
-    const { data: aihs, error: aihsError } = await aihsQuery.order('discharge_date', { ascending: false });
-    if (aihsError) {
-      console.error('[V2] Erro AIHs:', aihsError);
-      return [];
-    }
+    const aihs = aihsAll;
     if (!aihs || aihs.length === 0) return [];
 
     // 2) Referenciais (médicos e hospitais)

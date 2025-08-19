@@ -63,6 +63,15 @@ export interface ProcedureRecord {
 
 export class ProcedureRecordsService {
   
+  private static chunkArray<T>(items: T[], chunkSize: number): T[][] {
+    if (!items || items.length === 0) return [];
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += chunkSize) {
+      chunks.push(items.slice(i, i + chunkSize));
+    }
+    return chunks;
+  }
+  
   /**
    * 🔍 BUSCAR PROCEDIMENTOS POR PATIENT_ID 
    * (100% baseado na tabela procedure_records)
@@ -160,86 +169,95 @@ export class ProcedureRecordsService {
     try {
       console.log(`🔍 [PROCEDURE_RECORDS] Buscando procedimentos para ${patientIds.length} pacientes`);
       console.log('🔍 [PROCEDURE_RECORDS] Patient IDs (primeiros 3):', patientIds.slice(0, 3));
-      
-      let query = supabase
-        .from('procedure_records')
-        .select(`
-          id,
-          hospital_id,
-          patient_id,
-          procedure_id,
-          aih_id,
-          procedure_date,
-          procedure_code,
-          procedure_name,
-          procedure_description,
-          procedure_code_original,
-          value_charged,
-          value_original,
-          total_value,
-          unit_value,
-          professional,
-          professional_cbo,
-          professional_cns,
-          professional_name,
-          billing_status,
-          billing_date,
-          match_status,
-          match_confidence,
-          quantity,
-          care_modality,
-          care_character,
-          complexity,
-          authorization_type,
-          created_at,
-          sequencia,
-          authorization_number,
-          notes
-        `)
-        .in('patient_id', patientIds)
-        .order('procedure_date', { ascending: false });
 
-      if (options?.excludeAnesthetist) {
-        query = query.or(
-          'professional_cbo.is.null,' +
-          'professional_cbo.neq.225151,' +
-          'and(professional_cbo.eq.225151,procedure_code.like.03%),' +
-          'and(professional_cbo.eq.225151,procedure_code.eq."04.17.01.001-0")'
-        );
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error('❌ [PROCEDURE_RECORDS] Erro ao buscar procedimentos múltiplos:', error);
-        return { 
-          success: false, 
-          procedures: [], 
-          proceduresByPatientId: new Map(),
-          error: error.message 
+      if (!patientIds || patientIds.length === 0) {
+        return {
+          success: true,
+          procedures: [],
+          proceduresByPatientId: new Map()
         };
       }
 
-      console.log(`✅ [PROCEDURE_RECORDS] Encontrados ${data?.length || 0} procedimentos total`);
-      
+      // Evitar estouro de URL/POST e limites do PostgREST: processar em chunks
+      const CHUNK_SIZE = 400;
+      const chunks = this.chunkArray(patientIds, CHUNK_SIZE);
+
+      const results = await Promise.all(chunks.map(async (chunk, idx) => {
+        let query = supabase
+          .from('procedure_records')
+          .select(`
+            id,
+            hospital_id,
+            patient_id,
+            procedure_id,
+            aih_id,
+            procedure_date,
+            procedure_code,
+            procedure_name,
+            procedure_description,
+            procedure_code_original,
+            value_charged,
+            value_original,
+            total_value,
+            unit_value,
+            professional,
+            professional_cbo,
+            professional_cns,
+            professional_name,
+            billing_status,
+            billing_date,
+            match_status,
+            match_confidence,
+            quantity,
+            care_modality,
+            care_character,
+            complexity,
+            authorization_type,
+            created_at,
+            sequencia,
+            authorization_number,
+            notes
+          `)
+          .in('patient_id', chunk)
+          .order('procedure_date', { ascending: false });
+
+        if (options?.excludeAnesthetist) {
+          query = query.or(
+            'professional_cbo.is.null,' +
+            'professional_cbo.neq.225151,' +
+            'and(professional_cbo.eq.225151,procedure_code.like.03%),' +
+            'and(professional_cbo.eq.225151,procedure_code.eq."04.17.01.001-0")'
+          );
+        }
+
+        const { data, error } = await query;
+        if (error) {
+          console.error(`❌ [PROCEDURE_RECORDS] Erro no chunk ${idx + 1}/${chunks.length}:`, error);
+          return [] as ProcedureRecord[];
+        }
+        return (data || []) as ProcedureRecord[];
+      }));
+
+      const flatData = results.flat();
+
       // Organizar procedimentos por patient_id
       const proceduresByPatientId = new Map<string, ProcedureRecord[]>();
-      
-      (data || []).forEach(procedure => {
+      flatData.forEach(procedure => {
         const patientId = procedure.patient_id;
         if (!proceduresByPatientId.has(patientId)) {
           proceduresByPatientId.set(patientId, []);
         }
         proceduresByPatientId.get(patientId)!.push(procedure);
       });
-      
-      console.log('📊 [PROCEDURE_RECORDS] Distribuição por paciente:', 
+
+      console.log(`✅ [PROCEDURE_RECORDS] Encontrados ${flatData.length} procedimentos total (em ${chunks.length} chunks)`);
+      console.log('📊 [PROCEDURE_RECORDS] Distribuição por paciente:',
         Array.from(proceduresByPatientId.entries()).map(([id, procs]) => `${id}: ${procs.length}`).slice(0, 5)
       );
-      
-      return { 
-        success: true, 
-        procedures: data || [],
+
+      return {
+        success: true,
+        procedures: flatData,
         proceduresByPatientId
       };
       
@@ -266,49 +284,59 @@ export class ProcedureRecordsService {
       if (!aihIds || aihIds.length === 0) {
         return { success: true, proceduresByAihId: new Map() };
       }
-      let query = supabase
-        .from('procedure_records')
-        .select(`
-          id,
-          hospital_id,
-          patient_id,
-          aih_id,
-          procedure_date,
-          procedure_code,
-          procedure_name,
-          procedure_description,
-          total_value,
-          unit_value,
-          billing_status,
-          match_status,
-          match_confidence,
-          sequencia,
-          professional_name,
-          professional_cbo
-        `)
-        .in('aih_id', aihIds)
-        .order('procedure_date', { ascending: false });
 
-      if (options?.excludeAnesthetist) {
-        query = query.or(
-          'professional_cbo.is.null,' +
-          'professional_cbo.neq.225151,' +
-          'and(professional_cbo.eq.225151,procedure_code.like.03%),' +
-          'and(professional_cbo.eq.225151,procedure_code.eq."04.17.01.001-0")'
-        );
-      }
+      const CHUNK_SIZE = 400;
+      const chunks = this.chunkArray(aihIds, CHUNK_SIZE);
 
-      const { data, error } = await query;
+      const results = await Promise.all(chunks.map(async (chunk, idx) => {
+        let query = supabase
+          .from('procedure_records')
+          .select(`
+            id,
+            hospital_id,
+            patient_id,
+            aih_id,
+            procedure_date,
+            procedure_code,
+            procedure_name,
+            procedure_description,
+            total_value,
+            unit_value,
+            billing_status,
+            match_status,
+            match_confidence,
+            sequencia,
+            professional_name,
+            professional_cbo
+          `)
+          .in('aih_id', chunk)
+          .order('procedure_date', { ascending: false });
 
-      if (error) {
-        return { success: false, proceduresByAihId: new Map(), error: error.message };
-      }
+        if (options?.excludeAnesthetist) {
+          query = query.or(
+            'professional_cbo.is.null,' +
+            'professional_cbo.neq.225151,' +
+            'and(professional_cbo.eq.225151,procedure_code.like.03%),' +
+            'and(professional_cbo.eq.225151,procedure_code.eq."04.17.01.001-0")'
+          );
+        }
+
+        const { data, error } = await query;
+        if (error) {
+          console.error(`❌ [PROCEDURE_RECORDS] Erro no chunk AIH ${idx + 1}/${chunks.length}:`, error);
+          return [] as ProcedureRecord[];
+        }
+        return (data || []) as ProcedureRecord[];
+      }));
+
+      const flatData = results.flat();
       const map = new Map<string, ProcedureRecord[]>();
-      (data || []).forEach(p => {
+      flatData.forEach(p => {
         const key = p.aih_id as any as string;
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(p as any);
       });
+
       return { success: true, proceduresByAihId: map };
     } catch (e) {
       return { success: false, proceduresByAihId: new Map(), error: e instanceof Error ? e.message : 'Erro desconhecido' };
