@@ -395,50 +395,26 @@ const PatientManagement = () => {
   };
 
   // Ações inline para procedimentos
-  const handleRemoveProcedure = async (aihId: string, procedure: any) => {
-    try {
-      // 🎯 NOVA LÓGICA: Marcar como REJEITADO (valor permitido na constraint)
-      const updatedProcedures = proceduresData[aihId].map(proc => 
-        proc.procedure_sequence === procedure.procedure_sequence
-          ? { ...proc, match_status: 'rejected' } // ✅ VALOR PERMITIDO
-          : proc
-      );
-      
-      // Atualizar estado local
-      setProceduresData(prev => ({ ...prev, [aihId]: updatedProcedures }));
-      
-      // 🎯 RECALCULAR VALOR TOTAL DA AIH
-      const newTotal = recalculateAIHTotal(aihId, updatedProcedures);
-      
-      toast({
-        title: "✅ Procedimento Inativado",
-        description: `Procedimento inativado. Novo valor da AIH: R$ ${(newTotal/100).toFixed(2)}`,
-      });
-    } catch (error) {
-      console.error('❌ Erro ao inativar procedimento:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao inativar procedimento",
-        variant: "destructive"
-      });
-    }
-  };
+  // Botão de inativar removido
 
   const handleDeleteProcedure = async (aihId: string, procedure: any) => {
     try {
-      // 🎯 NOVA LÓGICA: Remover COMPLETAMENTE da tela
-      const updatedProcedures = proceduresData[aihId].filter(proc => 
+      // Persistir no banco: excluir permanentemente
+      if (user?.id) {
+        await persistenceService.deleteProcedureFromAIH(aihId, procedure.procedure_sequence, user.id);
+      }
+
+      // Atualizar estado local e recarregar do banco
+      const updatedProcedures = (proceduresData[aihId] || []).filter(proc => 
         proc.procedure_sequence !== procedure.procedure_sequence
       );
-      
-      // Atualizar estado local (remove da visualização)
       setProceduresData(prev => ({ ...prev, [aihId]: updatedProcedures }));
-      
-      // 🎯 RECALCULAR VALOR TOTAL DA AIH
+
       const newTotal = recalculateAIHTotal(aihId, updatedProcedures);
-      
+      await loadAIHProcedures(aihId);
+
       toast({
-        title: "🗑️ Procedimento Excluído",
+        title: "🗑️ Procedimento excluído",
         description: `Procedimento removido. Novo valor da AIH: R$ ${(newTotal/100).toFixed(2)}`,
         variant: "destructive"
       });
@@ -452,34 +428,7 @@ const PatientManagement = () => {
     }
   };
 
-  const handleRestoreProcedure = async (aihId: string, procedure: any) => {
-    try {
-      // 🎯 NOVA LÓGICA: Reativar procedimento
-      const updatedProcedures = proceduresData[aihId].map(proc => 
-        proc.procedure_sequence === procedure.procedure_sequence
-          ? { ...proc, match_status: 'matched' } // ✅ VALOR PERMITIDO PARA ATIVO
-          : proc
-      );
-      
-      // Atualizar estado local
-      setProceduresData(prev => ({ ...prev, [aihId]: updatedProcedures }));
-      
-      // 🎯 RECALCULAR VALOR TOTAL DA AIH  
-      const newTotal = recalculateAIHTotal(aihId, updatedProcedures);
-      
-      toast({
-        title: "♻️ Procedimento Reativado",
-        description: `Procedimento reativado. Novo valor da AIH: R$ ${(newTotal/100).toFixed(2)}`,
-      });
-    } catch (error) {
-      console.error('❌ Erro ao reativar procedimento:', error);
-      toast({
-        title: "Erro",
-        description: "Falha ao reativar procedimento",
-        variant: "destructive"
-      });
-    }
-  };
+  // Botão de reativar removido
 
   // Exclusão completa de AIH + Paciente
   const handleCompleteDeleteRequest = (aihId: string, aihNumber: string, patientName: string) => {
@@ -1226,13 +1175,8 @@ const PatientManagement = () => {
                                 key={`${procedure.aih_id}_${procedure.procedure_sequence}`}
                                 procedure={procedure}
                                 isReadOnly={!canManageProcedures()}
-                                onRemove={(proc) => handleRemoveProcedure(item.id, proc)}
                                 onDelete={(proc) => handleDeleteProcedure(item.id, proc)}
-                                onRestore={(proc) => handleRestoreProcedure(item.id, proc)}
-                                onShowDetails={(proc) => {
-                                  // Abrir modal de detalhes se necessário
-                                  console.log('Detalhes do procedimento:', proc);
-                                }}
+                                
                               />
                             ))}
                           </div>

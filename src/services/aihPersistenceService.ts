@@ -1422,26 +1422,49 @@ export class AIHPersistenceService {
       const currentUser = JSON.parse(sessionStorage.getItem('current_user') || '{}');
       const userName = currentUser.full_name || currentUser.email || 'Operador do Sistema';
 
-      // Processar dados para incluir informações do operador
-      const processedData = (data || []).map(aih => ({
-        ...aih,
-        processed_by_name: userName, // Nome real do usuário logado
-        processed_at_formatted: aih.processed_at ? 
-          new Date(aih.processed_at).toLocaleDateString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit', 
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          }) : 
-          new Date(aih.created_at).toLocaleDateString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit', 
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          })
-      }));
+      // Normalização segura do caráter de atendimento
+      const normalizeCareCharacter = (aih: any): string | null => {
+        const raw = (
+          aih?.care_character ??
+          aih?.caracter_atendimento ??
+          aih?.source_data?.care_character ??
+          aih?.source_data?.caracterAtendimento ??
+          aih?.source_data?.caracter_atendimento
+        );
+        if (!raw) return null;
+        const v = String(raw).trim().toLowerCase();
+        if (/^[1234]$/.test(v)) return v; // já é código
+        if (v.startsWith('elet')) return '1'; // eletivo
+        if (v.includes('urg') || v.startsWith('urg')) return '2'; // urgência/emergência
+        if (v.includes('trabal')) return '3'; // acidente de trabalho
+        if (v.includes('trâns') || v.includes('trans') || v.includes('trÃ¢ns') || v.includes('tr e2ns')) return '4'; // trânsito
+        return null;
+      };
+
+      // Processar dados para incluir informações do operador e normalizar care_character
+      const processedData = (data || []).map(aih => {
+        const normalizedCare = normalizeCareCharacter(aih);
+        return {
+          ...aih,
+          care_character: normalizedCare ?? aih.care_character ?? null,
+          processed_by_name: userName, // Nome real do usuário logado
+          processed_at_formatted: aih.processed_at ? 
+            new Date(aih.processed_at).toLocaleDateString('pt-BR', {
+              day: '2-digit',
+              month: '2-digit', 
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            }) : 
+            new Date(aih.created_at).toLocaleDateString('pt-BR', {
+              day: '2-digit',
+              month: '2-digit', 
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })
+        };
+      });
 
       // Filtrar por operador se fornecido (temporariamente desabilitado)
       // if (filters?.processedBy) {
@@ -3012,6 +3035,59 @@ export class AIHPersistenceService {
     }
   }
 
+  /**
+   * Remove (marca como rejeitado) um procedimento de uma AIH e persiste no banco
+   */
+  async removeProcedureFromAIH(aihId: string, procedureSequence: number, userId: string, procedureId?: string): Promise<void> {
+    let query = supabase
+      .from('procedure_records')
+      .update({ match_status: 'rejected', updated_at: new Date().toISOString() });
+    if (procedureId) {
+      query = query.eq('id', procedureId);
+    } else {
+      query = query.eq('aih_id', aihId).eq('sequencia', procedureSequence);
+    }
+    const { error } = await query;
+    if (error) throw error;
+
+    await this.recalculateAIHStatistics(aihId);
+  }
+
+  /**
+   * Exclui permanentemente um procedimento de uma AIH no banco
+   */
+  async deleteProcedureFromAIH(aihId: string, procedureSequence: number, userId: string, procedureId?: string): Promise<void> {
+    let query = supabase
+      .from('procedure_records')
+      .delete();
+    if (procedureId) {
+      query = query.eq('id', procedureId);
+    } else {
+      query = query.eq('aih_id', aihId).eq('sequencia', procedureSequence);
+    }
+    const { error } = await query;
+    if (error) throw error;
+
+    await this.recalculateAIHStatistics(aihId);
+  }
+
+  /**
+   * Restaura procedimento previamente rejeitado para 'matched'
+   */
+  async restoreProcedureInAIH(aihId: string, procedureSequence: number, userId: string, procedureId?: string): Promise<void> {
+    let query = supabase
+      .from('procedure_records')
+      .update({ match_status: 'matched', updated_at: new Date().toISOString() });
+    if (procedureId) {
+      query = query.eq('id', procedureId);
+    } else {
+      query = query.eq('aih_id', aihId).eq('sequencia', procedureSequence);
+    }
+    const { error } = await query;
+    if (error) throw error;
+
+    await this.recalculateAIHStatistics(aihId);
+  }
   /**
    * Enriquecer procedimentos com descrições SIGTAP
    */
