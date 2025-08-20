@@ -27,6 +27,8 @@ interface ProcedureData {
   match_status: 'pending' | 'matched' | 'manual' | 'rejected';
   match_confidence?: number;
   value_charged?: number;
+  total_value?: number; // Valor total do procedimento (quando disponível)
+  quantity?: number; // Quantidade selecionada para o procedimento
   professional?: string;
   professional_cbo?: string;
   procedure_date: string;
@@ -183,6 +185,11 @@ const ProcedureInlineCard = ({
                 </Badge>
               )}
 
+              {/* Quantidade selecionada */}
+              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                Qtd: {procedure.quantity ?? 1}
+              </Badge>
+
               {/* Badge de anestesista: exibir apenas quando NÃO calculável (mantém visual normal quando calculável) */}
               {anesthInfo.isAnesthetist && !anesthInfo.shouldCalculate && anesthInfo.badge && (
                 <Badge className={`flex items-center space-x-1 ${anesthInfo.badgeClass || ''}`} variant={anesthInfo.badgeVariant || 'secondary'}>
@@ -217,17 +224,43 @@ const ProcedureInlineCard = ({
 
             {/* Valor */}
             {(() => {
-              const showValue = !!procedure.value_charged && (!anesthInfo.isAnesthetist || anesthInfo.shouldCalculate);
-              if (showValue) {
+              const qty = procedure.quantity ?? 1;
+              const canShowMonetary = (!anesthInfo.isAnesthetist || anesthInfo.shouldCalculate);
+
+              // Caso 1: Temos valor cobrado (total)
+              if (canShowMonetary && procedure.value_charged && procedure.value_charged > 0) {
+                const totalCents = procedure.value_charged || 0;
+                const unitCents = qty > 0 ? Math.round(totalCents / qty) : totalCents;
                 return (
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-2">
                     <DollarSign className="w-4 h-4 text-green-600" />
-                    <span className="text-sm font-semibold text-green-700">
-                      {formatCurrency(procedure.value_charged)}
-                    </span>
+                    <div className="text-sm font-semibold text-green-700">
+                      {formatCurrency(totalCents)}
+                    </div>
+                    {qty > 1 && (
+                      <div className="text-xs text-gray-500">({formatCurrency(unitCents)} × {qty})</div>
+                    )}
                   </div>
                 );
               }
+
+              // Caso 2: Sem value_charged, mas temos valor do SIGTAP (unitário) → estimar total
+              if (canShowMonetary && procedure.sigtap_procedures?.value_hosp_total) {
+                const unitCents = procedure.sigtap_procedures.value_hosp_total || 0;
+                const totalCents = unitCents * (qty || 1);
+                return (
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-4 h-4 text-green-600" />
+                    <div className="text-sm font-semibold text-green-700">
+                      {formatCurrency(totalCents)}
+                    </div>
+                    {qty > 1 && (
+                      <div className="text-xs text-gray-500">({formatCurrency(unitCents)} × {qty})</div>
+                    )}
+                  </div>
+                );
+              }
+
               // Sinalizar sem valor monetário para anestesista não calculável
               if (anesthInfo.isAnesthetist && !anesthInfo.shouldCalculate) {
                 return (
@@ -270,4 +303,4 @@ const ProcedureInlineCard = ({
   );
 };
 
-export default ProcedureInlineCard; 
+export default ProcedureInlineCard;

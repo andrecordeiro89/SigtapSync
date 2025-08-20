@@ -202,7 +202,10 @@ const PatientManagement = () => {
     );
     
     const totalValue = activeProcedures.reduce((sum, proc) => {
-      return sum + (proc.value_charged || 0);
+      const qty = proc.quantity ?? 1;
+      if (proc.value_charged && proc.value_charged > 0) return sum + proc.value_charged;
+      const unit = proc.sigtap_procedures?.value_hosp_total || 0;
+      return sum + unit * qty;
     }, 0);
     
     // Atualizar estado do valor total recalculado
@@ -1149,7 +1152,14 @@ const PatientManagement = () => {
                                     p => (p.match_status === 'matched' || p.match_status === 'manual') &&
                                          filterCalculableProcedures({ cbo: p.professional_cbo, procedure_code: p.procedure_code })
                                   );
-                                  const approvedValue = approved.reduce((sum, p) => sum + (p.value_charged || p.sigtap_procedures?.value_hosp_total || 0), 0);
+                                  const approvedValue = approved.reduce((sum, p) => {
+                                    const qty = p.quantity ?? 1;
+                                    if (p.value_charged && p.value_charged > 0) {
+                                      return sum + p.value_charged;
+                                    }
+                                    const unit = p.sigtap_procedures?.value_hosp_total || 0;
+                                    return sum + unit * qty;
+                                  }, 0);
                                   
                                   return (
                                     <>
