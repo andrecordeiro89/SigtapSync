@@ -161,13 +161,24 @@ const PatientManagement = () => {
   // Lista de competências disponíveis com base nas AIHs (mês da alta; fallback para admissão)
   const availableCompetencies = React.useMemo(() => {
     try {
+      // Helpers seguros para data-only (YYYY-MM-DD)
+      const getYM = (s: string): string | null => {
+        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return `${m[1]}-${m[2]}`;
+        const d = new Date(s);
+        if (isNaN(d.getTime())) return null;
+        // Usar UTC para evitar deslocamentos de fuso
+        const y = d.getUTCFullYear();
+        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+        return `${y}-${mm}`;
+      };
+
       const setYM = new Set<string>();
       aihs.forEach((aih) => {
         const ref = aih.discharge_date || aih.admission_date;
         if (!ref) return;
-        const d = new Date(ref);
-        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        setYM.add(ym);
+        const ym = getYM(ref);
+        if (ym) setYM.add(ym);
       });
       const arr = Array.from(setYM);
       arr.sort((a, b) => (a < b ? 1 : -1)); // Descendente (mais recente primeiro)
@@ -540,7 +551,12 @@ const PatientManagement = () => {
     // Filtro por intervalo de datas
     let matchesDateRange = true;
     if (startDate || endDate) {
-      const admissionDate = new Date(item.admission_date);
+      const parseDateSafe = (s: string) => {
+        const m = s && s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        return new Date(s);
+      };
+      const admissionDate = parseDateSafe(item.admission_date);
       
       if (startDate) {
         const start = new Date(startDate);
@@ -559,9 +575,16 @@ const PatientManagement = () => {
     if (selectedCompetency && selectedCompetency !== 'all') {
       const ref = item.discharge_date || item.admission_date;
       if (ref) {
-        const d = new Date(ref);
-        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        matchesCompetency = ym === selectedCompetency;
+        const m = ref.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        let ym: string | null = null;
+        if (m) ym = `${m[1]}-${m[2]}`;
+        else {
+          const d = new Date(ref);
+          if (!isNaN(d.getTime())) {
+            ym = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+          }
+        }
+        if (ym) matchesCompetency = ym === selectedCompetency;
       }
     }
     
@@ -598,7 +621,16 @@ const PatientManagement = () => {
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('pt-BR');
+    if (!date) return '—';
+    const s = date.trim();
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/); // YYYY-MM-DD
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    // Para ISO com horário, formatar em UTC para evitar deslocamento de dia
+    try {
+      return new Date(s).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+    } catch {
+      return s;
+    }
   };
 
   // NOVA FUNÇÃO: Executar diagnóstico
@@ -888,7 +920,22 @@ const PatientManagement = () => {
                             )}
                             {item.discharge_date && (
                               <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 text-[11px]">
-                                Competência: {format(new Date(item.discharge_date), 'MMM/yy', { locale: ptBR }).replace('.', '')}
+                                {(() => {
+                                  const s = item.discharge_date;
+                                  const mm = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                                  let label = '';
+                                  if (mm) {
+                                    const y = Number(mm[1]);
+                                    const m = Number(mm[2]);
+                                    const dObj = new Date(y, m - 1, 1);
+                                    label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
+                                  } else {
+                                    const d = new Date(s);
+                                    const dObj = isNaN(d.getTime()) ? new Date() : new Date(d.getUTCFullYear(), d.getUTCMonth(), 1);
+                                    label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
+                                  }
+                                  return <>Competência: {label}</>;
+                                })()}
                               </Badge>
                             )}
                           </div>
