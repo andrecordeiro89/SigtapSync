@@ -36,23 +36,17 @@ const ProcedureManagement = ({ aihCompleta, onUpdateAIH, sigtapProcedures = [] }
   const [filteredProcedures, setFilteredProcedures] = useState<ProcedureAIH[]>([]);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const { toast } = useToast();
-  // Competência (YYYY-MM-01)
+  // Competência (YYYY-MM-01) – por padrão nula, o usuário deve selecionar
   const [competencia, setCompetencia] = useState<string>(() => {
     const existing = (aihCompleta as any)?.competencia as string | undefined;
-    if (existing) return existing;
-    const ref = aihCompleta.dataFim || aihCompleta.dataInicio;
-    try {
-      const d = ref ? new Date(ref) : new Date();
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      return `${y}-${m}-01`;
-    } catch {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      return `${y}-${m}-01`;
-    }
+    return existing || '';
   });
+
+  // Atualizar estado local quando AIH mudar (sem forçar default)
+  useEffect(() => {
+    const existing = (aihCompleta as any)?.competencia as string | undefined;
+    setCompetencia(existing || '');
+  }, [aihCompleta]);
 
   useEffect(() => {
     // Filtrar procedimentos baseado no termo de busca

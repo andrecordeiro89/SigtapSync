@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -1265,20 +1265,10 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
             <div className="flex items-center gap-2">
               <label className="text-xs text-gray-600">Competência</label>
               <select
-                className="px-2 py-1.5 text-sm border border-gray-200 rounded-md bg-white"
+                className={`px-2 py-1.5 text-sm rounded-md bg-white ${!(aihCompleta as any)?.competencia ? 'border border-red-400 focus:outline-none focus:ring-2 focus:ring-red-300' : 'border border-gray-200'}`}
                 value={(() => {
                   const comp = (aihCompleta as any)?.competencia as string | undefined;
-                  if (comp) return comp.slice(0,7);
-                  const ref = aihCompleta.dataFim || aihCompleta.dataInicio;
-                  try {
-                    const d = ref ? new Date(ref) : new Date();
-                    const y = d.getFullYear();
-                    const m = String(d.getMonth() + 1).padStart(2, '0');
-                    return `${y}-${m}`;
-                  } catch {
-                    const now = new Date();
-                    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                  }
+                  return comp ? comp.slice(0,7) : '';
                 })()}
                 onChange={(e) => {
                   const ym = e.target.value; // YYYY-MM
@@ -1286,6 +1276,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                   onUpdateAIH({ ...(aihCompleta as any), competencia: value } as any);
                 }}
               >
+                {/* Opção nula explícita para obrigar seleção */}
+                <option value="" disabled>Selecione a competência</option>
                 {(() => {
                   const options: JSX.Element[] = [];
                   const year = new Date().getFullYear();
@@ -2399,6 +2391,25 @@ const AIHMultiPageTester = () => {
         usuario: user?.email
       });
 
+      // Competência SUS: somente persistir se o usuário selecionou (não gerar automaticamente aqui)
+      try {
+        const compRaw = (aihCompleta as any)?.competencia as string | undefined;
+        if (compRaw && /^\d{4}-\d{2}-\d{2}$/.test(compRaw)) {
+          (aihForService as any).competencia = compRaw;
+        }
+      } catch {}
+
+      // Bloqueio: não salvar se competência não foi selecionada
+      if (!((aihCompleta as any)?.competencia)) {
+        toast({
+          title: 'Selecione a competência',
+          description: 'Para salvar a AIH é necessário escolher a competência (mês/ano).',
+          variant: 'destructive'
+        });
+        setIsProcessing(false);
+        return;
+      }
+
       const result = await AIHPersistenceService.persistAIHFromPDF(
         aihForService,
         hospitalId,
@@ -2464,6 +2475,20 @@ const AIHMultiPageTester = () => {
         title: "🔍 Verificando duplicatas",
         description: "Conferindo se esta AIH já foi salva anteriormente..."
       });
+
+      // Persistência completa: manter a regra estrita — só persistir se o usuário definiu a competência
+      // (aihCompleta.competencia já pode estar setada via UI; se não estiver, não forçar aqui)
+
+      // Bloqueio: não salvar se competência não foi selecionada
+      if (!((aihCompleta as any)?.competencia)) {
+        toast({
+          title: 'Selecione a competência',
+          description: 'Para salvar a AIH completa é necessário escolher a competência (mês/ano).',
+          variant: 'destructive'
+        });
+        setIsProcessing(false);
+        return;
+      }
 
       const result = await AIHPersistenceService.persistCompleteAIH(
         aihCompleta,
