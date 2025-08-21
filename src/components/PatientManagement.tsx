@@ -914,37 +914,53 @@ const PatientManagement = () => {
 
           {/* 🗓️ Abas de Competência (mês da alta) — posicionadas abaixo dos filtros */}
           {availableCompetencies.length > 0 && (
-            <div className="mt-6">
-              <Tabs value={selectedCompetency} onValueChange={setSelectedCompetency}>
-                <TabsList className="w-full h-auto flex flex-wrap gap-1 bg-muted rounded-md p-1">
-                  <TabsTrigger
-                    value="all"
-                    className="text-xs px-2 py-1 rounded data-[state=active]:bg-background data-[state=active]:text-foreground"
-                    title="Todas as competências"
-                  >
-                    Todos
-                  </TabsTrigger>
-                  {availableCompetencies.map((c) => (
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1 bg-blue-100 rounded">
+                    <FileText className="w-4 h-4 text-blue-700" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">Relatório - Pacientes por Competência</p>
+                      <p className="text-xs text-gray-600">Gera Nome, CNS, AIH, Admissão e Alta da competência selecionada</p>
+                    </div>
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">Total: {filteredData.length}</Badge>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <Tabs value={selectedCompetency} onValueChange={setSelectedCompetency}>
+                  <TabsList className="h-auto flex flex-wrap gap-1 bg-muted rounded-md p-1">
                     <TabsTrigger
-                      key={c.value}
-                      value={c.value}
+                      value="all"
                       className="text-xs px-2 py-1 rounded data-[state=active]:bg-background data-[state=active]:text-foreground"
-                      title={`Competência ${c.label}`}
+                      title="Todas as competências"
                     >
-                      {c.label}
+                      Todos
                     </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-              <div className="mt-3 flex justify-end">
-                <Button
-                  size="sm"
-                  onClick={handleGeneratePatientsByCompetencyPDF}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Gerar PDF (Pacientes)
-                </Button>
+                    {availableCompetencies.map((c) => (
+                      <TabsTrigger
+                        key={c.value}
+                        value={c.value}
+                        className="text-xs px-2 py-1 rounded data-[state=active]:bg-background data-[state=active]:text-foreground"
+                        title={`Competência ${c.label}`}
+                      >
+                        {c.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+                <div>
+                  <Button
+                    size="sm"
+                    onClick={handleGeneratePatientsByCompetencyPDF}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Pacientes - Competência
+                  </Button>
+                </div>
               </div>
             </div>
           )}
