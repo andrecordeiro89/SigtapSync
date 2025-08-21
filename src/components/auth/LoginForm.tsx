@@ -381,7 +381,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const selectedHospital = hospitals.find(h => h.id === formData.hospital_id);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 flex items-center justify-center p-4">
+    <div className="min-h-screen relative bg-gradient-to-br from-blue-900 via-indigo-900 to-blue-900 flex items-center justify-center p-4">
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-16 -left-16 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
+        <div className="absolute -bottom-16 -right-16 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
+      </div>
       <div className="w-full max-w-md">
         {/* Logo e Header */}
         <div className="text-center mb-8">
