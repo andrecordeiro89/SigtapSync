@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { Badge } from './ui/badge';
 import { ChevronDown, User, FileText, Calendar, DollarSign, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { 
   DoctorPatientService,
@@ -64,6 +65,7 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
             aih_info: {
               admission_date: patient.aih_info?.admission_date || '',
               discharge_date: patient.aih_info?.discharge_date,
+              competencia: (patient as any).aih_info?.competencia,
               aih_number: patient.aih_info?.aih_number || ''
             },
             total_value_reais: patient.total_value_reais || 0,
@@ -106,6 +108,19 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
   // 📅 FORMATAR datas
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR');
+  };
+  // 📅 FORMATAR competência (YYYY-MM[-DD] → MM/YYYY)
+  const formatCompetencia = (value?: string) => {
+    if (!value) return '';
+    const m = String(value).match(/^(\d{4})-(\d{2})/);
+    if (m) return `${m[2]}/${m[1]}`;
+    try {
+      const d = new Date(value);
+      if (!isNaN(d.getTime())) {
+        return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
+      }
+    } catch {}
+    return String(value);
   };
 
   // 🎨 DEFINIR cor e ícone do status
@@ -386,6 +401,18 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                         </div>
                         <div className="text-xs text-blue-600 mt-1">
                           {patient.procedures.length} procedimento(s)
+                        </div>
+                        <div className="text-[11px] text-gray-600 mt-1 flex items-center gap-2 flex-wrap">
+                          <Calendar className="h-3 w-3 text-gray-400" />
+                          <span>Admissão: {patient.aih_info?.admission_date ? formatDate(patient.aih_info.admission_date) : '-'}</span>
+                          {patient.aih_info?.discharge_date && (
+                            <span>· Alta: {formatDate(patient.aih_info.discharge_date)}</span>
+                          )}
+                          {patient.aih_info && (patient.aih_info as any).competencia && (
+                            <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700">
+                              Competência: {formatCompetencia((patient.aih_info as any).competencia as any)}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       <div className="text-right space-y-1">

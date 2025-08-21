@@ -1885,6 +1885,32 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                       Alta: —
                                                     </Badge>
                                                   )}
+                                                  {(() => {
+                                                    const compRaw = (patient as any)?.aih_info?.competencia as string | undefined;
+                                                    const ref = compRaw || patient.aih_info.discharge_date || patient.aih_info.admission_date;
+                                                    const label = (() => {
+                                                      const m = String(ref || '').match(/^(\d{4})-(\d{2})/);
+                                                      if (m) return `${m[2]}/${m[1]}`;
+                                                      try {
+                                                        const d = ref ? new Date(ref) : null;
+                                                        if (d && !isNaN(d.getTime())) {
+                                                          const y = d.getUTCFullYear();
+                                                          const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                                                          return `${mm}/${y}`;
+                                                        }
+                                                      } catch {}
+                                                      return '';
+                                                    })();
+                                                    return label ? (
+                                                      <Badge
+                                                        variant="outline"
+                                                        className="ml-1 bg-blue-50 text-blue-700 border-blue-200 text-[11px] px-2 py-0.5 inline-flex items-center gap-1"
+                                                        title="Competência SUS"
+                                                      >
+                                                        Competência: {label}
+                                                      </Badge>
+                                                    ) : null;
+                                                  })()}
                                                 </div>
                                                 {patient.aih_info.care_character && (
                                                   <Badge
