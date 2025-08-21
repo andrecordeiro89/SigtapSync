@@ -135,6 +135,43 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
   const [expandedSections, setExpandedSections] = useState<{endereco: boolean}>({endereco: false}); // NOVO ESTADO
   const { toast } = useToast();
   const { user } = useAuth();
+  // 🆕 Controle explícito do modo de competência (alta SUS x manual)
+  const [competenciaMode, setCompetenciaMode] = useState<'alta' | 'manual'>(() => {
+    try {
+      const ref = (aihCompleta as any)?.dataFim || (aihCompleta as any)?.dataInicio;
+      let altaYM = '';
+      if (ref) {
+        const d = new Date(ref);
+        if (!isNaN(d.getTime())) {
+          const y = d.getUTCFullYear();
+          const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+          altaYM = `${y}-${m}`;
+        }
+      }
+      const comp = (aihCompleta as any)?.competencia as string | undefined;
+      const compYM = comp ? comp.slice(0, 7) : '';
+      return (!!altaYM && (!compYM || compYM === altaYM)) ? 'alta' : 'manual';
+    } catch { return 'alta'; }
+  });
+  // Sincronizar quando datas/competência mudarem externamente
+  useEffect(() => {
+    try {
+      const ref = (aihCompleta as any)?.dataFim || (aihCompleta as any)?.dataInicio;
+      let altaYM = '';
+      if (ref) {
+        const d = new Date(ref);
+        if (!isNaN(d.getTime())) {
+          const y = d.getUTCFullYear();
+          const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+          altaYM = `${y}-${m}`;
+        }
+      }
+      const comp = (aihCompleta as any)?.competencia as string | undefined;
+      const compYM = comp ? comp.slice(0, 7) : '';
+      const shouldAlta = (!!altaYM && (!compYM || compYM === altaYM));
+      setCompetenciaMode(shouldAlta ? 'alta' : 'manual');
+    } catch {}
+  }, [(aihCompleta as any)?.dataFim, (aihCompleta as any)?.dataInicio, (aihCompleta as any)?.competencia]);
   
   // Definir hospital atual para busca de médicos
   const currentHospital = { id: user?.hospital_id || '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b', name: 'Hospital de Desenvolvimento' };
@@ -1262,34 +1299,88 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>📋 Procedimentos Realizados ({aihCompleta.procedimentos.length})</CardTitle>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-600">Competência</label>
-              <select
-                className={`px-2 py-1.5 text-sm rounded-md bg-white ${!(aihCompleta as any)?.competencia ? 'border border-red-400 focus:outline-none focus:ring-2 focus:ring-red-300' : 'border border-gray-200'}`}
-                value={(() => {
+            <div className="flex items-center gap-3">
+              {/* Modo de competência: Alta (padrão SUS) ou Manual */}
+              {(() => {
+                const altaYM = (() => {
+                  const ref = (aihCompleta as any)?.dataFim || (aihCompleta as any)?.dataInicio;
+                  try {
+                    const d = ref ? new Date(ref) : null;
+                    if (d && !isNaN(d.getTime())) {
+                      const y = d.getUTCFullYear();
+                      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+                      return `${y}-${m}`;
+                    }
+                  } catch {}
+                  return '';
+                })();
+                const compYM = (() => {
                   const comp = (aihCompleta as any)?.competencia as string | undefined;
                   return comp ? comp.slice(0,7) : '';
-                })()}
-                onChange={(e) => {
-                  const ym = e.target.value; // YYYY-MM
-                  const value = `${ym}-01`;
-                  onUpdateAIH({ ...(aihCompleta as any), competencia: value } as any);
-                }}
-              >
-                {/* Opção nula explícita para obrigar seleção */}
-                <option value="" disabled>Selecione a competência</option>
-                {(() => {
-                  const options: JSX.Element[] = [];
-                  const year = new Date().getFullYear();
-                  for (let m = 1; m <= 12; m++) {
-                    const d = new Date(year, m - 1, 1);
-                    const ym = `${year}-${String(m).padStart(2, '0')}`;
-                    const label = d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
-                    options.push(<option key={ym} value={ym}>{label}</option>);
-                  }
-                  return options;
-                })()}
-              </select>
+                })();
+                const isAltaMode = competenciaMode === 'alta';
+                return (
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="radio"
+                        name="competencia-mode"
+                        id="competencia-mode-alta"
+                        className="h-4 w-4"
+                        checked={competenciaMode === 'alta'}
+                        onChange={() => {
+                          setCompetenciaMode('alta');
+                          if (altaYM) {
+                            const value = `${altaYM}-01`;
+                            onUpdateAIH({ ...(aihCompleta as any), competencia: value } as any);
+                          }
+                        }}
+                      />
+                      <label htmlFor="competencia-mode-alta" className="text-xs text-gray-700 whitespace-nowrap">Usar alta (SUS)</label>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="radio"
+                        name="competencia-mode"
+                        id="competencia-mode-manual"
+                        className="h-4 w-4"
+                        checked={competenciaMode === 'manual'}
+                        onChange={() => {
+                          setCompetenciaMode('manual');
+                          // Entrar em modo manual não altera o valor atual; usuário define no dropdown
+                        }}
+                      />
+                      <label htmlFor="competencia-mode-manual" className="text-xs text-gray-700 whitespace-nowrap">Selecionar manualmente</label>
+                    </div>
+                    <div className="h-4 w-px bg-gray-300 mx-1" />
+                    <label className="text-xs text-gray-600">Competência</label>
+                    <select
+                      className={`px-2 py-1.5 text-sm rounded-md bg-white border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-200`}
+                      value={isAltaMode ? (altaYM || '') : compYM}
+                      disabled={isAltaMode}
+                      onChange={(e) => {
+                        const ym = e.target.value; // YYYY-MM
+                        const value = `${ym}-01`;
+                        onUpdateAIH({ ...(aihCompleta as any), competencia: value } as any);
+                      }}
+                    >
+                      {/* Opção nula explícita para obrigar seleção */}
+                      <option value="" disabled>Selecione a competência</option>
+                      {(() => {
+                        const options: JSX.Element[] = [];
+                        const year = new Date().getFullYear();
+                        for (let m = 1; m <= 12; m++) {
+                          const d = new Date(year, m - 1, 1);
+                          const ym = `${year}-${String(m).padStart(2, '0')}`;
+                          const label = d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+                          options.push(<option key={ym} value={ym}>{label}</option>);
+                        }
+                        return options;
+                      })()}
+                    </select>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </CardHeader>
