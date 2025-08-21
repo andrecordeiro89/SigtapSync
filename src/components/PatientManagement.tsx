@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity, CreditCard, Stethoscope, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
+import { supabase } from '../lib/supabase';
 
 import AIHExecutiveSummary from './AIHExecutiveSummary';
 import ProcedureInlineCard from './ProcedureInlineCard';
@@ -141,6 +142,8 @@ const PatientManagement = () => {
   
   // 🎯 NOVO: Estado para valores totais recalculados dinamicamente
   const [aihTotalValues, setAihTotalValues] = useState<{[aihId: string]: number}>({});
+  // 🆕 Estado: habilitar/desabilitar edição da competência por AIH
+  const [editingCompetency, setEditingCompetency] = useState<{[aihId: string]: boolean}>({});
 
   // Estados para exclusão completa
   const [completeDeleteDialogOpen, setCompleteDeleteDialogOpen] = useState(false);
@@ -1041,9 +1044,69 @@ const PatientManagement = () => {
                                 label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
                               }
                               return (
-                                <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 text-[11px]">
-                                  <>Competência: {label}</>
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 text-[11px]">
+                                    <>Competência: {label}</>
+                                  </Badge>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-[11px] h-6 px-2 py-0 border-blue-200 text-blue-700"
+                                    title={editingCompetency[item.id] ? 'Desativar edição de competência' : 'Ativar edição de competência'}
+                                    onClick={() => setEditingCompetency(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                                  >
+                                    {editingCompetency[item.id] ? 'Editar competência' : 'Editar competência'}
+                                  </Button>
+                                  <select
+                                      className="text-[11px] px-1.5 py-0.5 border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                      title="Alterar competência desta AIH"
+                                      value={(() => {
+                                        const ref2 = (item as any).competencia || item.discharge_date || item.admission_date;
+                                        const m2 = String(ref2 || '').match(/^(\d{4})-(\d{2})/);
+                                        if (m2) return `${m2[1]}-${m2[2]}`;
+                                        try {
+                                          const d = ref2 ? new Date(ref2) : null;
+                                          if (d && !isNaN(d.getTime())) {
+                                            const y = d.getUTCFullYear();
+                                            const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                                            return `${y}-${mm}`;
+                                          }
+                                        } catch {}
+                                        return '';
+                                      })()}
+                                      disabled={!editingCompetency[item.id]}
+                                      onChange={async (e) => {
+                                        try {
+                                          const ym = e.target.value; // YYYY-MM
+                                          const newComp = `${ym}-01`;
+                                          const { error } = await supabase
+                                            .from('aihs')
+                                            .update({ competencia: newComp })
+                                            .eq('id', item.id);
+                                          if (error) throw error;
+                                          // Atualizar no estado local para refletir imediatamente
+                                          setAIHs(prev => prev.map(a => a.id === item.id ? ({ ...a, competencia: newComp } as any) : a));
+                                          toast({ title: 'Competência atualizada', description: `Nova competência: ${ym}` });
+                                        } catch (err:any) {
+                                          console.error('Erro ao atualizar competência:', err);
+                                          toast({ title: 'Erro ao atualizar competência', description: err.message || 'Tente novamente.', variant: 'destructive' });
+                                        }
+                                      }}
+                                    >
+                                      <option value="" disabled>Alterar</option>
+                                      {(() => {
+                                        const options: JSX.Element[] = [];
+                                        const year = new Date().getFullYear();
+                                        for (let mOpt = 1; mOpt <= 12; mOpt++) {
+                                          const d2 = new Date(year, mOpt - 1, 1);
+                                          const ym2 = `${year}-${String(mOpt).padStart(2, '0')}`;
+                                          const lbl2 = `${format(d2, 'MMM', { locale: ptBR }).replace('.', '')}/${format(d2, 'yy', { locale: ptBR })}`;
+                                          options.push(<option key={ym2} value={ym2}>{lbl2}</option>);
+                                        }
+                                        return options;
+                                      })()}
+                                    </select>
+                                </div>
                               );
                             })()}
                           </div>
