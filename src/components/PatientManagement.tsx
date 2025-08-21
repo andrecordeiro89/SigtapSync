@@ -19,6 +19,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { filterCalculableProcedures } from '../utils/anesthetistLogic';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // 🔧 CORREÇÃO: Função para formatar valores que vêm em centavos
 const formatCurrency = (value: number | undefined | null): string => {
@@ -106,7 +108,7 @@ interface UnifiedAIHData extends AIH {
 }
 
 const PatientManagement = () => {
-  const { user, hasFullAccess, canManageProcedures } = useAuth();
+  const { user, hasFullAccess, canManageProcedures, canAccessAllHospitals } = useAuth();
   const currentHospitalId = user?.hospital_id;
   const { toast } = useToast();
   const persistenceService = new AIHPersistenceService();
@@ -158,6 +160,26 @@ const PatientManagement = () => {
   // 🗓️ Competência (mês da alta) — 'all' ou 'YYYY-MM'
   const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
 
+  // Quando competência estiver ativa, evitar interseção com filtros de período
+  useEffect(() => {
+    if (selectedCompetency && selectedCompetency !== 'all') {
+      setStartDate('');
+      setEndDate('');
+    }
+  }, [selectedCompetency]);
+
+  // Range mensal derivado da competência selecionada (UTC)
+  const competencyRange = React.useMemo(() => {
+    if (!selectedCompetency || selectedCompetency === 'all') return null as null | { start: Date; end: Date };
+    const m = selectedCompetency.match(/^(\d{4})-(\d{2})$/);
+    if (!m) return null;
+    const y = Number(m[1]);
+    const mo = Number(m[2]) - 1;
+    const start = new Date(Date.UTC(y, mo, 1, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(y, mo + 1, 0, 23, 59, 59, 999));
+    return { start, end };
+  }, [selectedCompetency]);
+
   // Lista de competências disponíveis com base nas AIHs (mês da alta; fallback para admissão)
   const availableCompetencies = React.useMemo(() => {
     try {
@@ -175,7 +197,7 @@ const PatientManagement = () => {
 
       const setYM = new Set<string>();
       aihs.forEach((aih) => {
-        const ref = aih.discharge_date || aih.admission_date;
+        const ref = (aih as any).competencia || aih.discharge_date || aih.admission_date;
         if (!ref) return;
         const ym = getYM(ref);
         if (ym) setYM.add(ym);
@@ -265,10 +287,27 @@ const PatientManagement = () => {
 
   const loadAIHs = async () => {
     try {
-      console.log('🔍 Carregando AIHs para hospital:', currentHospitalId);
-      const data = await persistenceService.getAIHs(currentHospitalId);
-      setAIHs(data);
-      console.log('📊 AIHs carregadas:', data.length);
+      console.log('🔍 Carregando AIHs (com paginação) para hospital:', currentHospitalId);
+      const pageSize = 1000; // Supabase limita a 1000 por request
+      let offset = 0;
+      const all: any[] = [];
+
+      while (true) {
+        const batch = await persistenceService.getAIHs(currentHospitalId || 'ALL', {
+          limit: pageSize,
+          offset,
+        } as any);
+        const batchLen = batch?.length || 0;
+        if (batchLen === 0) break;
+        all.push(...batch);
+        if (batchLen < pageSize) break;
+        offset += pageSize;
+        // Evitar UI freeze em listas enormes
+        await new Promise(r => setTimeout(r, 0));
+      }
+
+      setAIHs(all);
+      console.log('📊 AIHs carregadas (todas):', all.length);
     } catch (error) {
       console.error('❌ Erro ao carregar AIHs:', error);
       toast({
@@ -500,44 +539,29 @@ const PatientManagement = () => {
       (item.patients?.name && item.patients.name.toLowerCase().includes(globalSearch.toLowerCase())) ||
       (item.patient?.cns && item.patient.cns.includes(globalSearch));
     
+    // Datas de referência comuns (sempre usar a mesma base do badge: alta; fallback admissão)
+    const refStr = (item as any).competencia || item.discharge_date || item.admission_date;
+    const refDate = refStr ? new Date(refStr) : null;
+
     // Filtro por intervalo de datas
     let matchesDateRange = true;
-    if (startDate || endDate) {
-      const parseDateSafe = (s: string) => {
-        const m = s && s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-        return new Date(s);
-      };
-      const admissionDate = parseDateSafe(item.admission_date);
-      
+    const applyDateRange = !competencyRange; // não aplicar intervalo quando competência estiver ativa
+    if (applyDateRange && (startDate || endDate) && refDate) {
       if (startDate) {
         const start = new Date(startDate);
-        matchesDateRange = matchesDateRange && admissionDate >= start;
+        matchesDateRange = matchesDateRange && refDate >= start;
       }
-      
       if (endDate) {
         const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999); // Include the entire end date
-        matchesDateRange = matchesDateRange && admissionDate <= end;
+        end.setHours(23, 59, 59, 999);
+        matchesDateRange = matchesDateRange && refDate <= end;
       }
     }
 
-    // 🗓️ Filtro por competência (mês da alta; fallback admissão)
+    // 🗓️ Filtro por competência (mês da alta; fallback admissão) via range mensal
     let matchesCompetency = true;
-    if (selectedCompetency && selectedCompetency !== 'all') {
-      const ref = item.discharge_date || item.admission_date;
-      if (ref) {
-        const m = ref.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        let ym: string | null = null;
-        if (m) ym = `${m[1]}-${m[2]}`;
-        else {
-          const d = new Date(ref);
-          if (!isNaN(d.getTime())) {
-            ym = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-          }
-        }
-        if (ym) matchesCompetency = ym === selectedCompetency;
-      }
+    if (competencyRange && refDate) {
+      matchesCompetency = refDate >= competencyRange.start && refDate <= competencyRange.end;
     }
     
     return matchesSearch && matchesDateRange && matchesCompetency;
@@ -548,6 +572,109 @@ const PatientManagement = () => {
     currentPage * itemsPerPage,
     (currentPage + 1) * itemsPerPage
   );
+
+  // 📄 Gerar PDF com nomes dos pacientes por competência selecionada
+  const handleGeneratePatientsByCompetencyPDF = async () => {
+    try {
+      const patientsAll = filteredData.map(i => ({
+        name: i.patients?.name || (i.patient as any)?.name || 'Paciente não identificado',
+      }));
+
+      // Montar rótulo da competência
+      const compLabel = (() => {
+        if (!selectedCompetency || selectedCompetency === 'all') return 'Todas as Competências';
+        const found = availableCompetencies.find(c => c.value === selectedCompetency);
+        if (found) return `Competência ${found.label}`;
+        const parts = selectedCompetency.split('-');
+        if (parts.length === 2) {
+          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+          return `Competência ${format(d, 'MMM', { locale: ptBR }).replace('.', '')}/${format(d, 'yy', { locale: ptBR })}`;
+        }
+        return 'Competência';
+      })();
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(41, 128, 185);
+      doc.text('SIGTAP Sync', pageWidth / 2, 25, { align: 'center' });
+
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('RELATÓRIO SUS - PACIENTES POR COMPETÊNCIA', pageWidth / 2, 35, { align: 'center' });
+
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.5);
+      doc.line(20, 42, 190, 42);
+
+      const totalPacientes = filteredData.length;
+      const hospitalName = (() => {
+        if (canAccessAllHospitals()) return 'Todos os Hospitais';
+        const first = filteredData[0] as any;
+        return (first?.hospitals && (first.hospitals as any).name) || 'Hospital Atual';
+      })();
+      const userName = user?.full_name || user?.email || 'Usuário';
+
+      const leftX = 20;
+      const rightX = doc.internal.pageSize.getWidth() - 20;
+
+      // Esquerda: Hospital (seminegrito) e Competência abaixo; Total abaixo
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(40, 40, 40);
+      doc.text(`${hospitalName}`, leftX, 55);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.text(`${compLabel}`, leftX, 62);
+      doc.text(`Total: ${totalPacientes}`, leftX, 69);
+
+      // Direita: Operador (seminegrito) e Gerado em abaixo
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(40, 40, 40);
+      doc.text(`${userName}`, rightX, 55, { align: 'right' });
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`, rightX, 62, { align: 'right' });
+
+      const tableBody = filteredData.map((i) => [
+        i.patients?.name || (i.patient as any)?.name || 'Paciente não identificado',
+        i.patients?.cns || (i.patient as any)?.cns || '',
+        i.aih_number || '',
+        i.admission_date ? formatDate(i.admission_date) : '—',
+        i.discharge_date ? formatDate(i.discharge_date) : '—',
+      ]);
+
+      autoTable(doc, {
+        head: [['Nome do Paciente', 'CNS', 'AIH', 'Admissão', 'Alta']],
+        body: tableBody,
+        startY: 70,
+        margin: { left: 20, right: 20 },
+        headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+        styles: { fontSize: 9, overflow: 'ellipsize', cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 60, overflow: 'linebreak' }, // Nome pode quebrar linha
+          1: { cellWidth: 32, overflow: 'ellipsize' }, // CNS em uma linha
+          2: { cellWidth: 32, overflow: 'ellipsize' }, // AIH em uma linha
+          3: { cellWidth: 23, overflow: 'ellipsize', halign: 'center' }, // Admissão centralizada
+          4: { cellWidth: 23, overflow: 'ellipsize', halign: 'center' }, // Alta centralizada
+        },
+      });
+
+      const fileName = `relatorio-pacientes-${selectedCompetency === 'all' ? 'todas' : selectedCompetency}.pdf`;
+      doc.save(fileName);
+      toast({ title: 'Relatório gerado', description: `${patientsAll.length} pacientes exportados.` });
+    } catch (e) {
+      console.error('Erro ao gerar PDF de pacientes por competência:', e);
+      toast({ title: 'Erro ao gerar PDF', description: 'Tente novamente.', variant: 'destructive' });
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -809,6 +936,16 @@ const PatientManagement = () => {
                   ))}
                 </TabsList>
               </Tabs>
+              <div className="mt-3 flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleGeneratePatientsByCompetencyPDF}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Gerar PDF (Pacientes)
+                </Button>
+              </div>
             </div>
           )}
 
@@ -821,7 +958,9 @@ const PatientManagement = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-xl">
             <FileText className="w-5 h-5" />
-            <span>AIHs Processadas ({totalAIHsCount})</span>
+            <span>
+              AIHs Processadas ({selectedCompetency !== 'all' ? filteredData.length : totalAIHsCount})
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -870,26 +1009,27 @@ const PatientManagement = () => {
                                 {item.hospitals?.name}
                               </Badge>
                             )}
-                            {item.discharge_date && (
-                              <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 text-[11px]">
-                                {(() => {
-                                  const s = item.discharge_date;
-                                  const mm = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-                                  let label = '';
-                                  if (mm) {
-                                    const y = Number(mm[1]);
-                                    const m = Number(mm[2]);
-                                    const dObj = new Date(y, m - 1, 1);
-                                    label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
-                                  } else {
-                                    const d = new Date(s);
-                                    const dObj = isNaN(d.getTime()) ? new Date() : new Date(d.getUTCFullYear(), d.getUTCMonth(), 1);
-                                    label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
-                                  }
-                                  return <>Competência: {label}</>;
-                                })()}
-                              </Badge>
-                            )}
+                            {(() => {
+                              const ref = (item as any).competencia || item.discharge_date || item.admission_date;
+                              if (!ref) return null;
+                              const mm = String(ref).match(/^(\d{4})-(\d{2})/);
+                              let label = '';
+                              if (mm) {
+                                const y = Number(mm[1]);
+                                const m = Number(mm[2]);
+                                const dObj = new Date(y, m - 1, 1);
+                                label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
+                              } else {
+                                const d = new Date(ref);
+                                const dObj = isNaN(d.getTime()) ? new Date() : new Date(d.getUTCFullYear(), d.getUTCMonth(), 1);
+                                label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
+                              }
+                              return (
+                                <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 text-[11px]">
+                                  <>Competência: {label}</>
+                                </Badge>
+                              );
+                            })()}
                           </div>
 
                           {/* Info em colunas (organizado) */}

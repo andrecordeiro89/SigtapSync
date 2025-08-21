@@ -1004,9 +1004,31 @@ export class AIHPersistenceService {
         if (aih.cnsResponsavel && typeof aih.cnsResponsavel === 'string' && aih.cnsResponsavel.trim() !== '') {
           updates.cns_responsavel = aih.cnsResponsavel;
         }
-        if ((aih as any).competencia) {
-          updates.competencia = (aih as any).competencia; // esperado YYYY-MM-01
-        }
+        // Competência SUS: priorizar competência informada; fallback para mês de alta; fallback mês de admissão
+        try {
+          const compRaw = (aih as any).competencia as string | undefined;
+          let competenciaDate: string | null = null;
+          if (compRaw && /^(\d{4})-(\d{2})-\d{2}$/.test(compRaw)) {
+            competenciaDate = compRaw; // já vem como YYYY-MM-01
+          } else if (aih.dataFim) {
+            const d = new Date(aih.dataFim);
+            if (!isNaN(d.getTime())) {
+              const y = d.getUTCFullYear();
+              const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+              competenciaDate = `${y}-${m}-01`;
+            }
+          } else if (aih.dataInicio) {
+            const d = new Date(aih.dataInicio);
+            if (!isNaN(d.getTime())) {
+              const y = d.getUTCFullYear();
+              const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+              competenciaDate = `${y}-${m}-01`;
+            }
+          }
+          if (competenciaDate) {
+            updates.competencia = competenciaDate;
+          }
+        } catch {}
         if (Object.keys(updates).length > 0) {
           await supabase
             .from('aihs')
@@ -1134,6 +1156,21 @@ export class AIHPersistenceService {
           .from('aihs')
           .update({
             ...aihData,
+            // Persistir competência SUS como YYYY-MM-01
+            competencia: (() => {
+              const compRaw = (aihData as any).competencia as string | undefined;
+              if (compRaw && /^(\d{4})-(\d{2})-\d{2}$/.test(compRaw)) return compRaw;
+              const ref = aihData.discharge_date || aihData.admission_date;
+              try {
+                const d = ref ? new Date(ref) : null;
+                if (d && !isNaN(d.getTime())) {
+                  const y = d.getUTCFullYear();
+                  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+                  return `${y}-${m}-01`;
+                }
+              } catch {}
+              return null;
+            })(),
             processing_status: 'processing',
             processed_at: new Date().toISOString()
           })
@@ -1151,6 +1188,20 @@ export class AIHPersistenceService {
           .from('aihs')
           .insert([{
             ...aihData,
+            competencia: (() => {
+              const compRaw = (aihData as any).competencia as string | undefined;
+              if (compRaw && /^(\d{4})-(\d{2})-\d{2}$/.test(compRaw)) return compRaw;
+              const ref = aihData.discharge_date || aihData.admission_date;
+              try {
+                const d = ref ? new Date(ref) : null;
+                if (d && !isNaN(d.getTime())) {
+                  const y = d.getUTCFullYear();
+                  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+                  return `${y}-${m}-01`;
+                }
+              } catch {}
+              return null;
+            })(),
             id: crypto.randomUUID(),
             processing_status: 'processing',
             match_found: false,
