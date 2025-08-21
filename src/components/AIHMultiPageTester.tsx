@@ -170,6 +170,10 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       const compYM = comp ? comp.slice(0, 7) : '';
       const shouldAlta = (!!altaYM && (!compYM || compYM === altaYM));
       setCompetenciaMode(shouldAlta ? 'alta' : 'manual');
+      // 🆕 Se o modo efetivo for 'alta' e ainda não temos competência definida, definir automaticamente
+      if (shouldAlta && altaYM && (!comp || compYM !== altaYM)) {
+        onUpdateAIH({ ...(aihCompleta as any), competencia: `${altaYM}-01` } as any);
+      }
     } catch {}
   }, [(aihCompleta as any)?.dataFim, (aihCompleta as any)?.dataInicio, (aihCompleta as any)?.competencia]);
   
@@ -2490,15 +2494,31 @@ const AIHMultiPageTester = () => {
         }
       } catch {}
 
-      // Bloqueio: não salvar se competência não foi selecionada
+      // Permitir salvar quando modo for 'alta' e houver data de alta/admissão
       if (!((aihCompleta as any)?.competencia)) {
-        toast({
-          title: 'Selecione a competência',
-          description: 'Para salvar a AIH é necessário escolher a competência (mês/ano).',
-          variant: 'destructive'
-        });
-        setIsProcessing(false);
-        return;
+        const ref = (aihCompleta as any)?.dataFim || (aihCompleta as any)?.dataInicio;
+        const canDerive = (() => {
+          try {
+            const d = ref ? new Date(ref) : null;
+            return d && !isNaN(d.getTime());
+          } catch { return false; }
+        })();
+        if (!canDerive) {
+          toast({
+            title: 'Selecione a competência',
+            description: 'Para salvar a AIH é necessário escolher a competência (mês/ano).',
+            variant: 'destructive'
+          });
+          setIsProcessing(false);
+          return;
+        }
+        // Derivar competência de alta/admissão e anexar ao payload
+        try {
+          const d = new Date(ref);
+          const y = d.getUTCFullYear();
+          const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+          (aihForService as any).competencia = `${y}-${m}-01`;
+        } catch {}
       }
 
       const result = await AIHPersistenceService.persistAIHFromPDF(
@@ -2567,18 +2587,24 @@ const AIHMultiPageTester = () => {
         description: "Conferindo se esta AIH já foi salva anteriormente..."
       });
 
-      // Persistência completa: manter a regra estrita — só persistir se o usuário definiu a competência
-      // (aihCompleta.competencia já pode estar setada via UI; se não estiver, não forçar aqui)
-
-      // Bloqueio: não salvar se competência não foi selecionada
+      // Se competência não estiver setada, derivar pela alta/admissão no ato do salvar completo
       if (!((aihCompleta as any)?.competencia)) {
-        toast({
-          title: 'Selecione a competência',
-          description: 'Para salvar a AIH completa é necessário escolher a competência (mês/ano).',
-          variant: 'destructive'
-        });
-        setIsProcessing(false);
-        return;
+        const ref = (aihCompleta as any)?.dataFim || (aihCompleta as any)?.dataInicio;
+        const canDerive = (() => {
+          try {
+            const d = ref ? new Date(ref) : null;
+            return d && !isNaN(d.getTime());
+          } catch { return false; }
+        })();
+        if (!canDerive) {
+          toast({
+            title: 'Selecione a competência',
+            description: 'Para salvar a AIH completa é necessário escolher a competência (mês/ano).',
+            variant: 'destructive'
+          });
+          setIsProcessing(false);
+          return;
+        }
       }
 
       const result = await AIHPersistenceService.persistCompleteAIH(
