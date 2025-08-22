@@ -1037,10 +1037,19 @@ export function calculateDoctorPayment(
       } else {
         // Procedimentos com regra individual
         const standardRule = rule.rules.find(r => r.procedureCode === proc.procedure_code);
+        if (!standardRule) {
+          // Código aparece apenas em regras múltiplas, sem combinação ativa
+          return {
+            ...proc,
+            calculatedPayment: 0,
+            paymentRule: 'Sem regra individual aplicável',
+            isSpecialRule: true
+          };
+        }
         return {
           ...proc,
-          calculatedPayment: standardRule!.standardValue,
-          paymentRule: standardRule!.description || `R$ ${standardRule!.standardValue.toFixed(2)}`,
+          calculatedPayment: standardRule.standardValue,
+          paymentRule: standardRule.description || `R$ ${standardRule.standardValue.toFixed(2)}`,
           isSpecialRule: true
         };
       }
@@ -1049,16 +1058,21 @@ export function calculateDoctorPayment(
     appliedRule = `Regra múltiplos procedimentos: ${specialProcedures.length} procedimentos = R$ ${totalSpecialValue.toFixed(2)} total`;
   } else {
     // Aplicar regras individuais
-    calculatedProcedures = filteredProcedures.map(proc => {
-      const standardRule = rule.rules.find(r => r.procedureCode === proc.procedure_code);
-      
-      return {
-        ...proc,
-        calculatedPayment: standardRule!.standardValue,
-        paymentRule: standardRule!.description || `R$ ${standardRule!.standardValue.toFixed(2)}`,
-        isSpecialRule: true
-      };
-    });
+    calculatedProcedures = filteredProcedures
+      .map(proc => {
+        const standardRule = rule.rules.find(r => r.procedureCode === proc.procedure_code);
+        if (!standardRule) {
+          // Ignorar procedimentos que só possuem regra em combinação múltipla
+          return null as unknown as (ProcedurePaymentInfo & { calculatedPayment: number; paymentRule: string; isSpecialRule: boolean });
+        }
+        return {
+          ...proc,
+          calculatedPayment: standardRule.standardValue,
+          paymentRule: standardRule.description || `R$ ${standardRule.standardValue.toFixed(2)}`,
+          isSpecialRule: true
+        };
+      })
+      .filter(Boolean);
 
     appliedRule = `Regras individuais aplicadas para ${calculatedProcedures.length} procedimento(s)`;
   }

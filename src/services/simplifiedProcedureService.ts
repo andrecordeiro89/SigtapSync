@@ -179,7 +179,7 @@ export class ProcedureRecordsService {
       }
 
       // Evitar estouro de URL/POST e limites do PostgREST: processar em chunks
-      const CHUNK_SIZE = 400;
+      const CHUNK_SIZE = 80; // reduzir para evitar URLs muito longas em filtros IN
       const chunks = this.chunkArray(patientIds, CHUNK_SIZE);
 
       const results = await Promise.all(chunks.map(async (chunk, idx) => {
@@ -285,7 +285,7 @@ export class ProcedureRecordsService {
         return { success: true, proceduresByAihId: new Map() };
       }
 
-      const CHUNK_SIZE = 400;
+      const CHUNK_SIZE = 80; // reduzir para evitar URLs muito longas em filtros IN
       const chunks = this.chunkArray(aihIds, CHUNK_SIZE);
 
       const results = await Promise.all(chunks.map(async (chunk, idx) => {
