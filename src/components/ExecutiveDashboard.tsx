@@ -1054,8 +1054,6 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     <option value="all">Todos</option>
                     <option value="1">Eletivo</option>
                     <option value="2">Urgência/Emergência</option>
-                    <option value="3">Acidente no Trabalho</option>
-                    <option value="4">Acidente de Trânsito</option>
                   </select>
                   {selectedCareCharacter !== 'all' && (
                     <button

@@ -22,6 +22,8 @@ import { ptBR } from 'date-fns/locale';
 import { filterCalculableProcedures } from '../utils/anesthetistLogic';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import PatientAihInfoBadges from './PatientAihInfoBadges';
+import AihDatesBadges from './AihDatesBadges';
 
 // Ícone customizado: cruz médica vermelha
 const MedicalCrossIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -1030,9 +1032,19 @@ const PatientManagement = () => {
                               <User className="w-4 h-4 text-blue-600" />
                             </div>
                               <div className="flex flex-col min-w-0">
-                            <h3 className="font-semibold text-gray-900 truncate text-lg">
-                              {item.patients?.name || 'Paciente não identificado'}
-                            </h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-gray-900 truncate text-lg">
+                                {item.patients?.name || 'Paciente não identificado'}
+                              </h3>
+                              {item.care_character && (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[11px] ${CareCharacterUtils.getStyleClasses(item.care_character)}`}
+                                >
+                                  {CareCharacterUtils.formatForDisplay(item.care_character, false)}
+                                </Badge>
+                              )}
+                            </div>
                             {item.hospitals?.name && (
                                   <div className="mt-0.5 flex items-center text-[11px] text-slate-700">
                                     <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-red-50 border border-red-200 mr-1 text-red-600">
@@ -1062,27 +1074,7 @@ const PatientManagement = () => {
                                   </Badge>
                                 );
                               })()}
-                            {(() => {
-                              const ref = (item as any).competencia || item.discharge_date || item.admission_date;
-                              if (!ref) return null;
-                              const mm = String(ref).match(/^(\d{4})-(\d{2})/);
-                              let label = '';
-                              if (mm) {
-                                const y = Number(mm[1]);
-                                const m = Number(mm[2]);
-                                const dObj = new Date(y, m - 1, 1);
-                                label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
-                              } else {
-                                const d = new Date(ref);
-                                const dObj = isNaN(d.getTime()) ? new Date() : new Date(d.getUTCFullYear(), d.getUTCMonth(), 1);
-                                label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
-                              }
-                              return (
-                                  <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 text-[11px]">
-                                    <>Competência: {label}</>
-                                  </Badge>
-                                );
-                              })()}
+                            {/* Competência removida aqui para evitar duplicação com AihDatesBadges */}
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -1145,49 +1137,23 @@ const PatientManagement = () => {
 
                           
 
-                          {/* Info em colunas (organizado) */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
-                            {/* Coluna 1: AIH, CNS, CID */}
-                            <div className="space-y-2">
-                              <Badge variant="outline" className="flex w-full justify-start bg-sky-50 border-sky-200 text-sky-700 px-2 py-0.5">
-                                <FileText className="w-3 h-3 mr-1" />
-                                AIH {item.aih_number}
-                              </Badge>
-                              <Badge variant="outline" className="flex w-full justify-start bg-slate-50 border-slate-200 text-slate-700 px-2 py-0.5">
-                                <CreditCard className="w-3 h-3 mr-1" />
-                                CNS: {item.patients?.cns || 'N/A'}
-                              </Badge>
-                              <Badge variant="outline" className="flex w-full justify-start bg-violet-50 border-violet-200 text-violet-700 px-2 py-0.5">
-                                <Activity className="w-3 h-3 mr-1" />
-                                CID: {item.main_cid}
-                              </Badge>
-                            </div>
-                            {/* Coluna 2: Admissão, Alta, Outro (Especialidade ou Médico) */}
-                            <div className="space-y-2">
-                              <Badge variant="outline" className="flex w-full justify-start bg-slate-50 border-slate-200 text-slate-700 px-2 py-0.5">
-                                <Calendar className="w-3 h-3 mr-1" />
-                                Admissão: {formatDate(item.admission_date)}
-                              </Badge>
-                              {item.discharge_date && (
-                                <Badge variant="outline" className="flex w-full justify-start bg-blue-50 border-blue-200 text-blue-700 px-2 py-0.5">
-                                  <Calendar className="w-3 h-3 mr-1" />
-                                  Alta: {formatDate(item.discharge_date)}
-                                </Badge>
-                              )}
-                              {item.specialty ? (
-                                <Badge variant="outline" className="flex w-full justify-start bg-indigo-50 border-indigo-200 text-indigo-700 px-2 py-0.5">
-                                  <Stethoscope className="w-3 h-3 mr-1" />
-                                  {item.specialty}
-                                </Badge>
-                              ) : (
-                                item.requesting_physician && (
-                                  <Badge variant="outline" className="flex w-full justify-start bg-amber-50 border-amber-200 text-amber-700 px-2 py-0.5">
-                                    <User className="w-3 h-3 mr-1" />
-                                    {item.requesting_physician}
-                                  </Badge>
-                                )
-                              )}
-                            </div>
+                          {/* Datas padronizadas + info compacta */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <AihDatesBadges
+                              admissionDate={item.admission_date}
+                              dischargeDate={item.discharge_date}
+                              competencia={(item as any).competencia}
+                              className="text-[11px]"
+                            />
+                            <PatientAihInfoBadges
+                              aihNumber={item.aih_number}
+                              mainCid={item.main_cid}
+                              specialty={item.specialty}
+                              requestingPhysician={item.requesting_physician}
+                              careModality={item.care_modality}
+                              professionalCbo={item.professional_cbo}
+                              className="text-[11px]"
+                            />
                           </div>
                         </div>
                       </div>

@@ -19,6 +19,11 @@ export class DoctorsHierarchyV2Service {
         patient_id,
         admission_date,
         discharge_date,
+        main_cid,
+        specialty,
+        care_modality,
+        requesting_physician,
+        professional_cbo,
         care_character,
         calculated_total_value,
         cns_responsavel,
@@ -153,6 +158,11 @@ export class DoctorsHierarchyV2Service {
             admission_date: aih.admission_date,
             discharge_date: aih.discharge_date,
             aih_number: aih.aih_number,
+            main_cid: aih.main_cid,
+            specialty: aih.specialty,
+            care_modality: aih.care_modality,
+            requesting_physician: aih.requesting_physician,
+            professional_cbo: aih.professional_cbo,
             care_character: aih.care_character, // manter valor original para auditoria
             hospital_id: aih.hospital_id
           },

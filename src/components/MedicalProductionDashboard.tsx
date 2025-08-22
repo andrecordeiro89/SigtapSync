@@ -48,6 +48,8 @@ import {
   filterCalculableProcedures 
 } from '../utils/anesthetistLogic';
 import ReportGenerator from './ReportGenerator';
+import PatientAihInfoBadges from './PatientAihInfoBadges';
+import AihDatesBadges from './AihDatesBadges';
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -1860,74 +1862,46 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 </div>
                                               </div>
                                               <div className="space-y-1">
-                                                <div className="font-semibold text-base text-slate-900">
-                                                  {(/procedimento/i.test(patient.patient_info.name) || /\b\d{2}\.\d{2}\.\d{2}\.\d{3}-\d\b/.test(patient.patient_info.name)) ? 'Nome não disponível' : patient.patient_info.name}
+                                                <div className="flex items-center gap-2">
+                                                  <div className="font-semibold text-base text-slate-900">
+                                                    {(/procedimento/i.test(patient.patient_info.name) || /\b\d{2}\.\d{2}\.\d{2}\.\d{3}-\d\b/.test(patient.patient_info.name)) ? 'Nome não disponível' : patient.patient_info.name}
+                                                  </div>
+                                                  {patient.aih_info.care_character && (
+                                                    <Badge
+                                                      variant="outline"
+                                                      className={`inline-flex items-center gap-1.5 rounded-md ${CareCharacterUtils.getStyleClasses(
+                                                        patient.aih_info.care_character
+                                                      )} text-[11px]`}
+                                                    >
+                                                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                                      {CareCharacterUtils.formatForDisplay(
+                                                        typeof patient.aih_info.care_character === 'string'
+                                                          ? patient.aih_info.care_character.trim()
+                                                          : String(patient.aih_info.care_character),
+                                                        false
+                                                      )}
+                                                    </Badge>
+                                                  )}
                                                 </div>
                                                 <div className="text-sm text-slate-600 font-medium">
                                                   CNS: {patient.patient_info.cns}
                                                 </div>
-                                                <div className="text-sm text-slate-500 flex items-center gap-2">
-                                                  <span>Admissão: {new Date(patient.aih_info.admission_date).toLocaleDateString('pt-BR')}</span>
-                                                  {patient.aih_info.discharge_date ? (
-                                                    <Badge
-                                                      variant="outline"
-                                                      className="ml-1 bg-blue-50 text-blue-700 border-blue-200 text-[11px] px-2 py-0.5 inline-flex items-center gap-1"
-                                                      title="Filtrando pela Data de Alta (SUS)"
-                                                    >
-                                                      Alta: {new Date(patient.aih_info.discharge_date).toLocaleDateString('pt-BR')}
-                                                    </Badge>
-                                                  ) : (
-                                                    <Badge
-                                                      variant="outline"
-                                                      className="ml-1 bg-amber-50 text-amber-700 border-amber-200 text-[11px] px-2 py-0.5 inline-flex items-center gap-1"
-                                                      title="Sem data de alta; período considera apenas internação"
-                                                    >
-                                                      Alta: —
-                                                    </Badge>
-                                                  )}
-                                                  {(() => {
-                                                    const compRaw = (patient as any)?.aih_info?.competencia as string | undefined;
-                                                    const ref = compRaw || patient.aih_info.discharge_date || patient.aih_info.admission_date;
-                                                    const label = (() => {
-                                                      const m = String(ref || '').match(/^(\d{4})-(\d{2})/);
-                                                      if (m) return `${m[2]}/${m[1]}`;
-                                                      try {
-                                                        const d = ref ? new Date(ref) : null;
-                                                        if (d && !isNaN(d.getTime())) {
-                                                          const y = d.getUTCFullYear();
-                                                          const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-                                                          return `${mm}/${y}`;
-                                                        }
-                                                      } catch {}
-                                                      return '';
-                                                    })();
-                                                    return label ? (
-                                                      <Badge
-                                                        variant="outline"
-                                                        className="ml-1 bg-blue-50 text-blue-700 border-blue-200 text-[11px] px-2 py-0.5 inline-flex items-center gap-1"
-                                                        title="Competência SUS"
-                                                      >
-                                                        Competência: {label}
-                                                      </Badge>
-                                                    ) : null;
-                                                  })()}
-                                                </div>
-                                                {patient.aih_info.care_character && (
-                                                  <Badge
-                                                    variant="outline"
-                                                    className={`inline-flex items-center gap-1.5 rounded-md ${CareCharacterUtils.getStyleClasses(
-                                                      patient.aih_info.care_character
-                                                    )}`}
-                                                  >
-                                                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                                                    {CareCharacterUtils.formatForDisplay(
-                                                      typeof patient.aih_info.care_character === 'string'
-                                                        ? patient.aih_info.care_character.trim()
-                                                        : String(patient.aih_info.care_character),
-                                                      false
-                                                    )}
-                                                  </Badge>
-                                                )}
+                                                <AihDatesBadges
+                                                  admissionDate={patient.aih_info.admission_date}
+                                                  dischargeDate={patient.aih_info.discharge_date}
+                                                  competencia={(patient as any)?.aih_info?.competencia}
+                                                  className="text-sm"
+                                                />
+                                                
+                                                <PatientAihInfoBadges
+                                                  aihNumber={patient.aih_info.aih_number}
+                                                  mainCid={patient.aih_info.main_cid}
+                                                  specialty={patient.aih_info.specialty}
+                                                  requestingPhysician={patient.aih_info.requesting_physician}
+                                                  careModality={patient.aih_info.care_modality}
+                                                  professionalCbo={patient.aih_info.professional_cbo}
+                                                  className="mt-2"
+                                                />
                                               </div>
                                             </div>
                                             <div className="text-right">

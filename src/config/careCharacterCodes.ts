@@ -34,24 +34,7 @@ export const CARE_CHARACTER_CODES: Record<string, CareCharacterCode> = {
     bgColor: 'bg-red-100',
     borderColor: 'border-red-200'
   },
-  '3': {
-    code: '3',
-    description: 'Acidente no Trabalho',
-    shortDescription: 'Acidente Trabalho',
-    category: 'outros',
-    color: 'text-orange-800',
-    bgColor: 'bg-orange-100',
-    borderColor: 'border-orange-200'
-  },
-  '4': {
-    code: '4',
-    description: 'Acidente de Trânsito',
-    shortDescription: 'Acidente Trânsito',
-    category: 'outros',
-    color: 'text-purple-800',
-    bgColor: 'bg-purple-100',
-    borderColor: 'border-purple-200'
-  }
+  
 };
 
 // Array de códigos para facilitar iteração
