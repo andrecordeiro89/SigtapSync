@@ -45,20 +45,20 @@ const AihDatesBadges: React.FC<AihDatesBadgesProps> = ({ admissionDate, discharg
 	const compLabel = formatCompetencia(competencia, dischargeDate || admissionDate);
 	return (
 		<div className={`flex flex-wrap items-center gap-2 ${className || ''}`}>
-			<Badge variant="outline" className="bg-slate-50 border-slate-200 text-slate-700 px-2 py-0.5">
+			<Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 text-blue-700 px-2 py-0.5">
 				Admissão: {formatDate(admissionDate)}
 			</Badge>
 			{dischargeDate ? (
-				<Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 px-2 py-0.5">
+				<Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 text-blue-700 px-2 py-0.5">
 					Alta: {formatDate(dischargeDate)}
 				</Badge>
 			) : (
-				<Badge variant="outline" className="bg-amber-50 border-amber-200 text-amber-700 px-2 py-0.5" title="Sem data de alta; período considera apenas internação">
+				<Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 text-blue-700 px-2 py-0.5" title="Sem data de alta; período considera apenas internação">
 					Alta: —
 				</Badge>
 			)}
 			{compLabel && (
-				<Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 px-2 py-0.5" title="Competência SUS">
+				<Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 text-blue-700 px-2 py-0.5" title="Competência SUS">
 					Competência: {compLabel}
 				</Badge>
 			)}
