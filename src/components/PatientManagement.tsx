@@ -1014,102 +1014,126 @@ const PatientManagement = () => {
                         </Button>
 
                         <div className="flex-1 min-w-0">
-                          {/* Nome do Paciente */}
-                          <div className="flex items-center space-x-2 mb-2">
-                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                              <User className="w-4 h-4 text-blue-600" />
+                          {/* Nome do Paciente (esquerda) + Controles (direita, largura 1/2) */}
+                          <div className="flex items-center mb-2">
+                            {/* Esquerda: Nome e Hospital */}
+                            <div className="flex items-center space-x-2 flex-1 min-w-0">
+                              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <User className="w-4 h-4 text-blue-600" />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <h3 className="font-semibold text-gray-900 truncate text-lg">
+                                  {item.patients?.name || 'Paciente não identificado'}
+                                </h3>
+                                {item.hospitals?.name && (
+                                  <div className="mt-0.5 flex items-center text-[11px] text-slate-700">
+                                    <Building2 className="w-3 h-3 mr-1 text-slate-700" />
+                                    <span className="truncate font-semibold">{item.hospitals?.name}</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <h3 className="font-semibold text-gray-900 truncate text-lg">
-                              {item.patients?.name || 'Paciente não identificado'}
-                            </h3>
-                            {item.hospitals?.name && (
-                              <Badge variant="outline" className="bg-teal-50 border-teal-200 text-teal-700 text-[11px]">
-                                <Building2 className="w-3 h-3 mr-1" />
-                                {item.hospitals?.name}
-                              </Badge>
-                            )}
-                            {(() => {
-                              const ref = (item as any).competencia || item.discharge_date || item.admission_date;
-                              if (!ref) return null;
-                              const mm = String(ref).match(/^(\d{4})-(\d{2})/);
-                              let label = '';
-                              if (mm) {
-                                const y = Number(mm[1]);
-                                const m = Number(mm[2]);
-                                const dObj = new Date(y, m - 1, 1);
-                                label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
-                              } else {
-                                const d = new Date(ref);
-                                const dObj = isNaN(d.getTime()) ? new Date() : new Date(d.getUTCFullYear(), d.getUTCMonth(), 1);
-                                label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
-                              }
-                              return (
-                                <div className="flex items-center gap-2">
+
+                            {/* Direita: Controles alinhados e limitados à largura da coluna direita (1/2) */}
+                            <div className="hidden sm:flex w-1/2 justify-end gap-2 flex-wrap">
+                              {(() => {
+                                const birth = (item.patient || item.patients)?.birth_date as any;
+                                if (!birth) return null;
+                                const d = new Date(String(birth));
+                                if (isNaN(d.getTime())) return null;
+                                const today = new Date();
+                                let age = today.getFullYear() - d.getFullYear();
+                                const m = today.getMonth() - d.getMonth();
+                                if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+                                if (age < 0 || age > 130) return null;
+                                return (
+                                  <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-700 text-[11px]">
+                                    Idade: {age}
+                                  </Badge>
+                                );
+                              })()}
+                              {(() => {
+                                const ref = (item as any).competencia || item.discharge_date || item.admission_date;
+                                if (!ref) return null;
+                                const mm = String(ref).match(/^(\d{4})-(\d{2})/);
+                                let label = '';
+                                if (mm) {
+                                  const y = Number(mm[1]);
+                                  const m = Number(mm[2]);
+                                  const dObj = new Date(y, m - 1, 1);
+                                  label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
+                                } else {
+                                  const d = new Date(ref);
+                                  const dObj = isNaN(d.getTime()) ? new Date() : new Date(d.getUTCFullYear(), d.getUTCMonth(), 1);
+                                  label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
+                                }
+                                return (
                                   <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 text-[11px]">
                                     <>Competência: {label}</>
                                   </Badge>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-[11px] h-6 px-2 py-0 border-blue-200 text-blue-700"
-                                    title={editingCompetency[item.id] ? 'Desativar edição de competência' : 'Ativar edição de competência'}
-                                    onClick={() => setEditingCompetency(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                                  >
-                                    {editingCompetency[item.id] ? 'Editar competência' : 'Editar competência'}
-                                  </Button>
-                                  <select
-                                      className="text-[11px] px-1.5 py-0.5 border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                      title="Alterar competência desta AIH"
-                                      value={(() => {
-                                        const ref2 = (item as any).competencia || item.discharge_date || item.admission_date;
-                                        const m2 = String(ref2 || '').match(/^(\d{4})-(\d{2})/);
-                                        if (m2) return `${m2[1]}-${m2[2]}`;
-                                        try {
-                                          const d = ref2 ? new Date(ref2) : null;
-                                          if (d && !isNaN(d.getTime())) {
-                                            const y = d.getUTCFullYear();
-                                            const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-                                            return `${y}-${mm}`;
-                                          }
-                                        } catch {}
-                                        return '';
-                                      })()}
-                                      disabled={!editingCompetency[item.id]}
-                                      onChange={async (e) => {
-                                        try {
-                                          const ym = e.target.value; // YYYY-MM
-                                          const newComp = `${ym}-01`;
-                                          const { error } = await supabase
-                                            .from('aihs')
-                                            .update({ competencia: newComp })
-                                            .eq('id', item.id);
-                                          if (error) throw error;
-                                          // Atualizar no estado local para refletir imediatamente
-                                          setAIHs(prev => prev.map(a => a.id === item.id ? ({ ...a, competencia: newComp } as any) : a));
-                                          toast({ title: 'Competência atualizada', description: `Nova competência: ${ym}` });
-                                        } catch (err:any) {
-                                          console.error('Erro ao atualizar competência:', err);
-                                          toast({ title: 'Erro ao atualizar competência', description: err.message || 'Tente novamente.', variant: 'destructive' });
-                                        }
-                                      }}
-                                    >
-                                      <option value="" disabled>Alterar</option>
-                                      {(() => {
-                                        const options: JSX.Element[] = [];
-                                        const year = new Date().getFullYear();
-                                        for (let mOpt = 1; mOpt <= 12; mOpt++) {
-                                          const d2 = new Date(year, mOpt - 1, 1);
-                                          const ym2 = `${year}-${String(mOpt).padStart(2, '0')}`;
-                                          const lbl2 = `${format(d2, 'MMM', { locale: ptBR }).replace('.', '')}/${format(d2, 'yy', { locale: ptBR })}`;
-                                          options.push(<option key={ym2} value={ym2}>{lbl2}</option>);
-                                        }
-                                        return options;
-                                      })()}
-                                    </select>
-                                </div>
-                              );
-                            })()}
+                                );
+                              })()}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-[11px] h-6 px-2 py-0 border-blue-200 text-blue-700"
+                                title={editingCompetency[item.id] ? 'Desativar edição de competência' : 'Ativar edição de competência'}
+                                onClick={() => setEditingCompetency(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                              >
+                                {editingCompetency[item.id] ? 'Editar competência' : 'Editar competência'}
+                              </Button>
+                              <select
+                                className="text-[11px] px-1.5 py-0.5 border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                title="Alterar competência desta AIH"
+                                value={(() => {
+                                  const ref2 = (item as any).competencia || item.discharge_date || item.admission_date;
+                                  const m2 = String(ref2 || '').match(/^(\d{4})-(\d{2})/);
+                                  if (m2) return `${m2[1]}-${m2[2]}`;
+                                  try {
+                                    const d = ref2 ? new Date(ref2) : null;
+                                    if (d && !isNaN(d.getTime())) {
+                                      const y = d.getUTCFullYear();
+                                      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                                      return `${y}-${mm}`;
+                                    }
+                                  } catch {}
+                                  return '';
+                                })()}
+                                disabled={!editingCompetency[item.id]}
+                                onChange={async (e) => {
+                                  try {
+                                    const ym = e.target.value; // YYYY-MM
+                                    const newComp = `${ym}-01`;
+                                    const { error } = await supabase
+                                      .from('aihs')
+                                      .update({ competencia: newComp })
+                                      .eq('id', item.id);
+                                    if (error) throw error;
+                                    setAIHs(prev => prev.map(a => a.id === item.id ? ({ ...a, competencia: newComp } as any) : a));
+                                    toast({ title: 'Competência atualizada', description: `Nova competência: ${ym}` });
+                                  } catch (err:any) {
+                                    console.error('Erro ao atualizar competência:', err);
+                                    toast({ title: 'Erro ao atualizar competência', description: err.message || 'Tente novamente.', variant: 'destructive' });
+                                  }
+                                }}
+                              >
+                                <option value="" disabled>Alterar</option>
+                                {(() => {
+                                  const options: JSX.Element[] = [];
+                                  const year = new Date().getFullYear();
+                                  for (let mOpt = 1; mOpt <= 12; mOpt++) {
+                                    const d2 = new Date(year, mOpt - 1, 1);
+                                    const ym2 = `${year}-${String(mOpt).padStart(2, '0')}`;
+                                    const lbl2 = `${format(d2, 'MMM', { locale: ptBR }).replace('.', '')}/${format(d2, 'yy', { locale: ptBR })}`;
+                                    options.push(<option key={ym2} value={ym2}>{lbl2}</option>);
+                                  }
+                                  return options;
+                                })()}
+                              </select>
+                            </div>
                           </div>
+
+                          
 
                           {/* Info em colunas (organizado) */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
