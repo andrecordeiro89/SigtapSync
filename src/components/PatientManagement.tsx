@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity, CreditCard, Stethoscope, Building2 } from 'lucide-react';
+import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity, CreditCard, Stethoscope } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
 import { supabase } from '../lib/supabase';
@@ -22,6 +22,14 @@ import { ptBR } from 'date-fns/locale';
 import { filterCalculableProcedures } from '../utils/anesthetistLogic';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+
+// Ícone customizado: cruz médica vermelha
+const MedicalCrossIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+    <rect x="10" y="4" width="4" height="16" rx="1" />
+    <rect x="4" y="10" width="16" height="4" rx="1" />
+  </svg>
+);
 
 // 🔧 CORREÇÃO: Função para formatar valores que vêm em centavos
 const formatCurrency = (value: number | undefined | null): string => {
@@ -1018,17 +1026,19 @@ const PatientManagement = () => {
                           <div className="flex items-center mb-2">
                             {/* Esquerda: Nome e Hospital */}
                             <div className="flex items-center space-x-2 flex-1 min-w-0">
-                              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <User className="w-4 h-4 text-blue-600" />
-                              </div>
+                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <User className="w-4 h-4 text-blue-600" />
+                            </div>
                               <div className="flex flex-col min-w-0">
-                                <h3 className="font-semibold text-gray-900 truncate text-lg">
-                                  {item.patients?.name || 'Paciente não identificado'}
-                                </h3>
-                                {item.hospitals?.name && (
+                            <h3 className="font-semibold text-gray-900 truncate text-lg">
+                              {item.patients?.name || 'Paciente não identificado'}
+                            </h3>
+                            {item.hospitals?.name && (
                                   <div className="mt-0.5 flex items-center text-[11px] text-slate-700">
-                                    <Building2 className="w-3 h-3 mr-1 text-slate-700" />
-                                    <span className="truncate font-semibold">{item.hospitals?.name}</span>
+                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-red-50 border border-red-200 mr-1 text-red-600">
+                                      <MedicalCrossIcon className="w-3 h-3" />
+                                    </span>
+                                    <span className="truncate font-semibold text-[12px]">{item.hospitals?.name}</span>
                                   </div>
                                 )}
                               </div>
@@ -1052,85 +1062,85 @@ const PatientManagement = () => {
                                   </Badge>
                                 );
                               })()}
-                              {(() => {
-                                const ref = (item as any).competencia || item.discharge_date || item.admission_date;
-                                if (!ref) return null;
-                                const mm = String(ref).match(/^(\d{4})-(\d{2})/);
-                                let label = '';
-                                if (mm) {
-                                  const y = Number(mm[1]);
-                                  const m = Number(mm[2]);
-                                  const dObj = new Date(y, m - 1, 1);
-                                  label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
-                                } else {
-                                  const d = new Date(ref);
-                                  const dObj = isNaN(d.getTime()) ? new Date() : new Date(d.getUTCFullYear(), d.getUTCMonth(), 1);
-                                  label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
-                                }
-                                return (
+                            {(() => {
+                              const ref = (item as any).competencia || item.discharge_date || item.admission_date;
+                              if (!ref) return null;
+                              const mm = String(ref).match(/^(\d{4})-(\d{2})/);
+                              let label = '';
+                              if (mm) {
+                                const y = Number(mm[1]);
+                                const m = Number(mm[2]);
+                                const dObj = new Date(y, m - 1, 1);
+                                label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
+                              } else {
+                                const d = new Date(ref);
+                                const dObj = isNaN(d.getTime()) ? new Date() : new Date(d.getUTCFullYear(), d.getUTCMonth(), 1);
+                                label = `${format(dObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dObj, 'yy', { locale: ptBR })}`;
+                              }
+                              return (
                                   <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 text-[11px]">
                                     <>Competência: {label}</>
                                   </Badge>
                                 );
                               })()}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-[11px] h-6 px-2 py-0 border-blue-200 text-blue-700"
-                                title={editingCompetency[item.id] ? 'Desativar edição de competência' : 'Ativar edição de competência'}
-                                onClick={() => setEditingCompetency(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                              >
-                                {editingCompetency[item.id] ? 'Editar competência' : 'Editar competência'}
-                              </Button>
-                              <select
-                                className="text-[11px] px-1.5 py-0.5 border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                title="Alterar competência desta AIH"
-                                value={(() => {
-                                  const ref2 = (item as any).competencia || item.discharge_date || item.admission_date;
-                                  const m2 = String(ref2 || '').match(/^(\d{4})-(\d{2})/);
-                                  if (m2) return `${m2[1]}-${m2[2]}`;
-                                  try {
-                                    const d = ref2 ? new Date(ref2) : null;
-                                    if (d && !isNaN(d.getTime())) {
-                                      const y = d.getUTCFullYear();
-                                      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-                                      return `${y}-${mm}`;
-                                    }
-                                  } catch {}
-                                  return '';
-                                })()}
-                                disabled={!editingCompetency[item.id]}
-                                onChange={async (e) => {
-                                  try {
-                                    const ym = e.target.value; // YYYY-MM
-                                    const newComp = `${ym}-01`;
-                                    const { error } = await supabase
-                                      .from('aihs')
-                                      .update({ competencia: newComp })
-                                      .eq('id', item.id);
-                                    if (error) throw error;
-                                    setAIHs(prev => prev.map(a => a.id === item.id ? ({ ...a, competencia: newComp } as any) : a));
-                                    toast({ title: 'Competência atualizada', description: `Nova competência: ${ym}` });
-                                  } catch (err:any) {
-                                    console.error('Erro ao atualizar competência:', err);
-                                    toast({ title: 'Erro ao atualizar competência', description: err.message || 'Tente novamente.', variant: 'destructive' });
-                                  }
-                                }}
-                              >
-                                <option value="" disabled>Alterar</option>
-                                {(() => {
-                                  const options: JSX.Element[] = [];
-                                  const year = new Date().getFullYear();
-                                  for (let mOpt = 1; mOpt <= 12; mOpt++) {
-                                    const d2 = new Date(year, mOpt - 1, 1);
-                                    const ym2 = `${year}-${String(mOpt).padStart(2, '0')}`;
-                                    const lbl2 = `${format(d2, 'MMM', { locale: ptBR }).replace('.', '')}/${format(d2, 'yy', { locale: ptBR })}`;
-                                    options.push(<option key={ym2} value={ym2}>{lbl2}</option>);
-                                  }
-                                  return options;
-                                })()}
-                              </select>
-                            </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-[11px] h-6 px-2 py-0 border-blue-200 text-blue-700"
+                                    title={editingCompetency[item.id] ? 'Desativar edição de competência' : 'Ativar edição de competência'}
+                                    onClick={() => setEditingCompetency(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                                  >
+                                    {editingCompetency[item.id] ? 'Editar competência' : 'Editar competência'}
+                                  </Button>
+                                  <select
+                                      className="text-[11px] px-1.5 py-0.5 border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                      title="Alterar competência desta AIH"
+                                      value={(() => {
+                                        const ref2 = (item as any).competencia || item.discharge_date || item.admission_date;
+                                        const m2 = String(ref2 || '').match(/^(\d{4})-(\d{2})/);
+                                        if (m2) return `${m2[1]}-${m2[2]}`;
+                                        try {
+                                          const d = ref2 ? new Date(ref2) : null;
+                                          if (d && !isNaN(d.getTime())) {
+                                            const y = d.getUTCFullYear();
+                                            const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                                            return `${y}-${mm}`;
+                                          }
+                                        } catch {}
+                                        return '';
+                                      })()}
+                                      disabled={!editingCompetency[item.id]}
+                                      onChange={async (e) => {
+                                        try {
+                                          const ym = e.target.value; // YYYY-MM
+                                          const newComp = `${ym}-01`;
+                                          const { error } = await supabase
+                                            .from('aihs')
+                                            .update({ competencia: newComp })
+                                            .eq('id', item.id);
+                                          if (error) throw error;
+                                          setAIHs(prev => prev.map(a => a.id === item.id ? ({ ...a, competencia: newComp } as any) : a));
+                                          toast({ title: 'Competência atualizada', description: `Nova competência: ${ym}` });
+                                        } catch (err:any) {
+                                          console.error('Erro ao atualizar competência:', err);
+                                          toast({ title: 'Erro ao atualizar competência', description: err.message || 'Tente novamente.', variant: 'destructive' });
+                                        }
+                                      }}
+                                    >
+                                      <option value="" disabled>Alterar</option>
+                                      {(() => {
+                                        const options: JSX.Element[] = [];
+                                        const year = new Date().getFullYear();
+                                        for (let mOpt = 1; mOpt <= 12; mOpt++) {
+                                          const d2 = new Date(year, mOpt - 1, 1);
+                                          const ym2 = `${year}-${String(mOpt).padStart(2, '0')}`;
+                                          const lbl2 = `${format(d2, 'MMM', { locale: ptBR }).replace('.', '')}/${format(d2, 'yy', { locale: ptBR })}`;
+                                          options.push(<option key={ym2} value={ym2}>{lbl2}</option>);
+                                        }
+                                        return options;
+                                      })()}
+                                    </select>
+                                </div>
                           </div>
 
                           
