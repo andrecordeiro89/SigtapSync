@@ -9,6 +9,7 @@ import { Search, Filter, Download, Eye, FileText, AlertCircle, ChevronDown, Chev
 import { formatCurrency } from '../utils/validation';
 import { SigtapProcedure } from '../types';
 import { useSigtapContext } from '../contexts/SigtapContext';
+import SigtapCrossSearch from './SigtapCrossSearch';
 import { useAuth } from '../contexts/AuthContext';
 
 // Função para corrigir problemas de encoding
@@ -602,6 +603,12 @@ const SigtapViewer = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Separador entre filtros e título, igual ao header (bordas/tons) */}
+      <div className="border-t border-purple-100 my-4" />
+
+      {/* Pesquisa cruzada Procedimento ↔ CID */}
+      <SigtapCrossSearch />
 
       <Card>
         <CardContent className="p-0">
