@@ -29,7 +29,8 @@ import {
   BarChart3,
   Database,
   RefreshCw,
-  Building
+  Building,
+  FileSpreadsheet
 } from 'lucide-react';
 
 import { DoctorPatientService, type DoctorWithPatients } from '../services/doctorPatientService';
@@ -1622,8 +1623,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                  <div className="text-sm text-slate-600 font-medium">
                                    Total das AIHs do médico
                                  </div>
-                                 {/* Botão Relatório SUS */}
-                                 <div className="mt-3">
+                                 {/* Botões Relatório SUS (PDF e Excel) */}
+                                 <div className="mt-3 flex flex-col gap-2">
                                    <Button
                                      type="button"
                                      onClick={(e) => {
@@ -1641,6 +1642,25 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                      className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-4 py-2 rounded-md text-sm"
                                    >
                                      Gerar Relatório SUS
+                                   </Button>
+                                   <Button
+                                     type="button"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       const h = doctor.hospitals?.[0]?.hospital_id || '';
+                                       setReportPreset({
+                                         hospitalId: h,
+                                         doctorName: doctor.doctor_info.name,
+                                         startDate: dateRange?.startDate,
+                                         endDate: dateRange?.endDate
+                                       } as any);
+                                       setReportModalOpen(true);
+                                       // O modal abrirá com o ReportGenerator, que possui o botão Excel (verde)
+                                     }}
+                                     className="bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-4 py-2 rounded-md text-sm flex items-center justify-center gap-2"
+                                   >
+                                     <FileSpreadsheet className="h-4 w-4" />
+                                     Gerar Relatório Excel
                                    </Button>
                                  </div>
                                </div>

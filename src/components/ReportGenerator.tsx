@@ -5,12 +5,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
-import { Calendar, Download, FileText, Loader2 } from 'lucide-react';
+import { Calendar, Download, FileText, Loader2, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { DoctorPatientService, type DoctorWithPatients } from '@/services/doctorPatientService';
 import { calculateDoctorPayment, calculatePercentagePayment } from './DoctorPaymentRules';
@@ -1038,6 +1039,151 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     }
   };
 
+  // Gera Excel SUS (mesma rotina de cálculo do relatório SUS)
+  const generateSUSExcelReport = async (): Promise<void> => {
+    try {
+      // Validações específicas para relatório SUS
+      if (!selectedHospital) {
+        toast({
+          title: "Selecione um hospital",
+          description: "É necessário selecionar um hospital para gerar o relatório SUS em Excel.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!selectedDoctor) {
+        toast({
+          title: "Selecione um médico",
+          description: "É necessário selecionar um médico para gerar o relatório SUS em Excel.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setIsGenerating(true);
+      toast({
+        title: "Gerando relatório SUS (Excel)",
+        description: `Coletando dados do Dr(a). ${selectedDoctor}...`,
+      });
+
+      // Montar filtros iguais aos utilizados na tela/PDF
+      let dateFromISO: string | undefined;
+      let dateToISO: string | undefined;
+      if (customMode && customRange.startDate && customRange.endDate) {
+        const start = new Date(customRange.startDate);
+        const end = new Date(customRange.endDate);
+        end.setHours(23,59,59,999);
+        dateFromISO = start.toISOString();
+        dateToISO = end.toISOString();
+      } else if (preset?.startDate && preset?.endDate) {
+        const start = new Date(preset.startDate);
+        const end = new Date(preset.endDate);
+        end.setHours(23,59,59,999);
+        dateFromISO = start.toISOString();
+        dateToISO = end.toISOString();
+      } else {
+        const periodDays = parseInt(period);
+        const start = new Date();
+        start.setDate(start.getDate() - periodDays);
+        dateFromISO = start.toISOString();
+        dateToISO = new Date().toISOString();
+      }
+
+      // Obter relatório consolidado por médico
+      const report = await getDoctorPatientReport(selectedDoctor, {
+        hospitalIds: [selectedHospital],
+        dateFromISO,
+        dateToISO,
+      });
+
+      if (!report || !report.items || report.items.length === 0) {
+        toast({
+          title: "Nenhum paciente encontrado",
+          description: `O Dr(a). ${selectedDoctor} não possui pacientes no período selecionado.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Buscar nome do hospital
+      const selectedHospitalData = hospitals.find(h => h.id === selectedHospital);
+      const hospitalName = selectedHospitalData?.name || 'Hospital não informado';
+
+      await renderDoctorSUSExcelFromReport(report, hospitalName, dateFromISO, dateToISO);
+
+      toast({
+        title: "Relatório SUS (Excel) gerado com sucesso!",
+        description: `Relatório do Dr(a). ${selectedDoctor} foi baixado.`,
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório SUS (Excel):', error);
+      toast({
+        title: "Erro ao gerar relatório",
+        description: "Ocorreu um erro ao gerar o relatório SUS em Excel. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Renderiza o Excel SUS a partir do relatório consolidado
+  const renderDoctorSUSExcelFromReport = async (
+    report: DoctorPatientReport,
+    hospitalName?: string,
+    dateFromISO?: string,
+    dateToISO?: string
+  ): Promise<void> => {
+    const wb = XLSX.utils.book_new();
+
+    // Aba Resumo
+    const summaryRows: Array<Array<string | number>> = [];
+    summaryRows.push(["Relatório SUS - Produção Médica"]);
+    summaryRows.push(["Sistema", "SIGTAP Sync"]);
+    summaryRows.push(["Médico", report.doctorName]);
+    summaryRows.push(["Hospital", hospitalName || 'Hospital não informado']);
+    if (dateFromISO && dateToISO) {
+      const periodLabel = `${format(new Date(dateFromISO), 'dd/MM/yyyy')} a ${format(new Date(dateToISO), 'dd/MM/yyyy')}`;
+      summaryRows.push(["Período", periodLabel]);
+    }
+    summaryRows.push(["Gerado em", format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })]);
+    summaryRows.push([]);
+    summaryRows.push(["Totais"]);
+    summaryRows.push(["Pacientes", report.totals.patients]);
+    summaryRows.push(["Valor Total SUS", report.totals.aihTotalReais]);
+    summaryRows.push(["Valor de Produção (Médico)", report.totals.doctorReceivableReais]);
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo');
+
+    // Aba Pacientes
+    const header = ['#', 'Nome do Paciente', 'Data Alta (SUS)', 'Valor Total', 'Valor Médico'];
+    const body = report.items.map((item, idx) => {
+      const d = item.dischargeDateISO || item.admissionDateISO;
+      const dLabel = d ? format(new Date(d), 'dd/MM/yyyy') : '';
+      return [
+        idx + 1,
+        item.patientName || 'Nome não informado',
+        dLabel,
+        Number(item.aihTotalReais || 0),
+        Number(item.doctorReceivableReais || 0),
+      ];
+    });
+    const wsPatients = XLSX.utils.aoa_to_sheet([header, ...body]);
+    // Ajuste simples de largura de colunas
+    (wsPatients as any)['!cols'] = [
+      { wch: 5 },
+      { wch: 40 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 22 },
+    ];
+    XLSX.utils.book_append_sheet(wb, wsPatients, 'Pacientes');
+
+    const fileName = `Relatorio_SUS_${report.doctorName.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
   // Renderiza o PDF SUS a partir do relatório consolidado (mesma rotina da tela)
   const renderDoctorSUSPdfFromReport = async (
     report: DoctorPatientReport,
@@ -1594,6 +1740,28 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
             </Button>
           )}
         </div>
+
+        {reportType === 'sus-report' && (
+          <div className="pt-2">
+            <Button
+              onClick={generateSUSExcelReport}
+              disabled={isGenerating || !selectedHospital || !selectedDoctor}
+              className="w-full bg-green-600 hover:bg-green-700"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Gerando Excel...
+                </>
+              ) : (
+                <>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Gerar Relatório Excel
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
