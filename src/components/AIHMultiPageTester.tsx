@@ -51,7 +51,8 @@ import {
   isInstrument04Procedure,     // ✅ NOVA função para Instrumento 04
   debugInstrument04Detection,  // ✅ NOVA função de debug
   classifyProcedures,          // ✅ NOVA função de classificação
-  calculateMedicalPayment      // ✅ NOVA função para calcular pagamento médico
+  calculateMedicalPayment,      // ✅ NOVA função para calcular pagamento médico
+  isAlwaysFullPercentProcedure  // ✅ Procedimentos 100% sempre
 } from '../config/susCalculationRules';
 
 import { 
@@ -496,7 +497,9 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       const isPrincipalEntreNormais = posicaoEntreNormais === 1;
       
       // Regra padrão: 100% para primeiro procedimento normal, 70% para os demais
-      const porcentagem = isPrincipalEntreNormais ? 100 : 70;
+      // EXCEÇÃO: códigos marcados como 100% sempre (ex.: 02.05.02.015-1)
+      const isAlways100 = isAlwaysFullPercentProcedure(proc.procedimento);
+      const porcentagem = isAlways100 ? 100 : (isPrincipalEntreNormais ? 100 : 70);
       
       // ✅ CALCULAR SP E SH SEPARADAMENTE PARA PROCEDIMENTOS NORMAIS
       const valorTotalSigtap = proc.sigtapProcedure.valueHosp; // Total extraído
@@ -526,7 +529,9 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
         valorCalculadoSA: valorSACalculado, // Mantido para exibição informativa
         isSpecialRule: false,
         isInstrument04: false,
-        regraEspecial: `Regra padrão: SH=${porcentagem}%, SP=100% (${posicaoEntreNormais}º procedimento normal)`
+        regraEspecial: isAlways100
+          ? `Regra 100% permanente SUS (código específico)`
+          : `Regra padrão: SH=${porcentagem}%, SP=100% (${posicaoEntreNormais}º procedimento normal)`
       };
     });
 
@@ -589,6 +594,9 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       const temRegraEspecialGeral = Boolean(regraEspecialPrincipal);
       
       let porcentagemParaAplicar = procedure.porcentagemSUS || 100;
+      if (isAlwaysFullPercentProcedure(procedure.procedimento)) {
+        porcentagemParaAplicar = 100;
+      }
       
       if (isInstrument04) {
         // Instrumento 04 sempre 100%
@@ -614,7 +622,9 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           .sort((a, b) => a.sequencia - b.sequencia);
         
         const posicaoEntreNormais = procedimentosNormais.findIndex(p => p.sequencia === sequencia) + 1;
-        porcentagemParaAplicar = posicaoEntreNormais === 1 ? 100 : 70;
+        porcentagemParaAplicar = isAlwaysFullPercentProcedure(procedure.procedimento)
+          ? 100
+          : (posicaoEntreNormais === 1 ? 100 : 70);
       }
       
       setTempValues(prev => ({

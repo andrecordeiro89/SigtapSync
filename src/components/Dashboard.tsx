@@ -123,6 +123,35 @@ const Dashboard = () => {
           limit: 10
         });
 
+        // Buscar nome do médico relacionado às AIHs recentes
+        // Preferência: requesting_physician da AIH; fallback: primeiro professional_name em procedure_records
+        let doctorByAihId = new Map<string, string>();
+        try {
+          const aihIds = (recentAIHs || []).map((aih: any) => aih.id).filter(Boolean);
+          if (aihIds.length > 0) {
+            const { data: procRows, error: procErr } = await supabase
+              .from('procedure_records')
+              .select('aih_id, professional_name, procedure_date, created_at')
+              .in('aih_id', aihIds)
+              .order('procedure_date', { ascending: false })
+              .order('created_at', { ascending: false });
+
+            if (procErr) {
+              console.warn('⚠️ Falha ao buscar profissionais em procedure_records:', procErr);
+            } else if (procRows) {
+              for (const row of procRows as any[]) {
+                const aihId = row.aih_id;
+                const name = row.professional_name;
+                if (aihId && name && !doctorByAihId.has(aihId)) {
+                  doctorByAihId.set(aihId, name);
+                }
+              }
+            }
+          }
+        } catch (docErr) {
+          console.warn('⚠️ Erro inesperado ao resolver nomes de médicos:', docErr);
+        }
+
         // Processar dados para os cards
         setStats({
           totalAIHs: realStats.total_aihs,
@@ -132,7 +161,7 @@ const Dashboard = () => {
         });
 
         // Processar atividade recente
-        const processedActivity = recentAIHs.map(aih => ({
+        const processedActivity = recentAIHs.map((aih: any) => ({
           id: aih.id,
           action: 'AIH_CREATED',
           aih_number: aih.aih_number,
@@ -143,7 +172,8 @@ const Dashboard = () => {
             : (hospitalInfo?.name || 'Hospital'),
           created_at: aih.created_at,
           operation_type: 'CREATE',
-          patient_name: aih.patients?.name || 'Paciente'
+          patient_name: aih.patients?.name || 'Paciente',
+          doctor_name: aih.requesting_physician || doctorByAihId.get(aih.id) || undefined
         }));
 
         setRecentActivity(processedActivity);
@@ -454,9 +484,26 @@ const Dashboard = () => {
                             </p>
                           )}
                           {log.patient_name && (
-                              <p className="text-xs text-gray-700">
-                                <span className="text-gray-500">Paciente:</span> {log.patient_name}
-                            </p>
+                              <div className="flex items-center gap-2 text-xs text-gray-700">
+                                <Badge 
+                                  variant="secondary" 
+                                  className="px-2 py-0.5 h-5 text-[10px] bg-blue-100 text-blue-700 border border-blue-200"
+                                >
+                                  Paciente
+                                </Badge>
+                                <span>{log.patient_name}</span>
+                            </div>
+                          )}
+                          {log.doctor_name && (
+                              <div className="flex items-center gap-2 text-xs text-gray-700">
+                                <Badge 
+                                  variant="secondary" 
+                                  className="px-2 py-0.5 h-5 text-[10px] bg-green-100 text-green-700 border border-green-200"
+                                >
+                                  Médico
+                                </Badge>
+                                <span>{log.doctor_name}</span>
+                            </div>
                           )}
                           </div>
                         </td>

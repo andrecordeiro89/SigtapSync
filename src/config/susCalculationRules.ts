@@ -41,6 +41,16 @@ export interface ProcedureWithSigtap {
   registrationInstrument?: string; // Campo do SIGTAP para detectar procedimentos especiais
 }
 
+// ✅ LISTA DE CÓDIGOS QUE SEMPRE DEVEM SER 100% (SH e SP), INDEPENDENTE DE POSIÇÃO/REGRAS
+const ALWAYS_FULL_PERCENT_CODES: string[] = [
+  '02.05.02.015-1'
+];
+
+export function isAlwaysFullPercentProcedure(codeOrFull: string): boolean {
+  const code = codeOrFull.match(/^[\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d]/)?.[0] || codeOrFull;
+  return ALWAYS_FULL_PERCENT_CODES.includes(code);
+}
+
 // PROCEDIMENTOS ESPECIAIS COM REGRAS DE MÚLTIPLOS PROCEDIMENTOS
 export const SPECIAL_CALCULATION_RULES: SpecialCalculationRule[] = [
   {
@@ -206,6 +216,27 @@ export function applySpecialCalculation(
 }> {
   
   return procedures.map((proc) => {
+    // 🆕 PRIORIDADE MÁXIMA: Procedimentos que SEMPRE são 100% (SH + SP), independente da posição
+    if (isAlwaysFullPercentProcedure(proc.procedureCode)) {
+      const calculatedValueHosp = proc.valueHosp; // 100%
+      const calculatedValueProf = proc.valueProf; // 100%
+      const calculatedValueAmb = proc.valueAmb;   // 100% (informativo)
+      const calculatedTotal = calculatedValueHosp + calculatedValueProf; // AIH: SH + SP
+
+      return {
+        procedureCode: proc.procedureCode,
+        calculatedValueHosp,
+        calculatedValueProf,
+        calculatedValueAmb,
+        calculatedTotal,
+        appliedHospPercentage: 100,
+        appliedProfPercentage: 100,
+        ruleApplied: 'Regra 100% permanente (SUS) - código 02.05.02.015-1',
+        specialRule: true,
+        isInstrument04: false
+      };
+    }
+
     // 🎯 VERIFICAR INSTRUMENTO 04 - SEMPRE 100%
     if (isInstrument04Procedure(proc.registrationInstrument)) {
       const calculatedValueHosp = proc.valueHosp; // 100%
@@ -390,6 +421,11 @@ export function logSpecialRules(): void {
   console.log('   Tipo: Sempre 100% (SH, SP e SA)');
   console.log('   Detectado por: Campo "registrationInstrument" do SIGTAP');
   console.log('   Prioridade: MÁXIMA (aplicada antes de qualquer outra regra)');
+
+  console.log('\n🏥 REGRAS 100% PERMANENTES (SH + SP), INDEPENDENTE DE SEQUÊNCIA:');
+  ALWAYS_FULL_PERCENT_CODES.forEach(code => {
+    console.log(`   - ${code}: 100% SH e 100% SP`);
+  });
   
   console.log('\n🏥 CIRURGIAS MÚLTIPLAS E SEQUENCIAIS:');
   SPECIAL_CALCULATION_RULES.forEach(rule => {
