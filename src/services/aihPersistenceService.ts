@@ -1679,27 +1679,43 @@ export class AIHPersistenceService {
       let processedHospitalsCount: number | undefined = undefined;
       if (isAdminMode) {
         try {
-          const { data: hospitalAgg } = await supabase
+          const { data: hospitalAgg, error: viewErr } = await supabase
             .from('v_aih_stats_by_hospital')
             .select('hospital_id, total_aihs');
           processedHospitalsCount = (hospitalAgg || []).filter((h: any) => (h.total_aihs || 0) > 0).length;
           // Fallback: se view estiver vazia/indisponível, contar DISTINCT hospital_id diretamente na tabela aihs
-          if (!processedHospitalsCount || processedHospitalsCount === 0) {
-            const { data: distinctHospitals } = await supabase
+          if (viewErr || !processedHospitalsCount || processedHospitalsCount === 0) {
+            // Supabase (PostgREST) exige formato especial para DISTINCT
+            // select: 'hospital_id', head:false & use .neq/.is para nulls
+            const { data: distinctHospitals, error: distinctErr } = await supabase
               .from('aihs')
-              .select('distinct hospital_id')
-              .not('hospital_id', 'is', null);
-            processedHospitalsCount = distinctHospitals ? distinctHospitals.length : 0;
+              .select('hospital_id', { head: false })
+              .neq('hospital_id', null)
+              .order('hospital_id', { ascending: true });
+            if (distinctErr) {
+              console.warn('⚠️ Falha no fallback DISTINCT hospital_id:', distinctErr);
+              processedHospitalsCount = 0;
+            } else {
+              const unique = new Set((distinctHospitals || []).map((r: any) => r.hospital_id));
+              processedHospitalsCount = unique.size;
+            }
           }
         } catch (e) {
           console.warn('⚠️ Falha ao obter hospitais processados pela view v_aih_stats_by_hospital:', e);
           // Fallback direto em caso de erro
           try {
-            const { data: distinctHospitals } = await supabase
+            const { data: distinctHospitals, error: distinctErr } = await supabase
               .from('aihs')
-              .select('distinct hospital_id')
-              .not('hospital_id', 'is', null);
-            processedHospitalsCount = distinctHospitals ? distinctHospitals.length : 0;
+              .select('hospital_id', { head: false })
+              .neq('hospital_id', null)
+              .order('hospital_id', { ascending: true });
+            if (distinctErr) {
+              console.warn('⚠️ Falha no fallback DISTINCT hospital_id:', distinctErr);
+              processedHospitalsCount = 0;
+            } else {
+              const unique = new Set((distinctHospitals || []).map((r: any) => r.hospital_id));
+              processedHospitalsCount = unique.size;
+            }
           } catch (e2) {
             console.warn('⚠️ Falha no fallback em aihs para contar hospitais distintos:', e2);
             processedHospitalsCount = 0;
