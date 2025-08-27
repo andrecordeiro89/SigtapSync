@@ -38,7 +38,7 @@ import { DoctorsHierarchyV2Service } from '../services/doctorsHierarchyV2';
 import { DoctorsCrudService } from '../services/doctorsCrudService';
 import { ProcedureRecordsService, type ProcedureRecord } from '../services/simplifiedProcedureService';
 import { DateRange } from '../types';
-import DoctorPaymentRules, { calculateDoctorPayment, calculatePercentagePayment } from './DoctorPaymentRules';
+import DoctorPaymentRules, { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayment } from './DoctorPaymentRules';
 import ProcedurePatientDiagnostic from './ProcedurePatientDiagnostic';
 import CleuezaDebugComponent from './CleuezaDebugComponent';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
@@ -136,16 +136,25 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   );
   
   // 🎯 CALCULAR SOMA DOS VALORES DO DETALHAMENTO POR PROCEDIMENTO (POR PACIENTE)
-  // 🆕 VERIFICAR SE O MÉDICO TEM REGRA DE PERCENTUAL
-  const percentageCalculation = calculatePercentagePayment(doctorData.doctor_info.name, totalValue);
+  // 🆕 VERIFICAR TIPO DE REGRA: FIXA, PERCENTUAL OU INDIVIDUAL
+  const hospitalId = doctorData.hospitals?.[0]?.hospital_id;
   
-  if (percentageCalculation.hasPercentageRule) {
-    // ✅ USAR REGRA DE PERCENTUAL SOBRE VALOR TOTAL
-    calculatedPaymentValue = percentageCalculation.calculatedPayment;
-    
-    // 🔍 LOG PARA VERIFICAÇÃO DA REGRA DE PERCENTUAL
-    console.log(`🎯 ${doctorData.doctor_info.name}: ${percentageCalculation.appliedRule}`);
+  // 1. Verificar regra de valor fixo primeiro
+  const fixedCalculation = calculateFixedPayment(doctorData.doctor_info.name, hospitalId);
+  
+  if (fixedCalculation.hasFixedRule) {
+    // ✅ USAR REGRA DE VALOR FIXO
+    calculatedPaymentValue = fixedCalculation.calculatedPayment;
+    console.log(`🎯 ${doctorData.doctor_info.name}: ${fixedCalculation.appliedRule}`);
   } else {
+    // 2. Verificar regra de percentual
+    const percentageCalculation = calculatePercentagePayment(doctorData.doctor_info.name, totalValue, hospitalId);
+    
+    if (percentageCalculation.hasPercentageRule) {
+      // ✅ USAR REGRA DE PERCENTUAL SOBRE VALOR TOTAL
+      calculatedPaymentValue = percentageCalculation.calculatedPayment;
+      console.log(`🎯 ${doctorData.doctor_info.name}: ${percentageCalculation.appliedRule}`);
+    } else {
     // ✅ USAR REGRAS INDIVIDUAIS POR PROCEDIMENTO
     calculatedPaymentValue = doctorData.patients.reduce((totalSum, patient) => {
       // Coletar procedimentos médicos deste paciente (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
@@ -162,7 +171,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
       
       // Se há procedimentos médicos para este paciente, calcular o valor baseado nas regras
       if (patientMedicalProcedures.length > 0) {
-        const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures);
+        const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures, hospitalId);
         // Somar os valores calculados individuais (detalhamento por procedimento)
         const patientCalculatedSum = paymentCalculation.procedures.reduce((sum, proc) => sum + proc.calculatedPayment, 0);
         return totalSum + patientCalculatedSum;
@@ -170,6 +179,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
       
       return totalSum;
     }, 0);
+    }
   }
   
   return {
@@ -1522,7 +1532,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 
                                 {/* INFORMAÇÕES PRINCIPAIS DO MÉDICO */}
                                 <div className="space-y-3">
-                                  {/* LINHA 1: NOME E MEDALHA */}
+                                  {/* LINHA 1: NOME, MEDALHA E INDICADOR DE REGRAS */}
                                    <div className="flex items-center gap-3">
                                      <h3 className="font-semibold text-lg text-slate-900 tracking-tight">
                                        {doctor.doctor_info.name}
@@ -1539,6 +1549,37 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         🔗 Agrupamento
                                       </Badge>
                                     )}
+                                    
+                                    {/* 🆕 INDICADOR DE REGRAS DE PAGAMENTO */}
+                                    {(() => {
+                                      const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                      
+                                      // Verificar regra de valor fixo primeiro
+                                      const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
+                                      if (fixedCalc.hasFixedRule) {
+                                        return (
+                                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 font-medium px-2 py-1 text-xs">
+                                            💎 Valor Fixo: R$ {(fixedCalc.calculatedPayment / 1000).toFixed(0)}k
+                                          </Badge>
+                                        );
+                                      }
+                                      
+                                      const percentageCalc = calculatePercentagePayment(doctor.doctor_info.name, doctorStats.totalValue, hospitalId);
+                                      if (percentageCalc.hasPercentageRule) {
+                                        return (
+                                          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 font-medium px-2 py-1 text-xs">
+                                            💰 {percentageCalc.appliedRule.match(/\d+%/)?.[0] || '65%'} do Total
+                                          </Badge>
+                                        );
+                                      } else if (doctorStats.calculatedPaymentValue > 0) {
+                                        return (
+                                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium px-2 py-1 text-xs">
+                                            📋 Regras por Procedimento
+                                          </Badge>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
                                   </div>
                                   
                                   {/* LINHA 2: CNS, CRM E ESPECIALIDADE */}
@@ -1714,19 +1755,72 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   })()}
                             </div>
                             </div>
-                              {/* 🆕 CARD PRODUÇÃO MÉDICA - APENAS VALOR */}
+                              {/* 🆕 CARD PRODUÇÃO MÉDICA - COM REGRAS APLICADAS */}
               <div className="bg-emerald-50/40 p-2.5 rounded-lg border border-emerald-200/40 hover:bg-emerald-50/60 hover:border-emerald-300/50 transition-all duration-300">
                 <div className="flex items-center gap-2 mb-1.5">
                   <div className="w-6 h-6 bg-emerald-100/60 rounded-md flex items-center justify-center">
-                    <Stethoscope className="h-3.5 w-3.5 text-emerald-600" />
+                    <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
                   </div>
-                  <span className="text-emerald-700 font-medium text-xs">Produção Médica</span>
+                  <span className="text-emerald-700 font-medium text-xs">
+                    {(() => {
+                      const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                      
+                      // Verificar se médico tem regra de valor fixo primeiro
+                      const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
+                      if (fixedCalc.hasFixedRule) {
+                        return 'Pagamento (Fixo)';
+                      }
+                      
+                      // Verificar se médico tem regra de percentual
+                      const percentageCalc = calculatePercentagePayment(doctor.doctor_info.name, doctorStats.totalValue, hospitalId);
+                      if (percentageCalc.hasPercentageRule) {
+                        return `Pagamento (${percentageCalc.appliedRule.match(/\d+%/)?.[0] || '65%'})`;
+                      }
+                      return 'Pagamento (Regras)';
+                    })()}
+                  </span>
                 </div>
-                <div className="text-lg font-bold text-emerald-900">
-                  {doctorStats.calculatedPaymentValue > 0 
-                    ? formatCurrency(doctorStats.calculatedPaymentValue)
-                    : formatCurrency(doctorStats.medicalProceduresValue)
-                  }
+                <div className="space-y-1">
+                  <div className="text-lg font-bold text-emerald-900">
+                    {doctorStats.calculatedPaymentValue > 0 
+                      ? formatCurrency(doctorStats.calculatedPaymentValue)
+                      : formatCurrency(doctorStats.medicalProceduresValue)
+                    }
+                  </div>
+                  {(() => {
+                    const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                    
+                    // Verificar regra de valor fixo primeiro
+                    const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
+                    if (fixedCalc.hasFixedRule) {
+                      return (
+                        <div className="text-xs text-emerald-700 font-medium">
+                          Valor fixo independente
+                        </div>
+                      );
+                    }
+                    
+                    // Mostrar detalhes da regra aplicada
+                    const percentageCalc = calculatePercentagePayment(doctor.doctor_info.name, doctorStats.totalValue, hospitalId);
+                    if (percentageCalc.hasPercentageRule) {
+                      return (
+                        <div className="text-xs text-emerald-700 font-medium">
+                          {percentageCalc.appliedRule.match(/\d+%/)?.[0] || '65%'} de {formatCurrency(doctorStats.totalValue)}
+                        </div>
+                      );
+                    } else if (doctorStats.calculatedPaymentValue > 0) {
+                      return (
+                        <div className="text-xs text-emerald-700 font-medium">
+                          {doctorStats.medicalProceduresCount} proc. médicos
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="text-xs text-emerald-700 font-medium">
+                        Sem regras definidas
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
               
@@ -2135,6 +2229,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   procedure_description: proc.procedure_description,
                                                   value_reais: proc.value_reais || 0
                                                 }))}
+                                              hospitalId={doctor.hospitals?.[0]?.hospital_id}
                                               className="mt-5"
                                             />
                                           )}

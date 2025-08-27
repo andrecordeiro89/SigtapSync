@@ -27,6 +27,11 @@ export interface DoctorPaymentRule {
     percentage: number;
     description: string;
   };
+  // 🆕 REGRA DE VALOR FIXO (independente de procedimentos)
+  fixedPaymentRule?: {
+    amount: number;
+    description: string;
+  };
   rules: {
     procedureCode: string;
     standardValue: number;
@@ -58,6 +63,7 @@ export interface ProcedurePaymentInfo {
 interface DoctorPaymentRulesProps {
   doctorName: string;
   procedures: ProcedurePaymentInfo[];
+  hospitalId?: string;
   className?: string;
 }
 
@@ -68,12 +74,17 @@ interface DoctorPaymentRulesProps {
 // Hospital: Torao Tokuda - Apucarana
 // ================================================================
 
-const DOCTOR_PAYMENT_RULES: Record<string, DoctorPaymentRule> = {
+// ================================================================
+// 🏥 REGRAS DE PAGAMENTO POR HOSPITAL - ESTRUTURA HIERÁRQUICA
+// ================================================================
+
+const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaymentRule>> = {
   // ================================================================
-  // HOSPITAL TORAO TOKUDA - APUCARANA
+  // HOSPITAL TORAO TOKUDA - APUCARANA (APU)
+  // Hospital ID: (anterior - manter compatibilidade)
   // ================================================================
-  
-  'HUMBERTO MOREIRA DA SILVA': {
+  'TORAO_TOKUDA_APUCARANA': {
+    'HUMBERTO MOREIRA DA SILVA': {
     doctorName: 'HUMBERTO MOREIRA DA SILVA',
     rules: [
       {
@@ -408,28 +419,19 @@ const DOCTOR_PAYMENT_RULES: Record<string, DoctorPaymentRule> = {
   'JOÃO VICTOR RODRIGUES': {
     doctorName: 'JOÃO VICTOR RODRIGUES',
     rules: [
-      // Cirurgias Vasculares
-      {
-        procedureCode: '04.06.02.056-6',
-        standardValue: 1050.00,
-        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
-      },
-      {
-        procedureCode: '04.06.02.057-4',
-        standardValue: 1000.00,
-        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
-      },
-      // Cirurgias Gastrointestinais
-      {
-        procedureCode: '04.07.02.010-1',
-        standardValue: 1250.00,
-        description: 'SITO INTESTINAL (REVERSÃO DE COLOSTOMIA) - R$ 1.250,00'
-      },
+      // ================================================================
+      // 🏥 NOVA REGRA PRINCIPAL - COLECISTECTOMIA BASE + PROCEDIMENTOS ADICIONAIS
+      // Procedimento principal sempre R$ 900,00 + soma dos procedimentos sequenciais
+      // ================================================================
+      
+      // Procedimento Principal
       {
         procedureCode: '04.07.03.002-6',
         standardValue: 900.00,
-        description: 'COLECISTECTOMIA - R$ 900,00'
+        description: 'COLECISTECTOMIA (PRINCIPAL) - R$ 900,00'
       },
+      
+      // Procedimentos Sequenciais/Adicionais (somam ao principal)
       {
         procedureCode: '04.07.04.018-8',
         standardValue: 300.00,
@@ -448,28 +450,197 @@ const DOCTOR_PAYMENT_RULES: Record<string, DoctorPaymentRule> = {
       {
         procedureCode: '04.07.03.006-9',
         standardValue: 250.00,
-        description: 'COLEDOCOTOMIA - R$ 250,00'
+        description: 'COLEDOCOTOMIA COM OU SEM COLECISTECTOMIA - R$ 250,00'
       },
       {
         procedureCode: '04.07.03.005-0',
         standardValue: 200.00,
         description: 'COLEDOCOPLASTIA - R$ 200,00'
       },
-      // Hérnias
       {
         procedureCode: '04.07.04.012-9',
         standardValue: 300.00,
-        description: 'HERNIA UMBILICAL - R$ 300,00'
+        description: 'HERNIOPLASTIA UMBILICAL - R$ 300,00'
       },
       {
         procedureCode: '04.07.04.010-2',
         standardValue: 300.00,
-        description: 'HERNIA INGUINAL - R$ 300,00'
+        description: 'HERNIOPLASTIA INGUINAL / CRURAL (UNILATERAL) - R$ 300,00'
+      },
+      
+      // ================================================================
+      // CIRURGIAS VASCULARES (mantidas)
+      // ================================================================
+      {
+        procedureCode: '04.06.02.056-6',
+        standardValue: 1050.00,
+        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
+      },
+      {
+        procedureCode: '04.06.02.057-4',
+        standardValue: 1000.00,
+        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
+      },
+      
+      // ================================================================
+      // OUTRAS CIRURGIAS GASTROINTESTINAIS (mantidas)
+      // ================================================================
+      {
+        procedureCode: '04.07.02.010-1',
+        standardValue: 1250.00,
+        description: 'SITO INTESTINAL (REVERSÃO DE COLOSTOMIA) - R$ 1.250,00'
       },
       {
         procedureCode: '04.07.04.008-0',
         standardValue: 300.00,
         description: 'HERNIA VENTRAL - R$ 300,00'
+      }
+    ]
+  },
+  
+  'JOAO VICTOR RODRIGUES': {
+    doctorName: 'JOAO VICTOR RODRIGUES',
+    rules: [
+      // ================================================================
+      // 🏥 NOVA REGRA PRINCIPAL - COLECISTECTOMIA BASE + PROCEDIMENTOS ADICIONAIS
+      // Procedimento principal sempre R$ 900,00 + soma dos procedimentos sequenciais
+      // ================================================================
+      
+      // Procedimento Principal
+      {
+        procedureCode: '04.07.03.002-6',
+        standardValue: 900.00,
+        description: 'COLECISTECTOMIA (PRINCIPAL) - R$ 900,00'
+      },
+      
+      // Procedimentos Sequenciais/Adicionais (somam ao principal)
+      {
+        procedureCode: '04.07.04.018-8',
+        standardValue: 300.00,
+        description: 'LIBERAÇÃO DE ADERÊNCIAS INTESTINAIS - R$ 300,00'
+      },
+      {
+        procedureCode: '04.07.04.002-1',
+        standardValue: 300.00,
+        description: 'DRENAGEM DE ABSCESSO SUBFRÊNICO - R$ 300,00'
+      },
+      {
+        procedureCode: '04.07.03.014-0',
+        standardValue: 300.00,
+        description: 'HEPATORRAFIA - R$ 300,00'
+      },
+      {
+        procedureCode: '04.07.03.006-9',
+        standardValue: 250.00,
+        description: 'COLEDOCOTOMIA COM OU SEM COLECISTECTOMIA - R$ 250,00'
+      },
+      {
+        procedureCode: '04.07.03.005-0',
+        standardValue: 200.00,
+        description: 'COLEDOCOPLASTIA - R$ 200,00'
+      },
+      {
+        procedureCode: '04.07.04.012-9',
+        standardValue: 300.00,
+        description: 'HERNIOPLASTIA UMBILICAL - R$ 300,00'
+      },
+      {
+        procedureCode: '04.07.04.010-2',
+        standardValue: 300.00,
+        description: 'HERNIOPLASTIA INGUINAL / CRURAL (UNILATERAL) - R$ 300,00'
+      },
+      
+      // ================================================================
+      // CIRURGIAS VASCULARES (mantidas)
+      // ================================================================
+      {
+        procedureCode: '04.06.02.056-6',
+        standardValue: 1050.00,
+        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
+      },
+      {
+        procedureCode: '04.06.02.057-4',
+        standardValue: 1000.00,
+        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
+      },
+      
+      // ================================================================
+      // OUTRAS CIRURGIAS GASTROINTESTINAIS (mantidas)
+      // ================================================================
+      {
+        procedureCode: '04.07.02.010-1',
+        standardValue: 1250.00,
+        description: 'SITO INTESTINAL (REVERSÃO DE COLOSTOMIA) - R$ 1.250,00'
+      },
+      {
+        procedureCode: '04.07.04.008-0',
+        standardValue: 300.00,
+        description: 'HERNIA VENTRAL - R$ 300,00'
+      },
+      
+      // ================================================================
+      // 🆕 NOVAS REGRAS ADICIONAIS - DEZEMBRO 2024
+      // ================================================================
+      {
+        procedureCode: '04.01.02.007-0',
+        standardValue: 100.00,
+        description: 'EXÉRESE DE CISTO DERMOIDE - R$ 100,00'
+      },
+      {
+        procedureCode: '04.07.04.006-4',
+        standardValue: 800.00,
+        description: 'HERNIOPLASTIA EPIGASTRICA - R$ 800,00'
+      },
+      {
+        procedureCode: '04.01.02.010-0',
+        standardValue: 150.00,
+        description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 150,00'
+      },
+      {
+        procedureCode: '04.07.02.027-6',
+        standardValue: 100.00,
+        description: 'FISTULECTOMIA / FISTULOTOMIA ANAL - R$ 100,00'
+      },
+      {
+        procedureCode: '04.07.02.028-4',
+        standardValue: 450.00,
+        description: 'HEMORROIDECTOMIA - R$ 450,00'
+      },
+      {
+        procedureCode: '04.08.06.031-0',
+        standardValue: 250.00,
+        description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
+      },
+      {
+        procedureCode: '04.09.04.013-4',
+        standardValue: 250.00,
+        description: 'ORQUIDOPEXIA UNILATERAL - R$ 250,00'
+      },
+      {
+        procedureCode: '04.09.04.021-5',
+        standardValue: 250.00,
+        description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 250,00'
+      },
+      {
+        procedureCode: '04.09.06.013-5',
+        standardValue: 1000.00,
+        description: 'HISTERECTOMIA TOTAL - R$ 1.000,00'
+      },
+      {
+        procedureCode: '04.07.04.009-9',
+        standardValue: 300.00,
+        description: 'HERNIOPLASTIA INGUINAL (BILATERAL) - R$ 300,00'
+      }
+    ],
+    
+    // ================================================================
+    // 🔗 REGRAS MÚLTIPLAS - Combinações específicas de procedimentos
+    // ================================================================
+    multipleRules: [
+      {
+        codes: ['04.09.04.013-4', '04.09.04.021-5'],
+        totalValue: 500.00,
+        description: 'ORQUIDOPEXIA UNILATERAL + TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 500,00'
       }
     ]
   },
@@ -917,38 +1088,608 @@ const DOCTOR_PAYMENT_RULES: Record<string, DoctorPaymentRule> = {
     ]
   },
 
-  'RENE SERPA ROUEDE': {
-    doctorName: 'RENE SERPA ROUEDE',
-    // 🆕 REGRA DE PERCENTUAL: 65% sobre o valor total
-    percentageRule: {
-      percentage: 65,
-      description: 'Produção Médica: 65% sobre valor total do médico'
+    'RENE SERPA ROUEDE': {
+      doctorName: 'RENE SERPA ROUEDE',
+      // 🆕 REGRA DE PERCENTUAL: 65% sobre o valor total
+      percentageRule: {
+        percentage: 65,
+        description: 'Produção Médica: 65% sobre valor total do médico'
+      },
+      rules: [] // Sem regras individuais, usa apenas percentual
+    }
+  },
+
+  // ================================================================
+  // HOSPITAL 18 DE DEZEMBRO - ARAPOTI (ARA)
+  // Hospital ID: 01221e51-4bcd-4c45-b3d3-18d1df25c8f2
+  // ================================================================
+  'HOSPITAL_18_DEZEMBRO_ARAPOTI': {
+    'THADEU TIESSI SUZUKI': {
+      doctorName: 'THADEU TIESSI SUZUKI',
+      // 🆕 REGRA DE VALOR FIXO: R$ 47.000,00 independente de procedimentos
+      fixedPaymentRule: {
+        amount: 47000.00,
+        description: 'Valor fixo mensal: R$ 47.000,00 independente da quantidade de procedimentos'
+      },
+      rules: [] // Sem regras individuais, usa valor fixo
     },
-    rules: [] // Sem regras individuais, usa apenas percentual
+
+    'PEDRO HENRIQUE RODRIGUES': {
+      doctorName: 'PEDRO HENRIQUE RODRIGUES',
+      rules: [
+        {
+          procedureCode: '04.06.02.057-4',
+          standardValue: 1100.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.100,00'
+        }
+      ]
+    },
+
+    'JOAO VICTOR RODRIGUES': {
+      doctorName: 'JOAO VICTOR RODRIGUES',
+      rules: [
+        // ================================================================
+        // 🏥 REGRAS COLECISTECTOMIA BASE + PROCEDIMENTOS ADICIONAIS
+        // Procedimento principal sempre R$ 900,00 + soma dos procedimentos sequenciais
+        // ================================================================
+        
+        // Procedimento Principal
+        {
+          procedureCode: '04.07.03.002-6',
+          standardValue: 900.00,
+          description: 'COLECISTECTOMIA (PRINCIPAL) - R$ 900,00'
+        },
+        
+        // Procedimentos Sequenciais/Adicionais (somam ao principal)
+        {
+          procedureCode: '04.07.04.018-8',
+          standardValue: 300.00,
+          description: 'LIBERAÇÃO DE ADERÊNCIAS INTESTINAIS - R$ 300,00'
+        },
+        {
+          procedureCode: '04.07.04.002-1',
+          standardValue: 300.00,
+          description: 'DRENAGEM DE ABSCESSO SUBFRÊNICO - R$ 300,00'
+        },
+        {
+          procedureCode: '04.07.03.014-0',
+          standardValue: 300.00,
+          description: 'HEPATORRAFIA - R$ 300,00'
+        },
+        {
+          procedureCode: '04.07.03.006-9',
+          standardValue: 250.00,
+          description: 'COLEDOCOTOMIA COM OU SEM COLECISTECTOMIA - R$ 250,00'
+        },
+        {
+          procedureCode: '04.07.03.005-0',
+          standardValue: 200.00,
+          description: 'COLEDOCOPLASTIA - R$ 200,00'
+        },
+        {
+          procedureCode: '04.07.04.012-9',
+          standardValue: 300.00,
+          description: 'HERNIOPLASTIA UMBILICAL - R$ 300,00'
+        },
+        {
+          procedureCode: '04.07.04.010-2',
+          standardValue: 300.00,
+          description: 'HERNIOPLASTIA INGUINAL / CRURAL (UNILATERAL) - R$ 300,00'
+        },
+        
+        // ================================================================
+        // CIRURGIAS VASCULARES (mantidas)
+        // ================================================================
+        {
+          procedureCode: '04.06.02.056-6',
+          standardValue: 1050.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
+        },
+        {
+          procedureCode: '04.06.02.057-4',
+          standardValue: 1000.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
+        },
+        
+        // ================================================================
+        // OUTRAS CIRURGIAS GASTROINTESTINAIS (mantidas)
+        // ================================================================
+        {
+          procedureCode: '04.07.02.010-1',
+          standardValue: 1250.00,
+          description: 'SITO INTESTINAL (REVERSÃO DE COLOSTOMIA) - R$ 1.250,00'
+        },
+        {
+          procedureCode: '04.07.04.008-0',
+          standardValue: 300.00,
+          description: 'HERNIA VENTRAL - R$ 300,00'
+        },
+        
+        // ================================================================
+        // 🆕 NOVAS REGRAS ADICIONAIS - DEZEMBRO 2024
+        // ================================================================
+        {
+          procedureCode: '04.01.02.007-0',
+          standardValue: 100.00,
+          description: 'EXÉRESE DE CISTO DERMOIDE - R$ 100,00'
+        },
+        {
+          procedureCode: '04.07.04.006-4',
+          standardValue: 800.00,
+          description: 'HERNIOPLASTIA EPIGASTRICA - R$ 800,00'
+        },
+        {
+          procedureCode: '04.01.02.010-0',
+          standardValue: 150.00,
+          description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 150,00'
+        },
+        {
+          procedureCode: '04.07.02.027-6',
+          standardValue: 100.00,
+          description: 'FISTULECTOMIA / FISTULOTOMIA ANAL - R$ 100,00'
+        },
+        {
+          procedureCode: '04.07.02.028-4',
+          standardValue: 450.00,
+          description: 'HEMORROIDECTOMIA - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.031-0',
+          standardValue: 250.00,
+          description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.04.013-4',
+          standardValue: 250.00,
+          description: 'ORQUIDOPEXIA UNILATERAL - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.04.021-5',
+          standardValue: 250.00,
+          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.06.013-5',
+          standardValue: 1000.00,
+          description: 'HISTERECTOMIA TOTAL - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.07.04.009-9',
+          standardValue: 300.00,
+          description: 'HERNIOPLASTIA INGUINAL (BILATERAL) - R$ 300,00'
+        }
+      ],
+      
+      // ================================================================
+      // 🔗 REGRAS MÚLTIPLAS - Combinações específicas de procedimentos
+      // ================================================================
+      multipleRules: [
+        {
+          codes: ['04.09.04.013-4', '04.09.04.021-5'],
+          totalValue: 500.00,
+          description: 'ORQUIDOPEXIA UNILATERAL + TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 500,00'
+        }
+      ]
+    },
+
+    // 🔄 COMPATIBILIDADE: Versão com acento para JOÃO VICTOR RODRIGUES
+    'JOÃO VICTOR RODRIGUES': {
+      doctorName: 'JOÃO VICTOR RODRIGUES',
+      rules: [
+        // ================================================================
+        // 🏥 REGRAS COLECISTECTOMIA BASE + PROCEDIMENTOS ADICIONAIS
+        // Procedimento principal sempre R$ 900,00 + soma dos procedimentos sequenciais
+        // ================================================================
+        
+        // Procedimento Principal
+        {
+          procedureCode: '04.07.03.002-6',
+          standardValue: 900.00,
+          description: 'COLECISTECTOMIA (PRINCIPAL) - R$ 900,00'
+        },
+        
+        // Procedimentos Sequenciais/Adicionais (somam ao principal)
+        {
+          procedureCode: '04.07.04.018-8',
+          standardValue: 300.00,
+          description: 'LIBERAÇÃO DE ADERÊNCIAS INTESTINAIS - R$ 300,00'
+        },
+        {
+          procedureCode: '04.07.04.002-1',
+          standardValue: 300.00,
+          description: 'DRENAGEM DE ABSCESSO SUBFRÊNICO - R$ 300,00'
+        },
+        {
+          procedureCode: '04.07.03.014-0',
+          standardValue: 300.00,
+          description: 'HEPATORRAFIA - R$ 300,00'
+        },
+        {
+          procedureCode: '04.07.03.006-9',
+          standardValue: 250.00,
+          description: 'COLEDOCOTOMIA COM OU SEM COLECISTECTOMIA - R$ 250,00'
+        },
+        {
+          procedureCode: '04.07.03.005-0',
+          standardValue: 200.00,
+          description: 'COLEDOCOPLASTIA - R$ 200,00'
+        },
+        {
+          procedureCode: '04.07.04.012-9',
+          standardValue: 300.00,
+          description: 'HERNIOPLASTIA UMBILICAL - R$ 300,00'
+        },
+        {
+          procedureCode: '04.07.04.010-2',
+          standardValue: 300.00,
+          description: 'HERNIOPLASTIA INGUINAL / CRURAL (UNILATERAL) - R$ 300,00'
+        },
+        
+        // ================================================================
+        // CIRURGIAS VASCULARES (mantidas)
+        // ================================================================
+        {
+          procedureCode: '04.06.02.056-6',
+          standardValue: 1050.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
+        },
+        {
+          procedureCode: '04.06.02.057-4',
+          standardValue: 1000.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
+        },
+        
+        // ================================================================
+        // OUTRAS CIRURGIAS GASTROINTESTINAIS (mantidas)
+        // ================================================================
+        {
+          procedureCode: '04.07.02.010-1',
+          standardValue: 1250.00,
+          description: 'SITO INTESTINAL (REVERSÃO DE COLOSTOMIA) - R$ 1.250,00'
+        },
+        {
+          procedureCode: '04.07.04.008-0',
+          standardValue: 300.00,
+          description: 'HERNIA VENTRAL - R$ 300,00'
+        },
+        
+        // ================================================================
+        // 🆕 NOVAS REGRAS ADICIONAIS - DEZEMBRO 2024
+        // ================================================================
+        {
+          procedureCode: '04.01.02.007-0',
+          standardValue: 100.00,
+          description: 'EXÉRESE DE CISTO DERMOIDE - R$ 100,00'
+        },
+        {
+          procedureCode: '04.07.04.006-4',
+          standardValue: 800.00,
+          description: 'HERNIOPLASTIA EPIGASTRICA - R$ 800,00'
+        },
+        {
+          procedureCode: '04.01.02.010-0',
+          standardValue: 150.00,
+          description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 150,00'
+        },
+        {
+          procedureCode: '04.07.02.027-6',
+          standardValue: 100.00,
+          description: 'FISTULECTOMIA / FISTULOTOMIA ANAL - R$ 100,00'
+        },
+        {
+          procedureCode: '04.07.02.028-4',
+          standardValue: 450.00,
+          description: 'HEMORROIDECTOMIA - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.031-0',
+          standardValue: 250.00,
+          description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.04.013-4',
+          standardValue: 250.00,
+          description: 'ORQUIDOPEXIA UNILATERAL - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.04.021-5',
+          standardValue: 250.00,
+          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.06.013-5',
+          standardValue: 1000.00,
+          description: 'HISTERECTOMIA TOTAL - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.07.04.009-9',
+          standardValue: 300.00,
+          description: 'HERNIOPLASTIA INGUINAL (BILATERAL) - R$ 300,00'
+        }
+      ],
+      
+      // ================================================================
+      // 🔗 REGRAS MÚLTIPLAS - Combinações específicas de procedimentos
+      // ================================================================
+      multipleRules: [
+        {
+          codes: ['04.09.04.013-4', '04.09.04.021-5'],
+          totalValue: 500.00,
+          description: 'ORQUIDOPEXIA UNILATERAL + TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 500,00'
+        }
+      ]
+    },
+
+    'GUILHERME VINICIUS SAWCZYN': {
+      doctorName: 'GUILHERME VINICIUS SAWCZYN',
+      // 🔬 REGRAS INDIVIDUAIS - Procedimentos únicos
+      rules: [
+        {
+          procedureCode: '04.09.01.023-5',
+          standardValue: 1000.00,
+          description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.09.01.059-6',
+          standardValue: 900.00,
+          description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00'
+        },
+        {
+          procedureCode: '04.09.01.018-9',
+          standardValue: 1000.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.09.01.017-0',
+          standardValue: 250.00,
+          description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.03.004-0',
+          standardValue: 1000.00,
+          description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.09.03.002-3',
+          standardValue: 1000.00,
+          description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.09.04.021-5',
+          standardValue: 300.00,
+          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00'
+        },
+        {
+          procedureCode: '04.09.05.008-3',
+          standardValue: 250.00,
+          description: 'POSTECTOMIA - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.04.024-0',
+          standardValue: 450.00,
+          description: 'VASECTOMIA - R$ 450,00'
+        },
+        {
+          procedureCode: '04.09.04.013-4',
+          standardValue: 400.00,
+          description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00'
+        },
+        {
+          procedureCode: '04.09.04.012-6',
+          standardValue: 450.00,
+          description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00'
+        },
+        {
+          procedureCode: '04.09.01.006-5',
+          standardValue: 600.00,
+          description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00'
+        },
+        {
+          procedureCode: '04.09.05.007-5',
+          standardValue: 500.00,
+          description: 'PLASTICA TOTAL DO PENIS (INCLUI PEYRONIE) - R$ 500,00'
+        },
+        {
+          procedureCode: '04.09.04.016-9',
+          standardValue: 500.00,
+          description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00'
+        },
+        {
+          procedureCode: '04.09.01.032-4',
+          standardValue: 700.00,
+          description: 'PIELOPLASTIA - R$ 700,00'
+        },
+        {
+          procedureCode: '04.09.01.021-9',
+          standardValue: 1200.00,
+          description: 'NEFRECTOMIA TOTAL - R$ 1.200,00'
+        },
+        {
+          procedureCode: '04.09.01.020-0',
+          standardValue: 1000.00,
+          description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.09.01.022-7',
+          standardValue: 900.00,
+          description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00'
+        },
+        {
+          procedureCode: '04.09.01.029-4',
+          standardValue: 400.00,
+          description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00'
+        },
+        {
+          procedureCode: '04.09.02.017-6',
+          standardValue: 250.00,
+          description: 'URETROTOMIA INTERNA - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.04.023-1',
+          standardValue: 250.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00'
+        },
+        {
+          procedureCode: 'RESSECCAO_CISTOS_CAUTERIZACOES',
+          standardValue: 250.00,
+          description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00'
+        }
+      ],
+      // 🔬 REGRAS MÚLTIPLAS - Combinações específicas de procedimentos
+      multipleRules: [
+        // NEFROLITOTOMIA PERCUTÂNEA + Combinações
+        {
+          codes: ['04.09.01.023-5', '04.09.01.017-0'],
+          totalValue: 1100.00,
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
+        },
+        {
+          codes: ['04.09.01.023-5', '04.09.01.014-6'],
+          totalValue: 1300.00,
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL - R$ 1.300,00'
+        },
+        {
+          codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6'],
+          totalValue: 1400.00,
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER DUPLO J + EXTRAÇÃO CÁLCULO PELVE RENAL - R$ 1.400,00'
+        },
+        {
+          codes: ['04.09.01.023-5', '04.09.01.014-6', '04.09.01.059-6'],
+          totalValue: 1500.00,
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO CÁLCULO PELVE RENAL + URETEROLITOTRIPSIA - R$ 1.500,00'
+        },
+        {
+          codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'],
+          totalValue: 1600.00,
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER + EXTRAÇÃO CÁLCULO + URETEROLITOTRIPSIA - R$ 1.600,00'
+        },
+        
+        // URETEROLITOTRIPSIA + Combinações
+        {
+          codes: ['04.09.01.059-6', '04.09.01.017-0'],
+          totalValue: 1000.00,
+          description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA + INSTALAÇÃO CATETER DUPLO J (SEMIRRÍGIDA) - R$ 1.000,00'
+        },
+        
+        // LITOTRIPSIA (FLEXÍVEL) + Combinações
+        {
+          codes: ['04.09.01.018-9', '04.09.01.017-0'],
+          totalValue: 1100.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
+        },
+        {
+          codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'],
+          totalValue: 1200.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO CÁLCULO PELVE RENAL + INSTALAÇÃO CATETER - R$ 1.200,00'
+        },
+        {
+          codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'],
+          totalValue: 1300.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA + EXTRAÇÃO CÁLCULO + INSTALAÇÃO CATETER - R$ 1.300,00'
+        },
+        
+        // RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + Combinações
+        {
+          codes: ['04.09.03.004-0', '04.09.01.038-3'],
+          totalValue: 1200.00,
+          description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + RESSECCAO ENDOSCOPICA DE LESÃO VESICAL - R$ 1.200,00'
+        },
+        
+        // HIDROCELE + Combinações
+        {
+          codes: ['04.09.04.021-5', '04.09.04.019-3'],
+          totalValue: 400.00,
+          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE + RESSECÇÃO PARCIAL DA BOLSA ESCROTAL - R$ 400,00'
+        },
+        {
+          codes: ['04.09.04.021-5', '04.09.04.019-3', '04.09.04.017-7'],
+          totalValue: 500.00,
+          description: 'HIDROCELE + RESSECÇÃO PARCIAL BOLSA ESCROTAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 500,00'
+        },
+        
+        // ORQUIDOPEXIA + PLÁSTICA
+        {
+          codes: ['04.09.04.013-4', '04.09.04.017-7'],
+          totalValue: 550.00,
+          description: 'ORQUIDOPEXIA UNILATERAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 550,00'
+        },
+        {
+          codes: ['04.09.04.012-6', '04.09.04.017-7'],
+          totalValue: 550.00,
+          description: 'ORQUIDOPEXIA BILATERAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 550,00'
+        },
+        
+        // PIELOPLASTIA + Combinações
+        {
+          codes: ['04.09.01.032-4', '04.09.01.057-0'],
+          totalValue: 1000.00,
+          description: 'PIELOPLASTIA + URETEROPLASTIA - R$ 1.000,00'
+        },
+        {
+          codes: ['04.09.01.032-4', '04.09.01.057-0', '04.09.01.017-0'],
+          totalValue: 1100.00,
+          description: 'PIELOPLASTIA + URETEROPLASTIA + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00'
+        }
+      ]
+    }
   }
-  
+
   // ================================================================
   // OUTROS HOSPITAIS (adicionar conforme necessário)
   // ================================================================
 };
 
 // ================================================================
+// 🔄 COMPATIBILIDADE REGRESSIVA
+// ================================================================
+// Manter referência para o sistema atual (Torao Tokuda)
+const DOCTOR_PAYMENT_RULES = DOCTOR_PAYMENT_RULES_BY_HOSPITAL['TORAO_TOKUDA_APUCARANA'];
+
+// ================================================================
 // FUNÇÕES UTILITÁRIAS
 // ================================================================
 
 /**
+ * 🏥 DETECTAR HOSPITAL DO MÉDICO
+ * Função para identificar qual hospital baseado no contexto ou dados disponíveis
+ */
+function detectHospitalFromContext(doctorName: string, hospitalId?: string): string {
+  // Prioridade 1: ID do hospital fornecido
+  if (hospitalId === '01221e51-4bcd-4c45-b3d3-18d1df25c8f2') {
+    return 'HOSPITAL_18_DEZEMBRO_ARAPOTI';
+  }
+  
+  // Prioridade 2: Verificar se médico existe no Hospital 18 de Dezembro
+  if (DOCTOR_PAYMENT_RULES_BY_HOSPITAL['HOSPITAL_18_DEZEMBRO_ARAPOTI']?.[doctorName.toUpperCase()]) {
+    return 'HOSPITAL_18_DEZEMBRO_ARAPOTI';
+  }
+  
+  // Prioridade 3: Verificar se médico existe no Torao Tokuda (padrão)
+  if (DOCTOR_PAYMENT_RULES_BY_HOSPITAL['TORAO_TOKUDA_APUCARANA']?.[doctorName.toUpperCase()]) {
+    return 'TORAO_TOKUDA_APUCARANA';
+  }
+  
+  // Fallback: Torao Tokuda (compatibilidade)
+  return 'TORAO_TOKUDA_APUCARANA';
+}
+
+/**
  * 💰 CALCULAR PAGAMENTO BASEADO NAS REGRAS DO MÉDICO
- * Agora filtra apenas procedimentos com regras definidas
+ * 🆕 AGORA SUPORTA MÚLTIPLOS HOSPITAIS E REGRAS FIXAS
  */
 export function calculateDoctorPayment(
   doctorName: string,
-  procedures: ProcedurePaymentInfo[]
+  procedures: ProcedurePaymentInfo[],
+  hospitalId?: string
 ): {
   procedures: (ProcedurePaymentInfo & { calculatedPayment: number; paymentRule: string; isSpecialRule: boolean })[];
   totalPayment: number;
   appliedRule: string;
 } {
-  const rule = DOCTOR_PAYMENT_RULES[doctorName.toUpperCase()];
+  // Detectar hospital correto
+  const hospitalKey = detectHospitalFromContext(doctorName, hospitalId);
+  const hospitalRules = DOCTOR_PAYMENT_RULES_BY_HOSPITAL[hospitalKey];
+  const rule = hospitalRules?.[doctorName.toUpperCase()];
   
   if (!rule) {
     // Sem regra específica, retornar array vazio
@@ -956,6 +1697,23 @@ export function calculateDoctorPayment(
       procedures: [],
       totalPayment: 0,
       appliedRule: 'Nenhuma regra específica'
+    };
+  }
+
+  // 🆕 VERIFICAR SE É REGRA DE VALOR FIXO
+  if (rule.fixedPaymentRule) {
+    // Para regra fixa, aplicar valor total ao primeiro procedimento (se houver)
+    const calculatedProcedures = procedures.map((proc, index) => ({
+      ...proc,
+      calculatedPayment: index === 0 ? rule.fixedPaymentRule!.amount : 0,
+      paymentRule: rule.fixedPaymentRule!.description,
+      isSpecialRule: true
+    }));
+
+    return {
+      procedures: calculatedProcedures,
+      totalPayment: rule.fixedPaymentRule.amount,
+      appliedRule: rule.fixedPaymentRule.description
     };
   }
 
@@ -1087,18 +1845,52 @@ export function calculateDoctorPayment(
 }
 
 /**
+ * 💰 CALCULAR VALOR BASEADO EM VALOR FIXO
+ * Para médicos que têm regra de valor fixo independente de procedimentos
+ */
+export function calculateFixedPayment(
+  doctorName: string,
+  hospitalId?: string
+): {
+  calculatedPayment: number;
+  appliedRule: string;
+  hasFixedRule: boolean;
+} {
+  const hospitalKey = detectHospitalFromContext(doctorName, hospitalId);
+  const hospitalRules = DOCTOR_PAYMENT_RULES_BY_HOSPITAL[hospitalKey];
+  const rule = hospitalRules?.[doctorName.toUpperCase()];
+  
+  if (!rule || !rule.fixedPaymentRule) {
+    return {
+      calculatedPayment: 0,
+      appliedRule: 'Nenhuma regra de valor fixo definida',
+      hasFixedRule: false
+    };
+  }
+
+  return {
+    calculatedPayment: rule.fixedPaymentRule.amount,
+    appliedRule: rule.fixedPaymentRule.description,
+    hasFixedRule: true
+  };
+}
+
+/**
  * 🆕 CALCULAR VALOR BASEADO EM PERCENTUAL DO TOTAL
  * Para médicos que têm regra de percentual sobre o valor total
  */
 export function calculatePercentagePayment(
   doctorName: string,
-  totalValue: number
+  totalValue: number,
+  hospitalId?: string
 ): {
   calculatedPayment: number;
   appliedRule: string;
   hasPercentageRule: boolean;
 } {
-  const rule = DOCTOR_PAYMENT_RULES[doctorName.toUpperCase()];
+  const hospitalKey = detectHospitalFromContext(doctorName, hospitalId);
+  const hospitalRules = DOCTOR_PAYMENT_RULES_BY_HOSPITAL[hospitalKey];
+  const rule = hospitalRules?.[doctorName.toUpperCase()];
   
   if (!rule || !rule.percentageRule) {
     return {
@@ -1134,6 +1926,7 @@ const formatCurrency = (value: number) => {
 const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
   doctorName,
   procedures,
+  hospitalId,
   className = ''
 }) => {
   // Aplicação informativa das regras SUS de múltiplas cirurgias (não altera valores deste componente)
@@ -1148,15 +1941,22 @@ const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
     const calcPreview = applySpecialCalculation(mapped);
     console.log('🧮 [SUS Preview] Regras múltiplas/sequenciais aplicadas (informativo):', calcPreview);
   } catch {}
-  const paymentCalculation = calculateDoctorPayment(doctorName, procedures);
-  const hasSpecialRules = DOCTOR_PAYMENT_RULES[doctorName.toUpperCase()];
+  const paymentCalculation = calculateDoctorPayment(doctorName, procedures, hospitalId);
+  
+  // Detectar hospital e verificar regras
+  const hospitalKey = detectHospitalFromContext(doctorName, hospitalId);
+  const hospitalRules = DOCTOR_PAYMENT_RULES_BY_HOSPITAL[hospitalKey];
+  const hasSpecialRules = hospitalRules?.[doctorName.toUpperCase()];
+  
+  // 🆕 VERIFICAR SE HÁ REGRA DE VALOR FIXO
+  const fixedCalculation = calculateFixedPayment(doctorName, hospitalId);
   
   // 🆕 VERIFICAR SE HÁ REGRA DE PERCENTUAL
   const totalValueProcedures = procedures.reduce((sum, proc) => sum + proc.value_reais, 0);
-  const percentageCalculation = calculatePercentagePayment(doctorName, totalValueProcedures);
+  const percentageCalculation = calculatePercentagePayment(doctorName, totalValueProcedures, hospitalId);
 
-  // Se não há regras específicas nem regras de percentual, não mostrar
-  if (!hasSpecialRules || (paymentCalculation.procedures.length === 0 && !percentageCalculation.hasPercentageRule)) {
+  // Se não há regras específicas nem regras de percentual nem regras fixas, não mostrar
+  if (!hasSpecialRules || (paymentCalculation.procedures.length === 0 && !percentageCalculation.hasPercentageRule && !fixedCalculation.hasFixedRule)) {
     return null;
   }
 
@@ -1177,8 +1977,31 @@ const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
             </Badge>
           </div>
 
+          {/* 🆕 SEÇÃO DA REGRA DE VALOR FIXO */}
+          {fixedCalculation.hasFixedRule && (
+            <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-lg p-3 border border-purple-200">
+              <div className="flex items-start gap-2">
+                <DollarSign className="h-4 w-4 text-purple-600 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-sm font-bold text-purple-800">
+                    💎 Regra de Valor Fixo Aplicada
+                  </div>
+                  <div className="text-xs text-purple-700 mt-1">
+                    {fixedCalculation.appliedRule}
+                  </div>
+                  <div className="text-lg font-bold text-purple-800 mt-2">
+                    {formatCurrency(fixedCalculation.calculatedPayment)}
+                  </div>
+                  <div className="text-xs text-purple-600 mt-1 font-medium">
+                    ✅ Valor independe da quantidade ou tipo de procedimentos
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 🆕 SEÇÃO DA REGRA DE PERCENTUAL */}
-          {percentageCalculation.hasPercentageRule && (
+          {!fixedCalculation.hasFixedRule && percentageCalculation.hasPercentageRule && (
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-200">
               <div className="flex items-start gap-2">
                 <DollarSign className="h-4 w-4 text-green-600 mt-0.5" />
@@ -1198,7 +2021,7 @@ const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
           )}
 
           {/* Resumo da Regra Aplicada */}
-          {!percentageCalculation.hasPercentageRule && (
+          {!fixedCalculation.hasFixedRule && !percentageCalculation.hasPercentageRule && (
             <div className="bg-white rounded-lg p-3 border border-orange-200">
               <div className="flex items-start gap-2">
                 <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
