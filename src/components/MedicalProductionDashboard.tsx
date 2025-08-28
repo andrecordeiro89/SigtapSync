@@ -463,6 +463,26 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   // 🆕 MODAL RELATÓRIO SUS
   const [reportModalOpen, setReportModalOpen] = useState<boolean>(false);
+
+  // 🆕 FUNÇÃO PARA DETERMINAR HOSPITAL CORRETO BASEADO NO CONTEXTO
+  const getDoctorContextualHospitalId = (doctor: DoctorWithPatients): string | undefined => {
+    // Se há filtro de hospital específico (não 'all'), usar o primeiro selecionado
+    if (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) {
+      // Verificar se o médico atende no hospital selecionado
+      const selectedHospitalId = selectedHospitals[0];
+      const doctorWorksInSelectedHospital = doctor.hospitals?.some(h => h.hospital_id === selectedHospitalId);
+      
+      if (doctorWorksInSelectedHospital) {
+        console.log(`🏥 Usando hospital selecionado ${selectedHospitalId} para ${doctor.doctor_info.name}`);
+        return selectedHospitalId;
+      }
+    }
+    
+    // Fallback: usar o primeiro hospital do médico
+    const fallbackHospitalId = doctor.hospitals?.[0]?.hospital_id;
+    console.log(`🏥 Usando hospital fallback ${fallbackHospitalId} para ${doctor.doctor_info.name}`);
+    return fallbackHospitalId;
+  };
   const [reportPreset, setReportPreset] = useState<{ hospitalId?: string; doctorName?: string } | null>(null);
   // 🆕 ESTADOS PARA PAGINAÇÃO DE PACIENTES
   const [currentPatientPage, setCurrentPatientPage] = useState<Map<string, number>>(new Map());
@@ -2009,11 +2029,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 
                                                 <PatientAihInfoBadges
                                                   aihNumber={patient.aih_info.aih_number}
-                                                  mainCid={patient.aih_info.main_cid}
-                                                  specialty={patient.aih_info.specialty}
-                                                  requestingPhysician={patient.aih_info.requesting_physician}
-                                                  careModality={patient.aih_info.care_modality}
-                                                  professionalCbo={patient.aih_info.professional_cbo}
+                                                  mainCid={(patient.aih_info as any).main_cid}
+                                                  specialty={(patient.aih_info as any).specialty}
+                                                  requestingPhysician={(patient.aih_info as any).requesting_physician}
+                                                  careModality={(patient.aih_info as any).care_modality}
+                                                  professionalCbo={(patient.aih_info as any).professional_cbo}
                                                   className="mt-2"
                                                 />
                                               </div>
@@ -2229,7 +2249,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   procedure_description: proc.procedure_description,
                                                   value_reais: proc.value_reais || 0
                                                 }))}
-                                              hospitalId={doctor.hospitals?.[0]?.hospital_id}
+                                              hospitalId={getDoctorContextualHospitalId(doctor)}
                                               className="mt-5"
                                             />
                                           )}

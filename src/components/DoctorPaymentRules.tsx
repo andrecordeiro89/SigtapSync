@@ -2039,7 +2039,46 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         }
       ]
     }
-  }
+  },
+
+  // ================================================================
+  // HOSPITAL MATERNIDADE NOSSA SENHORA APARECIDA - FAZENDA RIO GRANDE
+  // Hospital ID: a8978eaa-b90e-4dc8-8fd5-0af984374d34
+  // ================================================================
+  'HOSPITAL_MATERNIDADE_NOSSA_SENHORA_APARECIDA': {
+    // 🆕 REGRAS ESPECÍFICAS PARA MATERNIDADE
+    // Dr. Thadeu Tiessi Suzuki tem regras diferentes aqui
+    
+    // EXEMPLO: Como definir regras diferentes para o Dr. Thadeu na Maternidade
+    // Descomente e configure conforme necessário:
+    /*
+    'THADEU TIESSI SUZUKI': {
+      doctorName: 'THADEU TIESSI SUZUKI',
+      // 🆕 OPÇÃO 1: Regra de valor fixo diferente (ex: R$ 25.000 na Maternidade)
+      fixedPaymentRule: {
+        amount: 25000.00,
+        description: 'Valor fixo mensal na Maternidade: R$ 25.000,00'
+      },
+      rules: [] // Sem regras individuais, usa valor fixo
+      
+      // 🆕 OPÇÃO 2: Regras de percentual (ex: 15% dos procedimentos)
+      // percentageRule: {
+      //   percentage: 15,
+      //   description: 'Percentual sobre procedimentos na Maternidade: 15%'
+      // },
+      
+      // 🆕 OPÇÃO 3: Regras por procedimento específico
+      // rules: [
+      //   {
+      //     procedureCode: '04.09.01.001-0',
+      //     standardValue: 800.00,
+      //     description: 'Parto normal - R$ 800,00'
+      //   },
+      //   // ... outras regras específicas
+      // ]
+    },
+    */
+  },
 
   // ================================================================
   // OUTROS HOSPITAIS (adicionar conforme necessário)
@@ -2061,12 +2100,21 @@ const DOCTOR_PAYMENT_RULES = DOCTOR_PAYMENT_RULES_BY_HOSPITAL['TORAO_TOKUDA_APUC
  * Função para identificar qual hospital baseado no contexto ou dados disponíveis
  */
 function detectHospitalFromContext(doctorName: string, hospitalId?: string): string {
-  // Prioridade 1: ID do hospital fornecido
+  // Prioridade 1: ID do hospital fornecido (SEMPRE usar se disponível)
   if (hospitalId === '01221e51-4bcd-4c45-b3d3-18d1df25c8f2') {
     return 'HOSPITAL_18_DEZEMBRO_ARAPOTI';
   }
   if (hospitalId === '792a0316-92b4-4504-8238-491d284099a3') {
     return 'HOSPITAL_MUNICIPAL_SAO_JOSE';
+  }
+  if (hospitalId === 'a8978eaa-b90e-4dc8-8fd5-0af984374d34') {
+    return 'HOSPITAL_MATERNIDADE_NOSSA_SENHORA_APARECIDA';
+  }
+  
+  // Se hospitalId foi fornecido mas não reconhecido, retornar padrão
+  if (hospitalId) {
+    console.warn(`⚠️ Hospital ID não reconhecido: ${hospitalId}`);
+    return 'TORAO_TOKUDA_APUCARANA';
   }
   
   // Prioridade 2: Verificar se médico existe no Hospital Municipal São José
