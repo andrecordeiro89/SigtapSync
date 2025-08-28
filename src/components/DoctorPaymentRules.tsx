@@ -1096,6 +1096,18 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         description: 'Produção Médica: 65% sobre valor total do médico'
       },
       rules: [] // Sem regras individuais, usa apenas percentual
+    },
+
+    'GEOVANA GONZALES STORTI': {
+      doctorName: 'GEOVANA GONZALES STORTI',
+      // 🔬 REGRAS VASCULARES - Procedimento específico
+      rules: [
+        {
+          procedureCode: '04.06.02.057-4',
+          standardValue: 900.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 900,00'
+        }
+      ]
     }
   },
 
