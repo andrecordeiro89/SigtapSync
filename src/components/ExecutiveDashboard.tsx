@@ -993,8 +993,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           {/* Relatórios aba removida */}
         </TabsList>
 
-        {/* 🔍 FILTROS EXECUTIVOS GLOBAIS - VISÍVEIS APENAS NA ABA MÉDICOS */}
-        {activeTab === 'doctors' && (
+        {/* 🔍 FILTROS EXECUTIVOS GLOBAIS - VISÍVEIS NAS ABAS MÉDICOS E PROCEDIMENTOS */}
+        {(activeTab === 'doctors' || activeTab === 'procedures') && (
         <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-blue-50/30">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
@@ -1263,7 +1263,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
         {/* TAB: PROCEDIMENTOS */}
         <TabsContent value="procedures" className="space-y-6">
-          <ProcedureHierarchyDashboard dateRange={selectedDateRange} selectedHospitals={selectedHospitals} />
+          <ProcedureHierarchyDashboard dateRange={selectedDateRange} selectedHospitals={selectedHospitals} selectedCareCharacter={selectedCareCharacter} selectedSpecialty={selectedSpecialty} searchTerm={searchTerm} />
         </TabsContent>
 
         {/* Aba Relatórios removida */}

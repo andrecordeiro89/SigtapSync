@@ -15,9 +15,12 @@ import { Users, FileText, Search, ChevronRight, ChevronDown, Calendar, Activity,
 interface ProcedureHierarchyDashboardProps {
   dateRange?: DateRange;
   selectedHospitals?: string[];
+  selectedCareCharacter?: string;
+  selectedSpecialty?: string;
+  searchTerm?: string; // termo global (nome/CNS/CRM)
 }
 
-const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = ({ dateRange, selectedHospitals = ['all'] }) => {
+const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = ({ dateRange, selectedHospitals = ['all'], selectedCareCharacter = 'all', selectedSpecialty = 'all', searchTerm = '' }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
@@ -34,12 +37,13 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
         setLoading(true);
         const dateFromISO = dateRange ? dateRange.startDate.toISOString() : undefined;
         const dateToISO = dateRange ? dateRange.endDate.toISOString() : undefined;
-        // Forçar TODOS os hospitais: agruparemos visualmente por hospital
-        const hospitalIds = undefined;
+        // Aplicar filtros globais iguais à aba Médicos
+        const hospitalIds = (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) ? selectedHospitals : undefined;
         const data = await DoctorsHierarchyV2Service.getDoctorsHierarchyV2({
           dateFromISO,
           dateToISO,
           hospitalIds,
+          careCharacter: selectedCareCharacter,
         });
         setDoctors(data);
       } finally {
@@ -47,21 +51,24 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
       }
     };
     load();
-  }, [dateRange?.startDate?.toISOString(), dateRange?.endDate?.toISOString()]);
+  }, [dateRange?.startDate?.toISOString(), dateRange?.endDate?.toISOString(), JSON.stringify(selectedHospitals), selectedCareCharacter]);
 
   // Normalização de busca de procedimento
   const procTermRaw = procedureSearch.toLowerCase().trim();
   const procTermNorm = procTermRaw.replace(/[\.\s]/g, '');
 
-  // Filtragem de médicos por nome/CRM/CNS
+  // Filtragem de médicos por nome/CRM/CNS (usa termo global + local)
   const filteredDoctors = useMemo(() => {
-    const docTerm = doctorSearch.toLowerCase().trim();
+    const docTerm = (doctorSearch || searchTerm).toLowerCase().trim();
     return (doctors || []).filter(d => {
       const dn = (d.doctor_info.name || '').toLowerCase();
       const dcns = (d.doctor_info.cns || '').toLowerCase();
       const dcrm = (d.doctor_info.crm || '').toLowerCase();
       const matchesDoctor = !docTerm || dn.includes(docTerm) || dcns.includes(docTerm) || dcrm.includes(docTerm);
       if (!matchesDoctor) return false;
+      if (selectedSpecialty && selectedSpecialty !== 'all') {
+        if ((d.doctor_info.specialty || '').toLowerCase() !== selectedSpecialty.toLowerCase()) return false;
+      }
       if (!procTermRaw) return true;
       // Só mantém o médico se houver algum procedimento que case
       return d.patients.some(p => (p.procedures || []).some(proc => {
@@ -70,7 +77,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
         return codeNorm.includes(procTermNorm) || desc.includes(procTermRaw);
       }));
     });
-  }, [doctors, doctorSearch, procTermRaw, procTermNorm]);
+  }, [doctors, doctorSearch, searchTerm, procTermRaw, procTermNorm, selectedSpecialty]);
 
   // Métricas e análises por médico
   const doctorAnalytics = useMemo(() => {
