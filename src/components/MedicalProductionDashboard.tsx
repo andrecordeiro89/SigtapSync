@@ -487,6 +487,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   // 🆕 ESTADOS PARA PAGINAÇÃO DE PACIENTES
   const [currentPatientPage, setCurrentPatientPage] = useState<Map<string, number>>(new Map());
   const [patientSearchTerm, setPatientSearchTerm] = useState<Map<string, string>>(new Map());
+  const [procedureSearchTerm, setProcedureSearchTerm] = useState<Map<string, string>>(new Map());
   const PATIENTS_PER_PAGE = 10;
   
   // 🆕 ESTADOS PARA PAGINAÇÃO DE MÉDICOS
@@ -1860,14 +1861,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   <User className="h-4 w-4 text-slate-600" />
                                 </div>
                                 Pacientes Atendidos ({(() => {
-                                   const searchTerm = patientSearchTerm.get(doctor.doctor_info.cns) || '';
-                                   if (searchTerm) {
-                                     const filteredCount = doctor.patients.filter(patient => 
-                                       patient.patient_info.name.toLowerCase().includes(searchTerm.toLowerCase())
-                                     ).length;
-                                     return `${filteredCount} de ${doctor.patients.length}`;
-                                   }
-                                   return doctor.patients.length;
+                                   const doctorKey = doctor.doctor_info.cns;
+                                   const nameTerm = (patientSearchTerm.get(doctorKey) || '').toLowerCase().trim();
+                                   const procTermRaw = (procedureSearchTerm.get(doctorKey) || '').toLowerCase().trim();
+                                   const procTerm = procTermRaw.replace(/[\.\s]/g, '');
+                                   const filteredCount = doctor.patients.filter(patient => {
+                                     const matchesName = !nameTerm || (patient.patient_info.name || '').toLowerCase().includes(nameTerm);
+                                     const matchesProc = !procTermRaw || (patient.procedures || []).some(proc => {
+                                       const codeNorm = (proc.procedure_code || '').toLowerCase().replace(/[\.\s]/g, '');
+                                       const desc = (proc.procedure_description || '').toLowerCase();
+                                       return codeNorm.includes(procTerm) || desc.includes(procTermRaw);
+                                     });
+                                     return matchesName && matchesProc;
+                                   }).length;
+                                   return nameTerm || procTermRaw ? `${filteredCount} de ${doctor.patients.length}` : doctor.patients.length;
                                  })()})
                               </h4>
                               
@@ -1890,61 +1897,44 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     className="pl-10 w-64"
                                   />
                                 </div>
+                                {/* Filtro de procedimento (código ou descrição) */}
+                                <div className="relative">
+                                  <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                  <Input
+                                    placeholder="Buscar procedimento (código ou descrição)..."
+                                    value={procedureSearchTerm.get(doctor.doctor_info.cns) || ''}
+                                    onChange={(e) => {
+                                      const newTerms = new Map(procedureSearchTerm);
+                                      newTerms.set(doctor.doctor_info.cns, e.target.value);
+                                      setProcedureSearchTerm(newTerms);
+                                      // Reset para primeira página ao buscar
+                                      const newPages = new Map(currentPatientPage);
+                                      newPages.set(doctor.doctor_info.cns, 1);
+                                      setCurrentPatientPage(newPages);
+                                    }}
+                                    className="pl-10 w-96"
+                                  />
+                                </div>
                                 
-                                {/* Controles de paginação no header */}
-                                {(() => {
-                                  const searchTerm = patientSearchTerm.get(doctor.doctor_info.cns) || '';
-                                  const filteredPatients = doctor.patients.filter(patient => 
-                                    patient.patient_info.name.toLowerCase().includes(searchTerm.toLowerCase())
-                                  );
-                                  const totalPages = Math.ceil(filteredPatients.length / PATIENTS_PER_PAGE);
-                                  const currentPage = currentPatientPage.get(doctor.doctor_info.cns) || 1;
-                                  
-                                  if (totalPages > 1) {
-                                    return (
-                                      <div className="flex items-center gap-2">
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => {
-                                            const newPages = new Map(currentPatientPage);
-                                            newPages.set(doctor.doctor_info.cns, Math.max(1, currentPage - 1));
-                                            setCurrentPatientPage(newPages);
-                                          }}
-                                          disabled={currentPage === 1}
-                                        >
-                                          Anterior
-                                        </Button>
-                                        <span className="text-sm text-gray-600 px-2">
-                                          {currentPage} de {totalPages}
-                                        </span>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => {
-                                            const newPages = new Map(currentPatientPage);
-                                            newPages.set(doctor.doctor_info.cns, Math.min(totalPages, currentPage + 1));
-                                            setCurrentPatientPage(newPages);
-                                          }}
-                                          disabled={currentPage === totalPages}
-                                        >
-                                          Próximo
-                                        </Button>
-                                      </div>
-                                    );
-                                  }
-                                  return null;
-                                })()}
+                                {/* Paginação do header removida para dar espaço aos filtros */}
                               </div>
                             </div>
                             
                             <div className="space-y-4">
                               {(() => {
                                 const doctorKey = doctor.doctor_info.cns;
-                                const searchTerm = patientSearchTerm.get(doctorKey) || '';
-                                const filteredPatients = doctor.patients.filter(patient => 
-                                  patient.patient_info.name.toLowerCase().includes(searchTerm.toLowerCase())
-                                );
+                                const nameTerm = (patientSearchTerm.get(doctorKey) || '').toLowerCase().trim();
+                                const procTermRaw = (procedureSearchTerm.get(doctorKey) || '').toLowerCase().trim();
+                                const procTerm = procTermRaw.replace(/[\.\s]/g, '');
+                                const filteredPatients = doctor.patients.filter(patient => {
+                                  const matchesName = !nameTerm || (patient.patient_info.name || '').toLowerCase().includes(nameTerm);
+                                  const matchesProc = !procTermRaw || (patient.procedures || []).some(proc => {
+                                    const codeNorm = (proc.procedure_code || '').toLowerCase().replace(/[\.\s]/g, '');
+                                    const desc = (proc.procedure_description || '').toLowerCase();
+                                    return codeNorm.includes(procTerm) || desc.includes(procTermRaw);
+                                  });
+                                  return matchesName && matchesProc;
+                                });
                                 // Ordenar por data mais recente primeiro (Alta SUS; fallback para Admissão)
                                 const sortedPatients = [...filteredPatients].sort((a, b) => {
                                   const aDate = new Date(a.aih_info.discharge_date || a.aih_info.admission_date);
@@ -2000,6 +1990,27 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   <div className="font-semibold text-base text-slate-900">
                                                     {(/procedimento/i.test(patient.patient_info.name) || /\b\d{2}\.\d{2}\.\d{2}\.\d{3}-\d\b/.test(patient.patient_info.name)) ? 'Nome não disponível' : patient.patient_info.name}
                                                   </div>
+                                                  {(() => {
+                                                    const doctorKeyLocal = doctor.doctor_info.cns;
+                                                    const procTermRawLocal = (procedureSearchTerm.get(doctorKeyLocal) || '').toLowerCase().trim();
+                                                    if (!procTermRawLocal) return null;
+                                                    const procTermLocal = procTermRawLocal.replace(/[\.\s]/g, '');
+                                                    const matchCount = (patient.procedures || []).filter(p => {
+                                                      const codeNorm = (p.procedure_code || '').toLowerCase().replace(/[\.\s]/g, '');
+                                                      const desc = (p.procedure_description || '').toLowerCase();
+                                                      return codeNorm.includes(procTermLocal) || desc.includes(procTermRawLocal);
+                                                    }).length;
+                                                    if (matchCount > 0) {
+                                                      return (
+                                                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs inline-flex items-center gap-1">
+                                                          <FileText className="h-3 w-3" />
+                                                          Procedimento
+                                                          <span className="ml-0.5">({matchCount})</span>
+                                                        </Badge>
+                                                      );
+                                                    }
+                                                    return null;
+                                                  })()}
                                                   {patient.aih_info.care_character && (
                                                     <Badge
                                                       variant="outline"
