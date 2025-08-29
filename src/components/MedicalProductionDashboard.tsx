@@ -1856,7 +1856,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         <div className="px-6 pb-6">
                           <div className="border-t border-slate-200/60 pt-6">
                             <div className="flex items-center justify-between mb-5">
-                              <h4 className="font-semibold text-lg text-slate-800 flex items-center gap-3">
+                              <h4 className="text-base font-semibold text-slate-800 flex items-center gap-3">
                                 <div className="w-7 h-7 bg-slate-100 rounded-xl flex items-center justify-center">
                                   <User className="h-4 w-4 text-slate-600" />
                                 </div>
@@ -1966,11 +1966,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                       const isPatientExpanded = expandedPatients.has(patientKey);
                                 
                                 return (
-                                  <div key={patientKey} className="bg-white/60 rounded-xl p-4 border border-slate-200/60 hover:bg-white/80 hover:border-slate-300/60 transition-all duration-300">
+                                  <div key={patientKey} className="p-3 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
                                     <Collapsible>
                                       <CollapsibleTrigger asChild>
                                         <div 
-                                          className="w-full cursor-pointer hover:bg-slate-50/50 rounded-xl p-3 transition-all duration-200"
+                                          className="w-full cursor-pointer p-3 rounded-lg hover:bg-slate-50 border border-slate-200 transition-colors"
                                           onClick={() => togglePatientExpansion(patientKey)}
                                         >
                                           <div className="flex items-center justify-between">
@@ -1981,13 +1981,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 ) : (
                                                   <ChevronRight className="h-4 w-4 text-slate-500 transition-transform duration-200" />
                                                 )}
-                                                <div className="w-11 h-11 bg-slate-100 rounded-xl flex items-center justify-center">
+                                                <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center">
                                                   <User className="h-5 w-5 text-slate-600" />
                                                 </div>
                                               </div>
                                               <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
-                                                  <div className="font-semibold text-base text-slate-900">
+                                                  <div className="font-medium text-slate-800">
                                                     {(/procedimento/i.test(patient.patient_info.name) || /\b\d{2}\.\d{2}\.\d{2}\.\d{3}-\d\b/.test(patient.patient_info.name)) ? 'Nome não disponível' : patient.patient_info.name}
                                                   </div>
                                                   {(() => {
