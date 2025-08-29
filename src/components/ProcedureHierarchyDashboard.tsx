@@ -10,7 +10,7 @@ import { Button } from './ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Alert, AlertDescription } from './ui/alert';
-import { Users, FileText, Search, ChevronRight, ChevronDown, Calendar, Activity, LineChart, Filter } from 'lucide-react';
+import { Users, FileText, Search, ChevronRight, ChevronDown, Calendar, Activity, LineChart, Filter, FileSpreadsheet } from 'lucide-react';
 
 interface ProcedureHierarchyDashboardProps {
   dateRange?: DateRange;
@@ -25,9 +25,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
   const [loading, setLoading] = useState(true);
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
 
-  // Filtros locais
-  const [doctorSearch, setDoctorSearch] = useState('');
-  const [procedureSearch, setProcedureSearch] = useState('');
+  // Estado de visualização
   const [activeView, setActiveView] = useState<'analytics' | 'specialties' | 'hospitals'>('analytics');
 
   // Carregar hierarquia
@@ -53,9 +51,9 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
     load();
   }, [dateRange?.startDate?.toISOString(), dateRange?.endDate?.toISOString(), JSON.stringify(selectedHospitals), selectedCareCharacter]);
 
-  // Normalização de busca de procedimento
-  const procTermRaw = procedureSearch.toLowerCase().trim();
-  const procTermNorm = procTermRaw.replace(/[\.\s]/g, '');
+  // Busca global (nome/CNS/CRM e também procedimento por código/descrição)
+  const globalTermRaw = (searchTerm || '').toLowerCase().trim();
+  const globalTermNorm = globalTermRaw.replace(/[\.\s]/g, '');
 
   // Helper: identificar procedimentos de anestesista (ocultar)
   const isAnesthetistProcedure = (proc: any): boolean => {
@@ -68,28 +66,35 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
     }
   };
 
-  // Filtragem de médicos por nome/CRM/CNS (usa termo global + local)
+  // Filtragem de médicos por nome/CRM/CNS e/ou por procedimentos (código/descrição) via busca global
   const filteredDoctors = useMemo(() => {
-    const docTerm = (doctorSearch || searchTerm).toLowerCase().trim();
     return (doctors || []).filter(d => {
       const dn = (d.doctor_info.name || '').toLowerCase();
       const dcns = (d.doctor_info.cns || '').toLowerCase();
       const dcrm = (d.doctor_info.crm || '').toLowerCase();
-      const matchesDoctor = !docTerm || dn.includes(docTerm) || dcns.includes(docTerm) || dcrm.includes(docTerm);
-      if (!matchesDoctor) return false;
-      if (selectedSpecialty && selectedSpecialty !== 'all') {
-        if ((d.doctor_info.specialty || '').toLowerCase() !== selectedSpecialty.toLowerCase()) return false;
+      if (!globalTermRaw) {
+        // sem termo: aplica só specialty quando houver
+        if (selectedSpecialty && selectedSpecialty !== 'all') {
+          if ((d.doctor_info.specialty || '').toLowerCase() !== selectedSpecialty.toLowerCase()) return false;
+        }
+        return true;
       }
-      if (!procTermRaw) return true;
-      // Só mantém o médico se houver algum procedimento que case
-      return d.patients.some(p => (p.procedures || []).some(proc => {
+      const matchesDoctor = dn.includes(globalTermRaw) || dcns.includes(globalTermRaw) || dcrm.includes(globalTermRaw);
+      // verificar procedimentos 
+      const matchesProc = (d.patients || []).some(p => (p.procedures || []).some(proc => {
         if (isAnesthetistProcedure(proc)) return false;
         const codeNorm = (proc.procedure_code || '').toLowerCase().replace(/[\.\s]/g, '');
         const desc = (proc.procedure_description || '').toLowerCase();
-        return codeNorm.includes(procTermNorm) || desc.includes(procTermRaw);
+        return codeNorm.includes(globalTermNorm) || desc.includes(globalTermRaw);
       }));
+      const matches = matchesDoctor || matchesProc;
+      if (!matches) return false;
+      if (selectedSpecialty && selectedSpecialty !== 'all') {
+        if ((d.doctor_info.specialty || '').toLowerCase() !== selectedSpecialty.toLowerCase()) return false;
+      }
+      return true;
     });
-  }, [doctors, doctorSearch, searchTerm, procTermRaw, procTermNorm, selectedSpecialty]);
+  }, [doctors, searchTerm, globalTermRaw, globalTermNorm, selectedSpecialty]);
 
   // Agrupar por hospital (id -> nome) e criar cortes por hospital
 
@@ -277,6 +282,174 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
     };
   };
 
+  // Export helper: CSV por médico (card) preservando estrutura visual
+  const exportDoctorCardCsv = (hospitalName: string, row: any) => {
+    try {
+      const doctor = row.doctor?.doctor_info || {};
+      const metrics = row.metrics || {};
+      const top = Array.isArray(row.topProcedures) ? row.topProcedures : [];
+
+      // Helpers para Excel pt-BR (CSV ; e vírgula decimal)
+      const quote = (t: any) => `"${String(t ?? '').replace(/"/g, '""')}"`;
+      const toDec = (n: any, digits: number = 2) => {
+        const num = Number(n || 0);
+        return String(num.toFixed(digits)).replace('.', ',');
+      };
+      const toInt = (n: any) => String(Math.round(Number(n || 0)));
+      const push = (arr: (string | number)[]) => lines.push(arr.join(';'));
+      const lines: string[] = [];
+
+      // Cabeçalho contextual
+      push([quote('Hospital'), quote(hospitalName)]);
+      push([quote('Médico'), quote(doctor.name || '')]);
+      push([quote('CNS'), quote(doctor.cns || '')]);
+      push([quote('Especialidade'), quote(doctor.specialty || '')]);
+      lines.push('');
+
+      // Métricas (como exibidas)
+      push([quote('AIHs'), toInt(metrics.totalAihs)]);
+      push([quote('Valor médio AIH (BRL)'), toDec(metrics.avgAihValue)]);
+      push([quote('Procedimentos'), toInt(metrics.totalProcedures)]);
+      push([quote('Total Procedimentos (BRL)'), toDec(metrics.totalProceduresValue)]);
+      lines.push('');
+
+      // Tabela Top procedimentos
+      push([quote('Procedimento (código)'), quote('Descrição'), quote('Qtde'), quote('Valor total (BRL)')]);
+      top.forEach((p: any) => {
+        push([
+          quote(p.code || '—'),
+          quote(p.desc || 'Sem descrição'),
+          toInt(p.count),
+          toDec(p.total)
+        ]);
+      });
+
+      // Prefixo BOM para Excel reconhecer UTF-8
+      const csv = '\uFEFF' + lines.join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const fileNameSafe = `${(doctor.name || 'medico').replace(/[^\w\-]+/g, '_')}_${new Date().toISOString().slice(0,10)}.csv`;
+      a.href = url;
+      a.download = fileNameSafe;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Erro ao exportar CSV do médico:', e);
+    }
+  };
+
+  // Export helper: CSV por especialidade (card)
+  const exportSpecialtyCardCsv = (hospitalName: string, row: any) => {
+    try {
+      const specialtyName = row.specialty || 'Especialidade';
+      const metrics = row.metrics || {};
+      const top = Array.isArray(row.topProcedures) ? row.topProcedures : [];
+
+      const quote = (t: any) => `"${String(t ?? '').replace(/"/g, '""')}"`;
+      const toDec = (n: any, digits: number = 2) => {
+        const num = Number(n || 0);
+        return String(num.toFixed(digits)).replace('.', ',');
+      };
+      const toInt = (n: any) => String(Math.round(Number(n || 0)));
+      const push = (arr: (string | number)[]) => lines.push(arr.join(';'));
+      const lines: string[] = [];
+
+      // Cabeçalho contextual
+      push([quote('Hospital'), quote(hospitalName)]);
+      push([quote('Especialidade'), quote(specialtyName)]);
+      push([quote('Médicos'), toInt(row.doctorsCount)]);
+      lines.push('');
+
+      // Métricas
+      push([quote('AIHs'), toInt(metrics.totalAihs)]);
+      push([quote('Valor médio AIH (BRL)'), toDec(metrics.avgAihValue)]);
+      push([quote('Procedimentos'), toInt(metrics.totalProcedures)]);
+      push([quote('Total Procedimentos (BRL)'), toDec(metrics.totalProceduresValue)]);
+      lines.push('');
+
+      // Tabela Top procedimentos
+      push([quote('Procedimento (código)'), quote('Descrição'), quote('Qtde'), quote('Valor total (BRL)')]);
+      top.forEach((p: any) => {
+        push([
+          quote(p.code || '—'),
+          quote(p.desc || 'Sem descrição'),
+          toInt(p.count),
+          toDec(p.total)
+        ]);
+      });
+
+      const csv = '\uFEFF' + lines.join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const fileNameSafe = `${('especialidade_' + specialtyName).replace(/[^\w\-]+/g, '_')}_${new Date().toISOString().slice(0,10)}.csv`;
+      a.href = url;
+      a.download = fileNameSafe;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Erro ao exportar CSV da especialidade:', e);
+    }
+  };
+
+  // Export helper: CSV por hospital (seção)
+  const exportHospitalSectionCsv = (hospitalName: string, ha: any) => {
+    try {
+      const quote = (t: any) => `"${String(t ?? '').replace(/"/g, '""')}"`;
+      const toDec = (n: any, digits: number = 2) => String(Number(n || 0).toFixed(digits)).replace('.', ',');
+      const toInt = (n: any) => String(Math.round(Number(n || 0)));
+      const lines: string[] = [];
+      const push = (arr: (string | number)[]) => lines.push(arr.join(';'));
+
+      // Cabeçalho
+      push([quote('Hospital'), quote(hospitalName)]);
+      lines.push('');
+
+      // Métricas
+      push([quote('AIHs'), toInt(ha.metrics?.totalAihs)]);
+      push([quote('Valor médio AIH (BRL)'), toDec(ha.metrics?.avgAihValue)]);
+      push([quote('Procedimentos'), toInt(ha.metrics?.totalProcedures)]);
+      push([quote('Total Procedimentos (BRL)'), toDec(ha.metrics?.totalProceduresValue)]);
+      lines.push('');
+
+      // Top especialidades
+      push([quote('Top especialidades por faturamento')]);
+      push([quote('Especialidade'), quote('Qtde proc.'), quote('Valor total (BRL)')]);
+      (ha.topSpecialties || []).forEach((s: any) => {
+        push([quote(s.name || ''), toInt(s.procCount), toDec(s.total)]);
+      });
+      lines.push('');
+
+      // Top procedimentos
+      push([quote('Top procedimentos por faturamento')]);
+      push([quote('Procedimento (código)'), quote('Descrição'), quote('Qtde'), quote('Valor total (BRL)')]);
+      (ha.topProcedures || []).forEach((p: any) => {
+        push([quote(p.code || '—'), quote(p.desc || 'Sem descrição'), toInt(p.count), toDec(p.total)]);
+      });
+      lines.push('');
+
+      // Médicos mais performáticos
+      push([quote('Médicos mais performáticos')]);
+      push([quote('Médico'), quote('AIHs'), quote('Procedimentos'), quote('Valor AIH (BRL)'), quote('Ticket médio (BRL)')]);
+      (ha.topDoctors || []).forEach((d: any) => {
+        push([quote(d.name || ''), toInt(d.totalAihs), toInt(d.totalProcedures), toDec(d.totalAihValue), toDec(d.avgAihValue)]);
+      });
+
+      const csv = '\uFEFF' + lines.join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const fileNameSafe = `${('hospital_' + hospitalName).replace(/[^\w\-]+/g, '_')}_${new Date().toISOString().slice(0,10)}.csv`;
+      a.href = url;
+      a.download = fileNameSafe;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Erro ao exportar CSV do hospital:', e);
+    }
+  };
+
   // Especialidades: agregação por especialidade → procedimentos e valores (exclui anestesista)
   const getSpecialtyAnalytics = (doctorsSubset: DoctorWithPatients[]) => {
     const specialtyMap = new Map<string, any>();
@@ -343,45 +516,12 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
 
   return (
     <div className="space-y-6">
-      {/* Header / Filtros Superiores */}
-      <Card className="bg-gradient-to-br from-white to-slate-50 border-slate-200/80">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <LineChart className="h-6 w-6 text-slate-700" />
-              <span>Procedimentos por Médico</span>
-            </div>
-            <Badge variant="secondary" className="bg-slate-100 text-slate-700">{doctorAnalytics.length} médico(s)</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-end">
-            <div className="flex-1 min-w-[220px] relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Buscar médico (nome, CNS, CRM)..."
-                value={doctorSearch}
-                onChange={(e) => setDoctorSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex-1 min-w-[280px] relative">
-              <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Buscar procedimento (código ou descrição)..."
-                value={procedureSearch}
-                onChange={(e) => setProcedureSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Seção de filtros local removida: cobertura via filtros globais do Analytics */}
 
       {/* Abas: Análises e Especialidades */}
       <Tabs value={activeView} onValueChange={(v) => setActiveView(v as any)}>
         <TabsList className="bg-slate-100">
-          <TabsTrigger value="analytics">Análises</TabsTrigger>
+          <TabsTrigger value="analytics">Médicos</TabsTrigger>
           <TabsTrigger value="specialties">Especialidades</TabsTrigger>
           <TabsTrigger value="hospitals">Hospitais</TabsTrigger>
         </TabsList>
@@ -406,8 +546,15 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                       {data.map(({ doctor, metrics, topProcedures }: any, idx: number) => (
                         <Card key={`${h.id}-${doctor.doctor_info.cns}-${idx}`} className="border-slate-200">
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-base">
+                            <CardTitle className="text-base flex items-center justify-between">
                               <div className="truncate">{doctor.doctor_info.name}</div>
+                              <Button
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                                size="sm"
+                                onClick={() => exportDoctorCardCsv(h.name, { doctor, metrics, topProcedures })}
+                              >
+                                <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
+                              </Button>
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-3">
@@ -494,7 +641,16 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                           <CardHeader className="pb-2">
                             <CardTitle className="text-base flex items-center justify-between">
                               <div className="truncate">{row.specialty}</div>
-                              <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">{row.doctorsCount} médico(s)</Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">{row.doctorsCount} médico(s)</Badge>
+                                <Button
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                  size="sm"
+                                  onClick={() => exportSpecialtyCardCsv(h.name, row)}
+                                >
+                                  <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
+                                </Button>
+                              </div>
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-3">
@@ -567,7 +723,16 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                 <div key={`hosp-${h.id}`} className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-semibold text-slate-700">{h.name}</div>
-                    <Badge variant="secondary" className="bg-slate-100 text-slate-700">Hospitais</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="bg-slate-100 text-slate-700">Hospitais</Badge>
+                      <Button
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        size="sm"
+                        onClick={() => exportHospitalSectionCsv(h.name, ha)}
+                      >
+                        <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
+                      </Button>
+                    </div>
                   </div>
                   {docs.length === 0 ? (
                     <Alert>
