@@ -27,6 +27,10 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
 
   // Estado de visualização
   const [activeView, setActiveView] = useState<'analytics' | 'specialties' | 'hospitals'>('analytics');
+  // Controle de expansão por médico (exibir todos os procedimentos além dos 5 primeiros)
+  const [expandedDoctors, setExpandedDoctors] = useState<Record<string, boolean>>({});
+  // Controle de expansão por especialidade
+  const [expandedSpecialties, setExpandedSpecialties] = useState<Record<string, boolean>>({});
 
   // Carregar hierarquia
   useEffect(() => {
@@ -119,7 +123,12 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
       });
 
       const procedures = Array.from(procMap.values())
-        .sort((a, b) => b.count - a.count);
+        .sort((a, b) => {
+          const aIs04 = String(a.code || '').startsWith('04') ? 1 : 0;
+          const bIs04 = String(b.code || '').startsWith('04') ? 1 : 0;
+          if (aIs04 !== bIs04) return bIs04 - aIs04; // Prioriza códigos que começam com '04'
+          return b.count - a.count;
+        });
 
       const topProcedures = procedures.slice(0, 5);
       const totalProcedures = procedures.reduce((s, p) => s + p.count, 0);
@@ -191,7 +200,12 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
         });
       });
 
-      const procedures = Array.from(procMap.values()).sort((a, b) => b.count - a.count);
+      const procedures = Array.from(procMap.values()).sort((a, b) => {
+        const aIs04 = String(a.code || '').startsWith('04') ? 1 : 0;
+        const bIs04 = String(b.code || '').startsWith('04') ? 1 : 0;
+        if (aIs04 !== bIs04) return bIs04 - aIs04;
+        return b.count - a.count;
+      });
       const topProcedures = procedures.slice(0, 5);
       const totalProcedures = procedures.reduce((s, p) => s + p.count, 0);
       const totalProceduresValue = procedures.reduce((s, p) => s + p.total, 0);
@@ -543,7 +557,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                     </Alert>
                   ) : (
                     <div className="grid grid-cols-1 gap-4">
-                      {data.map(({ doctor, metrics, topProcedures }: any, idx: number) => (
+                      {data.map(({ doctor, metrics, topProcedures, procedures }: any, idx: number) => (
                         <Card key={`${h.id}-${doctor.doctor_info.cns}-${idx}`} className="border-slate-200">
                           <CardHeader className="pb-2">
                             <CardTitle className="text-base flex items-center justify-between">
@@ -578,8 +592,8 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                               </div>
                             </div>
                             <div>
-                              <div className="text-xs text-slate-500 mb-1">Top procedimentos</div>
-                              {topProcedures.length === 0 ? (
+                              <div className="text-xs text-slate-500 mb-1">Procedimentos</div>
+                              {(!procedures || procedures.length === 0) ? (
                                 <span className="text-xs text-slate-400">Sem dados</span>
                               ) : (
                                 <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -588,22 +602,46 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                                       <tr>
                                         <th className="text-left px-3 py-2 font-medium">Procedimento</th>
                                         <th className="text-right px-3 py-2 font-medium">Qtde</th>
+                                        <th className="text-right px-3 py-2 font-medium">Valor</th>
                                         <th className="text-right px-3 py-2 font-medium">Valor total</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-200">
-                                      {topProcedures.map((p: any, i: number) => (
-                                        <tr key={i} className="hover:bg-slate-50">
-                                          <td className="px-3 py-2 text-slate-700">
-                                            <span className="font-mono text-xs text-slate-700 mr-1">{p.code || '—'}</span>
-                                            <span className="text-slate-800">{p.desc || 'Sem descrição'}</span>
-                                          </td>
-                                          <td className="px-3 py-2 text-right text-slate-700">{p.count}</td>
-                                          <td className="px-3 py-2 text-right font-medium text-slate-900">{(p.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                                        </tr>
-                                      ))}
+                                      {(() => {
+                                        const rowKey = doctor.doctor_info.cns || `${doctor.doctor_info.name}-${idx}`;
+                                        const isExpanded = !!expandedDoctors[rowKey];
+                                        const visible = isExpanded ? procedures : procedures.slice(0, 5);
+                                        return visible.map((p: any, i: number) => (
+                                          <tr key={i} className="hover:bg-slate-50">
+                                            <td className="px-3 py-2 text-slate-700">
+                                              <span className="font-mono text-xs text-slate-700 mr-1">{p.code || '—'}</span>
+                                              <span className="text-slate-800">{p.desc || 'Sem descrição'}</span>
+                                            </td>
+                                            <td className="px-3 py-2 text-right text-slate-700">{p.count}</td>
+                                            <td className="px-3 py-2 text-right text-slate-700">{((p.total || 0) / Math.max(1, p.count || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                            <td className="px-3 py-2 text-right font-medium text-slate-900">{(p.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                          </tr>
+                                        ));
+                                      })()}
                                     </tbody>
                                   </table>
+                                </div>
+                              )}
+                              {!!procedures && procedures.length > 5 && (
+                                <div className="mt-2 flex justify-end">
+                                  {(() => {
+                                    const rowKey = doctor.doctor_info.cns || `${doctor.doctor_info.name}-${idx}`;
+                                    const isExpanded = !!expandedDoctors[rowKey];
+                                    return (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setExpandedDoctors(prev => ({ ...prev, [rowKey]: !prev[rowKey] }))}
+                                      >
+                                        {isExpanded ? 'Ver menos' : 'Ver mais'}
+                                      </Button>
+                                    );
+                                  })()}
                                 </div>
                               )}
                             </div>
@@ -687,18 +725,41 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-200">
-                                      {row.topProcedures.map((p: any, j: number) => (
-                                        <tr key={`${i}-${j}`} className="hover:bg-slate-50">
-                                          <td className="px-3 py-2 text-slate-700">
-                                            <span className="font-mono text-xs text-slate-700 mr-1">{p.code || '—'}</span>
-                                            <span className="text-slate-800">{p.desc || 'Sem descrição'}</span>
-                                          </td>
-                                          <td className="px-3 py-2 text-right text-slate-700">{p.count}</td>
-                                          <td className="px-3 py-2 text-right font-medium text-slate-900">{(p.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                                        </tr>
-                                      ))}
+                                      {(() => {
+                                        const rowKey = `${h.id}-${row.specialty}`;
+                                        const isExpanded = !!expandedSpecialties[rowKey];
+                                        const visible = isExpanded ? row.topProcedures : row.topProcedures.slice(0, 5);
+                                        return visible.map((p: any, j: number) => (
+                                          <tr key={`${i}-${j}`} className="hover:bg-slate-50">
+                                            <td className="px-3 py-2 text-slate-700">
+                                              <span className="font-mono text-xs text-slate-700 mr-1">{p.code || '—'}</span>
+                                              <span className="text-slate-800">{p.desc || 'Sem descrição'}</span>
+                                            </td>
+                                            <td className="px-3 py-2 text-right text-slate-700">{p.count}</td>
+                                            <td className="px-3 py-2 text-right text-slate-700">{((p.total || 0) / Math.max(1, p.count || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                            <td className="px-3 py-2 text-right font-medium text-slate-900">{(p.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                          </tr>
+                                        ));
+                                      })()}
                                     </tbody>
                                   </table>
+                                </div>
+                              )}
+                              {row.topProcedures.length > 5 && (
+                                <div className="mt-2 flex justify-end">
+                                  {(() => {
+                                    const rowKey = `${h.id}-${row.specialty}`;
+                                    const isExpanded = !!expandedSpecialties[rowKey];
+                                    return (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setExpandedSpecialties(prev => ({ ...prev, [rowKey]: !prev[rowKey] }))}
+                                      >
+                                        {isExpanded ? 'Ver menos' : 'Ver mais'}
+                                      </Button>
+                                    );
+                                  })()}
                                 </div>
                               )}
                             </div>
@@ -763,7 +824,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                         </CardContent>
                       </Card>
 
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Card className="border-slate-200">
                           <CardHeader className="pb-2"><CardTitle className="text-base">Top especialidades por faturamento</CardTitle></CardHeader>
                           <CardContent>
@@ -806,6 +867,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                                     <tr>
                                       <th className="text-left px-3 py-2 font-medium">Procedimento</th>
                                       <th className="text-right px-3 py-2 font-medium">Qtde</th>
+                                      <th className="text-right px-3 py-2 font-medium">Valor</th>
                                       <th className="text-right px-3 py-2 font-medium">Valor total</th>
                                     </tr>
                                   </thead>
@@ -817,6 +879,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                                           <span className="text-slate-800">{p.desc || 'Sem descrição'}</span>
                                         </td>
                                         <td className="px-3 py-2 text-right text-slate-700">{p.count}</td>
+                                        <td className="px-3 py-2 text-right text-slate-700">{((p.total || 0) / Math.max(1, p.count || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                         <td className="px-3 py-2 text-right font-medium text-slate-900">{(p.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                                       </tr>
                                     ))}

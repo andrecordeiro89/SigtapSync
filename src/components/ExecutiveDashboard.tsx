@@ -980,7 +980,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         <TabsList className="grid w-full grid-cols-3 bg-blue-100">
           <TabsTrigger value="doctors" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <Users className="h-4 w-4 mr-2" />
-            Médicos
+            Profissionais
           </TabsTrigger>
           <TabsTrigger value="procedures" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <TrendingUp className="h-4 w-4 mr-2" />
