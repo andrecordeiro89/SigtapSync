@@ -8,7 +8,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+// Tabs removidos: Hierarquia não será mais exibida
 import { Alert, AlertDescription } from './ui/alert';
 import { Users, FileText, Search, ChevronRight, ChevronDown, Calendar, Activity, LineChart, Filter } from 'lucide-react';
 
@@ -28,7 +28,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
   // Filtros locais
   const [doctorSearch, setDoctorSearch] = useState('');
   const [procedureSearch, setProcedureSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'hierarchy' | 'analytics'>('hierarchy');
+  // Removido: estado de abas (apenas Análises permanece)
 
   // Carregar hierarquia
   useEffect(() => {
@@ -57,6 +57,17 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
   const procTermRaw = procedureSearch.toLowerCase().trim();
   const procTermNorm = procTermRaw.replace(/[\.\s]/g, '');
 
+  // Helper: identificar procedimentos de anestesista (ocultar)
+  const isAnesthetistProcedure = (proc: any): boolean => {
+    try {
+      const cbo = String(proc?.cbo || proc?.professional_cbo || '');
+      const code = String(proc?.procedure_code || '');
+      return cbo === '225151' && code.startsWith('04') && code !== '04.17.01.001-0';
+    } catch {
+      return false;
+    }
+  };
+
   // Filtragem de médicos por nome/CRM/CNS (usa termo global + local)
   const filteredDoctors = useMemo(() => {
     const docTerm = (doctorSearch || searchTerm).toLowerCase().trim();
@@ -72,6 +83,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
       if (!procTermRaw) return true;
       // Só mantém o médico se houver algum procedimento que case
       return d.patients.some(p => (p.procedures || []).some(proc => {
+        if (isAnesthetistProcedure(proc)) return false;
         const codeNorm = (proc.procedure_code || '').toLowerCase().replace(/[\.\s]/g, '');
         const desc = (proc.procedure_description || '').toLowerCase();
         return codeNorm.includes(procTermNorm) || desc.includes(procTermRaw);
@@ -90,6 +102,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
       const procMap = new Map<string, { code: string; desc: string; count: number; total: number }>();
       allAIHs.forEach(p => {
         (p.procedures || []).forEach(proc => {
+          if (isAnesthetistProcedure(proc)) return;
           const key = proc.procedure_code || proc.procedure_description || String(Math.random());
           const prev = procMap.get(key) || { code: proc.procedure_code || '', desc: proc.procedure_description || '', count: 0, total: 0 };
           prev.count += 1;
@@ -162,6 +175,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
       const procMap = new Map<string, { code: string; desc: string; count: number; total: number }>();
       allAIHs.forEach(p => {
         (p.procedures || []).forEach(proc => {
+          if (isAnesthetistProcedure(proc)) return;
           const key = proc.procedure_code || proc.procedure_description || String(Math.random());
           const prev = procMap.get(key) || { code: proc.procedure_code || '', desc: proc.procedure_description || '', count: 0, total: 0 };
           prev.count += 1;
@@ -232,14 +246,8 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
         </CardContent>
       </Card>
 
-      {/* Abas: Hierarquia e Analytics */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-        <TabsList className="bg-slate-100">
-          <TabsTrigger value="hierarchy">Hierarquia</TabsTrigger>
-          <TabsTrigger value="analytics">Análises</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="analytics" className="space-y-4">
+      {/* Somente Análises (Hierarquia removida) */}
+      <div className="space-y-4">
           {(() => {
             const sections = (hospitalsList.length > 0 ? hospitalsList : [{ id: 'ALL', name: 'Todos os Hospitais' }]);
             return sections.map((h) => {
@@ -264,6 +272,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-3">
+                            <div className="text-xs text-slate-600">Especialidade: <span className="font-medium text-slate-800">{doctor.doctor_info.specialty || 'Não informado'}</span></div>
                             <div className="grid grid-cols-2 gap-3 text-sm">
                               <div>
                                 <div className="text-slate-500">AIHs</div>
@@ -321,121 +330,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
               );
             });
           })()}
-        </TabsContent>
-
-        <TabsContent value="hierarchy" className="space-y-4">
-          {(() => {
-            const sections = (hospitalsList.length > 0 ? hospitalsList : [{ id: 'ALL', name: 'Todos os Hospitais' }]);
-            return sections.map((h) => {
-              const docs = h.id === 'ALL' ? filteredDoctors : getDoctorsForHospital(h.id);
-              if (docs.length === 0) {
-                return (
-                  <div key={`hier-${h.id}`} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold text-slate-700">{h.name}</div>
-                      <Badge variant="secondary" className="bg-slate-100 text-slate-700">Hierarquia</Badge>
-                    </div>
-                    <Alert>
-                      <AlertDescription>Nenhum resultado com os filtros.</AlertDescription>
-                    </Alert>
-                  </div>
-                );
-              }
-              return (
-                <div key={`hier-${h.id}`} className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold text-slate-700">{h.name}</div>
-                    <Badge variant="secondary" className="bg-slate-100 text-slate-700">Hierarquia</Badge>
-                  </div>
-                  {docs.map((doctor, dIdx) => (
-              <Card key={`${h.id}-${doctor.doctor_info.cns}-${dIdx}`} className="border-slate-200">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center justify-between">
-                    <div className="truncate">{doctor.doctor_info.name}</div>
-                    <Badge variant="secondary" className="bg-slate-100 text-slate-700">{doctor.patients.length} paciente(s)</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {(doctor.patients || []).map((patient, pIdx) => {
-                    const anyProcMatch = !!procTermRaw && (patient.procedures || []).some(proc => {
-                      const codeNorm = (proc.procedure_code || '').toLowerCase().replace(/[\.\s]/g, '');
-                      const desc = (proc.procedure_description || '').toLowerCase();
-                      return codeNorm.includes(procTermNorm) || desc.includes(procTermRaw);
-                    });
-                    return (
-                      <Collapsible key={(patient.patient_id || '') + pIdx}>
-                        <CollapsibleTrigger asChild>
-                          <div className="w-full cursor-pointer p-3 rounded-lg hover:bg-slate-50 border border-slate-200 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center">
-                                <Users className="h-4 w-4 text-slate-600" />
-                              </div>
-                              <div>
-                                <div className="font-medium text-slate-800">
-                                  {patient.patient_info.name || 'Paciente'}
-                                  {anyProcMatch && (
-                                    <Badge variant="outline" className="ml-2 bg-purple-50 text-purple-700 border-purple-200 text-[10px]">Procedimento</Badge>
-                                  )}
-                                </div>
-                                <div className="text-xs text-slate-600">CNS: {patient.patient_info.cns || '—'}</div>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm text-slate-600">Valor AIH</div>
-                              <div className="font-semibold text-slate-900">{(patient.total_value_reais || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
-                            </div>
-                          </div>
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <div className="mt-3 space-y-2">
-                            {(patient.procedures || []).length === 0 ? (
-                              <div className="text-slate-500 text-sm flex items-center gap-2 py-4 justify-center">
-                                <Activity className="h-4 w-4" />
-                                Nenhum procedimento
-                              </div>
-                            ) : (
-                              (patient.procedures || [])
-                                .sort((a, b) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime())
-                                .filter(proc => {
-                                  if (!procTermRaw) return true;
-                                  const codeNorm = (proc.procedure_code || '').toLowerCase().replace(/[\.\s]/g, '');
-                                  const desc = (proc.procedure_description || '').toLowerCase();
-                                  return codeNorm.includes(procTermNorm) || desc.includes(procTermRaw);
-                                })
-                                .map((procedure, idx) => (
-                                  <div key={procedure.procedure_id || idx} className="p-3 rounded-lg bg-white border border-slate-200">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className="text-xs bg-slate-50">{procedure.procedure_code || '—'}</Badge>
-                                        <div className="text-sm text-slate-800">{procedure.procedure_description || 'Descrição não disponível'}</div>
-                                      </div>
-                                      <div className="text-sm font-semibold text-slate-900">
-                                        {(procedure.value_reais || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                      </div>
-                                    </div>
-                                    <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-slate-600">
-                                      <div className="flex items-center gap-1.5">
-                                        <Calendar className="h-3.5 w-3.5" />
-                                        {procedure.procedure_date ? new Date(procedure.procedure_date).toLocaleDateString('pt-BR') : '—'}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))
-                            )}
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-                  ))}
-                </div>
-              );
-            });
-          })()}
-        </TabsContent>
-      </Tabs>
+      </div>
     </div>
   );
 };
