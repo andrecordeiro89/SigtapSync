@@ -255,15 +255,12 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                       <AlertDescription>Nenhum médico encontrado com os filtros atuais.</AlertDescription>
                     </Alert>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       {data.map(({ doctor, metrics, topProcedures }: any, idx: number) => (
                         <Card key={`${h.id}-${doctor.doctor_info.cns}-${idx}`} className="border-slate-200">
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-base flex items-center justify-between">
+                            <CardTitle className="text-base">
                               <div className="truncate">{doctor.doctor_info.name}</div>
-                              <Badge variant="outline" className={metrics.hasStrongPattern ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-slate-50 text-slate-700 border-slate-200'}>
-                                Padrão {metrics.patternRate}%
-                              </Badge>
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="space-y-3">
@@ -287,15 +284,33 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                             </div>
                             <div>
                               <div className="text-xs text-slate-500 mb-1">Top procedimentos</div>
-                              <div className="flex flex-wrap gap-1">
-                                {topProcedures.length === 0 ? (
-                                  <span className="text-xs text-slate-400">Sem dados</span>
-                                ) : topProcedures.map((p: any, i: number) => (
-                                  <Badge key={i} variant="outline" className="text-xs">
-                                    {p.code || 'Sem código'} · {p.count}
-                                  </Badge>
-                                ))}
-                              </div>
+                              {topProcedures.length === 0 ? (
+                                <span className="text-xs text-slate-400">Sem dados</span>
+                              ) : (
+                                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                  <table className="w-full text-sm">
+                                    <thead className="bg-slate-50/80 text-slate-600">
+                                      <tr>
+                                        <th className="text-left px-3 py-2 font-medium">Procedimento</th>
+                                        <th className="text-right px-3 py-2 font-medium">Qtde</th>
+                                        <th className="text-right px-3 py-2 font-medium">Valor total</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200">
+                                      {topProcedures.map((p: any, i: number) => (
+                                        <tr key={i} className="hover:bg-slate-50">
+                                          <td className="px-3 py-2 text-slate-700">
+                                            <span className="font-mono text-xs text-slate-700 mr-1">{p.code || '—'}</span>
+                                            <span className="text-slate-800">{p.desc || 'Sem descrição'}</span>
+                                          </td>
+                                          <td className="px-3 py-2 text-right text-slate-700">{p.count}</td>
+                                          <td className="px-3 py-2 text-right font-medium text-slate-900">{(p.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
                             </div>
                           </CardContent>
                         </Card>

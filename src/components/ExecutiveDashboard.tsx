@@ -983,8 +983,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             Médicos
           </TabsTrigger>
           <TabsTrigger value="procedures" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            <FileText className="h-4 w-4 mr-2" />
-            Procedimentos
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Análise de Performance
           </TabsTrigger>
           <TabsTrigger value="medical-staff" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
             <Users className="h-4 w-4 mr-2" />
