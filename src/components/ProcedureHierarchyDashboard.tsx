@@ -824,7 +824,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                         </CardContent>
                       </Card>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                         <Card className="border-slate-200">
                           <CardHeader className="pb-2"><CardTitle className="text-base">Top especialidades por faturamento</CardTitle></CardHeader>
                           <CardContent>
