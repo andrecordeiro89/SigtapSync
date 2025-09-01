@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collap
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Alert, AlertDescription } from './ui/alert';
 import { Users, FileText, Search, ChevronRight, ChevronDown, Calendar, Activity, LineChart, Filter, FileSpreadsheet } from 'lucide-react';
+import DoctorsSpecialtyComparison from './DoctorsSpecialtyComparison';
 
 interface ProcedureHierarchyDashboardProps {
   dateRange?: DateRange;
@@ -26,7 +27,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
 
   // Estado de visualização
-  const [activeView, setActiveView] = useState<'analytics' | 'specialties' | 'hospitals'>('analytics');
+  const [activeView, setActiveView] = useState<'analytics' | 'specialties' | 'hospitals' | 'comparisons'>('analytics');
   // Controle de expansão por médico (exibir todos os procedimentos além dos 5 primeiros)
   const [expandedDoctors, setExpandedDoctors] = useState<Record<string, boolean>>({});
   // Controle de expansão por especialidade
@@ -532,12 +533,13 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
     <div className="space-y-6">
       {/* Seção de filtros local removida: cobertura via filtros globais do Analytics */}
 
-      {/* Abas: Análises e Especialidades */}
+      {/* Abas: Análises, Especialidades, Hospitais e Comparativos */}
       <Tabs value={activeView} onValueChange={(v) => setActiveView(v as any)}>
         <TabsList className="bg-slate-100">
           <TabsTrigger value="analytics">Médicos</TabsTrigger>
           <TabsTrigger value="specialties">Especialidades</TabsTrigger>
           <TabsTrigger value="hospitals">Hospitais</TabsTrigger>
+          <TabsTrigger value="comparisons">Comparativos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="analytics" className="space-y-4">
@@ -930,6 +932,17 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
               );
             });
           })()}
+        </TabsContent>
+
+        <TabsContent value="comparisons" className="space-y-4">
+          <DoctorsSpecialtyComparison
+            dateRange={dateRange}
+            selectedHospitals={selectedHospitals}
+            selectedCareCharacter={selectedCareCharacter}
+            selectedSpecialty={selectedSpecialty}
+            searchTerm={searchTerm}
+            doctorsFromDashboard={filteredDoctors}
+          />
         </TabsContent>
       </Tabs>
     </div>

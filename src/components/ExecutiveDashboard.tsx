@@ -591,6 +591,16 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 	const formatDateForInput = (date: Date): string => {
 		return date.toISOString().split('T')[0];
 	};
+
+	// Parser seguro para datas de input em horário local (evita drift por timezone)
+	const parseDateInputLocal = (value: string): Date => {
+		try {
+			const [y, m, d] = value.split('-').map(Number);
+			return new Date(y, (m || 1) - 1, d || 1, 12, 0, 0, 0);
+		} catch {
+			return new Date(value);
+		}
+	};
   
 
 
@@ -1101,7 +1111,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   type="date"
                   value={formatDateForInput(selectedDateRange.startDate)}
                   onChange={(e) => {
-                    const newStart = new Date(e.target.value);
+                    const newStart = parseDateInputLocal(e.target.value);
                     const updated = { startDate: newStart, endDate: selectedDateRange.endDate };
                     setSelectedDateRange(updated);
                     handleDateRangeChange(updated);
@@ -1118,7 +1128,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   value={formatDateForInput(selectedDateRange.endDate)}
                   max={formatDateForInput(new Date())}
                   onChange={(e) => {
-                    const newEnd = new Date(e.target.value);
+                    const newEnd = parseDateInputLocal(e.target.value);
                     const updated = { startDate: selectedDateRange.startDate, endDate: newEnd };
                     setSelectedDateRange(updated);
                     handleDateRangeChange(updated);
@@ -1175,12 +1185,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {/* Abas por Hospital (sempre separar médicos por hospital) */}
             {hospitalStats && hospitalStats.length > 0 && (
               <div className="pt-4 border-t border-gray-100">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 block">
-                  Hospitais
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 flex items-center gap-2">
+                  <span>Hospitais</span>
+                  <span className="text-[10px] font-normal text-gray-500 normal-case">(Selecione o hospital)</span>
                 </label>
                 <Tabs value={activeHospitalTab || sortedHospitalStats[0]?.id} onValueChange={handleHospitalTabChange}>
                   <TabsList
-                    className="w-full h-auto grid gap-0 bg-muted rounded-md p-1"
+                    className="w-full h-auto grid gap-0 bg-muted rounded-md p-1 border border-gray-200"
                     style={{ gridTemplateColumns: `repeat(${sortedHospitalStats.length || 1}, minmax(0, 1fr))` }}
                   >
                     {sortedHospitalStats.map((h) => (
