@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Alert, AlertDescription } from './ui/alert';
 import { Users, FileText, Search, ChevronRight, ChevronDown, Calendar, Activity, LineChart, Filter, FileSpreadsheet } from 'lucide-react';
 import DoctorsSpecialtyComparison from './DoctorsSpecialtyComparison';
+import AnalyticsCharts from './AnalyticsCharts';
 
 interface ProcedureHierarchyDashboardProps {
   dateRange?: DateRange;
@@ -27,7 +28,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
 
   // Estado de visualização
-  const [activeView, setActiveView] = useState<'analytics' | 'specialties' | 'hospitals' | 'comparisons'>('analytics');
+  const [activeView, setActiveView] = useState<'analytics' | 'specialties' | 'hospitals' | 'comparisons' | 'charts'>('analytics');
   // Controle de expansão por médico (exibir todos os procedimentos além dos 5 primeiros)
   const [expandedDoctors, setExpandedDoctors] = useState<Record<string, boolean>>({});
   // Controle de expansão por especialidade
@@ -540,6 +541,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
           <TabsTrigger value="specialties">Especialidades</TabsTrigger>
           <TabsTrigger value="hospitals">Hospitais</TabsTrigger>
           <TabsTrigger value="comparisons">Comparativos</TabsTrigger>
+          <TabsTrigger value="charts">Gráficos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="analytics" className="space-y-4">
@@ -942,6 +944,14 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
             selectedSpecialty={selectedSpecialty}
             searchTerm={searchTerm}
             doctorsFromDashboard={filteredDoctors}
+          />
+        </TabsContent>
+
+        <TabsContent value="charts" className="space-y-4">
+          <AnalyticsCharts
+            dateRange={dateRange}
+            doctors={filteredDoctors}
+            specialty={selectedSpecialty}
           />
         </TabsContent>
       </Tabs>

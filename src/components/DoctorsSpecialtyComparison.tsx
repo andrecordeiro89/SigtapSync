@@ -22,6 +22,7 @@ type AggregatedDoctor = {
   doctorName: string;
   doctorCns: string;
   specialty: string;
+  hospitalName: string;
   aihCount: number;
   totalAihValue: number;
   avgAihValue: number;
@@ -44,7 +45,7 @@ const DoctorsSpecialtyComparison: React.FC<DoctorsSpecialtyComparisonProps> = ({
   const [compareA, setCompareA] = useState<string>('');
   const [compareB, setCompareB] = useState<string>('');
   const [localSpecialty, setLocalSpecialty] = useState<string>(() => (selectedSpecialty && selectedSpecialty !== 'all') ? selectedSpecialty : 'all');
-  const [sortBy, setSortBy] = useState<'deviation' | 'doctor' | 'specialty'>('deviation');
+  const [sortBy, setSortBy] = useState<'doctor' | 'specialty'>('doctor');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [granularity, setGranularity] = useState<'day' | 'week'>('week');
 
@@ -86,13 +87,18 @@ const DoctorsSpecialtyComparison: React.FC<DoctorsSpecialtyComparisonProps> = ({
       const cns = (d.doctor_info.cns || d.doctor_info.name || '').toString();
       const name = d.doctor_info.name || cns || 'Médico';
       const specialty = (d.doctor_info.specialty || 'Não informado').trim();
+      const hospSet = new Set<string>((d.hospitals || []).map((h: any) => (h?.hospital_name || '').trim()).filter(Boolean));
       const aihs = d.patients || [];
       const totalAihs = aihs.length;
       const totalValue = aihs.reduce((s, p) => s + (p.total_value_reais || 0), 0);
-      const prev = byCns.get(cns) || { doctorName: name, doctorCns: cns, specialty, aihCount: 0, totalAihValue: 0, avgAihValue: 0 };
+      const prev = byCns.get(cns) || { doctorName: name, doctorCns: cns, specialty, hospitalName: '', aihCount: 0, totalAihValue: 0, avgAihValue: 0 };
       prev.aihCount += totalAihs;
       prev.totalAihValue += totalValue;
       prev.specialty = prev.specialty || specialty;
+      // Acumular nomes de hospitais (usa primeiro ou 'Múltiplos')
+      const existing = prev.hospitalName ? new Set(prev.hospitalName.split(' | ').map(s => s.trim()).filter(Boolean)) : new Set<string>();
+      hospSet.forEach(h => existing.add(h));
+      prev.hospitalName = existing.size <= 1 ? (Array.from(existing)[0] || '') : 'Múltiplos';
       byCns.set(cns, prev);
     });
     const arr = Array.from(byCns.values()).map(r => ({
@@ -139,26 +145,16 @@ const DoctorsSpecialtyComparison: React.FC<DoctorsSpecialtyComparisonProps> = ({
 
   // Linhas com desvio em relação à média da especialidade
   const tableRows = useMemo(() => {
-    const specAvg = specialtyStats.specialtyAvg || 0;
-    const base = filteredRows.map(r => {
-      const diff = r.avgAihValue - specAvg;
-      const pct = specAvg > 0 ? (diff / specAvg) * 100 : 0;
-      return { ...r, diffValue: diff, diffPercent: pct };
-    });
-    let rows = base;
+    let rows = [...filteredRows];
     if (sortBy === 'doctor') {
       rows = rows.sort((a, b) => a.doctorName.localeCompare(b.doctorName, 'pt-BR'));
       if (sortDir === 'desc') rows.reverse();
     } else if (sortBy === 'specialty') {
       rows = rows.sort((a, b) => (a.specialty || '').localeCompare(b.specialty || '', 'pt-BR'));
       if (sortDir === 'desc') rows.reverse();
-    } else {
-      // deviation: ordenar por |desvio%| desc padrão
-      rows = rows.sort((a, b) => Math.abs(b.diffPercent) - Math.abs(a.diffPercent));
-      if (sortDir === 'asc') rows.reverse();
     }
     return rows;
-  }, [filteredRows, specialtyStats.specialtyAvg, sortBy, sortDir]);
+  }, [filteredRows, sortBy, sortDir]);
 
   const toggleSort = (key: 'doctor' | 'specialty') => {
     setSortBy(prev => {
@@ -461,102 +457,7 @@ const DoctorsSpecialtyComparison: React.FC<DoctorsSpecialtyComparisonProps> = ({
             <div className="text-slate-400 text-sm">Nenhum médico encontrado para o recorte atual.</div>
           ) : (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Gráfico de linha: evolução da média por médico (top 6) */}
-                <Card className="border-slate-200">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Evolução {granularity === 'day' ? 'diária' : 'semanal'} do ticket médio (AIH) — Top médicos</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {series.length === 0 || (granularity === 'day' ? allDays.length === 0 : allWeeks.length === 0) ? (
-                      <div className="text-xs text-slate-400">Sem dados</div>
-                    ) : (
-                      <svg viewBox="0 0 520 200" className="w-full h-52">
-                        {/* Eixos */}
-                        <line x1="40" y1="170" x2="500" y2="170" stroke="#CBD5E1" />
-                        <line x1="40" y1="20" x2="40" y2="170" stroke="#CBD5E1" />
-                        {/* Labels do eixo X */}
-                        {(granularity === 'day' ? allDays : allWeeks).map((m, i) => {
-                          const bins = granularity === 'day' ? allDays : allWeeks;
-                          const step = Math.max(1, Math.ceil(bins.length / 10));
-                          const x = 40 + i * (460 / Math.max(1, bins.length - 1));
-                          return (
-                            <g key={m}>
-                              {(i % step === 0) && (
-                                <text x={x} y={185} fontSize="9" textAnchor="middle" fill="#475569">{(() => {
-                                  const [yy, mm, dd] = m.split('-');
-                                  return granularity === 'day' ? `${dd}/${mm}` : `${dd}/${mm}`; // week shows start day
-                                })()}</text>
-                              )}
-                              <line x1={x} y1="170" x2={x} y2="172" stroke="#CBD5E1" />
-                            </g>
-                          );
-                        })}
-                        {/* Séries */}
-                        {series.map((s, idx) => {
-                          const bins = granularity === 'day' ? allDays : allWeeks;
-                          const points: Array<{ x: number; y: number; v: number | null }> = s.values.map((v, i) => {
-                            const x = 40 + i * (460 / Math.max(1, bins.length - 1));
-                            const y = v == null || maxY <= 0 ? 170 : 170 - (v / maxY) * 140;
-                            return { x, y, v };
-                          });
-                          // Construir path quebrando em pontos nulos
-                          let d = '';
-                          let started = false;
-                          points.forEach((p) => {
-                            if (p.v == null) { started = false; return; }
-                            d += `${started ? 'L' : 'M'} ${p.x} ${p.y} `;
-                            started = true;
-                          });
-                          return (
-                            <g key={s.cns || s.name}>
-                              <path d={d} fill="none" stroke={s.color} strokeWidth="2" />
-                              {points.map((p, i) => p.v != null ? <circle key={i} cx={p.x} cy={p.y} r="2.5" fill={s.color} /> : null)}
-                            </g>
-                          );
-                        })}
-                        {/* Legenda */}
-                        {series.map((s, i) => (
-                          <g key={`lg-${s.cns || s.name}`}>
-                            <rect x={50 + (i % 3) * 150} y={10 + Math.floor(i / 3) * 14} width="10" height="3" fill={s.color} />
-                            <text x={64 + (i % 3) * 150} y={14 + Math.floor(i / 3) * 14} fontSize="10" fill="#334155">{abbreviateName(s.name)}</text>
-                          </g>
-                        ))}
-                      </svg>
-                    )}
-                  </CardContent>
-                </Card>
-                {/* Gráfico de barras: quem tem maior ticket médio */}
-                <Card className="border-slate-200">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm">Ticket médio por médico (AIH) — Ranking</CardTitle></CardHeader>
-                  <CardContent>
-                    {topDoctors.length === 0 ? (
-                      <div className="text-xs text-slate-400">Sem dados</div>
-                    ) : (
-                      <svg viewBox="0 0 520 200" className="w-full h-52">
-                        <line x1="40" y1="170" x2="500" y2="170" stroke="#CBD5E1" />
-                        <line x1="40" y1="20" x2="40" y2="170" stroke="#CBD5E1" />
-                        {(() => {
-                          const maxBar = Math.max(...topDoctors.map(d => d.avgAihValue));
-                          const barW = 460 / Math.max(1, topDoctors.length) * 0.8;
-                          return topDoctors.map((d, i) => {
-                            const x = 40 + i * (460 / Math.max(1, topDoctors.length)) + ((460 / Math.max(1, topDoctors.length)) - barW) / 2;
-                            const h = maxBar > 0 ? (d.avgAihValue / maxBar) * 140 : 0;
-                            const y = 170 - h;
-                            const color = i === 0 ? '#16A34A' : '#60A5FA';
-                            return (
-                              <g key={d.doctorCns || d.doctorName}>
-                                <rect x={x} y={y} width={barW} height={h} fill={color} />
-                                <text x={x + barW / 2} y={185} fontSize="9" textAnchor="middle" fill="#475569">{abbreviateName(d.doctorName)}</text>
-                              </g>
-                            );
-                          });
-                        })()}
-                      </svg>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+              {/* Gráficos movidos para a aba Gráficos */}
 
               <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
                 <table className="w-full text-sm">
@@ -586,11 +487,9 @@ const DoctorsSpecialtyComparison: React.FC<DoctorsSpecialtyComparisonProps> = ({
                           )}
                         </button>
                       </th>
+                      <th className="text-left px-3 py-2 font-medium">Hospital</th>
                       <th className="text-right px-3 py-2 font-medium">AIHs</th>
                       <th className="text-right px-3 py-2 font-medium">Média AIH (médico)</th>
-                      <th className="text-right px-3 py-2 font-medium">Média AIH (esp.)</th>
-                      <th className="text-right px-3 py-2 font-medium">Desvio %</th>
-                      <th className="text-right px-3 py-2 font-medium">Diferença</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -598,11 +497,9 @@ const DoctorsSpecialtyComparison: React.FC<DoctorsSpecialtyComparisonProps> = ({
                       <tr key={r.doctorCns || r.doctorName || i} className="hover:bg-slate-50">
                         <td className="px-3 py-2 text-slate-800">{r.doctorName}</td>
                         <td className="px-3 py-2 text-slate-700">{r.specialty || 'Não informado'}</td>
+                        <td className="px-3 py-2 text-slate-700">{r.hospitalName || '—'}</td>
                         <td className="px-3 py-2 text-right text-slate-700">{r.aihCount}</td>
                         <td className="px-3 py-2 text-right font-medium text-slate-900">{formatBRL(r.avgAihValue)}</td>
-                        <td className="px-3 py-2 text-right text-slate-700">{formatBRL(specialtyStats.specialtyAvg)}</td>
-                        <td className={`px-3 py-2 text-right ${r.diffPercent >= 0 ? 'text-rose-600' : 'text-emerald-700'}`}>{(r.diffPercent).toFixed(1)}%</td>
-                        <td className={`px-3 py-2 text-right ${r.diffValue >= 0 ? 'text-rose-600' : 'text-emerald-700'}`}>{formatBRL(Math.abs(r.diffValue))}</td>
                       </tr>
                     ))}
                   </tbody>
