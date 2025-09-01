@@ -466,6 +466,173 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
     }
   };
 
+  // Helper para converter arquivo em dataURL
+  const toDataUrl = async (src: string): Promise<string | null> => {
+    try {
+      const res = await fetch(encodeURI(src));
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(String(reader.result || ''));
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  // Export helper: PDF por hospital (seção)
+  const exportHospitalSectionPdf = async (hospitalName: string, ha: any) => {
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const autoTable = (await import('jspdf-autotable')).default;
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+
+      // Logo (proporção 624x339)
+      const logoData = await toDataUrl('/CIS Sem fundo.jpg');
+      let headerBottomY = 40;
+      if (logoData) {
+        try {
+          const logoW = 120;
+          const logoH = Math.round((logoW / 624) * 339);
+          const logoY = 20;
+          doc.addImage(logoData, 'JPEG', 40, logoY, logoW, logoH);
+          headerBottomY = Math.max(headerBottomY, logoY + logoH);
+        } catch {}
+      }
+
+      // Título e subtítulo
+      const title = 'Relatório — Hospital';
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      const titleY = 40;
+      doc.text(title, 190, titleY);
+      headerBottomY = Math.max(headerBottomY, titleY);
+
+      doc.setFontSize(10);
+      const periodStr = dateRange ? `${dateRange.startDate.toLocaleDateString('pt-BR')} a ${dateRange.endDate.toLocaleDateString('pt-BR')}` : '—';
+      const subtitle = `Hospital: ${hospitalName}  •  Período: ${periodStr}`;
+      const subY = titleY + 18;
+      doc.text(subtitle, 190, subY);
+      headerBottomY = Math.max(headerBottomY, subY);
+
+      // Helpers para seções de página inteira
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const marginX = 40;
+      const contentW = pageW - marginX * 2;
+      const ensureSpace = (y: number) => {
+        if (y > pageH - 80) { doc.addPage(); return 40; }
+        return y;
+      };
+      const drawSectionHeader = (y: number, text: string) => {
+        y = ensureSpace(y);
+        doc.setFillColor(30, 64, 175);
+        doc.rect(marginX, y, contentW, 24, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(11);
+        doc.text(text, marginX + 12, y + 16);
+        doc.setTextColor(0, 0, 0);
+        return y + 32;
+      };
+
+      let startY = headerBottomY + 18;
+
+      // Indicadores
+      startY = drawSectionHeader(startY, 'Indicadores');
+      autoTable(doc, {
+        head: [["AIHs", "Valor médio AIH (BRL)", "Procedimentos", "Total Procedimentos (BRL)"]],
+        body: [[
+          String(ha.metrics?.totalAihs || 0),
+          (ha.metrics?.avgAihValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          String(ha.metrics?.totalProcedures || 0),
+          (ha.metrics?.totalProceduresValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        ]],
+        startY,
+        styles: { fontSize: 9, cellPadding: 6 },
+        headStyles: { fillColor: [237, 242, 255], textColor: [51, 65, 85] },
+        margin: { left: marginX, right: marginX }
+      });
+      // @ts-ignore
+      startY = (doc as any).lastAutoTable.finalY + 16;
+
+      // Seção contínua (sem nova página)
+      // Top especialidades — largura total
+      startY = drawSectionHeader(startY, 'Top especialidades por faturamento');
+      autoTable(doc, {
+        head: [["Especialidade", "Qtde proc.", "Valor total (BRL)"]],
+        body: (ha.topSpecialties || []).map((s: any) => [
+          s.name || '',
+          String(s.procCount || 0),
+          (s.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        ]),
+        startY,
+        styles: { fontSize: 9, cellPadding: 6 },
+        headStyles: { fillColor: [237, 242, 255], textColor: [51, 65, 85] },
+        alternateRowStyles: { fillColor: [245, 247, 255] },
+        margin: { left: marginX, right: marginX }
+      });
+      // @ts-ignore
+      startY = (doc as any).lastAutoTable.finalY + 16;
+
+      // Seção contínua (sem nova página)
+      // Top procedimentos — largura total
+      startY = drawSectionHeader(startY, 'Top procedimentos por valor');
+      autoTable(doc, {
+        head: [["Procedimento", "Qtde", "Valor total (BRL)"]],
+        body: (ha.topProcedures || []).map((p: any) => [
+          `${p.code || '—'} — ${p.desc || ''}`,
+          String(p.count || 0),
+          (p.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        ]),
+        startY,
+        styles: { fontSize: 9, cellPadding: 6 },
+        headStyles: { fillColor: [237, 242, 255], textColor: [51, 65, 85] },
+        alternateRowStyles: { fillColor: [245, 247, 255] },
+        margin: { left: marginX, right: marginX }
+      });
+      // @ts-ignore
+      startY = (doc as any).lastAutoTable.finalY + 16;
+
+      // Seção contínua (sem nova página)
+      // Top médicos — largura total
+      startY = drawSectionHeader(startY, 'Médicos mais performáticos');
+      autoTable(doc, {
+        head: [["Médico", "AIHs", "Procedimentos", "Valor AIH (BRL)", "Ticket médio (BRL)"]],
+        body: (ha.topDoctors || []).map((d: any) => [
+          d.name || '',
+          String(d.totalAihs || 0),
+          String(d.totalProcedures || 0),
+          (d.totalAihValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          (d.avgAihValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        ]),
+        startY,
+        styles: { fontSize: 9, cellPadding: 6 },
+        headStyles: { fillColor: [237, 242, 255], textColor: [51, 65, 85] },
+        alternateRowStyles: { fillColor: [245, 247, 255] },
+        margin: { left: marginX, right: marginX }
+      });
+
+      // Rodapé com numeração de páginas
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        const pageW2 = doc.internal.pageSize.getWidth();
+        const pageH2 = doc.internal.pageSize.getHeight();
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        const ts = new Date().toLocaleString('pt-BR');
+        doc.text(`Página ${i} de ${pageCount}`, pageW2 - 40, pageH2 - 14, { align: 'right' });
+        doc.text(`Gerado em ${ts}`, 40, pageH2 - 14);
+      }
+
+      doc.save(`hospital_${hospitalName.replace(/[^\w\-]+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`);
+    } catch (e) {
+      console.error('Erro ao exportar PDF do hospital:', e);
+    }
+  };
+
   // Especialidades: agregação por especialidade → procedimentos e valores (exclui anestesista)
   const getSpecialtyAnalytics = (doctorsSubset: DoctorWithPatients[]) => {
     const specialtyMap = new Map<string, any>();
@@ -796,6 +963,13 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
                         onClick={() => exportHospitalSectionCsv(h.name, ha)}
                       >
                         <FileSpreadsheet className="h-4 w-4 mr-1" /> Excel
+                      </Button>
+                      <Button
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        size="sm"
+                        onClick={() => exportHospitalSectionPdf(h.name, ha)}
+                      >
+                        PDF
                       </Button>
                     </div>
                   </div>

@@ -343,20 +343,55 @@ const DoctorsSpecialtyComparison: React.FC<DoctorsSpecialtyComparisonProps> = ({
     }
   };
 
+  const toDataUrl = async (src: string): Promise<string | null> => {
+    try {
+      const res = await fetch(encodeURI(src));
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(String(reader.result || ''));
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      return null;
+    }
+  };
+
   const exportTablePdf = async () => {
     try {
       const { default: jsPDF } = await import('jspdf');
       const autoTable = (await import('jspdf-autotable')).default;
       const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
 
+      // Logo (se disponível)
+      const logoData = await toDataUrl('/CIS Sem fundo.jpg');
+      let headerBottomY = 40; // será ajustado
+      if (logoData) {
+        try {
+          // Manter proporção original 624x339 (~1.842)
+          const logoW = 120; // pts
+          const logoH = Math.round((logoW / 624 * 339)); // ~65
+          const logoY = 20;
+          doc.addImage(logoData, 'JPEG', 40, logoY, logoW, logoH);
+          headerBottomY = Math.max(headerBottomY, logoY + logoH);
+        } catch {}
+      }
+
       const title = 'Relatório — Comparativos por Especialidade';
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(14);
-      doc.text(title, 40, 40);
+      const titleY = 40;
+      doc.text(title, 190, titleY);
+      headerBottomY = Math.max(headerBottomY, titleY);
 
       doc.setFontSize(10);
-      const subtitle = `Especialidade: ${effectiveSpecialty !== 'all' ? effectiveSpecialty : 'Todas'}  •  Data: ${new Date().toLocaleDateString('pt-BR')}`;
-      doc.text(subtitle, 40, 58);
+      const period = dateRange ? `${dateRange.startDate.toLocaleDateString('pt-BR')} a ${dateRange.endDate.toLocaleDateString('pt-BR')}` : '—';
+      const subtitle = `Especialidade: ${effectiveSpecialty !== 'all' ? effectiveSpecialty : 'Todas'}  •  Período: ${period}`;
+      const subY = titleY + 18;
+      doc.text(subtitle, 190, subY);
+      headerBottomY = Math.max(headerBottomY, subY);
+      const startY = headerBottomY + 18; // folga para evitar sobreposição
 
       const head = [['Médico', 'Especialidade', 'Hospital', 'AIHs', 'Média AIH (BRL)']];
       const body = tableRows.map(r => [
@@ -370,7 +405,7 @@ const DoctorsSpecialtyComparison: React.FC<DoctorsSpecialtyComparisonProps> = ({
       autoTable(doc, {
         head,
         body,
-        startY: 80,
+        startY,
         styles: { fontSize: 8, cellPadding: 6, overflow: 'linebreak' },
         headStyles: { fillColor: [30, 64, 175] },
         alternateRowStyles: { fillColor: [245, 247, 255] },
