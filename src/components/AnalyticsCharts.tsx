@@ -23,12 +23,69 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
   const [hospRevenue, setHospRevenue] = useState<Array<{ hospital: string; total: number }>>([]);
   const [weeklyRevenue, setWeeklyRevenue] = useState<Array<{ week: string; total: number }>>([]);
   const [procTop, setProcTop] = useState<Array<{ code: string; desc: string; total: number }>>([]);
+  const [specialtyLocal, setSpecialtyLocal] = useState<string>('all');
 
   // Preparos leves (top 6 por ticket médio)
+  // Catálogos locais
+  const specialtyOptions = useMemo(() => {
+    const set = new Set<string>();
+    (doctors || []).forEach(d => {
+      const s = (d.doctor_info.specialty || '').trim();
+      if (s) set.add(s);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [doctors]);
+
+  const hospitalActiveName = useMemo(() => {
+    try {
+      const selectedId = (selectedHospitals && selectedHospitals.length > 0 && !selectedHospitals.includes('all')) ? selectedHospitals[0] : null;
+      if (!selectedId) return 'Hospital (selecionado nos filtros)';
+      // Mapear nome por doctors.hospitals
+      const map = new Map<string, string>();
+      (doctors || []).forEach(d => (d.hospitals || []).forEach((h: any) => { if (h?.hospital_id) map.set(h.hospital_id, h.hospital_name || h.hospital_id); }));
+      return map.get(selectedId) || selectedId;
+    } catch { return 'Hospital'; }
+  }, [doctors, selectedHospitals?.[0]]);
+
+  const wrapLabel = (text: string, max: number = 36): string => {
+    try {
+      const clean = String(text || '').replace(/\s+/g, ' ').trim();
+      if (clean.length <= max) return clean;
+      const parts: string[] = [];
+      let cur = '';
+      clean.split(' ').forEach((w) => {
+        if ((cur + (cur ? ' ' : '') + w).length > max) {
+          if (cur) parts.push(cur);
+          cur = w;
+        } else {
+          cur = cur ? cur + ' ' + w : w;
+        }
+      });
+      if (cur) parts.push(cur);
+      return parts.join('\n');
+    } catch { return text; }
+  };
+
+  const procDescByCode = useMemo(() => {
+    const m: Record<string, string> = {};
+    (procTop || []).forEach(p => { if (p.code) m[p.code] = p.desc || ''; });
+    return m;
+  }, [procTop]);
+
+  // Escopo efetivo conforme filtros locais
+  const scopedDoctors: DoctorWithPatients[] = useMemo(() => {
+    const spec = (specialtyLocal && specialtyLocal !== 'all') ? specialtyLocal.toLowerCase() : undefined;
+    return (doctors || []).map(d => {
+      const matchSpec = !spec || (String(d.doctor_info.specialty || '').toLowerCase() === spec);
+      const pts = d.patients || [];
+      return matchSpec ? { ...d, patients: pts } : { ...d, patients: [] };
+    }).filter(d => (d.patients || []).length > 0);
+  }, [doctors, specialtyLocal]);
+
   // Fallback local ranking (avg AIH by doctor)
   const localRanking = useMemo(() => {
     const byDoctor = new Map<string, { name: string; sum: number; count: number }>();
-    (doctors || []).forEach(d => {
+    (scopedDoctors || []).forEach(d => {
       const key = d.doctor_info.cns || d.doctor_info.name || '';
       const aihs = d.patients || [];
       const sum = aihs.reduce((s, p) => s + (p.total_value_reais || 0), 0);
@@ -38,12 +95,14 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
     const rows = Array.from(byDoctor.entries()).map(([k, v]) => ({ id: k, name: v.name, avg: v.count > 0 ? v.sum / v.count : 0 }));
     rows.sort((a, b) => b.avg - a.avg);
     return rows.slice(0, 8);
-  }, [doctors]);
+  }, [scopedDoctors]);
+
+  const weeklyTotal = useMemo(() => weeklyRevenue.reduce((s, r) => s + (r.total || 0), 0), [weeklyRevenue]);
 
   // Fallback local share (total value by doctor)
   const localShare = useMemo(() => {
     const byDoctor = new Map<string, { name: string; total: number }>();
-    (doctors || []).forEach(d => {
+    (scopedDoctors || []).forEach(d => {
       const key = d.doctor_info.cns || d.doctor_info.name || '';
       const total = (d.patients || []).reduce((s, p) => s + (p.total_value_reais || 0), 0);
       const prev = byDoctor.get(key) || { name: d.doctor_info.name || key, total: 0 };
@@ -54,13 +113,13 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
     const top = rows.slice(0, 6);
     const totalAll = rows.reduce((s, r) => s + r.total, 0) || 1;
     return top.map(r => ({ doctor: r.name, value: r.total, pct: (r.total / totalAll) * 100 }));
-  }, [doctors]);
+  }, [scopedDoctors]);
 
   // Build payload rows and fetch from Python
   useEffect(() => {
     try {
       const rows: AnalyticsRow[] = [];
-      (doctors || []).forEach(d => {
+      (scopedDoctors || []).forEach(d => {
         (d.patients || []).forEach(p => {
           const iso = (p.aih_info as any)?.discharge_date;
           const v = Number(p.total_value_reais || 0);
@@ -94,7 +153,7 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
       setRankingApi(null);
       setShareApi(null);
     }
-  }, [doctors, dateRange?.startDate, dateRange?.endDate, specialty]);
+  }, [scopedDoctors, dateRange?.startDate, dateRange?.endDate, specialty]);
 
   // Agregações por hospital / semana / procedimento (client-side simples)
   useEffect(() => {
@@ -102,7 +161,7 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
       const byHospital = new Map<string, number>();
       const byWeek = new Map<string, number>();
       const byProc = new Map<string, { code: string; desc: string; total: number }>();
-      (doctors || []).forEach(d => {
+      (scopedDoctors || []).forEach(d => {
         (d.patients || []).forEach(p => {
           const iso = (p.aih_info as any)?.discharge_date;
           const hid = (p.aih_info as any)?.hospital_id;
@@ -133,7 +192,7 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
       const procArr = Array.from(byProc.values()).sort((a, b) => b.total - a.total).slice(0, 10);
       setHospRevenue(hospArr); setWeeklyRevenue(weekArr); setProcTop(procArr);
     } catch {}
-  }, [doctors]);
+  }, [scopedDoctors]);
 
   const abbreviate = (name: string) => {
     try { const p = (name||'').split(/\s+/); return p.length>1 ? `${p[0]} ${p[p.length-1][0]}.` : name; } catch { return name; }
@@ -149,9 +208,39 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-slate-600">Especialidade:</div>
-        <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">{specialty && specialty !== 'all' ? specialty : 'Todas'}</Badge>
+      <div className="pb-1">
+        <div className="text-base font-semibold text-slate-800">Análise individual por hospital</div>
+        <div className="text-xs text-slate-500 flex items-center gap-2">
+          <span>Contexto:</span>
+          <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200 text-xs">{hospitalActiveName}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Especialidade</label>
+          <div className="flex items-center gap-2">
+            <select
+              value={specialtyLocal}
+              onChange={(e) => setSpecialtyLocal(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm h-9"
+            >
+              <option value="all">Todas</option>
+              {specialtyOptions.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            {specialtyLocal !== 'all' && (
+              <button
+                onClick={() => setSpecialtyLocal('all')}
+                className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                title="Limpar"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Ranking por ticket médio (barras) */}
@@ -164,12 +253,12 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
             <div className="text-xs text-slate-400">Sem dados</div>
           ) : (
             <ReactECharts
-              style={{ height: 220 }}
+              style={{ height: 520 }}
               option={{
-                grid: { left: 40, right: 20, top: 10, bottom: 40 },
+                grid: { left: 50, right: 20, top: 10, bottom: 260 },
                 tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: (v: any) => formatBRL(Number(v || 0)) },
-                xAxis: { type: 'category', data: ranking.map(r => abbreviate(r.name)), axisLabel: { rotate: 35 } },
-                yAxis: { type: 'value' },
+                xAxis: { type: 'category', data: ranking.map(r => r.name), axisLabel: { rotate: 90, fontSize: 11, interval: 0, align: 'right', margin: 10 } },
+                yAxis: { type: 'value', axisLabel: { fontSize: 12 } },
                 series: [{ type: 'bar', data: ranking.map(r => r.avg), itemStyle: { color: '#3B82F6' } }]
               }}
             />
@@ -190,7 +279,7 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
               style={{ height: 220 }}
               option={{
                 tooltip: { trigger: 'item', valueFormatter: (v: any) => formatBRL(Number(v || 0)) },
-                legend: { orient: 'vertical', right: 10, top: 20 },
+                legend: { orient: 'vertical', right: 10, top: 20, textStyle: { fontSize: 12 } },
                 series: [{
                   type: 'pie', radius: ['40%', '70%'],
                   data: share.slice(0, 6).map(s => ({ name: abbreviate(s.doctor), value: s.value })),
@@ -202,26 +291,6 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
         </CardContent>
       </Card>
 
-      {/* Faturamento por hospital (Top 10) */}
-      <Card className="border-slate-200">
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Faturamento por hospital (Top 10)</CardTitle></CardHeader>
-        <CardContent>
-          {hospRevenue.length === 0 ? (
-            <div className="text-xs text-slate-400">Sem dados</div>
-          ) : (
-            <ReactECharts
-              style={{ height: 240 }}
-              option={{
-                grid: { left: 120, right: 20, top: 10, bottom: 20 },
-                tooltip: { trigger: 'axis', valueFormatter: (v: any) => formatBRL(Number(v || 0)) },
-                xAxis: { type: 'value' },
-                yAxis: { type: 'category', data: hospRevenue.map(h => h.hospital) },
-                series: [{ type: 'bar', data: hospRevenue.map(h => h.total), itemStyle: { color: '#10B981' } }]
-              }}
-            />
-          )}
-        </CardContent>
-      </Card>
 
       {/* Faturamento semanal */}
       <Card className="border-slate-200">
@@ -231,13 +300,31 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
             <div className="text-xs text-slate-400">Sem dados</div>
           ) : (
             <ReactECharts
-              style={{ height: 220 }}
+              style={{ height: 240 }}
               option={{
-                grid: { left: 40, right: 20, top: 10, bottom: 40 },
+                grid: { left: 60, right: 20, top: 10, bottom: 50, containLabel: true },
                 tooltip: { trigger: 'axis', valueFormatter: (v: any) => formatBRL(Number(v || 0)) },
-                xAxis: { type: 'category', data: weeklyRevenue.map(w => w.week), axisLabel: { rotate: 35 } },
-                yAxis: { type: 'value' },
-                series: [{ type: 'line', data: weeklyRevenue.map(w => w.total), smooth: true, areaStyle: {} }]
+                xAxis: { type: 'category', data: weeklyRevenue.map(w => w.week), axisLabel: { rotate: 30, fontSize: 12, interval: 0 } },
+                yAxis: { type: 'value', axisLabel: { fontSize: 12, margin: 8 } },
+                series: [{ type: 'line', data: weeklyRevenue.map(w => w.total), smooth: true, areaStyle: {} }],
+                graphic: [
+                  {
+                    type: 'text',
+                    right: 12,
+                    top: 12,
+                    style: {
+                      text: `Total: ${formatBRL(weeklyTotal)}`,
+                      fontSize: 12,
+                      fill: '#334155',
+                      fontWeight: 600,
+                      backgroundColor: '#F1F5F9',
+                      borderColor: '#CBD5E1',
+                      borderWidth: 1,
+                      borderRadius: 6,
+                      padding: [4, 8]
+                    }
+                  }
+                ]
               }}
             />
           )}
@@ -254,10 +341,18 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
             <ReactECharts
               style={{ height: 240 }}
               option={{
-                grid: { left: 200, right: 20, top: 10, bottom: 20 },
-                tooltip: { trigger: 'axis', valueFormatter: (v: any) => formatBRL(Number(v || 0)) },
-                xAxis: { type: 'value' },
-                yAxis: { type: 'category', data: procTop.map(p => `${p.code} — ${p.desc}`) },
+                grid: { left: 220, right: 20, top: 10, bottom: 20 },
+                tooltip: { 
+                  trigger: 'item',
+                  formatter: (p: any) => {
+                    const code = String(p?.name ?? '');
+                    const desc = procDescByCode[code] || '';
+                    const val = Number(p?.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                    return `<div><div><b>${code}</b></div><div>${desc}</div><div>${val}</div></div>`;
+                  }
+                },
+                xAxis: { type: 'value', axisLabel: { fontSize: 12 } },
+                yAxis: { type: 'category', data: procTop.map(p => p.code), axisLabel: { interval: 0, fontSize: 12 } },
                 series: [{ type: 'bar', data: procTop.map(p => p.total), itemStyle: { color: '#3B82F6' } }]
               }}
             />

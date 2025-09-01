@@ -315,6 +315,81 @@ const DoctorsSpecialtyComparison: React.FC<DoctorsSpecialtyComparisonProps> = ({
   const doctorA = compareOptions.find(d => d.doctorCns === compareA || d.doctorName === compareA);
   const doctorB = compareOptions.find(d => d.doctorCns === compareB || d.doctorName === compareB);
 
+  const exportTableCsv = () => {
+    try {
+      const lines: string[] = [];
+      const quote = (t: any) => `"${String(t ?? '').replace(/"/g, '""')}"`;
+      const toDec = (n: any) => String(Number(n || 0).toFixed(2)).replace('.', ',');
+      lines.push(['Médico', 'Especialidade', 'Hospital', 'AIHs', 'Média AIH (BRL)'].join(';'));
+      tableRows.forEach(r => {
+        lines.push([
+          quote(r.doctorName),
+          quote(r.specialty || ''),
+          quote(r.hospitalName || ''),
+          String(r.aihCount || 0),
+          toDec(r.avgAihValue || 0)
+        ].join(';'));
+      });
+      const csv = '\uFEFF' + lines.join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `comparativos_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Erro ao exportar CSV Comparativos:', e);
+    }
+  };
+
+  const exportTablePdf = async () => {
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const autoTable = (await import('jspdf-autotable')).default;
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+
+      const title = 'Relatório — Comparativos por Especialidade';
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text(title, 40, 40);
+
+      doc.setFontSize(10);
+      const subtitle = `Especialidade: ${effectiveSpecialty !== 'all' ? effectiveSpecialty : 'Todas'}  •  Data: ${new Date().toLocaleDateString('pt-BR')}`;
+      doc.text(subtitle, 40, 58);
+
+      const head = [['Médico', 'Especialidade', 'Hospital', 'AIHs', 'Média AIH (BRL)']];
+      const body = tableRows.map(r => [
+        r.doctorName,
+        r.specialty || '',
+        r.hospitalName || '',
+        String(r.aihCount || 0),
+        (r.avgAihValue || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      ]);
+
+      autoTable(doc, {
+        head,
+        body,
+        startY: 80,
+        styles: { fontSize: 8, cellPadding: 6, overflow: 'linebreak' },
+        headStyles: { fillColor: [30, 64, 175] },
+        alternateRowStyles: { fillColor: [245, 247, 255] },
+        columnStyles: {
+          0: { cellWidth: 220 }, // Médico
+          1: { cellWidth: 140 }, // Especialidade
+          2: { cellWidth: 180 }, // Hospital
+          3: { cellWidth: 60, halign: 'right' },
+          4: { cellWidth: 100, halign: 'right' }
+        },
+        margin: { left: 40, right: 40 }
+      });
+
+      doc.save(`comparativos_${new Date().toISOString().slice(0,10)}.pdf`);
+    } catch (e) {
+      console.error('Erro ao gerar PDF Comparativos:', e);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card className="border-slate-200">
@@ -441,12 +516,28 @@ const DoctorsSpecialtyComparison: React.FC<DoctorsSpecialtyComparisonProps> = ({
       <Card className="border-slate-200">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center justify-between">
-            <span>Médicos na especialidade {effectiveSpecialty !== 'all' ? `“${effectiveSpecialty}”` : '(todas)'} — média vs. desvio</span>
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <span>AIHs:</span>
-              <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">{specialtyStats.totalAihs}</Badge>
-              <span>Média da especialidade:</span>
-              <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">{formatBRL(specialtyStats.specialtyAvg)}</Badge>
+            <span>Médicos na especialidade {effectiveSpecialty !== 'all' ? `“${effectiveSpecialty}”` : '(todas)'} — tabela</span>
+            <div className="flex items-center gap-2">
+              <div className="hidden md:flex items-center gap-2 text-xs text-slate-600">
+                <span>AIHs:</span>
+                <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">{specialtyStats.totalAihs}</Badge>
+              </div>
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
+                size="sm"
+                onClick={exportTableCsv}
+                title="Exportar CSV do resultado filtrado"
+              >
+                Exportar CSV
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                size="sm"
+                onClick={exportTablePdf}
+                title="Exportar PDF do resultado filtrado"
+              >
+                Exportar PDF
+              </Button>
             </div>
           </CardTitle>
         </CardHeader>
