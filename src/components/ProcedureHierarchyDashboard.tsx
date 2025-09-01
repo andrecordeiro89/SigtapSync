@@ -952,6 +952,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
             dateRange={dateRange}
             doctors={filteredDoctors}
             specialty={selectedSpecialty}
+            selectedHospitals={selectedHospitals}
           />
         </TabsContent>
       </Tabs>
