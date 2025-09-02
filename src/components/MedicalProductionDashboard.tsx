@@ -1990,6 +1990,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   <div className="font-medium text-slate-800">
                                                     {(/procedimento/i.test(patient.patient_info.name) || /\b\d{2}\.\d{2}\.\d{2}\.\d{3}-\d\b/.test(patient.patient_info.name)) ? 'Nome não disponível' : patient.patient_info.name}
                                                   </div>
+                                                  {patient.common_name && (
+                                                    <Badge 
+                                                      variant="outline" 
+                                                      className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] px-2 py-0.5"
+                                                    >
+                                                      {patient.common_name}
+                                                    </Badge>
+                                                  )}
                                                   {(() => {
                                                     const doctorKeyLocal = doctor.doctor_info.cns;
                                                     const procTermRawLocal = (procedureSearchTerm.get(doctorKeyLocal) || '').toLowerCase().trim();

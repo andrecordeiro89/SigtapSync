@@ -39,6 +39,8 @@ export interface PatientWithProcedures {
     care_character?: string;
     hospital_id?: string;
   };
+  // 🆕 Nome Comum de procedimentos (rótulo amigável): ex. "A+A"
+  common_name?: string | null;
   total_value_reais: number;
   procedures: ProcedureDetail[];
   total_procedures: number;
@@ -246,6 +248,13 @@ export class DoctorPatientService {
         patient.procedures = mapped.sort((a: any, b: any) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime());
         patient.total_procedures = patient.procedures.length;
         patient.approved_procedures = patient.procedures.filter((pp: any) => pp.approved).length;
+        // 🆕 Resolver Nome Comum com base nos códigos do paciente
+        try {
+          const { resolveCommonProcedureName } = await import('../utils/commonProcedureName');
+          const codes = patient.procedures.map((pp: any) => pp.procedure_code).filter(Boolean);
+          const doctorSpecialty = (doctor.doctor_info?.specialty || '').trim() || undefined;
+          patient.common_name = resolveCommonProcedureName(codes, doctorSpecialty, patient.procedures);
+        } catch {}
       }
 
       const result = Array.from(doctorMap.values()).map((d: any) => ({
@@ -423,6 +432,15 @@ export class DoctorPatientService {
         patient.procedures.sort((a, b) => 
           new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime()
         );
+        // 🆕 Garantir Nome Comum após ordenação (se ainda não definido)
+        if (!patient.common_name) {
+          const codes = patient.procedures.map(pp => pp.procedure_code).filter(Boolean);
+          const doctorSpecialty = (doctor.doctor_info?.specialty || '').trim() || undefined;
+          try {
+            const { resolveCommonProcedureName } = require('../utils/commonProcedureName');
+            patient.common_name = resolveCommonProcedureName(codes, doctorSpecialty, patient.procedures);
+          } catch {}
+        }
       });
 
       const result: DoctorPatientData = {

@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { ProcedureRecordsService } from './simplifiedProcedureService';
+import { resolveCommonProcedureName } from '../utils/commonProcedureName';
 import type { DoctorWithPatients, ProcedureDetail } from './doctorPatientService';
 
 export interface HierarchyFilters {
@@ -208,6 +209,12 @@ export class DoctorsHierarchyV2Service {
         patient.procedures = mapped.sort((a: any, b: any) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime());
         patient.total_procedures = patient.procedures.length;
         patient.approved_procedures = patient.procedures.filter(pp => pp.approved).length;
+        // 🆕 Resolver Nome Comum (ex.: "A+A") baseado nos códigos e na especialidade do médico
+        try {
+          const codes = patient.procedures.map(pp => pp.procedure_code).filter(Boolean);
+          const doctorSpecialty = (card.doctor_info?.specialty || '').trim() || undefined;
+          (patient as any).common_name = resolveCommonProcedureName(codes, doctorSpecialty, patient.procedures);
+        } catch {}
       } else {
         // Garantir arrays vazios se não houver procedimentos (evitar estado sujo na troca de abas)
         patient.procedures = [];
