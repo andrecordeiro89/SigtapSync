@@ -15,6 +15,10 @@ export type CommonNameRule = {
 	// Opcional: exige exclusividade entre os procedimentos médicos "04".
 	// Se definido, todos os códigos iniciados por '04' do paciente devem pertencer a este conjunto.
 	allowedOnlyWithinMedical04Codes?: string[];
+	// Opcional: se qualquer um destes códigos estiver presente, a regra NÃO se aplica
+	excludeAnyOf?: string[];
+	// Opcional: exige pelo menos N ocorrências de códigos em anyOf
+	minAnyOfCount?: number;
 };
 
 // Regras iniciais (exemplo do usuário):
@@ -499,18 +503,7 @@ export const COMMON_PROCEDURE_NAME_RULES: CommonNameRule[] = [
 	// 🆕 HIDROCELE — Urologia
 	{
 		label: "HIDROCELE",
-		primaryAnyOf: [
-			"04.09.04.021-5" // TRATAMENTO CIRÚRGICO DE HIDROCELE
-		],
 		anyOf: [
-			"04.09.04.009-6", // EXPLORAÇÃO CIRÚRGICA DA BOLSA ESCROTAL
-			"04.09.04.012-6", // ORQUIDOPEXIA BILATERAL
-			"04.09.04.013-4", // ORQUIDOPEXIA UNILATERAL
-			"04.09.04.017-7", // PLÁSTICA DA BOLSA ESCROTAL
-			"04.09.04.019-3", // RESSECÇÃO PARCIAL DA BOLSA ESCROTAL
-			"04.09.04.021-5"  // TRATAMENTO CIRÚRGICO DE HIDROCELE
-		],
-		allowedOnlyWithinMedical04Codes: [
 			"04.09.04.009-6",
 			"04.09.04.012-6",
 			"04.09.04.013-4",
@@ -518,6 +511,7 @@ export const COMMON_PROCEDURE_NAME_RULES: CommonNameRule[] = [
 			"04.09.04.019-3",
 			"04.09.04.021-5"
 		],
+		minAnyOfCount: 3,
 		specialties: ["Urologia", "Urologista"]
 	},
 	// 🆕 HISTERECTOMIA — Ginecologia
@@ -554,6 +548,769 @@ export const COMMON_PROCEDURE_NAME_RULES: CommonNameRule[] = [
 			"Obstetrícia",
 			"Ginecologista"
 		]
+	},
+	// 🆕 LAQUEADURA — Ginecologia
+	{
+		label: "LAQUEADURA",
+		primaryAnyOf: [
+			"04.09.06.031-3" // LAQUEADURA TUBÁRIA NA MESMA INTERNAÇÃO DE PARTO NORMAL
+		],
+		anyOf: [
+			"04.09.06.031-3"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.06.031-3"
+		],
+		specialties: [
+			"Ginecologia e Obstetrícia",
+			"Ginecologia",
+			"Obstetrícia",
+			"Ginecologista"
+		]
+	},
+	// 🆕 MENISCECTOMIA SIMPLES — Ortopedia e Traumatologia
+	{
+		label: "MENISCECTOMIA SIMPLES",
+		anyOf: [
+			"04.08.05.089-6",
+			"04.08.06.071-9"
+		],
+		// Se houver LCA, não rotular como Meniscectomia
+		excludeAnyOf: ["04.08.05.016-0"],
+		specialties: [
+			"Ortopedia",
+			"Traumatologia",
+			"Ortopedia e Traumatologia",
+			"Ortopedista"
+		]
+	},
+	// 🆕 MÃO OUTRAS — Ortopedia e Traumatologia
+	{
+		label: "MÃO OUTRAS",
+		primaryAnyOf: [
+			"04.01.02.005-3", // EXCISÃO/SUTURA DE LESÃO NA PELE c/ plástica em Z/rotação de retalho
+			"04.03.02.007-7", // NEUROLISE NÃO FUNCIONAL DE NERVOS PERIFÉRICOS
+			"04.08.02.030-0", // TENOSINOVECTOMIA EM MEMBRO SUPERIOR
+			"04.08.06.014-0", // FASCIECTOMIA
+			"04.08.06.031-0", // RESSECÇÃO SIMPLES DE TUMOR ÓSSEO/PARTES MOLES
+			"04.08.06.033-6", // RETIRADA DE CORPO ESTRANHO INTRA-ÓSSEO
+			"04.08.06.044-1"  // TENÓLISE
+		],
+		anyOf: [
+			"04.01.02.005-3",
+			"04.03.02.007-7",
+			"04.08.02.030-0",
+			"04.08.06.014-0",
+			"04.08.06.031-0",
+			"04.08.06.033-6",
+			"04.08.06.044-1"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.01.02.005-3",
+			"04.03.02.007-7",
+			"04.08.02.030-0",
+			"04.08.06.014-0",
+			"04.08.06.031-0",
+			"04.08.06.033-6",
+			"04.08.06.044-1"
+		],
+		specialties: [
+			"Ortopedia",
+			"Traumatologia",
+			"Ortopedia e Traumatologia",
+			"Ortopedista"
+		]
+	},
+	// 🆕 NEFRECTOMIA — Urologia
+	{
+		label: "NEFRECTOMIA",
+		primaryAnyOf: [
+			"04.09.01.021-9" // NEFRECTOMIA TOTAL
+		],
+		anyOf: [
+			"04.09.01.021-9",
+			"04.09.01.006-5" // CISTOLITOTOMIA/RETIRADA DE CORPO ESTRANHO DA BEXIGA (relacionado)
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 OMBRO - LATARJET (TRATAMENTO DE INSTABILIDADE) — Ortopedia e Traumatologia
+	{
+		label: "OMBRO - LATARJET (TRATAMENTO DE INSTABILIDADE)",
+		primaryAnyOf: [
+			"04.08.01.021-5" // TRATAMENTO CIRÚRGICO DE LUXAÇÃO RECIDIVANTE/HABITUAL DE ARTICULAÇÃO ESCÁPULO-UMERAL
+		],
+		anyOf: [
+			"04.08.01.010-0", // OSTECTOMIA DA CLAVÍCULA OU DA ESCÁPULA
+			"04.08.01.011-8", // OSTEOTOMIA DA CLAVÍCULA OU DA ESCÁPULA
+			"04.08.01.014-2", // REPARO DE ROTURA DO MANGUITO ROTADOR
+			"04.08.01.021-5", // TRATAMENTO CIRÚRGICO DE LUXAÇÃO RECIDIVANTE/HABITUAL DO OMBRO
+			"04.08.01.023-1", // TRATAMENTO DA SÍNDROME DO IMPACTO SUB-ACROMIAL
+			"04.08.06.008-5", // BURSECTOMIA
+			"04.08.06.043-3", // TENODESE
+			"04.08.06.046-8", // TENOMIOTOMIA/DESINSERÇÃO
+			"04.08.06.047-6", // TENOPLASTIA/ENXERTO DE TENDÃO ÚNICO
+			"04.08.06.048-4", // TENORRAFIA ÚNICA EM TÚNEL ÓSTEO-FIBROSO
+			"04.08.06.053-0"  // TRANSPOSIÇÃO/TRANSFERÊNCIA MIOTENDINOSA MÚLTIPLA
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.08.01.010-0",
+			"04.08.01.011-8",
+			"04.08.01.014-2",
+			"04.08.01.021-5",
+			"04.08.01.023-1",
+			"04.08.06.008-5",
+			"04.08.06.043-3",
+			"04.08.06.046-8",
+			"04.08.06.047-6",
+			"04.08.06.048-4",
+			"04.08.06.053-0"
+		],
+		specialties: [
+			"Ortopedia",
+			"Traumatologia",
+			"Ortopedia e Traumatologia",
+			"Ortopedista"
+		]
+	},
+	// 🆕 OMBRO VÍDEO — Ortopedia e Traumatologia
+	{
+		label: "OMBRO VÍDEO",
+		primaryAnyOf: [
+			"04.08.01.010-0", // OSTECTOMIA DA CLAVÍCULA/ESCÁPULA
+			"04.08.01.014-2", // REPARO DO MANGUITO ROTADOR
+			"04.08.01.023-1", // IMPACTO SUB-ACROMIAL
+			"04.08.06.008-5", // BURSECTOMIA
+			"04.08.06.043-3", // TENODESE
+			"04.08.06.046-8", // TENOMIOTOMIA/DESINSERÇÃO
+			"04.08.06.047-6", // TENOPLASTIA/ENXERTO DE TENDÃO ÚNICO
+			"04.08.06.048-4"  // TENORRAFIA ÚNICA EM TÚNEL ÓSTEO-FIBROSO
+		],
+		anyOf: [
+			"04.08.01.010-0",
+			"04.08.01.014-2",
+			"04.08.01.023-1",
+			"04.08.06.008-5",
+			"04.08.06.043-3",
+			"04.08.06.046-8",
+			"04.08.06.047-6",
+			"04.08.06.048-4"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.08.01.010-0",
+			"04.08.01.014-2",
+			"04.08.01.023-1",
+			"04.08.06.008-5",
+			"04.08.06.043-3",
+			"04.08.06.046-8",
+			"04.08.06.047-6",
+			"04.08.06.048-4"
+		],
+		specialties: [
+			"Ortopedia",
+			"Traumatologia",
+			"Ortopedia e Traumatologia",
+			"Ortopedista"
+		]
+	},
+	// 🆕 ORQUIDOPEXIA — Urologia
+	{
+		label: "ORQUIDOPEXIA",
+		primaryAnyOf: [
+			"04.09.04.012-6", // ORQUIDOPEXIA BILATERAL
+			"04.09.04.013-4"  // ORQUIDOPEXIA UNILATERAL
+		],
+		anyOf: [
+			"04.09.04.003-7", // EPIDIDIMECTOMIA
+			"04.09.04.009-6", // EXPLORAÇÃO CIRÚRGICA DA BOLSA ESCROTAL
+			"04.09.04.012-6", // ORQUIDOPEXIA BILATERAL
+			"04.09.04.013-4", // ORQUIDOPEXIA UNILATERAL
+			"04.09.04.018-5"  // REPARAÇÃO/PLÁSTICA DO TESTÍCULO
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.04.003-7",
+			"04.09.04.009-6",
+			"04.09.04.012-6",
+			"04.09.04.013-4",
+			"04.09.04.018-5"
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 ORQUIECTOMIA — Urologia
+	{
+		label: "ORQUIECTOMIA",
+		primaryAnyOf: [
+			"04.09.04.016-9" // ORQUIECTOMIA UNILATERAL
+		],
+		anyOf: [
+			"04.09.04.016-9"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.04.016-9"
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 ORTOPEDIA OUTRAS — Ortopedia e Traumatologia
+	{
+		label: "ORTOPEDIA OUTRAS",
+		primaryAnyOf: [
+			"04.03.02.007-7", // NEUROLISE NÃO FUNCIONAL DE NERVOS PERIFÉRICOS
+			"04.03.02.010-7", // TRANSPOSIÇÃO DO NERVO CUBITAL
+			"04.08.05.005-5", // ARTROPLASTIA TOTAL DE JOELHO - REVISÃO/RECONSTRUÇÃO
+			"04.08.06.004-2", // AMPUTAÇÃO/DESARTICULAÇÃO DE DEDO
+			"04.08.06.031-0", // RESSECÇÃO SIMPLES DE TUMOR ÓSSEO/DE PARTES MOLES
+			"04.08.06.032-8", // RETIRADA DE CORPO ESTRANHO INTRA-ARTICULAR
+			"04.08.06.033-6", // RETIRADA DE CORPO ESTRANHO INTRA-ÓSSEO
+			"04.08.06.034-4", // RETIRADA DE ESPAÇADORES/OUTROS MATERIAIS
+			"04.08.06.035-2", // RETIRADA DE FIO OU PINO INTRA-ÓSSEO
+			"04.08.06.043-3", // TENODESE
+			"04.15.04.003-5"  // DEBRIDAMENTO DE ÚLCERA/TECIDOS DESVITALIZADOS
+		],
+		anyOf: [
+			"04.03.02.007-7",
+			"04.03.02.010-7",
+			"04.08.05.005-5",
+			"04.08.06.004-2",
+			"04.08.06.031-0",
+			"04.08.06.032-8",
+			"04.08.06.033-6",
+			"04.08.06.034-4",
+			"04.08.06.035-2",
+			"04.08.06.043-3",
+			"04.15.04.003-5"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.03.02.007-7",
+			"04.03.02.010-7",
+			"04.08.05.005-5",
+			"04.08.06.004-2",
+			"04.08.06.031-0",
+			"04.08.06.032-8",
+			"04.08.06.033-6",
+			"04.08.06.034-4",
+			"04.08.06.035-2",
+			"04.08.06.043-3",
+			"04.15.04.003-5"
+		],
+		specialties: [
+			"Ortopedia",
+			"Traumatologia",
+			"Ortopedia e Traumatologia",
+			"Ortopedista"
+		]
+	},
+	// 🆕 PARTO CESAREANO — Ginecologia
+	{
+		label: "PARTO CESAREANO",
+		primaryAnyOf: [
+			"04.11.01.003-4", // PARTO CESARIANO
+			"04.11.01.004-2"  // PARTO CESARIANO c/ LAQUEADURA TUBÁRIA
+		],
+		anyOf: [
+			"04.11.01.003-4",
+			"04.11.01.004-2"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.11.01.003-4",
+			"04.11.01.004-2"
+		],
+		specialties: [
+			"Ginecologia e Obstetrícia",
+			"Ginecologia",
+			"Obstetrícia",
+			"Ginecologista"
+		]
+	},
+	// 🆕 PERÍNEO — Ginecologia
+	{
+		label: "PERÍNEO",
+		primaryAnyOf: [
+			"04.09.07.003-3", // COLPOCLEISE (CIRURGIA DE LE FORT)
+			"04.09.07.005-0", // COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR
+			"04.09.07.009-2"  // COLPORRAFIA NÃO OBSTÉTRICA
+		],
+		anyOf: [
+			"04.09.07.003-3",
+			"04.09.07.005-0",
+			"04.09.07.009-2"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.07.003-3",
+			"04.09.07.005-0",
+			"04.09.07.009-2"
+		],
+		specialties: [
+			"Ginecologia e Obstetrícia",
+			"Ginecologia",
+			"Obstetrícia",
+			"Ginecologista"
+		]
+	},
+	// 🆕 PERÍNEO COM SLING — Ginecologia
+	{
+		label: "PERÍNEO COM SLING",
+		primaryAnyOf: [
+			"04.01.02.010-0", // EXTIRPAÇÃO/SUPRESSÃO DE LESÃO DE PELE E TCS
+			"04.09.07.005-0", // COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR
+			"04.09.07.009-2", // COLPORRAFIA NÃO OBSTÉTRICA
+			"04.09.07.027-0"  // TRATAMENTO CIRÚRGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL
+		],
+		anyOf: [
+			"04.01.02.010-0",
+			"04.09.07.005-0",
+			"04.09.07.009-2",
+			"04.09.07.027-0"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.01.02.010-0",
+			"04.09.07.005-0",
+			"04.09.07.009-2",
+			"04.09.07.027-0"
+		],
+		specialties: [
+			"Ginecologia e Obstetrícia",
+			"Ginecologia",
+			"Obstetrícia",
+			"Ginecologista"
+		]
+	},
+	// 🆕 PLÁSTICA DE PÊNIS — Urologia
+	{
+		label: "PLÁSTICA DE PÊNIS",
+		primaryAnyOf: [
+			"04.09.05.007-5" // PLÁSTICA TOTAL DO PÊNIS
+		],
+		anyOf: [
+			"04.09.02.007-9", // MEATOTOMIA SIMPLES
+			"04.09.05.007-5", // PLÁSTICA TOTAL DO PÊNIS
+			"04.09.05.008-3"  // POSTECTOMIA
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.02.007-9",
+			"04.09.05.007-5",
+			"04.09.05.008-3"
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 POSTECTOMIA — Urologia
+	{
+		label: "POSTECTOMIA",
+		anyOf: [
+			"04.09.05.008-3" // POSTECTOMIA
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 PROSTATECTOMIA SUPRAPÚBICA — Urologia
+	{
+		label: "PROSTATECTOMIA SUPRAPÚBICA",
+		anyOf: [
+			"04.09.03.002-3" // PROSTATECTOMIA SUPRAPÚBICA
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 PRÓTESE DE JOELHO — Ortopedia e Traumatologia
+	{
+		label: "PRÓTESE DE JOELHO",
+		primaryAnyOf: [
+			"04.08.05.005-5", // ARTROPLASTIA TOTAL DE JOELHO - REVISÃO/RECONSTRUÇÃO
+			"04.08.05.006-3"  // ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO
+		],
+		anyOf: [
+			"04.08.05.005-5",
+			"04.08.05.006-3"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.08.05.005-5",
+			"04.08.05.006-3"
+		],
+		specialties: [
+			"Ortopedia",
+			"Traumatologia",
+			"Ortopedia e Traumatologia",
+			"Ortopedista"
+		]
+	},
+	// 🆕 PRÓTESE DE QUADRIL — Ortopedia e Traumatologia
+	{
+		label: "PRÓTESE DE QUADRIL",
+		primaryAnyOf: [
+			"04.08.04.009-2" // ARTROPLASTIA TOTAL PRIMÁRIA DO QUADRIL NÃO CIMENTADA/HÍBRIDA
+		],
+		anyOf: [
+			"04.08.04.009-2"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.08.04.009-2"
+		],
+		specialties: [
+			"Ortopedia",
+			"Traumatologia",
+			"Ortopedia e Traumatologia",
+			"Ortopedista"
+		]
+	},
+	// 🆕 PSEUDOARTOSE DO ANTEBRAÇO — Ortopedia e Traumatologia
+	{
+		label: "PSEUDOARTOSE DO ANTEBRAÇO",
+		primaryAnyOf: [
+			"04.08.02.058-0" // TRATAMENTO CIRÚRGICO DE PSEUDARTROSE AO NÍVEL DO COTOVELO
+		],
+		anyOf: [
+			"04.03.02.010-7", // TRANSPOSIÇÃO DO NERVO CUBITAL
+			"04.08.02.058-0", // PSEUDARTROSE AO NÍVEL DO COTOVELO
+			"04.15.04.003-5"  // DEBRIDAMENTO DE ÚLCERA/TECIDOS DESVITALIZADOS
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.03.02.010-7",
+			"04.08.02.058-0",
+			"04.15.04.003-5"
+		],
+		specialties: [
+			"Ortopedia",
+			"Traumatologia",
+			"Ortopedia e Traumatologia",
+			"Ortopedista"
+		]
+	},
+	// 🆕 PSEUDOARTROSE DE CLAVÍCULA — Ortopedia e Traumatologia
+	{
+		label: "PSEUDOARTROSE DE CLAVÍCULA",
+		primaryAnyOf: [
+			"04.08.01.022-3" // TRATAMENTO CIRÚRGICO DE RETARDO DE CONSOLIDAÇÃO/PSEUDARTROSE DE CLAVÍCULA/ESCÁPULA
+		],
+		anyOf: [
+			"04.08.01.022-3",
+			"04.15.04.003-5"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.08.01.022-3",
+			"04.15.04.003-5"
+		],
+		specialties: [
+			"Ortopedia",
+			"Traumatologia",
+			"Ortopedia e Traumatologia",
+			"Ortopedista"
+		]
+	},
+	// 🆕 RECONSTRUÇÃO DO LCA — Ortopedia e Traumatologia
+	{
+		label: "RECONSTRUÇÃO DO LCA",
+		anyOf: [
+			"04.08.05.016-0" // RECONSTRUÇÃO LIGAMENTAR INTRA-ARTICULAR DO JOELHO (LCA)
+		],
+		specialties: [
+			"Ortopedia",
+			"Traumatologia",
+			"Ortopedia e Traumatologia",
+			"Ortopedista"
+		]
+	},
+	// 🆕 RETIRADA DE MATERIAL DE SÍNTESE — Ortopedia e Traumatologia
+	{
+		label: "RETIRADA DE MATERIAL DE SÍNTESE",
+		primaryAnyOf: [
+			"04.08.06.015-8", // MANIPULAÇÃO ARTICULAR
+			"04.08.06.035-2", // RETIRADA DE FIO OU PINO INTRA-ÓSSEO
+			"04.08.06.037-9", // RETIRADA DE PLACA E/OU PARAFUSOS
+			"04.08.06.044-1", // TENÓLISE
+			"04.15.04.003-5"  // DEBRIDAMENTO DE ÚLCERA/TECIDOS DESVITALIZADOS
+		],
+		anyOf: [
+			"04.08.06.015-8",
+			"04.08.06.035-2",
+			"04.08.06.037-9",
+			"04.08.06.044-1",
+			"04.15.04.003-5"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.08.06.015-8",
+			"04.08.06.035-2",
+			"04.08.06.037-9",
+			"04.08.06.044-1",
+			"04.15.04.003-5"
+		],
+		specialties: [
+			"Ortopedia",
+			"Traumatologia",
+			"Ortopedia e Traumatologia",
+			"Ortopedista"
+		]
+	},
+	// 🆕 RTU BEXIGA — Urologia
+	{
+		label: "RTU BEXIGA",
+		primaryAnyOf: [
+			"04.09.01.038-3" // RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL
+		],
+		anyOf: [
+			"04.09.01.038-3",
+			"04.09.02.017-6"  // URETROTOMIA INTERNA
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.01.038-3",
+			"04.09.02.017-6"
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 RTU PRÓSTATA — Urologia
+	{
+		label: "RTU PRÓSTATA",
+		primaryAnyOf: [
+			"04.09.03.004-0" // RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA
+		],
+		anyOf: [
+			"04.09.01.006-5", // CISTOLITOTOMIA/RETIRADA DE CORPO ESTRANHO DA BEXIGA
+			"04.09.01.009-0", // CISTOSTOMIA
+			"04.09.01.018-9", // LITOTRIPSIA
+			"04.09.01.038-3", // RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL
+			"04.09.02.007-9", // MEATOTOMIA SIMPLES
+			"04.09.02.017-6", // URETROTOMIA INTERNA
+			"04.09.03.004-0", // RTU DE PRÓSTATA
+			"04.09.04.013-4", // ORQUIDOPEXIA UNILATERAL
+			"04.09.04.021-5"  // TRATAMENTO CIRÚRGICO DE HIDROCELE
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.01.006-5",
+			"04.09.01.009-0",
+			"04.09.01.018-9",
+			"04.09.01.038-3",
+			"04.09.02.007-9",
+			"04.09.02.017-6",
+			"04.09.03.004-0",
+			"04.09.04.013-4",
+			"04.09.04.021-5"
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 SEPTOPLASTIA — Otorrinolaringologia
+	{
+		label: "SEPTOPLASTIA",
+		primaryAnyOf: [
+			"04.04.01.048-2", // SEPTOPLASTIA PARA CORREÇÃO DE DESVIO
+			"04.04.01.041-5", // TURBINECTOMIA
+			"04.04.01.032-6"  // SINUSOTOMIA BILATERAL
+		],
+		anyOf: [
+			"04.04.01.032-6",
+			"04.04.01.041-5",
+			"04.04.01.048-2"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.04.01.032-6",
+			"04.04.01.041-5",
+			"04.04.01.048-2"
+		],
+		specialties: ["Otorrinolaringologia", "Otorrino"]
+	},
+	// 🆕 SLING TOT — Urologia
+	{
+		label: "SLING TOT",
+		primaryAnyOf: [
+			"04.09.07.027-0" // TRATAMENTO CIRÚRGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL
+		],
+		anyOf: [
+			"04.09.07.027-0"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.07.027-0"
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 TURBINECTOMIA — Otorrinolaringologia
+	{
+		label: "TURBINECTOMIA",
+		primaryAnyOf: [
+			"04.04.01.041-5" // TURBINECTOMIA
+		],
+		anyOf: [
+			"04.04.01.041-5",
+			"04.04.01.048-2"  // SEPTOPLASTIA PARA CORREÇÃO DE DESVIO
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.04.01.041-5",
+			"04.04.01.048-2"
+		],
+		specialties: ["Otorrinolaringologia", "Otorrino"]
+	},
+	// 🆕 TÚNEL DO CARPO — Ortopedia e Traumatologia
+	{
+		label: "TÚNEL DO CARPO",
+		primaryAnyOf: [
+			"04.03.02.012-3" // TRATAMENTO CIRÚRGICO DE SÍNDROME COMPRESSIVA EM TÚNEL ÓSTEO-FIBROSO AO NÍVEL DO CARPO
+		],
+		anyOf: [
+			"04.03.02.005-0", // MICRONEUROLISE DE NERVO PERIFÉRICO
+			"04.03.02.012-3", // TÚNEL DO CARPO
+			"04.08.02.030-0", // TENOSINOVECTOMIA EM MEMBRO SUPERIOR
+			"04.08.05.037-3"  // TENOSINOVECTOMIA EM MEMBRO INFERIOR
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.03.02.005-0",
+			"04.03.02.012-3",
+			"04.08.02.030-0",
+			"04.08.05.037-3"
+		],
+		specialties: [
+			"Ortopedia",
+			"Traumatologia",
+			"Ortopedia e Traumatologia",
+			"Ortopedista"
+		]
+	},
+	// 🆕 PERCUTÂNEA — Urologia (qualquer 3 dos 4)
+	{
+		label: "PERCUTÂNEA",
+		anyOf: [
+			"04.09.01.023-5", // NEFROLITOTOMIA PERCUTÂNEA
+			"04.09.01.059-6", // URETEROLITOTRIPSIA TRANSURETEROSCÓPICA
+			"04.09.01.018-9", // LITOTRIPSIA
+			"04.09.01.017-0"  // INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J
+		],
+		minAnyOfCount: 3,
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 URETEROTRANS FLEX — Urologia
+	{
+		label: "URETEROTRANS FLEX",
+		primaryAnyOf: [
+			"04.09.01.059-6" // URETEROLITOTRIPSIA TRANSURETEROSCÓPICA
+		],
+		anyOf: [
+			"04.09.01.014-6", // EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL
+			"04.09.01.017-0", // INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J
+			"04.09.01.018-9", // LITOTRIPSIA
+			"04.09.01.023-5", // NEFROLITOTOMIA PERCUTÂNEA
+			"04.09.01.031-6", // PIELOLITOTOMIA
+			"04.09.01.059-6", // URETEROLITOTRIPSIA TRANSURETEROSCÓPICA
+			"04.09.02.007-9", // MEATOTOMIA SIMPLES
+			"04.09.02.017-6"  // URETROTOMIA INTERNA
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.01.014-6",
+			"04.09.01.017-0",
+			"04.09.01.018-9",
+			"04.09.01.023-5",
+			"04.09.01.031-6",
+			"04.09.01.059-6",
+			"04.09.02.007-9",
+			"04.09.02.017-6"
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 URETEROTRANS RÍGIDA — Urologia
+	{
+		label: "URETEROTRANS RÍGIDA",
+		primaryAnyOf: [
+			"04.09.01.059-6" // URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (rígida)
+		],
+		anyOf: [
+			"04.09.01.014-6", // EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL
+			"04.09.01.017-0", // INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J
+			"04.09.01.023-5", // NEFROLITOTOMIA PERCUTÂNEA
+			"04.09.01.059-6"  // URETEROLITOTRIPSIA TRANSURETEROSCÓPICA
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.01.014-6",
+			"04.09.01.017-0",
+			"04.09.01.023-5",
+			"04.09.01.059-6"
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 URETROTOMIA INTERNA — Urologia
+	{
+		label: "URETROTOMIA INTERNA",
+		primaryAnyOf: [
+			"04.09.02.017-6" // URETROTOMIA INTERNA
+		],
+		anyOf: [
+			"04.09.02.007-9", // MEATOTOMIA SIMPLES
+			"04.09.02.017-6"  // URETROTOMIA INTERNA
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.02.007-9",
+			"04.09.02.017-6"
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 UROLOGIA OUTRAS — Urologia
+	{
+		label: "UROLOGIA OUTRAS",
+		primaryAnyOf: [
+			"04.07.04.001-3", // DRENAGEM DE ABSCESSO PÉLVICO
+			"04.07.04.018-8", // LIBERAÇÃO DE ADERÊNCIAS INTESTINAIS
+			"04.09.01.008-1", // CISTORRAFIA
+			"04.09.01.022-7", // NEFROLITOTOMIA
+			"04.09.01.028-6", // NEFROSTOMIA COM/SEM DRENAGEM
+			"04.09.01.047-2", // TRATAMENTO CIRÚRGICO DE FÍSTULAS URETERAIS
+			"04.09.01.053-7", // URETEROCISTONEOSTOMIA
+			"04.09.04.007-0", // EXÉRESE DE CISTO DE EPIDÍDIMO
+			"04.09.04.013-4", // ORQUIDOPEXIA UNILATERAL
+			"04.09.04.018-5"  // REPARAÇÃO/PLÁSTICA DO TESTÍCULO
+		],
+		anyOf: [
+			"04.07.04.001-3",
+			"04.07.04.018-8",
+			"04.09.01.008-1",
+			"04.09.01.022-7",
+			"04.09.01.028-6",
+			"04.09.01.047-2",
+			"04.09.01.053-7",
+			"04.09.04.007-0",
+			"04.09.04.013-4",
+			"04.09.04.018-5"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.07.04.001-3",
+			"04.07.04.018-8",
+			"04.09.01.008-1",
+			"04.09.01.022-7",
+			"04.09.01.028-6",
+			"04.09.01.047-2",
+			"04.09.01.053-7",
+			"04.09.04.007-0",
+			"04.09.04.013-4",
+			"04.09.04.018-5"
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 VARICOLECE — Urologia
+	{
+		label: "VARICOLECE",
+		primaryAnyOf: [
+			"04.09.04.023-1" // TRATAMENTO CIRÚRGICO DE VARICOCELE
+		],
+		anyOf: [
+			"04.09.02.007-9", // MEATOTOMIA SIMPLES
+			"04.09.04.023-1"  // TRATAMENTO CIRÚRGICO DE VARICOCELE
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.02.007-9",
+			"04.09.04.023-1"
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 VASECTOMIA — Urologia
+	{
+		label: "VASECTOMIA",
+		primaryAnyOf: [
+			"04.09.04.024-0" // VASECTOMIA
+		],
+		anyOf: [
+			"04.09.04.024-0"
+		],
+		allowedOnlyWithinMedical04Codes: [
+			"04.09.04.024-0"
+		],
+		specialties: ["Urologia", "Urologista"]
+	},
+	// 🆕 PIELOLITOTOMIA — Urologia
+	{
+		label: "PIELOLITOTOMIA",
+		anyOf: [
+			"04.09.01.031-6" // PIELOLITOTOMIA
+		],
+		specialties: ["Urologia", "Urologista"]
 	}
 	// Adicione novas regras aqui, respeitando a ordem de prioridade
 ];

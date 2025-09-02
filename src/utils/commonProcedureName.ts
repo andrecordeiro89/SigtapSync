@@ -65,10 +65,20 @@ export function resolveCommonProcedureName(
 			if (allPresent) return rule.label;
 		}
 
-		// anyOf (qualquer ocorrência ativa)
+		// excludeAnyOf: se algum código proibido estiver presente, ignorar a regra
+		if ((rule as any).excludeAnyOf && (rule as any).excludeAnyOf.length > 0) {
+			const anyExcluded = (rule as any).excludeAnyOf.some((code: string) => codeSet.has(code));
+			if (anyExcluded) {
+				continue;
+			}
+		}
+
+
+		// anyOf (qualquer ocorrência ativa) com suporte a minAnyOfCount
 		if (rule.anyOf && rule.anyOf.length > 0) {
-			const anyPresent = rule.anyOf.some(code => codeSet.has(code));
-			if (anyPresent) return rule.label;
+			const presentCount = rule.anyOf.reduce((acc, code) => acc + (codeSet.has(code) ? 1 : 0), 0);
+			const required = (rule as any).minAnyOfCount && (rule as any).minAnyOfCount > 0 ? (rule as any).minAnyOfCount : 1;
+			if (presentCount >= required) return rule.label;
 		}
 	}
 
