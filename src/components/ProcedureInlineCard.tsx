@@ -121,6 +121,10 @@ const ProcedureInlineCard = ({
   const StatusIcon = config.icon;
   const anesthInfo = getAnesthetistProcedureType(procedure.professional_cbo, procedure.procedure_code);
 
+  const isMedical04 = (() => {
+    try { return (procedure.procedure_code || '').trim().startsWith('04'); } catch { return false; }
+  })();
+
   // 🎯 CORREÇÃO DIRETA: Priorizar procedure_description do banco de dados
   const procedureDescription = (() => {
     console.log('🔍 ProcedureInlineCard - Dados recebidos:', {
@@ -196,6 +200,8 @@ const ProcedureInlineCard = ({
                   <span className="text-xs">{anesthInfo.badge}</span>
                 </Badge>
               )}
+
+              {/* Opera Paraná: removido desta tela conforme solicitação */}
             </div>
 
             {/* 🎯 CÓDIGO E DESCRIÇÃO - FORMATO MELHORADO */}

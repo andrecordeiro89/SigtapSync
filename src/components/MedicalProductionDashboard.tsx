@@ -5,6 +5,7 @@ import { Switch } from './ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
+import { isOperaParanaEligible as isOperaEligibleConfig } from '../config/operaParana';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Alert, AlertDescription } from './ui/alert';
 import { toast } from 'sonner';
@@ -2128,23 +2129,50 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             <div className="space-y-3">
                                               {patient.procedures
                                                 .sort((a, b) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime())
-                                                .map((procedure, procIndex) => (
+                                                .map((procedure, procIndex) => {
+                                                  const careCharRaw = (patient as any)?.aih_info?.care_character;
+                                                  const careCharStr = typeof careCharRaw === 'string' ? careCharRaw.trim() : String(careCharRaw ?? '');
+                                                  const isMedical04 = !!(procedure?.procedure_code || '').toString().trim().startsWith('04');
+                                                  const effectiveCareChar = selectedCareCharacter === 'all' ? careCharStr : selectedCareCharacter;
+                                                  const operaEligible = isOperaEligibleConfig(procedure.procedure_code, effectiveCareChar);
+                                                  const diagReason = (() => {
+                                                    if (!isMedical04) return '';
+                                                    const cc = (effectiveCareChar ?? '').toString();
+                                                    const isElective = cc === '1' || cc.toLowerCase?.() === 'eletivo';
+                                                    if (!isElective) return 'Sem +150%: caráter ≠ Eletivo';
+                                                    // Normalizar aqui igual ao helper sem reimportar o Set
+                                                    const normalized = (procedure.procedure_code || '').toString().replace(/[\.\s-]/g, '');
+                                                    // Duplicamos a verificação via helper: se não elegível, e é médico 04 e eletivo, resta exclusão
+                                                    if (!operaEligible) return 'Sem +150%: código em lista de exclusões';
+                                                    return '';
+                                                  })();
+                                                  return (
                                                 <div key={procedure.procedure_id || procIndex} className={`bg-white/80 p-4 rounded-xl border-l-4 ${
-                                                  isMedicalProcedure(procedure.procedure_code) ? 'border-l-emerald-400 bg-emerald-50/20' : 'border-l-slate-300'
-                                                }`}>
+                                                  isMedical04 ? 'border-l-emerald-400 bg-emerald-50/20' : 'border-l-slate-300'
+                                                } ${operaEligible ? 'ring-1 ring-emerald-200' : ''}`}>
                                                   <div className="flex items-start justify-between">
                                                     <div className="flex-1">
                                                       <div className="flex items-center gap-2 mb-2">
                                                         <div className={`font-medium px-3 py-1 rounded-lg text-sm ${
-                                                          isMedicalProcedure(procedure.procedure_code) 
+                                                          isMedical04 
                                                             ? 'text-emerald-800 bg-emerald-100 border border-emerald-200' 
                                                             : 'text-slate-800 bg-slate-100 border border-slate-200'
                                                         }`}>
                                                           {procedure.procedure_code}
                                                         </div>
-                                                        {isMedicalProcedure(procedure.procedure_code) && (
+                                                        {isMedical04 && (
                                                           <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-300 text-xs">
                                                             🩺 Médico 04
+                                                          </Badge>
+                                                        )}
+                                                        {operaEligible && (
+                                                          <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                                                            Opera Paraná +150%
+                                                          </Badge>
+                                                        )}
+                                                        {!operaEligible && isMedical04 && diagReason && (
+                                                          <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200 text-[10px]">
+                                                            {diagReason}
                                                           </Badge>
                                                         )}
                                                         {(() => {
@@ -2220,7 +2248,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     <div className="text-right ml-4">
                                                       {(() => {
                                                         const anesthetistInfo = getAnesthetistProcedureType(procedure.cbo, procedure.procedure_code);
-                                                        
+                                                        if (operaEligible && (!anesthetistInfo.isAnesthetist || anesthetistInfo.shouldCalculate)) {
+                                                          const base = procedure.value_reais || 0;
+                                                          const increment = base * 1.5; // +150%
+                                                          return (
+                                                            <div className="text-right">
+                                                              <div className="text-[11px] text-slate-500 line-through">{formatCurrency(base)}</div>
+                                                              <div className="text-xl font-extrabold text-emerald-700">{formatCurrency(increment)}</div>
+                                                            </div>
+                                                          );
+                                                        }
                                                         if (anesthetistInfo.isAnesthetist && !anesthetistInfo.shouldCalculate) {
                                                           // 🚫 ANESTESISTA 04.xxx: Mostrar "Controle por Quantidade"
                                                           return (
@@ -2237,7 +2274,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           // ✅ PROCEDIMENTO NORMAL OU ANESTESISTA 03.xxx: Mostrar valor
                                                           return (
                                                             <div className={`text-xl font-bold ${
-                                                              isMedicalProcedure(procedure.procedure_code) ? 'text-emerald-700' : 'text-slate-900'
+                                                              isMedical04 ? 'text-emerald-700' : 'text-slate-900'
                                                             }`}>
                                                               {formatCurrency(procedure.value_reais)}
                                                             </div>
@@ -2247,7 +2284,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     </div>
                                                   </div>
                                                 </div>
-                                              ))}
+                                              );})}
                                             </div>
                                           )}
                                           

@@ -16,6 +16,7 @@ import {
   type PatientWithProcedures,
   type ProcedureDetail
 } from '../services/doctorPatientService';
+import { isOperaParanaEligible as isOperaEligibleConfig } from '../config/operaParana';
 
 interface DoctorPatientsDropdownProps {
   doctorName: string;
@@ -66,7 +67,8 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
               admission_date: patient.aih_info?.admission_date || '',
               discharge_date: patient.aih_info?.discharge_date,
               competencia: (patient as any).aih_info?.competencia,
-              aih_number: patient.aih_info?.aih_number || ''
+              aih_number: patient.aih_info?.aih_number || '',
+              care_character: (patient as any).aih_info?.care_character
             },
             total_value_reais: patient.total_value_reais || 0,
             total_procedures: patient.total_procedures || patient.procedures?.length || 0,
@@ -152,6 +154,11 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
     // Verifica se o código inicia com '04'
     const code = procedureCode.toString().trim();
     return code.startsWith('04');
+  };
+
+  // Programa Opera Paraná: usar verificação centralizada com lista de exclusões
+  const isOperaParanaEligible = (procedureCode: string, careCharacter?: string | number): boolean => {
+    return isOperaEligibleConfig(procedureCode, careCharacter);
   };
 
   // 📊 CALCULAR estatísticas dos pacientes
@@ -399,8 +406,13 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                         <div className="text-xs text-gray-500">
                           CNS: {patient.patient_info?.cns || 'CNS não disponível'}
                         </div>
-                        <div className="text-xs text-blue-600 mt-1">
-                          {patient.procedures.length} procedimento(s)
+                        <div className="text-xs text-blue-600 mt-1 flex items-center gap-2 flex-wrap">
+                          <span>{patient.procedures.length} procedimento(s)</span>
+                          {(patient.aih_info as any)?.care_character && (
+                            <Badge variant="outline" className={`border ${((patient.aih_info as any).care_character === '1') ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                              Caráter: {((patient.aih_info as any).care_character === '1') ? 'Eletivo' : 'Urgência/Emergência'}
+                            </Badge>
+                          )}
                         </div>
                         <div className="text-[11px] text-gray-600 mt-1 flex items-center gap-2 flex-wrap">
                           <Calendar className="h-3 w-3 text-gray-400" />
@@ -438,12 +450,14 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                     <div className="space-y-1">
                       {patient.procedures.map((procedure, procIndex) => {
                         const statusDisplay = getStatusDisplay(procedure);
+                        const careCharacter = (patient.aih_info as any)?.care_character;
+                        const operaEligible = isOperaParanaEligible(procedure.procedure_code, careCharacter);
                         return (
                           <div 
                             key={`${procedure.procedure_id}-${procIndex}`}
                             className={`p-3 hover:bg-gray-50 border-b last:border-b-0 ${
-                               isMedicalProcedure(procedure.procedure_code) ? 'bg-orange-50 border-l-4 border-l-orange-400' : ''
-                             }`}
+                               isMedicalProcedure(procedure.procedure_code) ? 'bg-orange-50/40 border-l-4 border-l-orange-300' : ''
+                             } ${operaEligible ? 'ring-1 ring-emerald-200 bg-emerald-50/40' : ''}`}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
@@ -454,6 +468,11 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                                   {isMedicalProcedure(procedure.procedure_code) && (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
                                       Médico 04
+                                    </span>
+                                  )}
+                                  {operaEligible && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                      Opera Paraná +150%
                                     </span>
                                   )}
                                 </div>
@@ -469,11 +488,23 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                                 </div>
                               </div>
                               <div className="text-right space-y-1 ml-3">
-                                <div className={`text-sm font-bold ${
-                                  isMedicalProcedure(procedure.procedure_code) ? 'text-orange-600' : 'text-green-600'
-                                }`}>
-                                  {formatValue(procedure.value_reais)}
-                                </div>
+                                {(() => {
+                                  const base = procedure.value_reais || 0;
+                                  if (operaEligible) {
+                                    const increment = base * 1.5; // +150%
+                                    return (
+                                      <div className="text-right">
+                                        <div className="text-[11px] text-gray-500 line-through">{formatValue(base)}</div>
+                                        <div className="text-sm font-extrabold text-emerald-700">{formatValue(increment)}</div>
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <div className={`text-sm font-bold ${isMedicalProcedure(procedure.procedure_code) ? 'text-orange-600' : 'text-green-600'}`}>
+                                      {formatValue(base)}
+                                    </div>
+                                  );
+                                })()}
                                 <div className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${statusDisplay.color}`}>
                                   {statusDisplay.icon}
                                   {statusDisplay.text}

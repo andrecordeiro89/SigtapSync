@@ -1405,7 +1405,6 @@ const PatientManagement = () => {
                                 procedure={procedure}
                                 isReadOnly={!canManageProcedures()}
                                 onDelete={(proc) => handleDeleteProcedure(item.id, proc)}
-                                
                               />
                             ))}
                           </div>

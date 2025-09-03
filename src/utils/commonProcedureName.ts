@@ -1,4 +1,5 @@
 import { COMMON_PROCEDURE_NAME_RULES } from "../config/commonProcedureNames";
+import { CUSTOM_COMMON_PROCEDURE_NAME_RULES } from "../config/commonProcedureNames.custom";
 
 type ProcedureLike = { procedure_code?: string; procedure_date?: string; sequence?: number };
 
@@ -13,7 +14,13 @@ export function resolveCommonProcedureName(
 	const codeSet = new Set(codes.map(c => (c || "").trim()));
 	const specialty = (doctorSpecialty || "").trim().toLowerCase();
 
-	for (const rule of COMMON_PROCEDURE_NAME_RULES) {
+	// Prioridade: regras customizadas primeiro, depois as regras padrão
+	const allRules = [
+		...(CUSTOM_COMMON_PROCEDURE_NAME_RULES || []),
+		...(COMMON_PROCEDURE_NAME_RULES || [])
+	];
+
+	for (const rule of allRules) {
 		// Especialidade (se definida na regra)
 		if (rule.specialties && rule.specialties.length > 0) {
 			if (!specialty) {
