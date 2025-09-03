@@ -1630,6 +1630,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   <TableRow className="bg-slate-50">
                                     <TableHead>Indicador</TableHead>
                                     <TableHead>Valor</TableHead>
+                                    <TableHead>Valor Incremento</TableHead>
                                     <TableHead>Valor c/ Opera Paraná</TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -1647,11 +1648,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     return 'Não definido';
                                     })()}</TableCell>
                                     <TableCell></TableCell>
+                                    <TableCell></TableCell>
                                   </TableRow>
                                   {/* 2) Pacientes Atendidos */}
                                   <TableRow>
                                     <TableCell className="font-medium">Pacientes Atendidos</TableCell>
                                     <TableCell className="font-bold">{doctorStats.totalAIHs}</TableCell>
+                                    <TableCell></TableCell>
                                     <TableCell></TableCell>
                                   </TableRow>
                                   {/* 3) Procedimentos */}
@@ -1659,11 +1662,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     <TableCell className="font-medium">Procedimentos</TableCell>
                                     <TableCell className="font-bold">{doctorStats.totalProcedures}</TableCell>
                                     <TableCell></TableCell>
+                                    <TableCell></TableCell>
                                   </TableRow>
                                   {/* 4) Total de AIHs */}
                                   <TableRow>
                                     <TableCell className="font-medium">Total de AIHs</TableCell>
                                     <TableCell className="font-bold">{formatCurrency(doctorStats.totalValue)}</TableCell>
+                                    <TableCell className="font-bold">{(() => {
+                                       const baseTotal = doctorStats.totalValue || 0;
+                                       const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
+                                       if (!doctorCovered) return '-';
+                                       const increment = (doctor.patients || []).reduce((acc, p) => (
+                                         acc + computeIncrementForProcedures(p.procedures as any, (p as any)?.aih_info?.care_character, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id)
+                                       ), 0);
+                                       return increment > 0 ? formatCurrency(increment) : '-';
+                                     })()}</TableCell>
                                     <TableCell className="font-bold">{(() => {
                                        const baseTotal = doctorStats.totalValue || 0;
                                        const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
@@ -1679,11 +1692,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     <TableCell className="font-medium">Pagamento Médico</TableCell>
                                     <TableCell className="font-bold">{doctorStats.calculatedPaymentValue > 0 ? formatCurrency(doctorStats.calculatedPaymentValue) : formatCurrency(doctorStats.medicalProceduresValue)}</TableCell>
                                     <TableCell></TableCell>
+                                    <TableCell></TableCell>
                                   </TableRow>
                                   {/* 6) Ticket Médio */}
                                   <TableRow>
                                     <TableCell className="font-medium">Ticket Médio</TableCell>
                                     <TableCell className="font-bold">{formatCurrency(doctorStats.avgTicket)}</TableCell>
+                                    <TableCell></TableCell>
                                     <TableCell></TableCell>
                                   </TableRow>
                                 </TableBody>
