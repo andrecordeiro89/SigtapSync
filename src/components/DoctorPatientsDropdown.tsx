@@ -16,7 +16,7 @@ import {
   type PatientWithProcedures,
   type ProcedureDetail
 } from '../services/doctorPatientService';
-import { isOperaParanaEligible as isOperaEligibleConfig } from '../config/operaParana';
+import { isOperaParanaEligible as isOperaEligibleConfig, isDoctorCoveredForOperaParana } from '../config/operaParana';
 
 interface DoctorPatientsDropdownProps {
   doctorName: string;
@@ -428,11 +428,32 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                         </div>
                       </div>
                       <div className="text-right space-y-1">
-                        <div className="text-xs text-gray-500">
-                          Total AIH: <span className="font-bold text-emerald-600">
-                            {formatValue(patient.procedures.reduce((sum, proc) => sum + proc.value_reais, 0))}
-                          </span>
-                        </div>
+                        {(() => {
+                          const doctorCovered = isDoctorCoveredForOperaParana(doctorName);
+                          const baseAih = typeof (patient as any).total_value_reais === 'number'
+                            ? (patient as any).total_value_reais
+                            : patient.procedures.reduce((sum, proc) => sum + proc.value_reais, 0);
+                          const careCharacter = (patient.aih_info as any)?.care_character;
+                          const eligibleSum = patient.procedures.reduce((sum, proc) => (
+                            isOperaParanaEligible(proc.procedure_code, careCharacter)
+                              ? sum + (proc.value_reais || 0)
+                              : sum
+                          ), 0);
+                          const hasIncrement = doctorCovered && eligibleSum > 0;
+                          const withIncrement = hasIncrement ? baseAih + (eligibleSum * 0.5) : baseAih;
+                          return (
+                            <>
+                              <div className="text-xs text-gray-500">
+                                AIH Seca: <span className="font-bold text-emerald-600">{formatValue(baseAih)}</span>
+                              </div>
+                              {hasIncrement && (
+                                <div className="text-xs text-emerald-700">
+                                  AIH c/ Incremento: <span className="font-bold">{formatValue(withIncrement)}</span>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                         <div className="text-xs text-orange-600">
                           Proc. 04: <span className="font-bold">
                             {formatValue(patient.procedures

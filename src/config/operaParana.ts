@@ -43,11 +43,31 @@ export const isOperaParanaEligible = (
 ): boolean => {
   const codeStr = (procedureCode ?? '').toString().trim();
   if (!codeStr || !codeStr.startsWith('04')) return false;
-  const cc = (careCharacter ?? '').toString();
-  const isElective = cc === '1' || cc.toLowerCase() === 'eletivo';
+  const ccRaw = (careCharacter ?? '').toString().trim();
+  // normalizar: remover zeros à esquerda e acentos, case-insensitive
+  const ccNum = ccRaw.replace(/^0+/, '');
+  const ccAscii = ccRaw
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+  const isElective = ccNum === '1' || ccAscii === 'eletivo';
   if (!isElective) return false;
   const normalized = normalizeSigtapCode(codeStr);
   return !OPERA_PARANA_EXCLUDED_CODES.has(normalized);
+};
+
+// Lista de médicos não contemplados pelo programa (nome normalizado em maiúsculas)
+const OPERA_PARANA_DOCTOR_DENY = new Set<string>([
+  'HUMBERTO MOREIRA DA SILVA'
+]);
+
+export const isDoctorCoveredForOperaParana = (
+  doctorName?: string,
+  _hospitalId?: string
+): boolean => {
+  if (!doctorName) return true;
+  const key = doctorName.toString().trim().toUpperCase();
+  return !OPERA_PARANA_DOCTOR_DENY.has(key);
 };
 
 

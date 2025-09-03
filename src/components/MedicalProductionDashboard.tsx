@@ -53,6 +53,7 @@ import {
 import ReportGenerator from './ReportGenerator';
 import PatientAihInfoBadges from './PatientAihInfoBadges';
 import AihDatesBadges from './AihDatesBadges';
+import { isDoctorCoveredForOperaParana } from '../config/operaParana';
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -1033,7 +1034,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     };
 
     loadDoctorsData();
-  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, dateRange, refreshTick]);
+  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, dateRange, refreshTick, selectedCareCharacter]);
 
   // 🆕 SUBSCRIÇÃO REALTIME: AIHs e PROCEDURE_RECORDS (apenas inserts)
   useEffect(() => {
@@ -1629,6 +1630,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   <TableRow className="bg-slate-50">
                                     <TableHead>Indicador</TableHead>
                                     <TableHead>Valor</TableHead>
+                                    <TableHead>Valor c/ Opera Paraná</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -1644,31 +1646,50 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     }
                                     return 'Não definido';
                                     })()}</TableCell>
+                                    <TableCell></TableCell>
                                   </TableRow>
                                   {/* 2) Pacientes Atendidos */}
                                   <TableRow>
                                     <TableCell className="font-medium">Pacientes Atendidos</TableCell>
                                     <TableCell className="font-bold">{doctorStats.totalAIHs}</TableCell>
+                                    <TableCell></TableCell>
                                   </TableRow>
                                   {/* 3) Procedimentos */}
                                   <TableRow>
                                     <TableCell className="font-medium">Procedimentos</TableCell>
                                     <TableCell className="font-bold">{doctorStats.totalProcedures}</TableCell>
+                                    <TableCell></TableCell>
                                   </TableRow>
                                   {/* 4) Total de AIHs */}
                                   <TableRow>
                                     <TableCell className="font-medium">Total de AIHs</TableCell>
                                     <TableCell className="font-bold">{formatCurrency(doctorStats.totalValue)}</TableCell>
+                                    <TableCell className="font-bold">{(() => {
+                                       const baseTotal = doctorStats.totalValue || 0;
+                                       // Incremento: somente quando há pelo menos um procedimento elegível na AIH
+                                       const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
+                                       if (!doctorCovered) return '-';
+                                       const increment = (doctor.patients || []).reduce((acc, p) => {
+                                         const care = (p as any)?.aih_info?.care_character;
+                                         const eligSum = (p.procedures || []).reduce((s, proc) => (
+                                           isOperaEligibleConfig(proc.procedure_code, care) ? s + (proc.value_reais || 0) : s
+                                         ), 0);
+                                         return acc + (eligSum > 0 ? (eligSum * 0.5) : 0);
+                                       }, 0);
+                                       return increment > 0 ? formatCurrency(baseTotal + increment) : '-';
+                                     })()}</TableCell>
                                   </TableRow>
                                   {/* 5) Pagamento Médico */}
                                   <TableRow>
                                     <TableCell className="font-medium">Pagamento Médico</TableCell>
                                     <TableCell className="font-bold">{doctorStats.calculatedPaymentValue > 0 ? formatCurrency(doctorStats.calculatedPaymentValue) : formatCurrency(doctorStats.medicalProceduresValue)}</TableCell>
+                                    <TableCell></TableCell>
                                   </TableRow>
                                   {/* 6) Ticket Médio */}
                                   <TableRow>
                                     <TableCell className="font-medium">Ticket Médio</TableCell>
                                     <TableCell className="font-bold">{formatCurrency(doctorStats.avgTicket)}</TableCell>
+                                    <TableCell></TableCell>
                                   </TableRow>
                                 </TableBody>
                               </Table>
@@ -1884,18 +1905,35 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               </div>
                                             </div>
                                             <div className="text-right">
-                                              <div className="font-bold text-lg text-slate-900">
-                                                {formatCurrency(patient.procedures
-                                                  .filter(filterCalculableProcedures) // 🚫 EXCLUIR ANESTESISTAS 04.xxx
-                                                  .reduce((sum, proc) => sum + (proc.value_reais || 0), 0))}
-                                              </div>
+                                              {(() => {
+                                                const baseAih = typeof (patient as any).total_value_reais === 'number'
+                                                  ? (patient as any).total_value_reais
+                                                  : patient.procedures
+                                                      .filter(filterCalculableProcedures)
+                                                      .reduce((sum, proc) => sum + (proc.value_reais || 0), 0);
+                                                const careCharacter = (patient as any)?.aih_info?.care_character;
+                                                const eligibleSum = patient.procedures.reduce((sum, proc) => (
+                                                  isOperaEligibleConfig(proc.procedure_code, careCharacter)
+                                                    ? sum + (proc.value_reais || 0)
+                                                    : sum
+                                                ), 0);
+                                                const hasIncrement = eligibleSum > 0;
+                                                const withIncrement = hasIncrement ? baseAih + (eligibleSum * 0.5) : baseAih;
+                                                return (
+                                                  <div className="text-right">
+                                                    <div className="text-xs text-slate-600">AIH Seca</div>
+                                                    <div className="font-bold text-slate-900">{formatCurrency(baseAih)}</div>
+                                                    {hasIncrement && (
+                                                      <>
+                                                        <div className="mt-1 text-xs text-emerald-700">AIH c/ Incremento</div>
+                                                        <div className="font-bold text-emerald-700">{formatCurrency(withIncrement)}</div>
+                                                      </>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })()}
                                               <div className="text-sm text-slate-600 mb-2">
                                                 {patient.procedures.length} procedimento(s)
-                                                {patient.procedures.length > 0 && (
-                                                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200 text-xs">
-                                                    ✅ Carregados
-                                                  </Badge>
-                                                )}
                                               </div>
                                               {/* ✅ ESTATÍSTICAS RÁPIDAS DOS PROCEDIMENTOS */}
                                               {patient.procedures.length > 0 && (

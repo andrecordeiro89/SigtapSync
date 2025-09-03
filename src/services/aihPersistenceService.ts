@@ -41,6 +41,27 @@ const convertBrazilianDateToISO = (dateString: string): string => {
   return new Date().toISOString().split('T')[0];
 };
 
+// ================================================================
+// Normalização de Caráter de Atendimento (apenas '1' Eletivo, '2' Urgência)
+// Padrão: '1'; troca para '2' somente com sinais claros de urgência/emergência
+// ================================================================
+const normalizeCareCharacterStrict = (raw?: any): '1' | '2' => {
+  try {
+    const v = String(raw ?? '').trim().toLowerCase();
+    if (v === '2' || v === '02') return '2';
+    if (v === '1' || v === '01') return '1';
+    // Palavras/indícios de urgência/emergência
+    const isUrgency =
+      v.includes('urg') ||
+      v.includes('emerg') ||
+      /\bpronto[-\s]?atendimento\b/.test(v) ||
+      /\bpa[:\s]?\b/i.test(v);
+    return isUrgency ? '2' : '1';
+  } catch {
+    return '1';
+  }
+};
+
 export interface AIHPersistenceResult {
   success: boolean;
   aihId?: string;
@@ -1156,6 +1177,7 @@ export class AIHPersistenceService {
           .from('aihs')
           .update({
             ...aihData,
+            care_character: normalizeCareCharacterStrict((aihData as any).care_character),
             // Persistir competência SUS como YYYY-MM-01
             competencia: (() => {
               const compRaw = (aihData as any).competencia as string | undefined;
@@ -1188,6 +1210,7 @@ export class AIHPersistenceService {
           .from('aihs')
           .insert([{
             ...aihData,
+            care_character: normalizeCareCharacterStrict((aihData as any).care_character),
             competencia: (() => {
               const compRaw = (aihData as any).competencia as string | undefined;
               if (compRaw && /^(\d{4})-(\d{2})-\d{2}$/.test(compRaw)) return compRaw;
@@ -1473,8 +1496,8 @@ export class AIHPersistenceService {
       const currentUser = JSON.parse(sessionStorage.getItem('current_user') || '{}');
       const userName = currentUser.full_name || currentUser.email || 'Operador do Sistema';
 
-      // Normalização segura do caráter de atendimento
-      const normalizeCareCharacter = (aih: any): string | null => {
+      // Normalização segura do caráter de atendimento (fallback padrão '1')
+      const normalizeCareCharacter = (aih: any): '1' | '2' => {
         const raw = (
           aih?.care_character ??
           aih?.caracter_atendimento ??
@@ -1482,14 +1505,7 @@ export class AIHPersistenceService {
           aih?.source_data?.caracterAtendimento ??
           aih?.source_data?.caracter_atendimento
         );
-        if (!raw) return null;
-        const v = String(raw).trim().toLowerCase();
-        if (/^[1234]$/.test(v)) return v; // já é código
-        if (v.startsWith('elet')) return '1'; // eletivo
-        if (v.includes('urg') || v.startsWith('urg')) return '2'; // urgência/emergência
-        if (v.includes('trabal')) return '3'; // acidente de trabalho
-        if (v.includes('trâns') || v.includes('trans') || v.includes('trÃ¢ns') || v.includes('tr e2ns')) return '4'; // trânsito
-        return null;
+        return normalizeCareCharacterStrict(raw);
       };
 
       // Processar dados para incluir informações do operador e normalizar care_character
@@ -1497,7 +1513,7 @@ export class AIHPersistenceService {
         const normalizedCare = normalizeCareCharacter(aih);
         return {
           ...aih,
-          care_character: normalizedCare ?? aih.care_character ?? null,
+          care_character: normalizedCare || '1',
           processed_by_name: userName, // Nome real do usuário logado
           processed_at_formatted: aih.processed_at ? 
             new Date(aih.processed_at).toLocaleDateString('pt-BR', {
@@ -1879,7 +1895,7 @@ export class AIHPersistenceService {
               notes: procedure.observacoes || '',
               aih_number: aihCompleta.numeroAIH,
               care_modality: aihCompleta.modalidade,
-              care_character: aihCompleta.caracterAtendimento,
+              care_character: normalizeCareCharacterStrict(aihCompleta.caracterAtendimento),
               quantity: procedure.quantity || 1 // 🆕 NOVO: Campo quantidade
             });
 
