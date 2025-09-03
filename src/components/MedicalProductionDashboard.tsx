@@ -1237,6 +1237,42 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     };
   }, [filteredDoctors]);
   
+  // 🧮 TOTAIS AGREGADOS PARA O CABEÇALHO (SIGTAP, Incrementos, Total)
+  const aggregatedOperaParanaTotals = React.useMemo(() => {
+    try {
+      let totalBaseSigtap = 0;
+      let totalIncrement = 0;
+
+      for (const doctor of filteredDoctors) {
+        // Base SIGTAP: somatório do valor total das AIHs por médico (patient.total_value_reais)
+        const baseForDoctor = doctor.patients.reduce((sum, p) => sum + (p.total_value_reais || 0), 0);
+        totalBaseSigtap += baseForDoctor;
+
+        // Incremento Opera Paraná: mesma regra da tabela do card do médico
+        const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+        const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, hospitalId);
+        if (!doctorCovered) continue;
+        const incrementForDoctor = (doctor.patients || []).reduce((acc, p) => (
+          acc + computeIncrementForProcedures(
+            p.procedures as any,
+            (p as any)?.aih_info?.care_character,
+            doctor.doctor_info.name,
+            hospitalId
+          )
+        ), 0);
+        totalIncrement += incrementForDoctor;
+      }
+
+      return {
+        totalBaseSigtap,
+        totalIncrement,
+        totalWithIncrement: totalBaseSigtap + totalIncrement
+      };
+    } catch {
+      return { totalBaseSigtap: 0, totalIncrement: 0, totalWithIncrement: 0 };
+    }
+  }, [filteredDoctors]);
+
   // ✅ ATUALIZAR ESTATÍSTICAS NO COMPONENTE PAI (BASEADO NOS MÉDICOS FILTRADOS)
   useEffect(() => {
     if (onStatsUpdate && !isLoading) {
@@ -1428,6 +1464,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               </div>
             </div>
           </CardTitle>
+
+          {/* 🧮 Totais Agregados - SIGTAP, Incrementos e Total */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <div className="text-[11px] uppercase text-slate-500">Valor Total SIGTAP</div>
+              <div className="text-xl font-extrabold text-slate-900">{formatCurrency(aggregatedOperaParanaTotals.totalBaseSigtap)}</div>
+            </div>
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+              <div className="text-[11px] uppercase text-emerald-700">Valor Total Incrementos</div>
+              <div className="text-xl font-extrabold text-emerald-700">{formatCurrency(aggregatedOperaParanaTotals.totalIncrement)}</div>
+            </div>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <div className="text-[11px] uppercase text-blue-700">Valor Total</div>
+              <div className="text-xl font-extrabold text-blue-700">{formatCurrency(aggregatedOperaParanaTotals.totalWithIncrement)}</div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
 

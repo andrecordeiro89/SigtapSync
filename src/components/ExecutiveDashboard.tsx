@@ -307,6 +307,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [availableCompetencies, setAvailableCompetencies] = useState<Array<{ value: string; label: string }>>([]);
   const showCompetencyTabs = false;
 
+  // Removido: Totais agregados no cabeçalho (mantidos apenas na Produção Médica)
+
   // Intervalo efetivo para a TABELA de Produção Médica (Médicos) — filtra por mês da alta
   const productionEffectiveDateRange: DateRange = React.useMemo(() => {
     if (!selectedCompetency || selectedCompetency === 'all') return selectedDateRange;
@@ -722,58 +724,20 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         ? selectedHospitals[0]
         : (activeHospitalTab || sortedHospitalStats[0]?.id || null);
 
-      let aihsTotalRevenue = 0;
-      let aihsCount = 0;
-
-      if (activeHospitalId) {
-        const { data: kpis, error: kpisError } = await supabase
-          .rpc('get_hospital_kpis', {
-            p_hospital_id: activeHospitalId,
-            p_start: startDateISO,
-            p_end: endDateISO
-          });
-
-        if (kpisError) {
-          console.warn('⚠️ Falha na RPC get_hospital_kpis, aplicando fallback por tabela:', kpisError);
-          const { data: sumRows, error: sumErr } = await supabase
-            .from('aihs')
-            .select('calculated_total_value', { count: 'exact', head: false })
-            .eq('hospital_id', activeHospitalId)
-            .not('calculated_total_value', 'is', null)
-            .gte('discharge_date', startDateISO)
-            .lte('discharge_date', endDateISO);
-          if (!sumErr) {
-            aihsTotalRevenue = (sumRows || []).reduce((s, r: any) => s + safeValue(r.calculated_total_value || 0), 0);
-            aihsCount = (sumRows || []).length;
-          }
-        } else if (Array.isArray(kpis) && kpis.length > 0) {
-          aihsTotalRevenue = Number(kpis[0].total_revenue) || 0;
-          aihsCount = Number(kpis[0].total_aihs) || 0;
-        }
-      }
-
-      // ✅ AGUARDAR UM MOMENTO PARA GARANTIR QUE OUTRAS OPERAÇÕES TERMINEM
-      // E ENTÃO DEFINIR OS DADOS DO CABEÇALHO COM DADOS DA TABELA AIHS
+      // ✅ Atualizar apenas KPIs padrões no state (sem cards de valores)
       setTimeout(() => {
         const aihsAverageTicket = aihsCount > 0 ? aihsTotalRevenue / aihsCount : 0;
-        
         setKpiData({
-          totalRevenue: aihsTotalRevenue, // ✅ SOMA calculated_total_value DA TABELA AIHS
-          totalAIHs: aihsCount,          // ✅ COUNT DE REGISTROS DA TABELA AIHS
-          averageTicket: aihsAverageTicket, // ✅ CALCULADO COM DADOS DA TABELA AIHS
+          totalRevenue: aihsTotalRevenue,
+          totalAIHs: aihsCount,
+          averageTicket: aihsAverageTicket,
           approvalRate,
           activeHospitals: hospitalsData.length,
           activeDoctors: activeDoctors,
-          processingTime: 2.3, // Manter mock por enquanto
-          monthlyGrowth: 12.5 // Manter mock por enquanto
+          processingTime: 2.3,
+          monthlyGrowth: 12.5
         });
-        
-        console.log('✅ CABEÇALHO ATUALIZADO COM DADOS DIRETOS DA TABELA AIHS (FINAL):', {
-          totalRevenue: formatCurrency(aihsTotalRevenue),
-          totalAIHs: aihsCount,
-          averageTicket: formatCurrency(aihsAverageTicket)
-        });
-      }, 100); // 100ms de delay para garantir que outras operações terminem
+      }, 100);
       
       // ✅ TAMBÉM ATUALIZAR O ESTADO DOS DADOS DOS MÉDICOS PARA SINCRONIZAÇÃO
       setDoctorsData(doctorsResult.doctors);
@@ -936,52 +900,31 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
       {/* CABEÇALHO (Premium) */}
-      <div className="relative overflow-hidden rounded-2xl shadow-2xl border border-white/10 bg-gradient-to-br from-blue-900 via-blue-800 to-purple-900 text-white p-6">
-        {/* Background decorativo */}
-        <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl"></div>
-        <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-purple-500/20 blur-3xl"></div>
+      <div className="relative">
 
         <div className="relative flex items-start justify-between">
           <div>
             <div className="flex items-center gap-3 mb-1.5">
               <BarChart4 className="h-9 w-9 md:h-10 md:w-10 drop-shadow-sm" />
-              <h1 className="text-3xl md:text-4xl font-black tracking-tight">Dashboard Executivo</h1>
+              <h1 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900">Análise de Dados</h1>
             </div>
-            <p className="text-blue-100 text-sm md:text-base">Central de Análises e Relatórios</p>
-            <div className="flex items-center gap-3 mt-3">
-              <Badge className="bg-blue-700 text-white px-3 py-1 text-xs md:text-sm shadow-md">
-                <Award className="h-4 w-4 mr-1" />
-                {user?.role?.toUpperCase()}
-              </Badge>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white/90 text-xs md:text-sm backdrop-blur-sm shadow-md">
-                <TrendingUp className="h-3 w-3" />
-                <span className="font-medium">Indicador Executivo</span>
-              </div>
-            </div>
+            <p className="text-gray-600 text-sm md:text-base">Central executiva de insights e relatórios</p>
           </div>
           <div className="text-right">
-            {/* ✅ DADOS DIRETOS DA TABELA AIHS */}
-            <div className="text-sm text-blue-200 mb-1">Faturamento Total</div>
-            <div className="text-3xl md:text-4xl font-extrabold drop-shadow-sm">
-              {isLoading ? '...' : formatCurrency(kpiData.totalRevenue)}
-            </div>
             {currentHospitalFullName && (
-              <div className="text-xs md:text-sm text-blue-100 mt-1 font-medium flex items-center justify-end gap-1">
+              <div className="inline-flex items-center justify-end gap-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200 px-3 py-1 text-xs md:text-sm font-semibold mt-1">
                 <Hospital className="h-3 w-3" />
                 {currentHospitalFullName}
               </div>
             )}
             {lastUpdate && (
-              <div className="text-xs text-blue-200/90 mt-2 flex items-center justify-end gap-1">
+              <div className="text-xs text-gray-500 mt-2 flex items-center justify-end gap-1">
                 <Clock className="h-3 w-3" />
                 Atualizado: {lastUpdate.toLocaleTimeString('pt-BR')}
               </div>
             )}
           </div>
         </div>
-
-        {/* Divisor sutil */}
-        <div className="relative mt-4 h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
       </div>
 
 
