@@ -16,7 +16,7 @@ import {
   type PatientWithProcedures,
   type ProcedureDetail
 } from '../services/doctorPatientService';
-import { isOperaParanaEligible as isOperaEligibleConfig, isDoctorCoveredForOperaParana } from '../config/operaParana';
+import { isDoctorCoveredForOperaParana, computeIncrementForProcedures, getProcedureIncrementMeta } from '../config/operaParana';
 
 interface DoctorPatientsDropdownProps {
   doctorName: string;
@@ -158,7 +158,7 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
 
   // Programa Opera Paraná: usar verificação centralizada com lista de exclusões
   const isOperaParanaEligible = (procedureCode: string, careCharacter?: string | number): boolean => {
-    return isOperaEligibleConfig(procedureCode, careCharacter);
+    return isDoctorCoveredForOperaParana(doctorName);
   };
 
   // 📊 CALCULAR estatísticas dos pacientes
@@ -434,13 +434,9 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                             ? (patient as any).total_value_reais
                             : patient.procedures.reduce((sum, proc) => sum + proc.value_reais, 0);
                           const careCharacter = (patient.aih_info as any)?.care_character;
-                          const eligibleSum = patient.procedures.reduce((sum, proc) => (
-                            isOperaParanaEligible(proc.procedure_code, careCharacter)
-                              ? sum + (proc.value_reais || 0)
-                              : sum
-                          ), 0);
-                          const hasIncrement = doctorCovered && eligibleSum > 0;
-                          const withIncrement = hasIncrement ? baseAih + (eligibleSum * 0.5) : baseAih;
+                          const increment = doctorCovered ? computeIncrementForProcedures(patient.procedures as any, careCharacter, doctorName) : 0;
+                          const hasIncrement = increment > 0;
+                          const withIncrement = baseAih + increment;
                           return (
                             <>
                               <div className="text-xs text-gray-500">
@@ -472,13 +468,13 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                       {patient.procedures.map((procedure, procIndex) => {
                         const statusDisplay = getStatusDisplay(procedure);
                         const careCharacter = (patient.aih_info as any)?.care_character;
-                        const operaEligible = isOperaParanaEligible(procedure.procedure_code, careCharacter);
+                        const incMeta = getProcedureIncrementMeta(procedure.procedure_code, careCharacter, doctorName);
                         return (
                           <div 
                             key={`${procedure.procedure_id}-${procIndex}`}
                             className={`p-3 hover:bg-gray-50 border-b last:border-b-0 ${
                                isMedicalProcedure(procedure.procedure_code) ? 'bg-orange-50/40 border-l-4 border-l-orange-300' : ''
-                             } ${operaEligible ? 'ring-1 ring-emerald-200 bg-emerald-50/40' : ''}`}
+                             } ${incMeta ? 'ring-1 ring-emerald-200 bg-emerald-50/40' : ''}`}
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
@@ -491,9 +487,9 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                                       Médico 04
                                     </span>
                                   )}
-                                  {operaEligible && (
+                                  {incMeta && (
                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                      Opera Paraná +150%
+                                      {incMeta.label}
                                     </span>
                                   )}
                                 </div>
@@ -511,12 +507,12 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                               <div className="text-right space-y-1 ml-3">
                                 {(() => {
                                   const base = procedure.value_reais || 0;
-                                  if (operaEligible) {
-                                    const increment = base * 1.5; // +150%
+                                  if (incMeta) {
+                                    const incremented = base * incMeta.factor;
                                     return (
                                       <div className="text-right">
                                         <div className="text-[11px] text-gray-500 line-through">{formatValue(base)}</div>
-                                        <div className="text-sm font-extrabold text-emerald-700">{formatValue(increment)}</div>
+                                        <div className="text-sm font-extrabold text-emerald-700">{formatValue(incremented)}</div>
                                       </div>
                                     );
                                   }

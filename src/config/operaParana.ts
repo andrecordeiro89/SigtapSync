@@ -70,4 +70,90 @@ export const isDoctorCoveredForOperaParana = (
   return !OPERA_PARANA_DOCTOR_DENY.has(key);
 };
 
+// Normalizadores de Caráter
+const normalizeCare = (cc: string | number | null | undefined): string => {
+  const raw = (cc ?? '').toString().trim();
+  const noZero = raw.replace(/^0+/, '');
+  return noZero
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+};
+
+export const isElectiveCare = (cc: string | number | null | undefined): boolean => {
+  const n = normalizeCare(cc);
+  return n === '1' || n === 'eletivo';
+};
+
+export const isUrgencyCare = (cc: string | number | null | undefined): boolean => {
+  const n = normalizeCare(cc);
+  return n === '2' || n.includes('urg') || n.includes('emerg');
+};
+
+export interface SimpleProcedureLike {
+  procedure_code?: string;
+  value_reais?: number;
+}
+
+/**
+ * Calcula o incremento total para uma AIH a partir dos procedimentos e do caráter de atendimento.
+ * - Eletivo (1): +50% sobre os procedimentos elegíveis do Opera Paraná (códigos 04 não excluídos)
+ * - Urgência/Emergência (2): +20% sobre todos os procedimentos cirúrgicos (códigos iniciados por 04)
+ * Retorna 0 quando não houver incremento aplicável.
+ */
+export const computeIncrementForProcedures = (
+  procedures: SimpleProcedureLike[] | undefined,
+  careCharacter?: string | number | null,
+  doctorName?: string,
+  hospitalId?: string
+): number => {
+  const procs = Array.isArray(procedures) ? procedures : [];
+  if (procs.length === 0) return 0;
+
+  // Regra 1: Eletivo (Opera Paraná 150%)
+  if (isElectiveCare(careCharacter)) {
+    if (!isDoctorCoveredForOperaParana(doctorName, hospitalId)) return 0;
+    const eligibleSum = procs.reduce((sum, p) => (
+      isOperaParanaEligible(p.procedure_code, '1') ? sum + (p.value_reais || 0) : sum
+    ), 0);
+    return eligibleSum > 0 ? eligibleSum * 0.5 : 0;
+  }
+
+  // Regra 2: Urgência/Emergência (20% sobre 04)
+  if (isUrgencyCare(careCharacter)) {
+    const surgicalSum = procs.reduce((sum, p) => {
+      const code = (p.procedure_code || '').toString().trim();
+      return code.startsWith('04') ? sum + (p.value_reais || 0) : sum;
+    }, 0);
+    return surgicalSum > 0 ? surgicalSum * 0.2 : 0;
+  }
+
+  return 0;
+};
+
+export const isUrgencySurgicalEligible = (
+  procedureCode?: string,
+  careCharacter?: string | number | null
+): boolean => {
+  const code = (procedureCode || '').toString().trim();
+  return isUrgencyCare(careCharacter) && code.startsWith('04');
+};
+
+export const getProcedureIncrementMeta = (
+  procedureCode?: string,
+  careCharacter?: string | number | null,
+  doctorName?: string,
+  hospitalId?: string
+): { factor: number; label: string } | null => {
+  // Prioridade: 150% eletivo, quando elegível e médico contemplado
+  if (isElectiveCare(careCharacter) && isDoctorCoveredForOperaParana(doctorName, hospitalId) && isOperaParanaEligible(procedureCode || '', '1')) {
+    return { factor: 1.5, label: 'Opera Paraná +150%' };
+  }
+  // Urgência: 20% sobre cirúrgicos
+  if (isUrgencySurgicalEligible(procedureCode, careCharacter)) {
+    return { factor: 1.2, label: 'Urgência +20%' };
+  }
+  return null;
+};
+
 

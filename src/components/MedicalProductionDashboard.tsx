@@ -53,7 +53,7 @@ import {
 import ReportGenerator from './ReportGenerator';
 import PatientAihInfoBadges from './PatientAihInfoBadges';
 import AihDatesBadges from './AihDatesBadges';
-import { isDoctorCoveredForOperaParana } from '../config/operaParana';
+import { isDoctorCoveredForOperaParana, computeIncrementForProcedures } from '../config/operaParana';
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -1666,16 +1666,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     <TableCell className="font-bold">{formatCurrency(doctorStats.totalValue)}</TableCell>
                                     <TableCell className="font-bold">{(() => {
                                        const baseTotal = doctorStats.totalValue || 0;
-                                       // Incremento: somente quando há pelo menos um procedimento elegível na AIH
                                        const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
                                        if (!doctorCovered) return '-';
-                                       const increment = (doctor.patients || []).reduce((acc, p) => {
-                                         const care = (p as any)?.aih_info?.care_character;
-                                         const eligSum = (p.procedures || []).reduce((s, proc) => (
-                                           isOperaEligibleConfig(proc.procedure_code, care) ? s + (proc.value_reais || 0) : s
-                                         ), 0);
-                                         return acc + (eligSum > 0 ? (eligSum * 0.5) : 0);
-                                       }, 0);
+                                       const increment = (doctor.patients || []).reduce((acc, p) => (
+                                         acc + computeIncrementForProcedures(p.procedures as any, (p as any)?.aih_info?.care_character, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id)
+                                       ), 0);
                                        return increment > 0 ? formatCurrency(baseTotal + increment) : '-';
                                      })()}</TableCell>
                                   </TableRow>
@@ -1912,13 +1907,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                       .filter(filterCalculableProcedures)
                                                       .reduce((sum, proc) => sum + (proc.value_reais || 0), 0);
                                                 const careCharacter = (patient as any)?.aih_info?.care_character;
-                                                const eligibleSum = patient.procedures.reduce((sum, proc) => (
-                                                  isOperaEligibleConfig(proc.procedure_code, careCharacter)
-                                                    ? sum + (proc.value_reais || 0)
-                                                    : sum
-                                                ), 0);
-                                                const hasIncrement = eligibleSum > 0;
-                                                const withIncrement = hasIncrement ? baseAih + (eligibleSum * 0.5) : baseAih;
+                                                const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
+                                                const increment = doctorCovered ? computeIncrementForProcedures(patient.procedures as any, careCharacter, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id) : 0;
+                                                const hasIncrement = increment > 0;
+                                                const withIncrement = baseAih + increment;
                                                 return (
                                                   <div className="text-right">
                                                     <div className="text-xs text-slate-600">AIH Seca</div>

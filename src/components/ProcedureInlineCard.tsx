@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { getAnesthetistProcedureType } from '@/utils/anesthetistLogic';
+import { getProcedureIncrementMeta } from '@/config/operaParana';
 
 interface ProcedureData {
   id: string;
@@ -45,13 +46,15 @@ interface ProcedureInlineCardProps {
   isReadOnly?: boolean;
   onDelete?: (procedure: ProcedureData) => Promise<void>;
   onShowDetails?: (procedure: ProcedureData) => void;
+  aihCareCharacter?: string | number; // caráter da AIH (1=Eletivo, 2=Urgência/Emergência)
 }
 
 const ProcedureInlineCard = ({
   procedure,
   isReadOnly = false,
   onDelete,
-  onShowDetails
+  onShowDetails,
+  aihCareCharacter
 }: ProcedureInlineCardProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -120,6 +123,7 @@ const ProcedureInlineCard = ({
   const config = getStatusConfig();
   const StatusIcon = config.icon;
   const anesthInfo = getAnesthetistProcedureType(procedure.professional_cbo, procedure.procedure_code);
+  const incMeta = getProcedureIncrementMeta(procedure.procedure_code, aihCareCharacter);
 
   const isMedical04 = (() => {
     try { return (procedure.procedure_code || '').trim().startsWith('04'); } catch { return false; }
@@ -201,7 +205,12 @@ const ProcedureInlineCard = ({
                 </Badge>
               )}
 
-              {/* Opera Paraná: removido desta tela conforme solicitação */}
+              {/* Incremento (Opera PR 150% | Urgência 20%) */}
+              {incMeta && (
+                <Badge className="flex items-center space-x-1 bg-emerald-100 text-emerald-800 border-emerald-200" variant="outline">
+                  <span className="text-xs font-bold">{incMeta.label}</span>
+                </Badge>
+              )}
             </div>
 
             {/* 🎯 CÓDIGO E DESCRIÇÃO - FORMATO MELHORADO */}
@@ -228,40 +237,41 @@ const ProcedureInlineCard = ({
               </div>
             )}
 
-            {/* Valor */}
+            {/* Valor com regra de incremento quando aplicável */}
             {(() => {
               const qty = procedure.quantity ?? 1;
               const canShowMonetary = (!anesthInfo.isAnesthetist || anesthInfo.shouldCalculate);
 
-              // Caso 1: Temos valor cobrado (total)
+              // Determinar valor base (em centavos)
+              let baseCents: number | null = null;
               if (canShowMonetary && procedure.value_charged && procedure.value_charged > 0) {
-                const totalCents = procedure.value_charged || 0;
-                const unitCents = qty > 0 ? Math.round(totalCents / qty) : totalCents;
-                return (
-                  <div className="flex items-center space-x-2">
-                    <DollarSign className="w-4 h-4 text-green-600" />
-                    <div className="text-sm font-semibold text-green-700">
-                      {formatCurrency(totalCents)}
-                    </div>
-                    {qty > 1 && (
-                      <div className="text-xs text-gray-500">({formatCurrency(unitCents)} × {qty})</div>
-                    )}
-                  </div>
-                );
+                baseCents = procedure.value_charged;
+              } else if (canShowMonetary && procedure.sigtap_procedures?.value_hosp_total) {
+                const unitCents = procedure.sigtap_procedures.value_hosp_total || 0;
+                baseCents = unitCents * (qty || 1);
               }
 
-              // Caso 2: Sem value_charged, mas temos valor do SIGTAP (unitário) → estimar total
-              if (canShowMonetary && procedure.sigtap_procedures?.value_hosp_total) {
-                const unitCents = procedure.sigtap_procedures.value_hosp_total || 0;
-                const totalCents = unitCents * (qty || 1);
+              if (baseCents != null) {
+                if (incMeta) {
+                  const incrementedCents = Math.round(baseCents * incMeta.factor);
+                  return (
+                    <div className="flex items-center space-x-2">
+                      <DollarSign className="w-4 h-4 text-green-600" />
+                      <div className="text-[11px] text-gray-500 line-through">{formatCurrency(baseCents)}</div>
+                      <div className="text-sm font-extrabold text-emerald-700">{formatCurrency(incrementedCents)}</div>
+                      {qty > 1 && (
+                        <div className="text-xs text-gray-500">({formatCurrency(Math.round(baseCents / Math.max(1, qty)))} × {qty})</div>
+                      )}
+                    </div>
+                  );
+                }
+                // Sem incremento
                 return (
                   <div className="flex items-center space-x-2">
                     <DollarSign className="w-4 h-4 text-green-600" />
-                    <div className="text-sm font-semibold text-green-700">
-                      {formatCurrency(totalCents)}
-                    </div>
+                    <div className="text-sm font-semibold text-green-700">{formatCurrency(baseCents)}</div>
                     {qty > 1 && (
-                      <div className="text-xs text-gray-500">({formatCurrency(unitCents)} × {qty})</div>
+                      <div className="text-xs text-gray-500">({formatCurrency(Math.round(baseCents / Math.max(1, qty)))} × {qty})</div>
                     )}
                   </div>
                 );
