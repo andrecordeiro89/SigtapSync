@@ -1,5 +1,4 @@
 import React from 'react';
-import { Badge } from './ui/badge';
 
 export interface AihDatesBadgesProps {
 	admissionDate?: string;
@@ -45,22 +44,12 @@ const AihDatesBadges: React.FC<AihDatesBadgesProps> = ({ admissionDate, discharg
 	const compLabel = formatCompetencia(competencia, dischargeDate || admissionDate);
 	return (
 		<div className={`flex flex-wrap items-center gap-2 ${className || ''}`}>
-			<Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 text-blue-700 px-2 py-0.5">
-				Admissão: {formatDate(admissionDate)}
-			</Badge>
-			{dischargeDate ? (
-				<Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 text-blue-700 px-2 py-0.5">
-					Alta: {formatDate(dischargeDate)}
-				</Badge>
-			) : (
-				<Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 text-blue-700 px-2 py-0.5" title="Sem data de alta; período considera apenas internação">
-					Alta: —
-				</Badge>
-			)}
+			<span className="text-xs text-slate-700"><span className="font-semibold">Admissão:</span> {formatDate(admissionDate)}</span>
+			<span className="text-xs text-slate-700" title={dischargeDate ? undefined : 'Sem data de alta; período considera apenas internação'}>
+				<span className="font-semibold">Alta:</span> {dischargeDate ? formatDate(dischargeDate) : '—'}
+			</span>
 			{compLabel && (
-				<Badge variant="outline" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200 text-blue-700 px-2 py-0.5" title="Competência SUS">
-					Competência: {compLabel}
-				</Badge>
+				<span className="text-xs text-slate-700" title="Competência SUS"><span className="font-semibold">Competência:</span> {compLabel}</span>
 			)}
 		</div>
 	);

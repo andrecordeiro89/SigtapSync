@@ -1,5 +1,4 @@
 import React from 'react';
-import { Badge } from './ui/badge';
 
 export interface AihInfoBadgesProps {
 	aihNumber?: string;
@@ -23,34 +22,22 @@ const PatientAihInfoBadges: React.FC<AihInfoBadgesProps> = ({
 	return (
 		<div className={`grid grid-cols-2 gap-2 text-[11px] text-slate-700 w-fit ${className || ''}`}>
 			{aihNumber && (
-				<Badge variant="outline" className="bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200 text-slate-700 px-2 py-0.5 max-w-[220px] truncate">
-					AIH: {aihNumber}
-				</Badge>
+				<span className="truncate max-w-[220px]"><span className="font-semibold">AIH:</span> {aihNumber}</span>
 			)}
 			{mainCid && (
-				<Badge variant="outline" className="bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200 text-slate-700 px-2 py-0.5 max-w-[220px] truncate">
-					CID: {mainCid}
-				</Badge>
+				<span className="truncate max-w-[220px]"><span className="font-semibold">CID:</span> {mainCid}</span>
 			)}
 			{specialty && (
-				<Badge variant="outline" className="bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200 text-slate-700 px-2 py-0.5 max-w-[220px] truncate">
-					{specialty}
-				</Badge>
+				<span className="truncate max-w-[220px]">{specialty}</span>
 			)}
 			{!specialty && requestingPhysician && (
-				<Badge variant="outline" className="bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200 text-slate-700 px-2 py-0.5 max-w-[220px] truncate">
-					{requestingPhysician}
-				</Badge>
+				<span className="truncate max-w-[220px]">{requestingPhysician}</span>
 			)}
 			{careModality && (
-				<Badge variant="outline" className="bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200 text-slate-700 px-2 py-0.5 max-w-[220px] truncate">
-					Modalidade: {careModality}
-				</Badge>
+				<span className="truncate max-w-[220px]"><span className="font-semibold">Modalidade:</span> {careModality}</span>
 			)}
 			{professionalCbo && (
-				<Badge variant="outline" className="bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200 text-slate-700 px-2 py-0.5 max-w-[220px] truncate">
-					CBO: {professionalCbo}
-				</Badge>
+				<span className="truncate max-w-[220px]"><span className="font-semibold">CBO:</span> {professionalCbo}</span>
 			)}
 		</div>
 	);
