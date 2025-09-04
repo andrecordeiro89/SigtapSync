@@ -4,6 +4,7 @@ import type { DoctorWithPatients } from '../services/doctorPatientService';
 import { useAuth } from '../contexts/AuthContext';
 import { DateRange } from '../types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Switch } from './ui/switch';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -11,6 +12,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collap
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Alert, AlertDescription } from './ui/alert';
 import { Users, FileText, Search, ChevronRight, ChevronDown, Calendar, Activity, LineChart, Filter, FileSpreadsheet } from 'lucide-react';
+import { resolveCommonProcedureName } from '../utils/commonProcedureName';
+import { COMMON_PROCEDURE_NAME_RULES } from '../config/commonProcedureNames';
+import { CUSTOM_COMMON_PROCEDURE_NAME_RULES } from '../config/commonProcedureNames.custom';
 import DoctorsSpecialtyComparison from './DoctorsSpecialtyComparison';
 import AnalyticsCharts from './AnalyticsCharts';
 
@@ -28,11 +32,17 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
 
   // Estado de visualização
-  const [activeView, setActiveView] = useState<'analytics' | 'specialties' | 'hospitals' | 'comparisons' | 'charts'>('analytics');
+  const [activeView, setActiveView] = useState<'analytics' | 'specialties' | 'hospitals' | 'comparisons' | 'charts' | 'common'>('analytics');
   // Controle de expansão por médico (exibir todos os procedimentos além dos 5 primeiros)
   const [expandedDoctors, setExpandedDoctors] = useState<Record<string, boolean>>({});
   // Controle de expansão por especialidade
   const [expandedSpecialties, setExpandedSpecialties] = useState<Record<string, boolean>>({});
+  // Nome comum selecionado
+  const [selectedCommonName, setSelectedCommonName] = useState<string>('all');
+  // Nomes comuns: incluir todos os hospitais (ignorar filtro de hospital)
+  const [includeAllHospitalsCommon, setIncludeAllHospitalsCommon] = useState<boolean>(false);
+  const [allDoctorsForCommon, setAllDoctorsForCommon] = useState<DoctorWithPatients[]>([]);
+  const [commonLoading, setCommonLoading] = useState<boolean>(false);
 
   // Carregar hierarquia
   useEffect(() => {
@@ -101,6 +111,92 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
       return true;
     });
   }, [doctors, searchTerm, globalTermRaw, globalTermNorm, selectedSpecialty]);
+
+  // Carregar médicos de TODOS os hospitais para a aba de Nomes Comuns, quando habilitado
+  useEffect(() => {
+    if (!includeAllHospitalsCommon) return;
+    const loadAll = async () => {
+      try {
+        setCommonLoading(true);
+        const dateFromISO = dateRange ? dateRange.startDate.toISOString() : undefined;
+        const dateToISO = dateRange ? dateRange.endDate.toISOString() : undefined;
+        const data = await DoctorsHierarchyV2Service.getDoctorsHierarchyV2({
+          dateFromISO,
+          dateToISO,
+          hospitalIds: undefined, // forçar todos os hospitais
+          careCharacter: selectedCareCharacter,
+        });
+        setAllDoctorsForCommon(data || []);
+      } finally {
+        setCommonLoading(false);
+      }
+    };
+    loadAll();
+  }, [includeAllHospitalsCommon, dateRange?.startDate?.toISOString(), dateRange?.endDate?.toISOString(), selectedCareCharacter]);
+
+  // Catálogo de nomes comuns (labels) a partir das regras
+  const availableCommonNames = useMemo(() => {
+    try {
+      const labels = new Set<string>();
+      (CUSTOM_COMMON_PROCEDURE_NAME_RULES || []).forEach(r => r && r.label && labels.add(r.label));
+      (COMMON_PROCEDURE_NAME_RULES || []).forEach((r: any) => r && r.label && labels.add(r.label));
+      return Array.from(labels).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    } catch { return []; }
+  }, []);
+
+  // Agregação: Nome Comum x Médico x Média do valor da AIH
+  const commonNameDoctorRows = useMemo(() => {
+    if (!selectedCommonName || selectedCommonName === 'all') return [] as Array<{ doctor: string; cns: string; aihCount: number; totalValue: number; avgValue: number }>;
+    const map = new Map<string, { doctor: string; cns: string; aihCount: number; totalValue: number; hospitals: Set<string> }>();
+    const source = includeAllHospitalsCommon ? (allDoctorsForCommon && allDoctorsForCommon.length > 0 ? allDoctorsForCommon : filteredDoctors) : filteredDoctors;
+    (source || []).forEach(d => {
+      const doctorName = d.doctor_info?.name || '';
+      const cns = d.doctor_info?.cns || doctorName;
+      const specialty = d.doctor_info?.specialty || '';
+      (d.patients || []).forEach(p => {
+        try {
+          const procs = (p.procedures || []).map((pr: any) => ({
+            procedure_code: pr?.procedure_code || '',
+            procedure_date: pr?.procedure_date || pr?.data || pr?.execution_date || '',
+            sequence: typeof pr?.sequence === 'number' ? pr.sequence : (typeof pr?.sequencia === 'number' ? pr.sequencia : undefined)
+          }));
+          const codes = procs.map(x => x.procedure_code).filter(Boolean);
+          if (codes.length === 0) return;
+          const resolved = resolveCommonProcedureName(codes, specialty, procs as any);
+          if (resolved && resolved.trim().toLowerCase() === selectedCommonName.trim().toLowerCase()) {
+            const key = cns || doctorName;
+            const totalVal = Number(p.total_value_reais || 0);
+            const prev = map.get(key) || { doctor: doctorName, cns, aihCount: 0, totalValue: 0, hospitals: new Set<string>() };
+            prev.aihCount += 1;
+            prev.totalValue += isFinite(totalVal) ? totalVal : 0;
+            // adicionar hospital desta AIH
+            try {
+              const hid = (p as any)?.aih_info?.hospital_id;
+              const hospName = (d.hospitals || []).find((h: any) => h.hospital_id === hid)?.hospital_name || hid;
+              if (hospName) prev.hospitals.add(hospName);
+            } catch {}
+            map.set(key, prev);
+          }
+        } catch {}
+      });
+    });
+    const rows = Array.from(map.values()).map(r => ({ 
+      doctor: r.doctor, 
+      cns: r.cns, 
+      aihCount: r.aihCount, 
+      totalValue: r.totalValue, 
+      avgValue: r.aihCount > 0 ? r.totalValue / r.aihCount : 0,
+      hospitalLabel: (() => {
+        const count = r.hospitals.size;
+        if (count === 0) return '—';
+        if (count === 1) return Array.from(r.hospitals)[0];
+        return 'Múltiplos';
+      })()
+    }));
+    // Ordenar por média desc
+    rows.sort((a, b) => b.avgValue - a.avgValue);
+    return rows;
+  }, [filteredDoctors, allDoctorsForCommon, includeAllHospitalsCommon, selectedCommonName]);
 
   // Agrupar por hospital (id -> nome) e criar cortes por hospital
 
@@ -708,6 +804,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
           <TabsTrigger value="specialties">Especialidades</TabsTrigger>
           <TabsTrigger value="hospitals">Hospitais</TabsTrigger>
           <TabsTrigger value="comparisons">Comparativos</TabsTrigger>
+          <TabsTrigger value="common">Nomes Comuns</TabsTrigger>
           <TabsTrigger value="charts">Gráficos</TabsTrigger>
         </TabsList>
 
@@ -1128,6 +1225,87 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
             specialty={selectedSpecialty}
             selectedHospitals={selectedHospitals}
           />
+        </TabsContent>
+
+        {/* NOME COMUM x MÉDICO x MÉDIA AIH */}
+        <TabsContent value="common" className="space-y-4">
+          <Card className="border-slate-200">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Nome Comum × Médico × Média da AIH</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                <div className="w-full">
+                  <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Nome Comum</label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedCommonName}
+                      onChange={(e) => setSelectedCommonName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm h-9"
+                    >
+                      <option value="all">Selecione...</option>
+                      {availableCommonNames.map((label) => (
+                        <option key={label} value={label}>{label}</option>
+                      ))}
+                    </select>
+                    {selectedCommonName !== 'all' && (
+                      <button
+                        onClick={() => setSelectedCommonName('all')}
+                        className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                        title="Limpar"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="w-full">
+                  <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Todos os Hospitais</label>
+                  <div className="flex items-center gap-2 h-9">
+                    <Switch checked={includeAllHospitalsCommon} onCheckedChange={setIncludeAllHospitalsCommon} />
+                    <span className="text-sm text-slate-700">{includeAllHospitalsCommon ? 'Ativado' : 'Desativado'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {selectedCommonName === 'all' ? (
+                <div className="text-xs text-slate-500">Escolha um Nome Comum para ver os médicos e a média do valor das AIHs associadas.</div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50/80 text-slate-600">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-medium">Médico</th>
+                        <th className="text-left px-3 py-2 font-medium">CNS</th>
+                        <th className="text-left px-3 py-2 font-medium">Hospital</th>
+                        <th className="text-right px-3 py-2 font-medium">AIHs</th>
+                        <th className="text-right px-3 py-2 font-medium">Média AIH</th>
+                        <th className="text-right px-3 py-2 font-medium">Total AIH</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {commonNameDoctorRows.length === 0 ? (
+                        <tr>
+                          <td className="px-3 py-3 text-xs text-slate-400" colSpan={5}>Sem dados para o nome comum selecionado.</td>
+                        </tr>
+                      ) : (
+                        commonNameDoctorRows.map((row, i) => (
+                          <tr key={row.cns || i} className="hover:bg-slate-50">
+                            <td className="px-3 py-2 text-slate-800">{row.doctor}</td>
+                            <td className="px-3 py-2 text-slate-700">{row.cns || '—'}</td>
+                            <td className="px-3 py-2 text-slate-700">{row.hospitalLabel}</td>
+                            <td className="px-3 py-2 text-right text-slate-700">{row.aihCount}</td>
+                            <td className="px-3 py-2 text-right font-medium text-slate-900">{row.avgValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                            <td className="px-3 py-2 text-right text-slate-700">{row.totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
