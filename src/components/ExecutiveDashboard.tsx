@@ -899,7 +899,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
+    <div className="w-full px-6 space-y-6">
       {/* CABEÇALHO (Premium) */}
       <div className="relative">
 
@@ -973,7 +973,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* FILTROS EM LINHA (Busca maior) */}
-            <div className="flex flex-col md:flex-row md:items-end gap-3">
+            <div className="flex flex-col md:flex-row md:flex-wrap lg:flex-nowrap md:items-end gap-3">
               {/* BUSCA RÁPIDA (maior largura) */}
               <div className="flex-1 min-w-[240px]">
                 <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Busca Rápida</label>
