@@ -1882,8 +1882,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           className="w-full cursor-pointer p-3 rounded-lg hover:bg-slate-50 border border-slate-200 transition-colors"
                                           onClick={() => togglePatientExpansion(patientKey)}
                                         >
-                                          <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-4">
+                                          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_360px_auto] items-center">
+                                            <div className="flex items-center gap-4 min-w-0">
                                             <div className="flex items-center gap-3">
                                                 {isPatientExpanded ? (
                                                   <ChevronDown className="h-4 w-4 text-slate-500 transition-transform duration-200" />
@@ -1896,17 +1896,30 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               </div>
                                               <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
-                                                  <div className="font-medium text-slate-800">
+                                                  <div className="font-medium text-slate-800 truncate">
                                                     {(/procedimento/i.test(patient.patient_info.name) || /\b\d{2}\.\d{2}\.\d{2}\.\d{3}-\d\b/.test(patient.patient_info.name)) ? 'Nome não disponível' : patient.patient_info.name}
                                                   </div>
-                                                  {patient.common_name && (
-                                                    <Badge 
-                                                      variant="outline" 
-                                                      className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] px-2 py-0.5"
-                                                    >
-                                                      {patient.common_name}
-                                                    </Badge>
-                                                  )}
+                                                  {/* Badge de caráter (Eletivo etc.) ao lado do nome */}
+                                                  {patient.aih_info.care_character && (() => {
+                                                    const raw = String(patient.aih_info.care_character || '').toLowerCase().trim();
+                                                    const isElective = raw === '1' || raw.includes('eletivo');
+                                                    const isUrgent = raw === '2' || raw.includes('urg') || raw.includes('emerg');
+                                                    const color = isElective ? 'text-blue-600' : (isUrgent ? 'text-red-600' : 'text-slate-700');
+                                                    return (
+                                                      <Badge
+                                                        variant="ghost"
+                                                        className={`inline-flex items-center gap-1 rounded-md border-0 bg-transparent px-0 py-0 h-auto ${color} text-[11px]`}
+                                                      >
+                                                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                                        {CareCharacterUtils.formatForDisplay(
+                                                          typeof patient.aih_info.care_character === 'string'
+                                                            ? patient.aih_info.care_character.trim()
+                                                            : String(patient.aih_info.care_character),
+                                                          false
+                                                        )}
+                                                      </Badge>
+                                                    );
+                                                  })()}
                                                   {(() => {
                                                     const doctorKeyLocal = doctor.doctor_info.cns;
                                                     const procTermRawLocal = (procedureSearchTerm.get(doctorKeyLocal) || '').toLowerCase().trim();
@@ -1928,25 +1941,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     }
                                                     return null;
                                                   })()}
-                                                  {patient.aih_info.care_character && (
-                                                    <Badge
-                                                      variant="outline"
-                                                      className={`inline-flex items-center gap-1.5 rounded-md ${CareCharacterUtils.getStyleClasses(
-                                                        patient.aih_info.care_character
-                                                      )} text-[11px]`}
+                                                </div>
+                                                <div className="text-sm text-slate-600 font-medium flex items-center gap-2">
+                                                  <span>CNS: {patient.patient_info.cns}</span>
+                                                  {patient.common_name && (
+                                                    <Badge 
+                                                      variant="outline" 
+                                                      className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] px-2 py-0.5"
                                                     >
-                                                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                                                      {CareCharacterUtils.formatForDisplay(
-                                                        typeof patient.aih_info.care_character === 'string'
-                                                          ? patient.aih_info.care_character.trim()
-                                                          : String(patient.aih_info.care_character),
-                                                        false
-                                                      )}
+                                                      {patient.common_name}
                                                     </Badge>
                                                   )}
-                                                </div>
-                                                <div className="text-sm text-slate-600 font-medium">
-                                                  CNS: {patient.patient_info.cns}
                                                 </div>
                                                 <AihDatesBadges
                                                   admissionDate={patient.aih_info.admission_date}
@@ -1954,17 +1959,29 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   competencia={(patient as any)?.aih_info?.competencia}
                                                   className="text-sm"
                                                 />
-                                                
-                                                <PatientAihInfoBadges
-                                                  aihNumber={patient.aih_info.aih_number}
-                                                  mainCid={(patient.aih_info as any).main_cid}
-                                                  specialty={(patient.aih_info as any).specialty}
-                                                  requestingPhysician={(patient.aih_info as any).requesting_physician}
-                                                  careModality={(patient.aih_info as any).care_modality}
-                                                  professionalCbo={(patient.aih_info as any).professional_cbo}
-                                                  className="mt-2"
-                                                />
+                                                {/* Bloco de AIH/CID/Especialidade/Modalidade - visível no mobile dentro do bloco esquerdo */}
+                                                <div className="md:hidden">
+                                                  <PatientAihInfoBadges
+                                                    aihNumber={patient.aih_info.aih_number}
+                                                    mainCid={(patient.aih_info as any).main_cid}
+                                                    specialty={(patient.aih_info as any).specialty}
+                                                    requestingPhysician={(patient.aih_info as any).requesting_physician}
+                                                    careModality={(patient.aih_info as any).care_modality}
+                                                    professionalCbo={(patient.aih_info as any).professional_cbo}
+                                                  />
+                                                </div>
                                               </div>
+                                            </div>
+                                            {/* Bloco central (desktop): AIH, CID, Especialidade, Modalidade (largura fixa) */}
+                                            <div className="hidden md:block w-[360px] self-center">
+                                              <PatientAihInfoBadges
+                                                aihNumber={patient.aih_info.aih_number}
+                                                mainCid={(patient.aih_info as any).main_cid}
+                                                specialty={(patient.aih_info as any).specialty}
+                                                requestingPhysician={(patient.aih_info as any).requesting_physician}
+                                                careModality={(patient.aih_info as any).care_modality}
+                                                professionalCbo={(patient.aih_info as any).professional_cbo}
+                                              />
                                             </div>
                                             <div className="text-right">
                                               {(() => {
@@ -1994,36 +2011,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               <div className="text-sm text-slate-600 mb-2">
                                                 {patient.procedures.length} procedimento(s)
                                               </div>
-                                              {/* ✅ ESTATÍSTICAS RÁPIDAS DOS PROCEDIMENTOS */}
-                                              {patient.procedures.length > 0 && (
-                                                <div className="flex gap-1 justify-end">
-                                                  {(() => {
-                                                    const approved = patient.procedures.filter(p => p.approval_status === 'approved').length;
-                                                    const pending = patient.procedures.filter(p => p.approval_status === 'pending').length;
-                                                    const rejected = patient.procedures.filter(p => p.approval_status === 'rejected').length;
-                                                    
-                                                    return (
-                                                      <>
-                                                        {approved > 0 && (
-                                                          <Badge variant="default" className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 border-emerald-200">
-                                                            ✓{approved}
-                                                          </Badge>
-                                                        )}
-                                                        {pending > 0 && (
-                                                          <Badge variant="default" className="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 border-emerald-200">
-                                                            ✓{pending}
-                                                          </Badge>
-                                                        )}
-                                                        {rejected > 0 && (
-                                                          <Badge variant="destructive" className="bg-red-100 text-red-700 text-xs px-2 py-1 border-red-200">
-                                                            ✗{rejected}
-                                                          </Badge>
-                                                        )}
-                                                      </>
-                                                    );
-                                                  })()}
-                                                </div>
-                                              )}
+                                              {/* Quick stats removidos a pedido: sem badge verde com check */}
                                             </div>
                                           </div>
                                         </div>
@@ -2050,7 +2038,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           ) : (
                                             <div className="space-y-3">
                                               {patient.procedures
-                                                .sort((a, b) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime())
+                                                .sort((a, b) => {
+                                                  const a04 = ((a?.procedure_code || '').toString().trim().startsWith('04')) ? 1 : 0;
+                                                  const b04 = ((b?.procedure_code || '').toString().trim().startsWith('04')) ? 1 : 0;
+                                                  if (a04 !== b04) return b04 - a04; // 04 primeiro
+                                                  const ad = new Date(a.procedure_date).getTime();
+                                                  const bd = new Date(b.procedure_date).getTime();
+                                                  return bd - ad; // depois por data desc
+                                                })
                                                 .map((procedure, procIndex) => {
                                                   const careCharRaw = (patient as any)?.aih_info?.care_character;
                                                   const careCharStr = typeof careCharRaw === 'string' ? careCharRaw.trim() : String(careCharRaw ?? '');
@@ -2075,7 +2070,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   <div className="flex items-start justify-between">
                                                     <div className="flex-1">
                                                       <div className="flex items-center gap-2 mb-2">
-                                                        <div className={`font-medium px-3 py-1 rounded-lg text-sm ${
+                                                        <div className={`font-medium px-3 py-1 rounded-lg text-xs ${
                                                           isMedical04 
                                                             ? 'text-emerald-800 bg-emerald-100 border border-emerald-200' 
                                                             : 'text-slate-800 bg-slate-100 border border-slate-200'
@@ -2083,7 +2078,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           {procedure.procedure_code}
                                                         </div>
                                                         {isMedical04 && (
-                                                          <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-300 text-xs">
+                                                          <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-300 text-[10px]">
                                                             🩺 Médico 04
                                                           </Badge>
                                                         )}
@@ -2118,7 +2113,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                         )}
                                                       </div>
                                                       
-                                                      <div className="text-sm text-slate-700 mb-3 leading-relaxed">
+                                                      <div className="text-xs text-slate-700 mb-3 leading-relaxed">
                                                         {procedure.procedure_description || 'Descrição não disponível'}
                                                       </div>
                                                       
@@ -2137,13 +2132,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           <div className="flex items-center gap-2">
                                                             <Stethoscope className="h-4 w-4 text-slate-500" />
                                                             <span className="font-medium">Executante:</span>
-                                                            <span className="truncate">{procedure.professional_name}</span>
+                                                            <span className="truncate text-xs">{procedure.professional_name}</span>
                                                           </div>
                                                         )}
                                                         
                                                         {procedure.cbo && (
                                                           <div className="flex items-center gap-2">
-                                                            <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 text-xs">
+                                                            <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 text-[10px]">
                                                               CBO: {procedure.cbo}
                                                             </Badge>
                                                           </div>
@@ -2153,7 +2148,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           <div className="flex items-center gap-2">
                                                             <Users className="h-4 w-4 text-slate-500" />
                                                             <span className="font-medium">Participação:</span>
-                                                            <span>{procedure.participation}</span>
+                                                            <span className="text-xs">{procedure.participation}</span>
                                                           </div>
                                                         )}
                                                         
@@ -2161,7 +2156,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           <div className="flex items-center gap-2">
                                                             <TrendingUp className="h-4 w-4 text-slate-500" />
                                                             <span className="font-medium">Confiança:</span>
-                                                            <span>{(procedure.match_confidence * 100).toFixed(1)}%</span>
+                                                            <span className="text-xs">{(procedure.match_confidence * 100).toFixed(1)}%</span>
                                                           </div>
                                                         )}
                                                       </div>
