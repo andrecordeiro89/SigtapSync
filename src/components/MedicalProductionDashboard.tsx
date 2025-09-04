@@ -437,6 +437,7 @@ interface MedicalProductionDashboardProps {
   searchTerm?: string; // 🆕 BUSCA GLOBAL
   selectedCareCharacter?: string; // 🆕 FILTRO GLOBAL DE CARÁTER DE ATENDIMENTO
   selectedSpecialty?: string; // 🆕 FILTRO GLOBAL DE ESPECIALIDADE
+  selectedCareSpecialty?: string; // 🆕 NOVO: ESPECIALIDADE DE ATENDIMENTO (AIH)
 }
 
 // ✅ COMPONENTE PRINCIPAL
@@ -447,7 +448,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   selectedHospitals = ['all'], // 🆕 FILTROS GLOBAIS DE HOSPITAL
   searchTerm = '', // 🆕 BUSCA GLOBAL
   selectedCareCharacter = 'all', // 🆕 FILTRO GLOBAL DE CARÁTER DE ATENDIMENTO
-  selectedSpecialty = 'all' // 🆕 FILTRO GLOBAL DE ESPECIALIDADE
+  selectedSpecialty = 'all', // 🆕 FILTRO GLOBAL DE ESPECIALIDADE
+  selectedCareSpecialty = 'all' // 🆕 NOVO: ESPECIALIDADE DE ATENDIMENTO (AIH)
 }) => {
   const { user, canAccessAllHospitals, hasFullAccess } = useAuth();
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
@@ -1120,17 +1122,29 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       });
     }
 
-    // Filtrar por especialidade (global)
+    // Filtrar por especialidade MÉDICA (global)
     if (selectedSpecialty && selectedSpecialty !== 'all') {
       const sel = selectedSpecialty.toLowerCase();
       filtered = filtered.filter(doctor => (doctor.doctor_info.specialty || '').toLowerCase() === sel);
+    }
+
+    // Filtrar por Especialidade de Atendimento (AIH) no nível de pacientes dentro de cada médico
+    if (selectedCareSpecialty && selectedCareSpecialty !== 'all') {
+      const selCare = selectedCareSpecialty.toLowerCase();
+      filtered = filtered.map(doctor => {
+        const patientsFiltered = doctor.patients.filter(p => {
+          const aihSpec = (((p as any).aih_info?.specialty) || ((p as any).aih_info?.especialidade) || '').toString();
+          return aihSpec.toLowerCase() === selCare;
+        });
+        return { ...doctor, patients: patientsFiltered } as typeof doctor;
+      }).filter(d => d.patients.length > 0);
     }
 
     setFilteredDoctors(filtered);
     
     // Reset da página atual quando filtros são aplicados
     setCurrentDoctorPage(1);
-  }, [searchTerm, selectedSpecialty, doctors, selectedHospitals, selectedCareCharacter, dateRange]);
+  }, [searchTerm, selectedSpecialty, selectedCareSpecialty, doctors, selectedHospitals, selectedCareCharacter, dateRange]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
   const toggleDoctorExpansion = (doctorKey: string) => {
@@ -2171,7 +2185,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           return (
                                                             <div className="text-right">
                                                               <div className="text-[11px] text-slate-500 line-through">{formatCurrency(base)}</div>
-                                                              <div className="text-xl font-extrabold text-emerald-700">{formatCurrency(increment)}</div>
+                                                              <div className="text-lg font-extrabold text-emerald-700">{formatCurrency(increment)}</div>
                                                             </div>
                                                           );
                                                         }
@@ -2190,7 +2204,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                         } else {
                                                           // ✅ PROCEDIMENTO NORMAL OU ANESTESISTA 03.xxx: Mostrar valor
                                                           return (
-                                                            <div className={`text-xl font-bold ${
+                                                            <div className={`text-lg font-bold ${
                                                               isMedical04 ? 'text-emerald-700' : 'text-slate-900'
                                                             }`}>
                                                               {formatCurrency(procedure.value_reais)}

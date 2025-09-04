@@ -938,6 +938,30 @@ export class AIHPersistenceService {
         competencia: null as any
       };
       
+      // 🎯 Regra de fallback para Especialidade:
+      // Padrão "01 - Cirúrgico"; se Urgência/Emergência, usar "03 - Clínico",
+      // exceto parto cesáreo (permanece "01 - Cirúrgico").
+      const resolveSpecialtyFromRules = (): string => {
+        try {
+          const extracted = (aih.especialidade || '').toString().trim();
+          if (extracted) return extracted;
+          const care = normalizeCareCharacterStrict(aih.caracterAtendimento);
+          const isUrgency = care === '2';
+          let specialty = '01 - Cirúrgico';
+          if (isUrgency) {
+            const principal = (aih.procedimentoPrincipal || '').toString().toLowerCase();
+            const isCesarean =
+              /\bparto\b.*\bcesa/.test(principal) ||
+              /\bces(ar|área|ariana|ariano)/.test(principal) ||
+              principal.includes('cesarea') || principal.includes('cesárea');
+            specialty = isCesarean ? '01 - Cirúrgico' : '03 - Clínico';
+          }
+          return specialty;
+        } catch {
+          return '01 - Cirúrgico';
+        }
+      };
+
       // 🆕 CAMPOS EXPANDIDOS COMPLETOS – preparos em PT e EN
       // Preferimos os nomes PT do seu schema; se falhar, tentamos EN como fallback.
       const expandedAihDataPT = {
@@ -965,7 +989,7 @@ export class AIHPersistenceService {
         motivo_encerramento: aih.motivoEncerramento || null,
 
         // Classificações de atendimento (PT)
-        especialidade: aih.especialidade || null,
+        especialidade: (aih.especialidade && aih.especialidade.trim() !== '') ? aih.especialidade : resolveSpecialtyFromRules(),
         modalidade: aih.modalidade || null,
         caracter_atendimento: aih.caracterAtendimento || null,
 
@@ -986,7 +1010,7 @@ export class AIHPersistenceService {
         procedure_requested: aih.procedimentoSolicitado || null,
         procedure_changed: aih.mudancaProc || false,
         discharge_reason: aih.motivoEncerramento || null,
-        specialty: aih.especialidade || null,
+        specialty: (aih.especialidade && aih.especialidade.trim() !== '') ? aih.especialidade : resolveSpecialtyFromRules(),
         care_modality: aih.modalidade || null,
         care_character: aih.caracterAtendimento || null,
         estimated_original_value: (aih as any).estimatedOriginalValue ?? null
