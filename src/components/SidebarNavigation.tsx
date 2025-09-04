@@ -281,10 +281,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       
       <Sidebar side="left" variant="sidebar" collapsible="icon" className="border-r-0 shadow-2xl shadow-slate-900/10 h-screen flex flex-col">
         {/* HEADER - Logo e Nome da Empresa com Design Premium */}
-        <SidebarHeader className="relative border-b border-slate-200/60 bg-gradient-to-br from-slate-50 to-slate-100/50 p-6 backdrop-blur-sm">
-          {/* Background decorativo */}
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-500/5 to-blue-500/5"></div>
-          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full blur-3xl"></div>
+        <SidebarHeader className="relative bg-sidebar p-6">
           
           <div className="relative flex items-center space-x-4">
             <div className="relative group">
@@ -296,8 +293,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                 <Building2 className="h-6 w-6 text-white drop-shadow-sm" />
               </div>
               
-              {/* Pulse effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl animate-pulse opacity-20"></div>
+              {/* Efeito de pulsar removido para manter o ícone estático */}
             </div>
             
             <div className="group-data-[collapsible=icon]:hidden flex-1">
@@ -309,37 +305,23 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                   Sync
                 </div>
               </div>
-              <div className="text-xs text-slate-600 mt-0.5 font-medium tracking-wide">
-                Billing Wizard v3.0
-              </div>
+              {/* Texto de versão removido */}
               
               {canAccessAllHospitals() && (
-                <Badge className="mt-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 text-xs px-3 py-1.5 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group-data-[collapsible=icon]:hidden">
+                <Badge className="mt-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-0 text-xs px-3 py-1.5 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 group-data-[collapsible=icon]:hidden">
                   <Globe className="h-3 w-3 mr-1.5" />
                   ADMIN
                 </Badge>
               )}
             </div>
           </div>
-          {/* Toggle fixo no topo: abaixo do badge admin, canto inferior direito do header */}
-          <div className="absolute bottom-3 right-3">
-            <SidebarTrigger
-              className="h-8 w-8 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-sm"
-              aria-label="Expandir/Recolher menu"
-              title="Expandir/Recolher menu"
-            />
-          </div>
+          {/* Botão de expansão removido conforme solicitação */}
         </SidebarHeader>
 
         {/* CONTENT - Menu de Navegação com Design Premium */}
         <SidebarContent className="px-4 py-6 space-y-3 flex-1 overflow-y-auto">
           <SidebarGroup>
-            <SidebarGroupLabel className="text-xs font-bold text-slate-500 uppercase tracking-wider px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/80 rounded-xl mb-4 border border-slate-200/60 group-data-[collapsible=icon]:hidden">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full animate-pulse"></div>
-                <span>Navegação</span>
-              </div>
-            </SidebarGroupLabel>
+            {/* Label "Navegação" removido conforme solicitação */}
             <SidebarGroupContent className="space-y-1">
               <SidebarMenu>
                 {tabs.map((tab, index) => {
@@ -426,7 +408,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                       min-h-[4.5rem]
                     `}>
                       <div className="relative flex-shrink-0">
-                        <Avatar className="h-12 w-12 ring-2 ring-white shadow-lg">
+                        <Avatar className="h-10 w-10 ring-2 ring-white shadow-lg">
                           <AvatarFallback className={`text-sm font-bold ${
                             canAccessAllHospitals() 
                               ? 'bg-purple-500 text-white' 
@@ -444,8 +426,8 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white group-data-[collapsible=icon]:hidden">
                         </div>
                       </div>
-                      <div className="group-data-[collapsible=icon]:hidden flex-1 text-left min-w-0 ml-4">
-                        <div className="text-sm font-semibold text-slate-900 truncate group-data-[state=open]/user-button:text-blue-700 transition-all duration-200">
+                      <div className="group-data-[collapsible=icon]:hidden flex-1 text-left min-w-0 ml-3">
+                        <div className="text-sm font-semibold text-slate-900 whitespace-normal break-words group-data-[state=open]/user-button:text-blue-700 transition-all duration-200">
                           {user.full_name || user.email?.split('@')[0]}
                         </div>
                         <div className="flex items-center space-x-2 mt-1">
