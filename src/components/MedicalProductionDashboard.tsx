@@ -1299,6 +1299,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
   }, [filteredStats, onStatsUpdate, isLoading]);
 
+  // 🏥 Nome do hospital selecionado para exibir como badge no título
+  const selectedHospitalName = React.useMemo(() => {
+    try {
+      if (selectedHospitals && selectedHospitals.length > 0 && !selectedHospitals.includes('all')) {
+        const id = selectedHospitals[0];
+        const match = availableHospitals.find(h => h.id === id);
+        return match?.name || 'Hospital selecionado';
+      }
+      return 'Todos os hospitais';
+    } catch {
+      return 'Hospital';
+    }
+  }, [selectedHospitals, availableHospitals]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -1463,7 +1477,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               <Stethoscope className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-gray-900">Produção Médica - Médicos Responsáveis</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-xl font-bold text-gray-900">Produção Médica - Pagamentos Médicos</h3>
+                <Badge 
+                  variant="outline" 
+                  className="bg-gradient-to-br from-blue-50/80 to-blue-100/50 text-blue-800 border-blue-200/70 shadow-sm backdrop-blur-sm px-2.5 py-0.5 text-xs font-semibold"
+                >
+                  {selectedHospitalName}
+                </Badge>
+              </div>
               <p className="text-sm text-gray-600 mt-1">Visualização hierárquica completa: Médicos → Pacientes → Procedimentos</p>
                 </div>
               </div>

@@ -1171,7 +1171,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                         key={h.id}
                         value={h.id}
                         title={h.name}
-                        className="justify-center text-center whitespace-nowrap text-[11px] leading-tight px-1.5 py-1 rounded-none first:rounded-l-md last:rounded-r-md data-[state=active]:bg-background data-[state=active]:text-foreground hover:bg-background/60 transition-colors min-h-[1.5rem] w-full"
+                        className="justify-center text-center whitespace-nowrap text-[11px] leading-tight px-1.5 py-1 rounded-none first:rounded-l-md last:rounded-r-md transition-colors min-h-[1.5rem] w-full border border-transparent hover:bg-blue-50/40 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200/80 data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-50/80 data-[state=active]:to-blue-100/40 data-[state=active]:text-blue-800 data-[state=active]:border-blue-200/60 data-[state=active]:shadow-sm data-[state=active]:backdrop-blur-sm"
                         aria-label={`Selecionar ${h.name}`}
                       >
                         {getHospitalTabLabel(h.name)}
