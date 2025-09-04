@@ -51,7 +51,7 @@ const Index = () => {
       <SidebarNavigation activeTab={activeTab} onTabChange={setActiveTab} />
       <SidebarInset>
         {/* Conteúdo principal */}
-        <main className={`flex-1 overflow-auto ${isCompact ? 'p-3' : 'p-4 md:p-6'} min-h-svh`}>
+        <main className={`flex-1 overflow-y-auto overflow-x-hidden ${isCompact ? 'p-3' : 'p-4 md:p-6'} min-h-svh`}>
           <div className="w-full">
             {renderContent()}
           </div>
