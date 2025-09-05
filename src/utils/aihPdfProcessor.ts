@@ -607,6 +607,29 @@ export class AIHPDFProcessor {
     // Extrair apenas código do CID principal
     const cidCode = data.cidPrincipal?.match(/^([A-Z]\d+)/)?.[1] || '';
 
+    // 🔒 Normalização segura do Caráter e Fallback de Especialidade (mesma regra do serviço)
+    const normalizeCareCharacterUI = (raw?: any): '1' | '2' => {
+      try {
+        const v = String(raw ?? '').trim().toLowerCase();
+        if (v === '2' || v === '02' || v === 'urgencia' || v === 'urgência' || v.includes('urg') || v.includes('emerg')) return '2';
+        if (v === '1' || v === '01' || v === 'eletivo') return '1';
+        return '1';
+      } catch { return '1'; }
+    };
+    const deriveSpecialtyFallback = (careCode: '1'|'2', principal: string | undefined): string => {
+      try {
+        if (careCode !== '2') return '01 - Cirúrgico';
+        const p = (principal || '').toString().toLowerCase();
+        const isCesarean = /\bparto\b.*\bcesa/.test(p) || /\bces(ar|área|ariana|ariano)/.test(p) || p.includes('cesarea') || p.includes('cesárea');
+        return isCesarean ? '01 - Cirúrgico' : '03 - Clínico';
+      } catch { return '01 - Cirúrgico'; }
+    };
+
+    const careCode = normalizeCareCharacterUI(data.caracterAtendimento);
+    const specialtySafe = (data.especialidade && data.especialidade.trim() !== '')
+      ? data.especialidade
+      : deriveSpecialtyFallback(careCode, procedimentoPrincipalCompleto);
+
     const aih: AIH = {
       id: crypto.randomUUID(),
       hospitalId: hospitalContext?.hospitalId,
@@ -653,9 +676,9 @@ export class AIHPDFProcessor {
       mudancaProc: data.mudancaProc?.toLowerCase() === 'sim',
       procedimentoPrincipal: procedimentoPrincipalCompleto,
       cidPrincipal: cidCode,
-      especialidade: data.especialidade || '',
+      especialidade: specialtySafe,
       modalidade: data.modalidade || '',
-      caracterAtendimento: data.caracterAtendimento || '',
+      caracterAtendimento: careCode,
       
       // Dados específicos de faturamento SUS
       utiDias: data.utiDias ? parseInt(data.utiDias) : undefined,

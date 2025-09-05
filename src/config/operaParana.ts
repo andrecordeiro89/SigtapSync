@@ -1,6 +1,6 @@
 // Configuração central do Programa Opera Paraná
-// - Elegibilidade: procedimentos médicos (códigos iniciados por '04') com caráter de atendimento eletivo ('1' ou 'Eletivo')
-// - Exclusões: lista de códigos que NÃO recebem o incremento de 150%
+// - Elegibilidade: procedimentos com caráter de atendimento eletivo ('1' ou 'Eletivo')
+// - Exclusões: lista de códigos que NÃO recebem o incremento (eletivo e urgência)
 
 export const OPERA_PARANA_EXCLUDED_CODES_RAW: string[] = [
   // Quadril
@@ -42,7 +42,7 @@ export const isOperaParanaEligible = (
   careCharacter?: string | number | null
 ): boolean => {
   const codeStr = (procedureCode ?? '').toString().trim();
-  if (!codeStr || !codeStr.startsWith('04')) return false;
+  if (!codeStr) return false;
   const ccRaw = (careCharacter ?? '').toString().trim();
   // normalizar: remover zeros à esquerda e acentos, case-insensitive
   const ccNum = ccRaw.replace(/^0+/, '');
@@ -119,13 +119,13 @@ export const computeIncrementForProcedures = (
     return eligibleSum > 0 ? eligibleSum * 0.5 : 0;
   }
 
-  // Regra 2: Urgência/Emergência (20% sobre 04)
+  // Regra 2: Urgência/Emergência (20% sobre todos, exceto excluídos)
   if (isUrgencyCare(careCharacter)) {
-    const surgicalSum = procs.reduce((sum, p) => {
-      const code = (p.procedure_code || '').toString().trim();
-      return code.startsWith('04') ? sum + (p.value_reais || 0) : sum;
+    const sumAllEligible = procs.reduce((sum, p) => {
+      const normalized = normalizeSigtapCode((p.procedure_code || '').toString());
+      return OPERA_PARANA_EXCLUDED_CODES.has(normalized) ? sum : sum + (p.value_reais || 0);
     }, 0);
-    return surgicalSum > 0 ? surgicalSum * 0.2 : 0;
+    return sumAllEligible > 0 ? sumAllEligible * 0.2 : 0;
   }
 
   return 0;
@@ -135,8 +135,8 @@ export const isUrgencySurgicalEligible = (
   procedureCode?: string,
   careCharacter?: string | number | null
 ): boolean => {
-  const code = (procedureCode || '').toString().trim();
-  return isUrgencyCare(careCharacter) && code.startsWith('04');
+  const normalized = normalizeSigtapCode((procedureCode || '').toString());
+  return isUrgencyCare(careCharacter) && !OPERA_PARANA_EXCLUDED_CODES.has(normalized);
 };
 
 export const getProcedureIncrementMeta = (

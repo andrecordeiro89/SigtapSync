@@ -16,6 +16,30 @@ export const CUSTOM_COMMON_PROCEDURE_NAME_RULES: CommonNameRule[] = [
     label: "ADENOIDECTOMIA",
     anyOf: ["04.04.01.001-6"],
     specialties: ["Otorrinolaringologia", "Otorrino"]
+  },
+  {
+    label: "VARIZES UNILATERAL",
+    anyOf: ["04.06.02.057-4"]
+  },
+  {
+    label: "ARTRODESE DE PEQUENAS ARTICULAÇÕES",
+    anyOf: ["04.08.06.005-0"],
+    specialties: [
+      "Ortopedia",
+      "Traumatologia",
+      "Ortopedia e Traumatologia",
+      "Ortopedista"
+    ]
+  },
+  {
+    label: "HISTERECTOMIA",
+    anyOf: ["04.09.06.011-9"],
+    specialties: [
+      "Ginecologia e Obstetrícia",
+      "Ginecologia",
+      "Obstetrícia",
+      "Ginecologista"
+    ]
   }
 ];
 

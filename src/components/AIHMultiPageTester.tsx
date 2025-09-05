@@ -60,6 +60,7 @@ import {
   getAnesthetistProcedureType 
 } from '../utils/anesthetistLogic';
 
+import { CareCharacterUtils } from '../config/careCharacterCodes';
 import { 
   formatParticipationCode, 
   getParticipationBadge, 
@@ -177,6 +178,54 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
       }
     } catch {}
   }, [(aihCompleta as any)?.dataFim, (aihCompleta as any)?.dataInicio, (aihCompleta as any)?.competencia]);
+
+  // ✅ Normalização segura do Caráter de Atendimento (UI) e fallback de Especialidade
+  const normalizeCareCharacterUI = (raw?: any): '1' | '2' => {
+    try {
+      const v = String(raw ?? '').trim().toLowerCase();
+      if (v === '2' || v === '02' || v === 'urgencia' || v === 'urgência' || v.includes('urg') || v.includes('emerg')) return '2';
+      if (v === '1' || v === '01' || v === 'eletivo') return '1';
+      return '1';
+    } catch {
+      return '1';
+    }
+  };
+
+  const deriveSpecialtyFallback = (careCode: '1'|'2', principal: string | undefined): string => {
+    try {
+      if (careCode !== '2') return '01 - Cirúrgico';
+      const p = (principal || '').toString().toLowerCase();
+      const isCesarean = /\bparto\b.*\bcesa/.test(p) || /\bces(ar|área|ariana|ariano)/.test(p) || p.includes('cesarea') || p.includes('cesárea');
+      return isCesarean ? '01 - Cirúrgico' : '03 - Clínico';
+    } catch {
+      return '01 - Cirúrgico';
+    }
+  };
+
+  // Aplicar defaults organizados para caracterAtendimento e especialidade (antes de salvar)
+  useEffect(() => {
+    try {
+      const currentCare = normalizeCareCharacterUI((aihCompleta as any)?.caracterAtendimento);
+      const needsCareFix = !(aihCompleta as any)?.caracterAtendimento || !CareCharacterUtils.isValidCode((aihCompleta as any)?.caracterAtendimento);
+      const currentSpec = (aihCompleta as any)?.especialidade as string | undefined;
+      const needsSpecFix = !currentSpec || currentSpec.trim() === '';
+      if (!needsCareFix && !needsSpecFix) return;
+
+      const fixedCare = needsCareFix ? currentCare : ((aihCompleta as any)?.caracterAtendimento as '1'|'2');
+      const fixedSpec = needsSpecFix ? deriveSpecialtyFallback(fixedCare, (aihCompleta as any)?.procedimentoPrincipal) : currentSpec!;
+
+      onUpdateAIH({
+        ...(aihCompleta as any),
+        caracterAtendimento: fixedCare,
+        especialidade: fixedSpec
+      } as any);
+    } catch {}
+  // Dependências que podem afetar os defaults
+  }, [
+    (aihCompleta as any)?.caracterAtendimento,
+    (aihCompleta as any)?.especialidade,
+    (aihCompleta as any)?.procedimentoPrincipal
+  ]);
   
   // Definir hospital atual para busca de médicos
   const currentHospital = { id: user?.hospital_id || '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b', name: 'Hospital de Desenvolvimento' };
@@ -1191,7 +1240,12 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                 <div>
                   <label className="text-sm font-medium text-gray-600">Caráter Atendimento</label>
                   <p className="text-gray-900 text-sm bg-gray-50 px-2 py-1 rounded mt-1">
-                    {aihCompleta.caracterAtendimento || 'N/A'}
+                    {(() => {
+                      const raw = (aihCompleta as any)?.caracterAtendimento;
+                      if (!raw) return 'N/A';
+                      const code = normalizeCareCharacterUI(raw);
+                      return CareCharacterUtils.formatForDisplay(code, true);
+                    })()}
                   </p>
                 </div>
               </div>
