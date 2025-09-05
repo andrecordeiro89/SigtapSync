@@ -17,6 +17,7 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { getAnesthetistProcedureType } from '@/utils/anesthetistLogic';
 import { getProcedureIncrementMeta } from '@/config/operaParana';
+import { resolveCommonProcedureName } from '@/utils/commonProcedureName';
 
 interface ProcedureData {
   id: string;
@@ -124,6 +125,13 @@ const ProcedureInlineCard = ({
   const StatusIcon = config.icon;
   const anesthInfo = getAnesthetistProcedureType(procedure.professional_cbo, procedure.procedure_code);
   const incMeta = getProcedureIncrementMeta(procedure.procedure_code, aihCareCharacter);
+  const commonName = (() => {
+    try {
+      const code = (procedure.procedure_code || '').trim();
+      if (!code) return null;
+      return resolveCommonProcedureName([code], undefined, [{ procedure_code: code, sequence: procedure.procedure_sequence }]);
+    } catch { return null; }
+  })();
 
   const isMedical04 = (() => {
     try { return (procedure.procedure_code || '').trim().startsWith('04'); } catch { return false; }
@@ -223,6 +231,13 @@ const ProcedureInlineCard = ({
                   <p className="text-sm font-medium text-gray-900 leading-relaxed">
                     {procedureDescription}
                   </p>
+                  {commonName && (
+                    <div className="mt-1">
+                      <Badge variant="outline" className="text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200">
+                        {commonName}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

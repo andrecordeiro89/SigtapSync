@@ -96,9 +96,10 @@ export interface SimpleProcedureLike {
 }
 
 /**
- * Calcula o incremento total para uma AIH a partir dos procedimentos e do caráter de atendimento.
- * - Eletivo (1): +50% sobre os procedimentos elegíveis do Opera Paraná (códigos 04 não excluídos)
- * - Urgência/Emergência (2): +20% sobre todos os procedimentos cirúrgicos (códigos iniciados por 04)
+ * Calcula o incremento (apenas a parcela acrescida) para uma AIH a partir dos procedimentos e do caráter de atendimento.
+ * - Eletivo (1): incremento de +150% no programa (UI por procedimento exibe total com fator 1.5),
+ *   porém ESTA função retorna somente o acréscimo (ex.: 50% da base ⇒ base * 0.5).
+ * - Urgência/Emergência (2): retorna somente o acréscimo de +20% (base * 0.2) sobre os elegíveis.
  * Retorna 0 quando não houver incremento aplicável.
  */
 export const computeIncrementForProcedures = (
@@ -116,6 +117,7 @@ export const computeIncrementForProcedures = (
     const eligibleSum = procs.reduce((sum, p) => (
       isOperaParanaEligible(p.procedure_code, '1') ? sum + (p.value_reais || 0) : sum
     ), 0);
+    // Retornar apenas a PARCELA DO INCREMENTO (para somar à base na AIH): 50% da base elegível
     return eligibleSum > 0 ? eligibleSum * 0.5 : 0;
   }
 

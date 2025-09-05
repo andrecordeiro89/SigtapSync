@@ -40,6 +40,20 @@ export const CUSTOM_COMMON_PROCEDURE_NAME_RULES: CommonNameRule[] = [
       "Obstetrícia",
       "Ginecologista"
     ]
+  },
+  {
+    label: "CISTORRAFIA",
+    // Caso haja os dois códigos ou apenas o CISTORRAFIA, considerar CISTORRAFIA.
+    // Para o card individual funcionar, basta detectar a presença de 04.09.01.008-1.
+    anyOf: ["04.09.01.008-1"]
+  },
+  {
+    label: "VASECTOMIA",
+    anyOf: ["04.09.04.024-0"]
+  },
+  {
+    label: "HIDROCELE",
+    anyOf: ["04.09.04.021-5"]
   }
 ];
 

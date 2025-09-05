@@ -17,6 +17,7 @@ import {
   type ProcedureDetail
 } from '../services/doctorPatientService';
 import { isDoctorCoveredForOperaParana, computeIncrementForProcedures, getProcedureIncrementMeta } from '../config/operaParana';
+import { sumProceduresBaseReais } from '@/utils/valueHelpers';
 
 interface DoctorPatientsDropdownProps {
   doctorName: string;
@@ -432,7 +433,7 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                           const doctorCovered = isDoctorCoveredForOperaParana(doctorName);
                           const baseAih = typeof (patient as any).total_value_reais === 'number'
                             ? (patient as any).total_value_reais
-                            : patient.procedures.reduce((sum, proc) => sum + proc.value_reais, 0);
+                            : sumProceduresBaseReais(patient.procedures as any);
                           const careCharacter = (patient.aih_info as any)?.care_character;
                           const increment = doctorCovered ? computeIncrementForProcedures(patient.procedures as any, careCharacter, doctorName) : 0;
                           const hasIncrement = increment > 0;

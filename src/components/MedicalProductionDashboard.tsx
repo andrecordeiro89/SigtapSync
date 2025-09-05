@@ -54,6 +54,7 @@ import ReportGenerator from './ReportGenerator';
 import PatientAihInfoBadges from './PatientAihInfoBadges';
 import AihDatesBadges from './AihDatesBadges';
 import { isDoctorCoveredForOperaParana, computeIncrementForProcedures } from '../config/operaParana';
+import { sumProceduresBaseReais } from '@/utils/valueHelpers';
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -2023,9 +2024,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               {(() => {
                                                 const baseAih = typeof (patient as any).total_value_reais === 'number'
                                                   ? (patient as any).total_value_reais
-                                                  : patient.procedures
-                                                      .filter(filterCalculableProcedures)
-                                                      .reduce((sum, proc) => sum + (proc.value_reais || 0), 0);
+                                                  : sumProceduresBaseReais(patient.procedures as any);
                                                 const careCharacter = (patient as any)?.aih_info?.care_character;
                                                 const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
                                                 const increment = doctorCovered ? computeIncrementForProcedures(patient.procedures as any, careCharacter, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id) : 0;

@@ -20,6 +20,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { filterCalculableProcedures } from '../utils/anesthetistLogic';
+import { sumProceduresBaseReais } from '@/utils/valueHelpers';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import PatientAihInfoBadges from './PatientAihInfoBadges';
@@ -236,12 +237,9 @@ const PatientManagement = () => {
       filterCalculableProcedures({ cbo: proc.professional_cbo, procedure_code: proc.procedure_code })
     );
     
-    const totalValue = activeProcedures.reduce((sum, proc) => {
-      const qty = proc.quantity ?? 1;
-      if (proc.value_charged && proc.value_charged > 0) return sum + proc.value_charged;
-      const unit = proc.sigtap_procedures?.value_hosp_total || 0;
-      return sum + unit * qty;
-    }, 0);
+    // Somar em CENTAVOS a partir de uma base robusta em REAIS
+    const totalReais = sumProceduresBaseReais(activeProcedures);
+    const totalValue = Math.round(totalReais * 100);
     
     // Atualizar estado do valor total recalculado
     setAihTotalValues(prev => ({
