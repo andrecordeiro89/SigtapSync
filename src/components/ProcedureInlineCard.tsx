@@ -48,6 +48,7 @@ interface ProcedureInlineCardProps {
   onDelete?: (procedure: ProcedureData) => Promise<void>;
   onShowDetails?: (procedure: ProcedureData) => void;
   aihCareCharacter?: string | number; // caráter da AIH (1=Eletivo, 2=Urgência/Emergência)
+  aihHasExcluded?: boolean; // indica se a AIH contém qualquer procedimento excluído do Opera PR
 }
 
 const ProcedureInlineCard = ({
@@ -55,7 +56,8 @@ const ProcedureInlineCard = ({
   isReadOnly = false,
   onDelete,
   onShowDetails,
-  aihCareCharacter
+  aihCareCharacter,
+  aihHasExcluded
 }: ProcedureInlineCardProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -124,7 +126,7 @@ const ProcedureInlineCard = ({
   const config = getStatusConfig();
   const StatusIcon = config.icon;
   const anesthInfo = getAnesthetistProcedureType(procedure.professional_cbo, procedure.procedure_code);
-  const incMeta = getProcedureIncrementMeta(procedure.procedure_code, aihCareCharacter);
+  const incMeta = getProcedureIncrementMeta(procedure.procedure_code, aihCareCharacter, undefined, undefined, !!aihHasExcluded);
   const commonName = (() => {
     try {
       const code = (procedure.procedure_code || '').trim();

@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 
 import AIHExecutiveSummary from './AIHExecutiveSummary';
 import ProcedureInlineCard from './ProcedureInlineCard';
+import { hasAnyExcludedCodeInProcedures } from '@/config/operaParana';
 import { formatCurrency as baseCurrency } from '../utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import { CareCharacterUtils } from '../config/careCharacterCodes';
@@ -1397,14 +1398,20 @@ const PatientManagement = () => {
                           )}
                           
                           <div className="space-y-2">
-                            {proceduresData[item.id].map((procedure) => (
-                              <ProcedureInlineCard
-                                key={`${procedure.aih_id}_${procedure.procedure_sequence}`}
-                                procedure={procedure}
-                                isReadOnly={!canManageProcedures()}
-                                onDelete={(proc) => handleDeleteProcedure(item.id, proc)}
-                              />
-                            ))}
+                            {(() => {
+                              const aihHasExcluded = hasAnyExcludedCodeInProcedures(proceduresData[item.id]);
+                              const careCharacter = (item as any)?.care_character;
+                              return proceduresData[item.id].map((procedure) => (
+                                <ProcedureInlineCard
+                                  key={`${procedure.aih_id}_${procedure.procedure_sequence}`}
+                                  procedure={procedure}
+                                  isReadOnly={!canManageProcedures()}
+                                  onDelete={(proc) => handleDeleteProcedure(item.id, proc)}
+                                  aihCareCharacter={careCharacter}
+                                  aihHasExcluded={aihHasExcluded}
+                                />
+                              ));
+                            })()}
                           </div>
                         </div>
                       )}

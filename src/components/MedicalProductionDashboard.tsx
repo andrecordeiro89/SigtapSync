@@ -53,7 +53,7 @@ import {
 import ReportGenerator from './ReportGenerator';
 import PatientAihInfoBadges from './PatientAihInfoBadges';
 import AihDatesBadges from './AihDatesBadges';
-import { isDoctorCoveredForOperaParana, computeIncrementForProcedures } from '../config/operaParana';
+import { isDoctorCoveredForOperaParana, computeIncrementForProcedures, hasAnyExcludedCodeInProcedures } from '../config/operaParana';
 import { sumProceduresBaseReais } from '@/utils/valueHelpers';
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
@@ -2074,6 +2074,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             <div className="space-y-3">
                                               {patient.procedures
                                                 .sort((a, b) => {
+                                                  // 1) Ordenar primeiro pela sequência (seq. 1, 2, 3...)
+                                                  const seqA = Number((a as any)?.sequence ?? (a as any)?.procedure_sequence ?? 0);
+                                                  const seqB = Number((b as any)?.sequence ?? (b as any)?.procedure_sequence ?? 0);
+                                                  const hasSeqA = Number.isFinite(seqA) && seqA > 0;
+                                                  const hasSeqB = Number.isFinite(seqB) && seqB > 0;
+                                                  if (hasSeqA && hasSeqB && seqA !== seqB) {
+                                                    return seqA - seqB; // ascendente por seq
+                                                  }
+                                                  if (hasSeqA && !hasSeqB) return -1;
+                                                  if (!hasSeqA && hasSeqB) return 1;
+                                                  // 2) Fallback: priorizar 04.xxx e depois por data desc
                                                   const a04 = ((a?.procedure_code || '').toString().trim().startsWith('04')) ? 1 : 0;
                                                   const b04 = ((b?.procedure_code || '').toString().trim().startsWith('04')) ? 1 : 0;
                                                   if (a04 !== b04) return b04 - a04; // 04 primeiro
@@ -2085,8 +2096,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   const careCharRaw = (patient as any)?.aih_info?.care_character;
                                                   const careCharStr = typeof careCharRaw === 'string' ? careCharRaw.trim() : String(careCharRaw ?? '');
                                                   const isMedical04 = !!(procedure?.procedure_code || '').toString().trim().startsWith('04');
+                                                  const isPrincipal = Number((procedure as any)?.sequence ?? (procedure as any)?.procedure_sequence ?? 0) === 1;
                                                   const effectiveCareChar = selectedCareCharacter === 'all' ? careCharStr : selectedCareCharacter;
-                                                  const operaEligible = isOperaEligibleConfig(procedure.procedure_code, effectiveCareChar);
+                                                  const aihHasExcluded = hasAnyExcludedCodeInProcedures(patient.procedures as any);
+                                                  const operaEligible = !aihHasExcluded && isOperaEligibleConfig(procedure.procedure_code, effectiveCareChar);
                                                   const diagReason = (() => {
                                                     if (!isMedical04) return '';
                                                     const cc = (effectiveCareChar ?? '').toString();
@@ -2100,8 +2113,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   })();
                                                   return (
                                                 <div key={procedure.procedure_id || procIndex} className={`bg-white/80 p-4 rounded-xl border-l-4 ${
-                                                  isMedical04 ? 'border-l-emerald-400 bg-emerald-50/20' : 'border-l-slate-300'
-                                                } ${operaEligible ? 'ring-1 ring-emerald-200' : ''}`}>
+                                                  isMedical04 && isPrincipal ? 'border-l-emerald-400 bg-emerald-50/20' : 'border-l-slate-300'
+                                                } ${operaEligible && isPrincipal ? 'ring-1 ring-emerald-200' : ''}`}>
                                                   <div className="flex items-start justify-between">
                                                     <div className="flex-1">
                                                       <div className="flex items-center gap-2 mb-2">
@@ -2113,8 +2126,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           {procedure.procedure_code}
                                                         </div>
                                                         {isMedical04 && (
-                                                          <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-300 text-[10px]">
+                                                          <Badge 
+                                                            variant="outline" 
+                                                            className={`${isPrincipal ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-100 text-slate-700 border-slate-300'} text-[10px]`}
+                                                          >
                                                             🩺 Médico 04
+                                                          </Badge>
+                                                        )}
+                                                        {isMedical04 && isPrincipal && (
+                                                          <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                                                            Principal
                                                           </Badge>
                                                         )}
                                                         {operaEligible && (
@@ -2226,7 +2247,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           // ✅ PROCEDIMENTO NORMAL OU ANESTESISTA 03.xxx: Mostrar valor
                                                           return (
                                                             <div className={`text-lg font-bold ${
-                                                              isMedical04 ? 'text-emerald-700' : 'text-slate-900'
+                                                              isMedical04 && isPrincipal ? 'text-emerald-700' : 'text-slate-900'
                                                             }`}>
                                                               {formatCurrency(procedure.value_reais)}
                                                             </div>

@@ -16,7 +16,7 @@ import {
   type PatientWithProcedures,
   type ProcedureDetail
 } from '../services/doctorPatientService';
-import { isDoctorCoveredForOperaParana, computeIncrementForProcedures, getProcedureIncrementMeta } from '../config/operaParana';
+import { isDoctorCoveredForOperaParana, computeIncrementForProcedures, getProcedureIncrementMeta, hasAnyExcludedCodeInProcedures } from '../config/operaParana';
 import { sumProceduresBaseReais } from '@/utils/valueHelpers';
 
 interface DoctorPatientsDropdownProps {
@@ -469,7 +469,8 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                       {patient.procedures.map((procedure, procIndex) => {
                         const statusDisplay = getStatusDisplay(procedure);
                         const careCharacter = (patient.aih_info as any)?.care_character;
-                        const incMeta = getProcedureIncrementMeta(procedure.procedure_code, careCharacter, doctorName);
+                        const aihHasExcluded = hasAnyExcludedCodeInProcedures(patient.procedures as any);
+                        const incMeta = getProcedureIncrementMeta(procedure.procedure_code, careCharacter, doctorName, undefined, aihHasExcluded);
                         return (
                           <div 
                             key={`${procedure.procedure_id}-${procIndex}`}
