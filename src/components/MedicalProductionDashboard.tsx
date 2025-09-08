@@ -2119,8 +2119,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     <div className="flex-1">
                                                       <div className="flex items-center gap-2 mb-2">
                                                         <div className={`font-medium px-3 py-1 rounded-lg text-xs ${
-                                                          isMedical04 
-                                                            ? 'text-emerald-800 bg-emerald-100 border border-emerald-200' 
+                                                          (isMedical04 && isPrincipal)
+                                                            ? 'text-emerald-800 bg-emerald-100 border border-emerald-200'
                                                             : 'text-slate-800 bg-slate-100 border border-slate-200'
                                                         }`}>
                                                           {procedure.procedure_code}

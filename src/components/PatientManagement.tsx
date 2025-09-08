@@ -1409,6 +1409,7 @@ const PatientManagement = () => {
                                   onDelete={(proc) => handleDeleteProcedure(item.id, proc)}
                                   aihCareCharacter={careCharacter}
                                   aihHasExcluded={aihHasExcluded}
+                                  showOperaParanaBadges={false}
                                 />
                               ));
                             })()}

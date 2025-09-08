@@ -49,6 +49,7 @@ interface ProcedureInlineCardProps {
   onShowDetails?: (procedure: ProcedureData) => void;
   aihCareCharacter?: string | number; // caráter da AIH (1=Eletivo, 2=Urgência/Emergência)
   aihHasExcluded?: boolean; // indica se a AIH contém qualquer procedimento excluído do Opera PR
+  showOperaParanaBadges?: boolean; // exibir badge de incremento (somente em Analytics)
 }
 
 const ProcedureInlineCard = ({
@@ -57,7 +58,8 @@ const ProcedureInlineCard = ({
   onDelete,
   onShowDetails,
   aihCareCharacter,
-  aihHasExcluded
+  aihHasExcluded,
+  showOperaParanaBadges = false
 }: ProcedureInlineCardProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -126,7 +128,9 @@ const ProcedureInlineCard = ({
   const config = getStatusConfig();
   const StatusIcon = config.icon;
   const anesthInfo = getAnesthetistProcedureType(procedure.professional_cbo, procedure.procedure_code);
-  const incMeta = getProcedureIncrementMeta(procedure.procedure_code, aihCareCharacter, undefined, undefined, !!aihHasExcluded);
+  const incMeta = showOperaParanaBadges 
+    ? getProcedureIncrementMeta(procedure.procedure_code, aihCareCharacter, undefined, undefined, !!aihHasExcluded)
+    : null;
   const commonName = (() => {
     try {
       const code = (procedure.procedure_code || '').trim();
