@@ -9,7 +9,6 @@ import {
   CheckCircle, 
   XCircle, 
   Clock, 
-  DollarSign,
   User,
   Info,
   Zap
@@ -229,21 +228,73 @@ const ProcedureInlineCard = ({
 
             {/* 🎯 CÓDIGO E DESCRIÇÃO - FORMATO MELHORADO */}
             <div className="mb-3">
-              <div className="flex items-start space-x-3">
-                <span className="font-mono text-sm font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-md border border-blue-200 shrink-0">
-                  {procedure.procedure_code}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 leading-relaxed">
-                    {procedureDescription}
-                  </p>
+              <div className="flex items-start">
+                <div className="flex-1 min-w-0 pr-3">
+                  <div className="flex items-start space-x-3">
+                    <span className="font-mono text-sm font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-md border border-blue-200 shrink-0">
+                      {procedure.procedure_code}
+                    </span>
+                    <p className="text-sm font-medium text-gray-900 leading-relaxed flex-1 min-w-0">
+                      {procedureDescription}
+                    </p>
+                  </div>
                   {commonName && (
-                    <div className="mt-1">
+                    <div className="mt-1 ml-12">
                       <Badge variant="outline" className="text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200">
                         {commonName}
                       </Badge>
                     </div>
                   )}
+                </div>
+                {/* Valor destacado à direita */}
+                <div className="shrink-0 pl-3 border-l border-gray-100 flex items-center h-9 -mt-0.5">
+                  {(() => {
+                    const qty = procedure.quantity ?? 1;
+                    const canShowMonetary = (!anesthInfo.isAnesthetist || anesthInfo.shouldCalculate);
+                    let baseCents: number | null = null;
+                    if (canShowMonetary && procedure.value_charged && procedure.value_charged > 0) {
+                      baseCents = procedure.value_charged;
+                    } else if (canShowMonetary && procedure.sigtap_procedures?.value_hosp_total) {
+                      const unitCents = procedure.sigtap_procedures.value_hosp_total || 0;
+                      baseCents = unitCents * (qty || 1);
+                    }
+                    if (baseCents != null) {
+                      if (incMeta) {
+                        const incrementedCents = Math.round(baseCents * incMeta.factor);
+                        return (
+                          <div className="text-right">
+                            <div className="text-[11px] text-gray-400 line-through leading-none">{formatCurrency(baseCents)}</div>
+                            <div className="text-lg font-extrabold text-emerald-700 leading-none">{formatCurrency(incrementedCents)}</div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-green-700 leading-none">{formatCurrency(baseCents)}</div>
+                          {qty > 1 && (
+                            <div className="text-[10px] text-gray-500">({formatCurrency(Math.round(baseCents / Math.max(1, qty)))} × {qty})</div>
+                          )}
+                        </div>
+                      );
+                    }
+                    // Anestesista sem valor no cálculo total: exibir valor, mas sinalizar que NÃO entra no total
+                    if (anesthInfo.isAnesthetist && !anesthInfo.shouldCalculate) {
+                      const qty = procedure.quantity ?? 1;
+                      let baseCents = 0;
+                      if (procedure.value_charged && procedure.value_charged > 0) {
+                        baseCents = procedure.value_charged;
+                      } else if (procedure.sigtap_procedures?.value_hosp_total) {
+                        const unitCents = procedure.sigtap_procedures.value_hosp_total || 0;
+                        baseCents = unitCents * (qty || 1);
+                      }
+                      return (
+                        <div className="text-right">
+                          <div className="text-lg font-semibold text-red-700 leading-none">{formatCurrency(baseCents)}</div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               </div>
             </div>
@@ -258,67 +309,18 @@ const ProcedureInlineCard = ({
               </div>
             )}
 
-            {/* Valor com regra de incremento quando aplicável */}
-            {(() => {
-              const qty = procedure.quantity ?? 1;
-              const canShowMonetary = (!anesthInfo.isAnesthetist || anesthInfo.shouldCalculate);
-
-              // Determinar valor base (em centavos)
-              let baseCents: number | null = null;
-              if (canShowMonetary && procedure.value_charged && procedure.value_charged > 0) {
-                baseCents = procedure.value_charged;
-              } else if (canShowMonetary && procedure.sigtap_procedures?.value_hosp_total) {
-                const unitCents = procedure.sigtap_procedures.value_hosp_total || 0;
-                baseCents = unitCents * (qty || 1);
-              }
-
-              if (baseCents != null) {
-                if (incMeta) {
-                  const incrementedCents = Math.round(baseCents * incMeta.factor);
-                  return (
-                    <div className="flex items-center space-x-2">
-                      <DollarSign className="w-4 h-4 text-green-600" />
-                      <div className="text-[11px] text-gray-500 line-through">{formatCurrency(baseCents)}</div>
-                      <div className="text-sm font-extrabold text-emerald-700">{formatCurrency(incrementedCents)}</div>
-                      {qty > 1 && (
-                        <div className="text-xs text-gray-500">({formatCurrency(Math.round(baseCents / Math.max(1, qty)))} × {qty})</div>
-                      )}
-                    </div>
-                  );
-                }
-                // Sem incremento
-                return (
-                  <div className="flex items-center space-x-2">
-                    <DollarSign className="w-4 h-4 text-green-600" />
-                    <div className="text-sm font-semibold text-green-700">{formatCurrency(baseCents)}</div>
-                    {qty > 1 && (
-                      <div className="text-xs text-gray-500">({formatCurrency(Math.round(baseCents / Math.max(1, qty)))} × {qty})</div>
-                    )}
-                  </div>
-                );
-              }
-
-              // Sinalizar sem valor monetário para anestesista não calculável
-              if (anesthInfo.isAnesthetist && !anesthInfo.shouldCalculate) {
-                return (
-                  <div className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 inline-block px-2 py-1 rounded">
-                    Sem valor monetário
-                  </div>
-                );
-              }
-              return null;
-            })()}
+            {/* (Removido) Valor abaixo do código: agora exibimos apenas o valor à direita */}
           </div>
 
           {/* Ações */}
           {!isReadOnly && (
-            <div className="flex items-center space-x-1 ml-4">
+            <div className="flex items-center space-x-1 ml-4 h-9">
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => onDelete && handleAction(() => onDelete(procedure), 'Excluir')}
                 disabled={isLoading}
-                className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                className="h-9 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                 title="Excluir permanentemente"
               >
                 <Trash2 className={`w-3 h-3 ${isLoading ? 'animate-pulse' : ''}`} />
