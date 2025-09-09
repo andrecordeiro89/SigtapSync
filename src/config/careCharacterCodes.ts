@@ -22,7 +22,7 @@ export const CARE_CHARACTER_CODES: Record<string, CareCharacterCode> = {
     shortDescription: 'Eletivo',
     category: 'eletivo',
     color: 'text-blue-800',
-    bgColor: 'bg-blue-100',
+    bgColor: 'bg-gradient-to-r from-blue-50 to-blue-100',
     borderColor: 'border-blue-200'
   },
   '2': {
@@ -31,7 +31,7 @@ export const CARE_CHARACTER_CODES: Record<string, CareCharacterCode> = {
     shortDescription: 'Urgência',
     category: 'urgencia',
     color: 'text-red-800',
-    bgColor: 'bg-red-100',
+    bgColor: 'bg-gradient-to-r from-rose-50 to-red-100',
     borderColor: 'border-red-200'
   },
   

@@ -700,6 +700,21 @@ export class AIHPDFProcessor {
       status: 'pending'
     };
 
+    // 🔎 Marcação de anestesista: primeiro pelo CBO 225151, depois pela Participação contendo "Anestesista" (ou equivalências)
+    try {
+      const hasAnesthetistByCBO = (data.procedimentos || []).some(p => (p as any)?.profissionais?.some((pr: any) => String(pr?.cbo || '').trim() === '225151'));
+      if (!hasAnesthetistByCBO) {
+        const participationTextIncludesAnest = (txt: string) => {
+          const v = (txt || '').toLowerCase();
+          return v.includes('anestesista') || v.includes('anestesia') || v.includes('anest');
+        };
+        const hasAnesthetistByParticipation = (data.procedimentos || []).some(p => (p as any)?.profissionais?.some((pr: any) => participationTextIncludesAnest(String(pr?.participacao || pr?.participation || ''))));
+        (aih as any).hasAnesthetist = hasAnesthetistByParticipation;
+      } else {
+        (aih as any).hasAnesthetist = true;
+      }
+    } catch {}
+
     console.log('🔄 AIH convertida:', {
       numeroAIH: aih.numeroAIH,
       paciente: aih.nomePaciente,

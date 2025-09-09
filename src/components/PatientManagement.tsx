@@ -22,6 +22,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { filterCalculableProcedures } from '../utils/anesthetistLogic';
 import { sumProceduresBaseReais } from '@/utils/valueHelpers';
+import { isLikelyProcedureString, sanitizePatientName } from '@/utils/patientName';
+import { PatientService } from '@/services/supabaseService';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import PatientAihInfoBadges from './PatientAihInfoBadges';
@@ -82,6 +84,10 @@ interface AIH {
   aih_situation?: string;
   care_character?: string;
   specialty?: string;
+  care_modality?: string;
+  requesting_physician?: string;
+  professional_cbo?: string;
+  hospitals?: { name: string };
   processed_at?: string;
   processed_by_name?: string;
   created_at?: string;
@@ -89,6 +95,9 @@ interface AIH {
   patients?: {
     name: string;
     cns: string;
+    birth_date?: string;
+    gender?: 'M' | 'F' | string;
+    medical_record?: string;
   };
   aih_matches?: Array<{
     id: string;
@@ -162,6 +171,63 @@ const PatientManagement = () => {
   const [aihToCompleteDelete, setAihToCompleteDelete] = useState<{id: string, name: string, patientName: string} | null>(null);
 
   // NOVOS ESTADOS: Diagnóstico e Sincronização
+  // Estado para edição rápida de nome do paciente
+  const [inlineNameEdit, setInlineNameEdit] = useState<{ [patientId: string]: string }>({});
+  const [savingName, setSavingName] = useState<{ [patientId: string]: boolean }>({});
+
+  const handleStartEditName = (patientId: string, currentName: string) => {
+    setInlineNameEdit(prev => (prev[patientId] === undefined ? ({ ...prev, [patientId]: currentName || '' }) : prev));
+  };
+
+  const handleChangeEditName = (patientId: string, value: string) => {
+    setInlineNameEdit(prev => ({ ...prev, [patientId]: value }));
+  };
+
+  const handleSaveEditName = async (patientId: string, hospitalId: string) => {
+    try {
+      const raw = inlineNameEdit[patientId] || '';
+      const cleaned = sanitizePatientName(raw);
+      if (!cleaned || cleaned === 'Nome não informado') {
+        toast({
+          title: 'Nome inválido',
+          description: 'Informe um nome válido do paciente.',
+          variant: 'destructive'
+        });
+        return;
+      }
+      setSavingName(prev => ({ ...prev, [patientId]: true }));
+      // Guardar CNS para sincronização otimista no array de AIHs
+      const currentPatient = patients.find(p => (p as any).id === patientId) as any;
+      const currentCns = currentPatient?.cns;
+      await PatientService.updatePatient(patientId, {
+        name: cleaned,
+        updated_at: new Date().toISOString()
+      } as any);
+
+      // Sincronizar na lista local de pacientes
+      setPatients(prev => prev.map(p => p.id === patientId ? { ...p, name: cleaned } as any : p));
+      // Sincronizar na lista de AIHs (nested join visual) por id OU cns
+      setAIHs(prev => prev.map(a => {
+        const nested: any = (a as any).patients;
+        if (!nested) return a;
+        const matchById = nested.id && nested.id === patientId;
+        const matchByCns = currentCns && nested.cns && nested.cns === currentCns;
+        if (matchById || matchByCns) {
+          return { ...a, patients: { ...nested, name: cleaned } } as any;
+        }
+        return a;
+      }));
+
+      setInlineNameEdit(prev => { const copy = { ...prev }; delete copy[patientId]; return copy; });
+      toast({ title: 'Nome atualizado', description: 'Paciente atualizado com sucesso.' });
+      // Recarregar pacientes em background para garantir consistência
+      try { await loadPatients(); } catch {}
+    } catch (e:any) {
+      toast({ title: 'Erro ao salvar', description: e?.message || 'Falha ao atualizar o nome', variant: 'destructive' });
+    } finally {
+      setSavingName(prev => ({ ...prev, [patientId]: false }));
+    }
+  };
   const [diagnosticModalOpen, setDiagnosticModalOpen] = useState(false);
   const [diagnosticData, setDiagnosticData] = useState<any>(null);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
@@ -548,7 +614,10 @@ const PatientManagement = () => {
     // Filtro de busca por texto
     const matchesSearch = 
       item.aih_number.toLowerCase().includes(globalSearch.toLowerCase()) ||
-      (item.patients?.name && item.patients.name.toLowerCase().includes(globalSearch.toLowerCase())) ||
+      (
+        (item.patient?.name && item.patient.name.toLowerCase().includes(globalSearch.toLowerCase())) ||
+        (item.patients?.name && item.patients.name.toLowerCase().includes(globalSearch.toLowerCase()))
+      ) ||
       (item.patient?.cns && item.patient.cns.includes(globalSearch));
     
     // Datas de referência comuns (sempre usar a mesma base do badge: alta; fallback admissão)
@@ -589,7 +658,7 @@ const PatientManagement = () => {
   const handleGeneratePatientsByCompetencyPDF = async () => {
     try {
       const patientsAll = filteredData.map(i => ({
-        name: i.patients?.name || (i.patient as any)?.name || 'Paciente não identificado',
+        name: (i.patient as any)?.name || i.patients?.name || 'Paciente não identificado',
       }));
 
       // Montar rótulo da competência
@@ -1033,8 +1102,35 @@ const PatientManagement = () => {
                               <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-2">
                               <h3 className="font-semibold text-gray-900 truncate text-lg">
-                                {item.patients?.name || 'Paciente não identificado'}
+                                {item.patient?.name || item.patients?.name || 'Paciente não identificado'}
                               </h3>
+                              {(() => {
+                                const patientId = (item.patient as any)?.id || (item.patients as any)?.id;
+                                const shownName = (item.patient as any)?.name || (item.patients as any)?.name || '';
+                                const looksWrong = !shownName || isLikelyProcedureString(shownName) || /^nome não informado$/i.test(shownName);
+                                if (!patientId || !looksWrong) return null;
+                                const value = inlineNameEdit[patientId] ?? '';
+                                const saving = !!savingName[patientId];
+                                return (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <input
+                                      className="border rounded px-2 py-1 text-sm"
+                                      placeholder="Digite o nome correto do paciente"
+                                      value={value}
+                                      onChange={(e) => handleChangeEditName(patientId, e.target.value)}
+                                      onFocus={() => handleStartEditName(patientId, '')}
+                                      disabled={saving}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleSaveEditName(patientId, (item as any).hospital_id || currentHospitalId || '')}
+                                      disabled={saving || !(inlineNameEdit[patientId] ?? '').trim()}
+                                    >
+                                      {saving ? 'Salvando...' : 'Salvar nome'}
+                                    </Button>
+                                  </div>
+                                );
+                              })()}
                               {item.care_character && (
                                 <Badge
                                   variant="outline"
@@ -1056,7 +1152,7 @@ const PatientManagement = () => {
                             </div>
 
                             {/* Direita: Controles alinhados e limitados à largura da coluna direita (1/2) */}
-                            <div className="hidden sm:flex w-1/2 justify-end gap-2 flex-wrap">
+                            <div className="hidden sm:flex w-1/2 justify-end gap-2 flex-wrap self-end mt-4 sm:mt-6">
                               {(() => {
                                 const birth = (item.patient || item.patients)?.birth_date as any;
                                 if (!birth) return null;
@@ -1197,148 +1293,108 @@ const PatientManagement = () => {
                         onRefresh={() => loadAIHProcedures(item.id)}
                       />
 
-                      {/* Grid Compacto de Informações */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                        {/* Informações do Paciente */}
-                        {(item.patient || item.patients) && (
-                          <div className="bg-white rounded-lg border border-blue-200 p-3">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <User className="w-3 h-3 text-blue-600" />
-                              </div>
-                              <h4 className="font-semibold text-blue-900 text-sm">Dados do Paciente</h4>
+                      {/* Seção Premium Unificada: Paciente + AIH */}
+                      <div className="bg-gradient-to-r from-indigo-50 via-white to-emerald-50 rounded-xl border p-4 border-indigo-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center">
+                              <User className="w-4 h-4 text-indigo-600" />
                             </div>
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                              <div>
-                                <span className="text-gray-500">Nome:</span>
-                                <p className="font-medium text-gray-900 truncate">{(item.patient || item.patients).name}</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">CNS:</span>
-                                <p className="font-medium text-gray-900">{(item.patient || item.patients).cns}</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Nascimento:</span>
-                                <p className="font-medium text-gray-900">{(item.patient || item.patients).birth_date ? formatDate((item.patient || item.patients).birth_date) : 'N/A'}</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Gênero:</span>
-                                <p className="font-medium text-gray-900">{(item.patient || item.patients).gender === 'M' ? 'Masculino' : 'Feminino'}</p>
-                              </div>
-                              {(item.requesting_physician || (proceduresData[item.id]?.[0]?.professional_name)) && (
-                                <div className="col-span-2">
-                                  <span className="text-gray-500">Médico:</span>
-                                  <p className="font-medium text-gray-900">{item.requesting_physician || proceduresData[item.id]?.[0]?.professional_name}</p>
-                                </div>
-                              )}
-                              {(item.patient || item.patients).medical_record && (
-                                <div className="col-span-2">
-                                  <span className="text-gray-500">Prontuário:</span>
-                                  <p className="font-medium text-gray-900">{(item.patient || item.patients).medical_record}</p>
-                                </div>
-                              )}
-                            </div>
+                            <h4 className="text-sm font-semibold text-indigo-900">Dados do Paciente e AIH</h4>
                           </div>
-                        )}
-
-                        {/* Informações da AIH */}
-                        <div className="bg-white rounded-lg border border-gray-200 p-3">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <div className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center">
-                              <FileText className="w-3 h-3 text-gray-600" />
-                            </div>
-                            <h4 className="font-semibold text-gray-900 text-sm">Detalhes da AIH</h4>
+                        </div>
+                        <div className="grid grid-cols-12 gap-4 text-[13px]">
+                          {/* Linha 1: Nome + Caráter */}
+                          <div className="col-span-12 md:col-span-8 xl:col-span-9">
+                            <span className="text-[11px] text-gray-500">Nome</span>
+                            <p className="font-medium text-gray-900 truncate">{(item.patient || item.patients)?.name || 'N/A'}</p>
                           </div>
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                          <div className="col-span-12 md:col-span-4 xl:col-span-3 flex md:justify-end items-end">
                             <div>
-                              <span className="text-gray-500">Código Proc:</span>
-                              <p className="font-medium text-gray-900">{item.procedure_code}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">CID Principal:</span>
-                              <p className="font-medium text-gray-900">{item.main_cid}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Admissão:</span>
-                              <p className="font-medium text-gray-900">{formatDate(item.admission_date)}</p>
-                            </div>
-                            {item.discharge_date && (
-                              <div>
-                                <span className="text-gray-500">Alta:</span>
-                                <p className="font-medium text-gray-900">{formatDate(item.discharge_date)}</p>
-                              </div>
-                            )}
-                            <div>
-                              <span className="text-gray-500">Situação:</span>
-                              <p className="font-medium text-gray-900">{item.aih_situation || 'N/A'}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Caráter:</span>
-                              <div className={`text-sm font-medium px-2 py-1 rounded-md border inline-block mt-1 ${item.care_character ? CareCharacterUtils.getStyleClasses(item.care_character) : 'text-gray-600 bg-gray-100 border-gray-200'}`}>
+                              <span className="text-[11px] text-gray-500 block">Caráter</span>
+                              <div className={`text-[11px] leading-none font-medium px-2 py-1 rounded-md border inline-block mt-1 ${item.care_character ? CareCharacterUtils.getStyleClasses(item.care_character) : 'text-gray-600 bg-gray-100 border-gray-200'}`}>
                                 {item.care_character ? CareCharacterUtils.formatForDisplay(item.care_character) : 'N/A'}
                               </div>
                             </div>
-                            {item.specialty && (
-                              <div className="col-span-2">
-                                <span className="text-gray-500">Especialidade:</span>
-                                <p className="font-medium text-gray-900">{item.specialty}</p>
-                              </div>
-                            )}
-                            {item.hospitals?.name && (
-                              <div className="col-span-2">
-                                <span className="text-gray-500">Hospital:</span>
-                                <p className="font-medium text-gray-900">{item.hospitals?.name}</p>
-                              </div>
-                            )}
-                            {item.requesting_physician && (
-                              <div className="col-span-2">
-                                <span className="text-gray-500">Médico Solicitante:</span>
-                                <p className="font-medium text-gray-900">{item.requesting_physician}</p>
-                              </div>
-                            )}
-                            {item.professional_cbo && (
-                              <div>
-                                <span className="text-gray-500">CBO:</span>
-                                <p className="font-medium text-gray-900">{item.professional_cbo}</p>
-                              </div>
-                            )}
-                            {item.care_modality && (
-                              <div>
-                                <span className="text-gray-500">Modalidade:</span>
-                                <p className="font-medium text-gray-900">{item.care_modality}</p>
-                              </div>
-                            )}
                           </div>
+
+                          {/* Linha 2: CNS, Prontuário, Nascimento, Gênero */}
+                          <div className="col-span-6 md:col-span-3">
+                            <span className="text-[11px] text-gray-500">CNS</span>
+                            <p className="font-medium text-gray-900">{(item.patient || item.patients)?.cns || 'N/A'}</p>
+                          </div>
+                          {(item.patient || item.patients)?.medical_record && (
+                            <div className="col-span-6 md:col-span-3">
+                              <span className="text-[11px] text-gray-500">Prontuário</span>
+                              <p className="font-medium text-gray-900">{(item.patient || item.patients)?.medical_record}</p>
+                            </div>
+                          )}
+                          <div className="col-span-6 md:col-span-3">
+                            <span className="text-[11px] text-gray-500">Nascimento</span>
+                            <p className="font-medium text-gray-900">{(item.patient || item.patients)?.birth_date ? formatDate((item.patient || item.patients).birth_date) : 'N/A'}</p>
+                          </div>
+                          <div className="col-span-6 md:col-span-3">
+                            <span className="text-[11px] text-gray-500">Gênero</span>
+                            <p className="font-medium text-gray-900">{(item.patient || item.patients)?.gender === 'M' ? 'Masculino' : (item.patient || item.patients)?.gender === 'F' ? 'Feminino' : 'N/A'}</p>
+                          </div>
+
+                          {/* Linha 3: Código Proc, CID */}
+                          <div className="col-span-12 md:col-span-6">
+                            <span className="text-[11px] text-gray-500">Código Proc</span>
+                            <p className="font-medium text-gray-900">{item.procedure_code || 'N/A'}</p>
+                          </div>
+                          <div className="col-span-12 md:col-span-6">
+                            <span className="text-[11px] text-gray-500">CID Principal</span>
+                            <p className="font-medium text-gray-900">{item.main_cid || 'N/A'}</p>
+                          </div>
+
+                          {/* Linha 4: Admissão, Alta, Especialidade, Modalidade */}
+                          <div className="col-span-6 md:col-span-3">
+                            <span className="text-[11px] text-gray-500">Admissão</span>
+                            <p className="font-medium text-gray-900">{formatDate(item.admission_date)}</p>
+                          </div>
+                          {item.discharge_date && (
+                            <div className="col-span-6 md:col-span-3">
+                              <span className="text-[11px] text-gray-500">Alta</span>
+                              <p className="font-medium text-gray-900">{formatDate(item.discharge_date)}</p>
+                            </div>
+                          )}
+                          {item.specialty && (
+                            <div className="col-span-6 md:col-span-3">
+                              <span className="text-[11px] text-gray-500">Especialidade</span>
+                              <p className="font-medium text-gray-900">{item.specialty}</p>
+                            </div>
+                          )}
+                          {item.care_modality && (
+                            <div className="col-span-6 md:col-span-3">
+                              <span className="text-[11px] text-gray-500">Modalidade</span>
+                              <p className="font-medium text-gray-900">{item.care_modality}</p>
+                            </div>
+                          )}
+
+                          {/* Linha 5: Hospital, Médico, CBO */}
+                          {item.hospitals?.name && (
+                            <div className="col-span-12 xl:col-span-12">
+                              <span className="text-[11px] text-gray-500">Hospital</span>
+                              <p className="font-medium text-gray-900">{item.hospitals?.name}</p>
+                            </div>
+                          )}
+                          {(item.requesting_physician || proceduresData[item.id]?.[0]?.professional_name) && (
+                            <div className="col-span-12 md:col-span-8">
+                              <span className="text-[11px] text-gray-500">Médico</span>
+                              <p className="font-medium text-gray-900">{item.requesting_physician || proceduresData[item.id]?.[0]?.professional_name}</p>
+                            </div>
+                          )}
+                          {item.professional_cbo && (
+                            <div className="col-span-6 md:col-span-4">
+                              <span className="text-[11px] text-gray-500">CBO</span>
+                              <p className="font-medium text-gray-900">{item.professional_cbo}</p>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Matches Encontrados - Compacto */}
-                      {item.matches.length > 0 && (
-                        <div className="bg-white rounded-lg border border-green-200 p-3">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <div className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center">
-                              <CheckCircle className="w-3 h-3 text-green-600" />
-                            </div>
-                            <h4 className="font-semibold text-green-900 text-sm">Matches SIGTAP ({item.matches.length})</h4>
-                          </div>
-                          <div className="space-y-2">
-                            {item.matches.map((match, index) => (
-                              <div key={match.id} className="flex items-center justify-between p-2 bg-green-50 rounded-lg border border-green-100">
-                                <div className="flex items-center space-x-2">
-                                  {getScoreBadge(match.overall_score)}
-                                  <span className="text-xs font-medium text-green-800">Match #{index + 1}</span>
-                                </div>
-                                <div className="flex items-center space-x-3 text-xs">
-                                  <span className="text-green-700">Confiança: {match.match_confidence}%</span>
-                                  {isDirector && (
-                                    <span className="font-semibold text-green-800">{formatCurrency(match.calculated_total)}</span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      {/* Matches SIGTAP removido do card do paciente */}
 
                       {/* NOVO: Gerenciamento Inline de Procedimentos - Compacto */}
                       {proceduresData[item.id] && proceduresData[item.id].length > 0 && (
@@ -1386,9 +1442,43 @@ const PatientManagement = () => {
                                         <span className="text-gray-600">{approved.length} aprovados</span>
                                         <span className="font-semibold text-green-700">{formatCurrency(approvedValue)}</span>
                                       </div>
-                                      <div className="flex items-center space-x-1">
+                                      <div className="flex items-center space-x-2">
                                         <span className="text-gray-500">Total:</span>
-                                        <span className="font-bold text-blue-800">{formatCurrency(aihTotalValues[item.id])}</span>
+                                        {(() => {
+                                          // Valor COM anestesistas: inclui todos os procedimentos aprovados/manual/matched
+                                          const allActive = (proceduresData[item.id] || []).filter(
+                                            p => (p.match_status === 'matched' || p.match_status === 'manual')
+                                          );
+                                          const totalWithAnest = allActive.reduce((sum: number, p: any) => {
+                                            const charged = p.value_charged && p.value_charged > 0 ? p.value_charged : null; // centavos
+                                            if (charged !== null) return sum + charged;
+                                            const unitReais = p.sigtap_procedures?.value_hosp_total || 0; // reais
+                                            const qty = p.quantity ?? 1;
+                                            return sum + Math.round(unitReais * qty * 100); // centavos
+                                          }, 0);
+
+                                          // Valor SEM anestesistas (base aprovado acima), calculado em centavos
+                                          const approvedCent = (approved || []).reduce((sum: number, p: any) => {
+                                            const charged = p.value_charged && p.value_charged > 0 ? p.value_charged : null; // centavos
+                                            if (charged !== null) return sum + charged;
+                                            const unitReais = p.sigtap_procedures?.value_hosp_total || 0; // reais
+                                            const qty = p.quantity ?? 1;
+                                            return sum + Math.round(unitReais * qty * 100);
+                                          }, 0);
+
+                                          const delta = Math.max(0, totalWithAnest - approvedCent);
+
+                                          return (
+                                            <>
+                                              <span className="font-bold text-blue-800">{formatCurrency(totalWithAnest)}</span>
+                                              {delta > 0 && (
+                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                                                  Inclui anestesistas: +{formatCurrency(delta)}
+                                                </span>
+                                              )}
+                                            </>
+                                          );
+                                        })()}
                                       </div>
                                     </>
                                   );

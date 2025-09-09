@@ -16,6 +16,8 @@ import {
   Shield,
   AlertCircle
 } from 'lucide-react';
+import { filterCalculableProcedures } from '@/utils/anesthetistLogic';
+import { sumProceduresBaseReais } from '@/utils/valueHelpers';
 
 interface ProcedureData {
   id: string;
@@ -25,6 +27,9 @@ interface ProcedureData {
   match_confidence?: number;
   value_charged?: number;
   professional?: string;
+  professional_cbo?: string;
+  quantity?: number;
+  sigtap_procedures?: { value_hosp_total?: number };
 }
 
 interface AIHData {
@@ -54,9 +59,22 @@ const AIHExecutiveSummary = ({ aih, onRefresh, className = "" }: AIHExecutiveSum
     const rejected = procedures.filter(p => p.match_status === 'rejected').length;
     const removed = procedures.filter(p => p.match_status === 'removed').length;
     
-    const totalValue = procedures
-      .filter(p => p.match_status !== 'removed')
-      .reduce((sum, p) => sum + (p.value_charged || 0), 0);
+    // Totais (centavos)
+    // 1) Sem anestesistas: mesmos critérios do PatientManagement (matched/manual + filtro calculável)
+    const activeForCalc = procedures.filter(p => (p.match_status === 'approved' || p.match_status === 'matched' || p.match_status === 'manual'))
+      .filter(p => filterCalculableProcedures({ cbo: (p as any).professional_cbo, procedure_code: p.procedure_code }));
+    const totalSemAnestReais = sumProceduresBaseReais(activeForCalc);
+    const totalSemAnest = Math.round(totalSemAnestReais * 100);
+
+    // 2) Com anestesistas: matched/manual, inclui tudo. Usa value_charged (centavos) se existir; senão calcula por base SIGTAP (reais -> centavos)
+    const activeAll = procedures.filter(p => (p.match_status === 'approved' || p.match_status === 'matched' || p.match_status === 'manual'));
+    const totalComAnest = activeAll.reduce((sum, p) => {
+      const charged = p.value_charged && p.value_charged > 0 ? p.value_charged : null;
+      if (charged !== null) return sum + charged;
+      const unitReais = p.sigtap_procedures?.value_hosp_total || 0;
+      const qty = p.quantity ?? 1;
+      return sum + Math.round(unitReais * qty * 100);
+    }, 0);
     
     const averageConfidence = procedures
       .filter(p => p.match_confidence && p.match_status !== 'removed')
@@ -78,7 +96,8 @@ const AIHExecutiveSummary = ({ aih, onRefresh, className = "" }: AIHExecutiveSum
       rejected,
       removed,
       totalActive,
-      totalValue,
+      totalValue: totalSemAnest, // card verde exibirá SEM anestesistas
+      totalWithAnesthetists: totalComAnest,
       averageConfidence,
       processingRate,
       uniqueProfessionals
@@ -158,37 +177,40 @@ const AIHExecutiveSummary = ({ aih, onRefresh, className = "" }: AIHExecutiveSum
         )}
       </div>
 
-      {/* Grid de Estatísticas - SIMPLIFICADO PARA 2 CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Total de Procedimentos */}
-        <Card className="border-blue-200 bg-blue-50">
+      {/* Card Premium Unificado: Procedimentos + Valor Total */}
+      <div className="grid grid-cols-1">
+        <Card className="border-2 border-emerald-200 bg-gradient-to-r from-emerald-50 via-green-50 to-blue-50">
           <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <FileText className="w-5 h-5 text-blue-600" />
-              <div className="flex-1">
-                <p className="text-sm text-blue-600 font-medium">Total Procedimentos</p>
-                <p className="text-2xl font-bold text-blue-800">{stats.total}</p>
-                <p className="text-xs text-blue-500 mt-1">
-                  {stats.totalActive} ativos
-                </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* KPI: Total de Procedimentos */}
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-md bg-blue-100 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-blue-700" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-blue-700 font-medium">Total Procedimentos</p>
+                  <p className="text-2xl font-bold text-blue-900">{stats.total}</p>
+                  <p className="text-[11px] text-blue-700/80 mt-0.5">{stats.totalActive} ativos</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Valor Total */}
-        <Card className="border-emerald-200 bg-emerald-50">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <DollarSign className="w-5 h-5 text-emerald-600" />
-              <div className="flex-1">
-                <p className="text-sm text-emerald-600 font-medium">Valor Total</p>
-                <p className="text-xl font-bold text-emerald-800">
-                  {formatCurrency(stats.totalValue)}
-                </p>
-                <p className="text-xs text-emerald-500 mt-1">
-                  Procedimentos ativos
-                </p>
+              {/* KPI: Valor Total (sem anestesistas) + delta com anestesistas */}
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-md bg-emerald-100 flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-emerald-700" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-emerald-700 font-medium">Valor Total</p>
+                  <p className="text-2xl font-bold text-emerald-900">{formatCurrency(stats.totalValue)}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[11px] text-emerald-700/80">Sem anestesistas</span>
+                    {stats.totalWithAnesthetists > stats.totalValue && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                        Inclui anestesistas: +{formatCurrency(stats.totalWithAnesthetists - stats.totalValue)}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>

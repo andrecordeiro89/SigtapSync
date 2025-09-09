@@ -1109,6 +1109,35 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                 <div className="w-4 h-4 bg-blue-500 rounded"></div>
                 <h4 className="text-sm font-semibold text-gray-700">🔬 Procedimentos</h4>
               </div>
+              {/* Cards de valores (com e sem anestesistas) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <div className="p-3 rounded border bg-gradient-to-r from-blue-50 to-blue-100">
+                  <div className="text-xs font-medium text-blue-700">💰 Valor com Anestesistas</div>
+                  <div className="text-xl font-bold text-blue-900">
+                    {(() => {
+                      try {
+                        const totalComAnest = aihCompleta.procedimentos
+                          .filter(p => p.aprovado !== false)
+                          .reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
+                        return totalComAnest.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                      } catch { return 'R$ 0,00'; }
+                    })()}
+                  </div>
+                </div>
+                <div className="p-3 rounded border bg-gradient-to-r from-green-50 to-green-100">
+                  <div className="text-xs font-medium text-green-700">💰 Valor sem Anestesistas</div>
+                  <div className="text-xl font-bold text-green-900">
+                    {(() => {
+                      try {
+                        const totalSemAnest = aihCompleta.procedimentos
+                          .filter(p => p.aprovado && !p.isAnesthesiaProcedure)
+                          .reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
+                        return totalSemAnest.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                      } catch { return 'R$ 0,00'; }
+                    })()}
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-1 gap-4">
                 <div>
                   <label className="text-sm font-medium text-gray-600">Procedimento Principal</label>
@@ -1293,7 +1322,6 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
               <p className="text-2xl font-bold text-green-800">
                 {formatCurrency(aihCompleta.valorTotalCalculado || 0)}
               </p>
-              <p className="text-xs text-gray-500">Incluindo anestesistas</p>
               <div className="absolute top-1 right-1">
                 <Badge variant="default" className="text-xs bg-green-600">Total</Badge>
               </div>
@@ -2221,6 +2249,31 @@ const AIHMultiPageTester = () => {
       if (matchingResult.success) {
         // Atualizar procedimentos com resultados do matching
         // TODOS os procedimentos são APROVADOS por padrão (conforme solicitação do operador)
+        const detectAnesthetist = (p: any): boolean => {
+          try {
+            // 1) Nível do procedimento
+            const cboProc = String((p as any)?.cbo || (p as any)?.professional_cbo || '').trim();
+            if (cboProc === '225151') return true;
+            const partProc = String((p as any)?.participacao || (p as any)?.participation || '').toLowerCase();
+            if (partProc.includes('anestesista') || partProc.includes('anestesia') || partProc.includes('anest')) return true;
+
+            // 2) Nível do profissional (lista profissionais extraída do PDF)
+            const list = Array.isArray((p as any)?.profissionais) ? (p as any).profissionais : [];
+            for (const pr of list) {
+              const cbo = String((pr as any)?.cbo || '').trim();
+              if (cbo === '225151') return true;
+              const part = String((pr as any)?.participacao || (pr as any)?.participation || '').toLowerCase();
+              if (part.includes('anestesista') || part.includes('anestesia') || part.includes('anest')) return true;
+              // Varredura robusta: checar quaisquer campos string do profissional
+              for (const key of Object.keys(pr || {})) {
+                const value = (pr as any)[key];
+                if (typeof value === 'string' && value.toLowerCase().includes('anest')) return true;
+              }
+            }
+            return false;
+          } catch { return false; }
+        };
+
         const updatedProcedimentos = aihData.procedimentos.map((proc, index) => {
           const matchDetail = matchingResult.matchingDetails[index];
           return {
@@ -2230,7 +2283,8 @@ const AIHMultiPageTester = () => {
             sigtapProcedure: matchDetail.sigtapMatch,
             valorCalculado: matchDetail.sigtapMatch?.valueHospTotal || 0,
             valorOriginal: matchDetail.sigtapMatch?.valueHospTotal || 0,
-            aprovado: true // SEMPRE aprovado
+            aprovado: true, // SEMPRE aprovado
+            isAnesthesiaProcedure: detectAnesthetist(proc)
           };
         });
 

@@ -1,5 +1,5 @@
 import { supabase, AIHDB, PatientDB } from '../lib/supabase';
-import { sanitizePatientName } from '../utils/patientName';
+import { sanitizePatientName, isLikelyProcedureString } from '../utils/patientName';
 import { buildAIHIdempotencyKey } from '../utils/idempotency';
 import { AIH } from '../types';
 import { PatientService, AIHService } from './supabaseService';
@@ -215,6 +215,7 @@ export class AIHPersistenceService {
               id: crypto.randomUUID(),
               cns,
               name: `Dr(a). CNS ${cns}`,
+              specialty: 'Não informado',
               is_active: true,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
@@ -803,6 +804,25 @@ export class AIHPersistenceService {
     const updates: Partial<PatientDB> = {};
     
     // Atualizar campos que podem ter mudado
+    try {
+      // Corrigir nomes inválidos pré-existentes (ex.: "Procedimento solicitado")
+      const extractedName = sanitizePatientName(aih.nomePaciente || '');
+      const shouldFixName = (
+        !!extractedName &&
+        extractedName !== 'Nome não informado' &&
+        (
+          !existingPatient.name ||
+          existingPatient.name.trim() === '' ||
+          /^procedimento/i.test(existingPatient.name) ||
+          existingPatient.name === 'Nome não informado' ||
+          isLikelyProcedureString(existingPatient.name)
+        )
+      );
+      if (shouldFixName && extractedName !== existingPatient.name) {
+        updates.name = extractedName;
+      }
+    } catch {}
+
     if (aih.endereco && aih.endereco !== existingPatient.address) {
       updates.address = aih.endereco;
     }
@@ -938,6 +958,9 @@ export class AIHPersistenceService {
         competencia: null as any
       };
       
+      // Normalizar caráter de atendimento para persistência
+      const normalizedCareCharacter = normalizeCareCharacterStrict(aih.caracterAtendimento);
+      
       // 🎯 Regra de fallback para Especialidade:
       // Padrão "01 - Cirúrgico"; se Urgência/Emergência, usar "03 - Clínico",
       // exceto parto cesáreo (permanece "01 - Cirúrgico").
@@ -991,7 +1014,7 @@ export class AIHPersistenceService {
         // Classificações de atendimento (PT)
         especialidade: (aih.especialidade && aih.especialidade.trim() !== '') ? aih.especialidade : resolveSpecialtyFromRules(),
         modalidade: aih.modalidade || null,
-        caracter_atendimento: aih.caracterAtendimento || null,
+        caracter_atendimento: normalizedCareCharacter,
 
         // Estimativa financeira (PT – ajuste se sua coluna tiver outro nome)
         valor_original_estimado: (aih as any).estimatedOriginalValue ?? null
@@ -1012,7 +1035,7 @@ export class AIHPersistenceService {
         discharge_reason: aih.motivoEncerramento || null,
         specialty: (aih.especialidade && aih.especialidade.trim() !== '') ? aih.especialidade : resolveSpecialtyFromRules(),
         care_modality: aih.modalidade || null,
-        care_character: aih.caracterAtendimento || null,
+        care_character: normalizedCareCharacter,
         estimated_original_value: (aih as any).estimatedOriginalValue ?? null
       } as Record<string, any>;
       
@@ -1043,8 +1066,25 @@ export class AIHPersistenceService {
         }
       }
 
-      // Garantir preenchimento de campos pós-inserção (cns_responsavel, competencia)
+      // Garantir preenchimento de campos pós-inserção (care_character/caracter_atendimento, cns_responsavel, competencia)
       try {
+        // 1) Tentar setar care_character (EN). Se a coluna não existir, ignorar erro e tentar PT.
+        try {
+          await supabase
+            .from('aihs')
+            .update({ care_character: normalizedCareCharacter })
+            .eq('id', createdAIH.id);
+        } catch (e1) {
+          try {
+            await supabase
+              .from('aihs')
+              .update({ caracter_atendimento: normalizedCareCharacter })
+              .eq('id', createdAIH.id);
+          } catch (e2) {
+            // Sem coluna correspondente neste schema; seguir adiante
+          }
+        }
+
         const updates: Record<string, any> = {};
         if (aih.cnsResponsavel && typeof aih.cnsResponsavel === 'string' && aih.cnsResponsavel.trim() !== '') {
           updates.cns_responsavel = aih.cnsResponsavel;
@@ -2297,7 +2337,7 @@ export class AIHPersistenceService {
       cid_valid: true,        // ✅ CORRIGIDO: era cid_value
       habilitation_valid: true,
       cbo_valid: true,
-      "overall score": Math.round(data.overall_score),
+      overall_score: Math.round(data.overall_score),
       calculated_value_amb: Math.round((data.sigtap_procedure.valueAmb || 0) * 100),
       calculated_value_hosp: Math.round((data.sigtap_procedure.valueHosp || 0) * 100),
       calculated_value_prof: Math.round((data.sigtap_procedure.valueProf || 0) * 100), // ✅ CORRIGIDO: era caculated_value_prof
