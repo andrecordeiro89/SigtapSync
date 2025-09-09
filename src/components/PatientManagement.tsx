@@ -1075,8 +1075,8 @@ const PatientManagement = () => {
               {paginatedData.map((item) => (
                 <div key={item.id} className="border border-gray-200 rounded-xl bg-white hover:shadow-lg transition-all duration-300 hover:border-blue-300 overflow-hidden min-h-[120px]">
                   {/* Header Compacto */}
-                  <div className="bg-gradient-to-r from-slate-50 to-gray-50 p-5 border-b border-gray-100">
-                    <div className="flex items-center justify-between">
+                  <div className="bg-white p-5">
+                    <div className="flex items-end justify-between min-h-[64px]">
                       {/* Lado Esquerdo: Info Principal */}
                       <div className="flex items-center space-x-4 flex-1">
                         <Button
@@ -1139,122 +1139,139 @@ const PatientManagement = () => {
                                   {CareCharacterUtils.formatForDisplay(item.care_character, false)}
                                 </Badge>
                               )}
+                              {/* Controles imediatamente após o badge de Caráter */}
+                              <div className="hidden sm:flex items-center gap-2 ml-2">
+                                {(() => {
+                                  const birth = (item.patient || item.patients)?.birth_date as any;
+                                  if (!birth) return null;
+                                  const d = new Date(String(birth));
+                                  if (isNaN(d.getTime())) return null;
+                                  const today = new Date();
+                                  let age = today.getFullYear() - d.getFullYear();
+                                  const m = today.getMonth() - d.getMonth();
+                                  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+                                  if (age < 0 || age > 130) return null;
+                                  return (
+                                    <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-700 text-[11px] h-7 inline-flex items-center">
+                                      Idade: {age}
+                                    </Badge>
+                                  );
+                                })()}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-[11px] h-7 px-3 py-0 border-blue-200 text-blue-700"
+                                  title={editingCompetency[item.id] ? 'Desativar edição de competência' : 'Ativar edição de competência'}
+                                  onClick={() => setEditingCompetency(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+                                >
+                                  {editingCompetency[item.id] ? 'Editar competência' : 'Editar competência'}
+                                </Button>
+                                <select
+                                  className="text-[11px] h-7 px-2 py-0.5 border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                  title="Alterar competência desta AIH"
+                                  value={(() => {
+                                    const ref2 = (item as any).competencia || item.discharge_date || item.admission_date;
+                                    const m2 = String(ref2 || '').match(/^(\d{4})-(\d{2})/);
+                                    if (m2) return `${m2[1]}-${m2[2]}`;
+                                    try {
+                                      const d = ref2 ? new Date(ref2) : null;
+                                      if (d && !isNaN(d.getTime())) {
+                                        const y = d.getUTCFullYear();
+                                        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+                                        return `${y}-${mm}`;
+                                      }
+                                    } catch {}
+                                    return '';
+                                  })()}
+                                  disabled={!editingCompetency[item.id]}
+                                  onChange={async (e) => {
+                                    try {
+                                      const ym = e.target.value; // YYYY-MM
+                                      const newComp = `${ym}-01`;
+                                      const { error } = await supabase
+                                        .from('aihs')
+                                        .update({ competencia: newComp })
+                                        .eq('id', item.id);
+                                      if (error) throw error;
+                                      setAIHs(prev => prev.map(a => a.id === item.id ? ({ ...a, competencia: newComp } as any) : a));
+                                      toast({ title: 'Competência atualizada', description: `Nova competência: ${ym}` });
+                                    } catch (err:any) {
+                                      console.error('Erro ao atualizar competência:', err);
+                                      toast({ title: 'Erro ao atualizar competência', description: err.message || 'Tente novamente.', variant: 'destructive' });
+                                    }
+                                  }}
+                                >
+                                  <option value="" disabled>Alterar</option>
+                                  {(() => {
+                                    const options: JSX.Element[] = [];
+                                    const year = new Date().getFullYear();
+                                    for (let mOpt = 1; mOpt <= 12; mOpt++) {
+                                      const d2 = new Date(year, mOpt - 1, 1);
+                                      const ym2 = `${year}-${String(mOpt).padStart(2, '0')}`;
+                                      const lbl2 = `${format(d2, 'MMM', { locale: ptBR }).replace('.', '')}/${format(d2, 'yy', { locale: ptBR })}`;
+                                      options.push(<option key={ym2} value={ym2}>{lbl2}</option>);
+                                    }
+                                    return options;
+                                  })()}
+                                </select>
+                              </div>
                             </div>
-                            {item.hospitals?.name && (
-                                  <div className="mt-0.5 flex items-center text-[11px] text-slate-700">
-                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-red-50 border border-red-200 mr-1 text-red-600">
-                                      <MedicalCrossIcon className="w-3 h-3" />
-                                    </span>
-                                    <span className="truncate font-semibold text-[12px]">{item.hospitals?.name}</span>
-                                  </div>
-                                )}
+                            {/* Removido: nome do hospital abaixo do nome do paciente */}
                               </div>
                             </div>
 
-                            {/* Direita: Controles alinhados e limitados à largura da coluna direita (1/2) */}
-                            <div className="hidden sm:flex w-1/2 justify-end gap-2 flex-wrap self-end mt-4 sm:mt-6">
-                              {(() => {
-                                const birth = (item.patient || item.patients)?.birth_date as any;
-                                if (!birth) return null;
-                                const d = new Date(String(birth));
-                                if (isNaN(d.getTime())) return null;
-                                const today = new Date();
-                                let age = today.getFullYear() - d.getFullYear();
-                                const m = today.getMonth() - d.getMonth();
-                                if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
-                                if (age < 0 || age > 130) return null;
-                                return (
-                                  <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-700 text-[11px]">
-                                    Idade: {age}
-                                  </Badge>
-                                );
-                              })()}
-                            {/* Competência removida aqui para evitar duplicação com AihDatesBadges */}
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="text-[11px] h-6 px-2 py-0 border-blue-200 text-blue-700"
-                                    title={editingCompetency[item.id] ? 'Desativar edição de competência' : 'Ativar edição de competência'}
-                                    onClick={() => setEditingCompetency(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                                  >
-                                    {editingCompetency[item.id] ? 'Editar competência' : 'Editar competência'}
-                                  </Button>
-                                  <select
-                                      className="text-[11px] px-1.5 py-0.5 border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                      title="Alterar competência desta AIH"
-                                      value={(() => {
-                                        const ref2 = (item as any).competencia || item.discharge_date || item.admission_date;
-                                        const m2 = String(ref2 || '').match(/^(\d{4})-(\d{2})/);
-                                        if (m2) return `${m2[1]}-${m2[2]}`;
-                                        try {
-                                          const d = ref2 ? new Date(ref2) : null;
-                                          if (d && !isNaN(d.getTime())) {
-                                            const y = d.getUTCFullYear();
-                                            const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-                                            return `${y}-${mm}`;
-                                          }
-                                        } catch {}
-                                        return '';
-                                      })()}
-                                      disabled={!editingCompetency[item.id]}
-                                      onChange={async (e) => {
-                                        try {
-                                          const ym = e.target.value; // YYYY-MM
-                                          const newComp = `${ym}-01`;
-                                          const { error } = await supabase
-                                            .from('aihs')
-                                            .update({ competencia: newComp })
-                                            .eq('id', item.id);
-                                          if (error) throw error;
-                                          setAIHs(prev => prev.map(a => a.id === item.id ? ({ ...a, competencia: newComp } as any) : a));
-                                          toast({ title: 'Competência atualizada', description: `Nova competência: ${ym}` });
-                                        } catch (err:any) {
-                                          console.error('Erro ao atualizar competência:', err);
-                                          toast({ title: 'Erro ao atualizar competência', description: err.message || 'Tente novamente.', variant: 'destructive' });
-                                        }
-                                      }}
-                                    >
-                                      <option value="" disabled>Alterar</option>
-                                      {(() => {
-                                        const options: JSX.Element[] = [];
-                                        const year = new Date().getFullYear();
-                                        for (let mOpt = 1; mOpt <= 12; mOpt++) {
-                                          const d2 = new Date(year, mOpt - 1, 1);
-                                          const ym2 = `${year}-${String(mOpt).padStart(2, '0')}`;
-                                          const lbl2 = `${format(d2, 'MMM', { locale: ptBR }).replace('.', '')}/${format(d2, 'yy', { locale: ptBR })}`;
-                                          options.push(<option key={ym2} value={ym2}>{lbl2}</option>);
-                                        }
-                                        return options;
-                                      })()}
-                                    </select>
-                                </div>
+                            {/* Controles posicionados após o badge */}
                           </div>
 
                           
 
-                          {/* Datas padronizadas + info compacta */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <AihDatesBadges
-                              admissionDate={item.admission_date}
-                              dischargeDate={item.discharge_date}
-                              competencia={(item as any).competencia}
-                              className="text-[11px]"
-                            />
-                            <PatientAihInfoBadges
-                              aihNumber={item.aih_number}
-                              mainCid={item.main_cid}
-                              specialty={item.specialty}
-                              requestingPhysician={item.requesting_physician}
-                              careModality={item.care_modality}
-                              professionalCbo={item.professional_cbo}
-                              className="text-[11px]"
-                            />
+                          {/* Datas padronizadas + info compacta (2 colunas: Admissão/Alta e Competência/Hospital) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2 ml-0">
+                            <div className="grid grid-cols-2 gap-1 sm:gap-2">
+                              <div className="text-[11px]"><span className="text-gray-500">Admissão:</span> {formatDate(item.admission_date)}</div>
+                              <div className="text-[11px]"><span className="text-gray-500">Alta:</span> {item.discharge_date ? formatDate(item.discharge_date) : 'N/A'}</div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1 sm:gap-2">
+                              <div className="text-[11px] whitespace-nowrap flex items-center gap-1">
+                                <span className="text-gray-500">Competência:</span>
+                                {(() => {
+                                  const ref = (item as any).competencia || item.discharge_date || item.admission_date;
+                                  let label = 'N/A';
+                                  try {
+                                    const d = ref ? new Date(ref) : null;
+                                    if (d && !isNaN(d.getTime())) {
+                                      const y = d.getUTCFullYear();
+                                      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+                                      label = `${m}/${String(y).slice(-2)}`;
+                                    }
+                                  } catch {}
+                                  return (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] bg-blue-50 border-blue-200 text-blue-700">
+                                      {label}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                              <div className="text-[11px] truncate"><span className="text-gray-500">Hospital:</span> <span className="truncate inline-block align-bottom max-w-[260px] sm:max-w-[360px] font-semibold">{item.hospitals?.name || 'N/A'}</span></div>
+                            </div>
+                          </div>
+
+                          {/* Campos técnicos (AIH, CID, Especialidade, Modalidade) em 2 colunas fixas */}
+                          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2 ml-0">
+                            <div className="grid grid-cols-2 gap-1 sm:gap-2">
+                              <div className="text-[11px] whitespace-nowrap"><span className="text-gray-500">AIH:</span> {item.aih_number || '-'}</div>
+                              <div className="text-[11px] whitespace-nowrap"><span className="text-gray-500">CID:</span> {item.main_cid || '-'}</div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1 sm:gap-2">
+                              <div className="text-[11px] whitespace-nowrap"><span className="text-gray-500">01 -</span> {item.specialty || 'Cirúrgico'}</div>
+                              <div className="text-[11px] whitespace-nowrap"><span className="text-gray-500">Modalidade:</span> {item.care_modality || 'Hospitalar'}</div>
+                            </div>
                           </div>
                         </div>
                       </div>
 
                       {/* Lado Direito: Ações */}
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-end space-x-3">
                         {/* Botão de Exclusão */}
                         {(() => {
                           const userRole = user?.role as string;
@@ -1265,7 +1282,7 @@ const PatientManagement = () => {
                               size="sm"
                               variant="outline"
                               onClick={() => handleDeleteRequest('aih', item.id, item.aih_number)}
-                              className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors p-2 ml-2"
+                              className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors h-7 px-3 py-0 ml-2 flex items-center"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
