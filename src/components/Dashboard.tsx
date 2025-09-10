@@ -297,6 +297,13 @@ const Dashboard = () => {
     return labels[action] || action;
   };
 
+  // Variant visual para o ticker (telejornal): cores por volume
+  const getChipVariant = (count: number) => {
+    if (count >= 500) return 'chip-high';
+    if (count >= 200) return 'chip-mid';
+    return 'chip-low';
+  };
+
   const formatTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleString('pt-BR', {
       day: '2-digit',
@@ -513,14 +520,39 @@ const Dashboard = () => {
                         backdrop-filter: blur(6px);
                       }
                       .chip-sep { height: 14px; width: 1px; background: rgba(148,163,184,0.35); margin: 0 6px; }
+                      .chip-title { 
+                        background: linear-gradient(180deg, rgba(30,64,175,0.12) 0%, rgba(37,99,235,0.10) 100%);
+                        color: rgb(30,58,138);
+                        border: 1px solid rgba(30,64,175,0.25);
+                      }
+                      .chip-low { 
+                        background: linear-gradient(180deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.08) 100%);
+                        border: 1px solid rgba(16,185,129,0.25);
+                        color: rgb(22,101,52);
+                      }
+                      .chip-mid { 
+                        background: linear-gradient(180deg, rgba(234,179,8,0.14) 0%, rgba(234,179,8,0.10) 100%);
+                        border: 1px solid rgba(234,179,8,0.28);
+                        color: rgb(133,77,14);
+                      }
+                      .chip-high { 
+                        background: linear-gradient(180deg, rgba(239,68,68,0.14) 0%, rgba(239,68,68,0.10) 100%);
+                        border: 1px solid rgba(239,68,68,0.28);
+                        color: rgb(127,29,29);
+                      }
                     `}</style>
                     <div className="relative w-[640px] max-w-[60vw] overflow-hidden ticker-container">
                       <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-slate-50 via-slate-50/60 to-transparent pointer-events-none" />
                       <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-slate-50 via-slate-50/60 to-transparent pointer-events-none" />
                       <div className="ticker-track inline-flex items-center gap-2 whitespace-nowrap will-change-transform" style={{ animation: 'tickerMove 22s linear infinite' }}>
+                        {/* Chip título */}
+                        <span className="glass-chip chip-title inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold">
+                          Últimos 7 dias
+                        </span>
+                        <span className="chip-sep" />
                         {weekActivityCounts.map((d, idx) => (
                           <div key={`a-${d.dateLabel}`} className="inline-flex items-center">
-                            <span className="glass-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-slate-700">
+                            <span className={`glass-chip ${getChipVariant(d.count)} inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px]`}>
                               <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
                               <span className="font-semibold text-slate-900">{d.dateLabel}</span>
                               <span className="opacity-60">-</span>
@@ -529,9 +561,14 @@ const Dashboard = () => {
                             {idx !== weekActivityCounts.length - 1 && <span className="chip-sep" />}
                           </div>
                         ))}
+                        {/* Segunda sequência para loop infinito */}
+                        <span className="glass-chip chip-title inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold">
+                          Últimos 7 dias
+                        </span>
+                        <span className="chip-sep" />
                         {weekActivityCounts.map((d, idx) => (
                           <div key={`b-${d.dateLabel}`} className="inline-flex items-center">
-                            <span className="glass-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-slate-700">
+                            <span className={`glass-chip ${getChipVariant(d.count)} inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px]`}>
                               <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
                               <span className="font-semibold text-slate-900">{d.dateLabel}</span>
                               <span className="opacity-60">-</span>
