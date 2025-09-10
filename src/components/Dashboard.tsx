@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { AlertCircle, CheckCircle, Clock, Users, Building2, FileText, Activity, ShieldCheck, BookOpen, ArrowRight, Database, Search, Upload, Save, Eye } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Users, Building2, FileText, Activity, ShieldCheck, BookOpen, ArrowRight, Database, Search, Upload, Save, Eye, CalendarDays } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSupabaseAIH } from '../hooks/useSupabase';
 import { supabase } from '../lib/supabase';
@@ -38,6 +38,7 @@ const Dashboard = () => {
   const [recentAuditLogs, setRecentAuditLogs] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [weekActivityCounts, setWeekActivityCounts] = useState<Array<{ dateLabel: string; count: number }>>([]);
 
   // ✅ Função para verificar se é usuário de diretoria
   const isManagementRole = (): boolean => {
@@ -212,6 +213,56 @@ const Dashboard = () => {
           console.warn('⚠️ Falha ao calcular hospitais únicos na Atividade Recente:', diagErr);
         }
         console.log(`✅ Dados ${isAdminMode ? 'de TODOS os hospitais' : 'do hospital específico'} carregados:`, realStats);
+
+        // ✅ Contagem dos últimos 7 dias (discreto no header da Atividade Recente)
+        try {
+          // Montar janelas por dia (local) para os ÚLTIMOS 7 DIAS EXCLUINDO HOJE
+          // i = 7..1 dias atrás (não inclui hoje)
+          const dayWindows: Array<{ label: string; start: string; end: string }> = [];
+          for (let i = 7; i >= 1; i--) {
+            const start = new Date(
+              nowLocal.getFullYear(),
+              nowLocal.getMonth(),
+              nowLocal.getDate() - i,
+              0, 0, 0, 0
+            );
+            const end = new Date(
+              nowLocal.getFullYear(),
+              nowLocal.getMonth(),
+              nowLocal.getDate() - i + 1,
+              0, 0, 0, 0
+            );
+            dayWindows.push({
+              label: start.toLocaleDateString('pt-BR'),
+              start: start.toISOString(),
+              end: end.toISOString()
+            });
+          }
+
+          const counts = await Promise.all(
+            dayWindows.map(async (w) => {
+              let q = supabase
+                .from('aihs')
+                .select('id', { count: 'exact', head: true })
+                .gte('created_at', w.start)
+                .lt('created_at', w.end);
+              if (!isAdminMode) {
+                q = q.eq('hospital_id', hospitalId);
+              }
+              const { count, error } = await q;
+              if (error) {
+                console.warn(`⚠️ Erro ao contar AIHs em ${w.label}:`, error);
+                return { label: w.label, count: 0 };
+              }
+              return { label: w.label, count: count || 0 };
+            })
+          );
+
+          setWeekActivityCounts(counts.map(c => ({ dateLabel: c.label, count: c.count })));
+        } catch (wErr) {
+          console.warn('⚠️ Falha ao calcular contagem semanal:', wErr);
+          setWeekActivityCounts([]);
+        }
 
       } catch (error) {
         console.error('❌ Erro geral ao carregar dashboard:', error);
@@ -449,9 +500,51 @@ const Dashboard = () => {
                   </CardDescription>
                 </div>
               </div>
-              <Badge variant="secondary" className="bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 border-purple-300 px-3 py-1.5 font-medium">
-                {recentActivity.length} registros
-              </Badge>
+              <div className="flex items-center gap-2">
+                {weekActivityCounts.length > 0 && (
+                  <div className="hidden md:block ml-1">
+                    <style>{`
+                      @keyframes tickerMove { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+                      .ticker-container:hover .ticker-track { animation-play-state: paused; }
+                      .glass-chip { 
+                        background: linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.65) 100%);
+                        border: 1px solid rgba(148,163,184,0.35); /* slate-300/35 */
+                        box-shadow: 0 2px 6px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.6);
+                        backdrop-filter: blur(6px);
+                      }
+                      .chip-sep { height: 14px; width: 1px; background: rgba(148,163,184,0.35); margin: 0 6px; }
+                    `}</style>
+                    <div className="relative w-[640px] max-w-[60vw] overflow-hidden ticker-container">
+                      <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-slate-50 via-slate-50/60 to-transparent pointer-events-none" />
+                      <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-slate-50 via-slate-50/60 to-transparent pointer-events-none" />
+                      <div className="ticker-track inline-flex items-center gap-2 whitespace-nowrap will-change-transform" style={{ animation: 'tickerMove 22s linear infinite' }}>
+                        {weekActivityCounts.map((d, idx) => (
+                          <div key={`a-${d.dateLabel}`} className="inline-flex items-center">
+                            <span className="glass-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-slate-700">
+                              <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
+                              <span className="font-semibold text-slate-900">{d.dateLabel}</span>
+                              <span className="opacity-60">-</span>
+                              <span className="font-medium">{d.count} AIHs</span>
+                            </span>
+                            {idx !== weekActivityCounts.length - 1 && <span className="chip-sep" />}
+                          </div>
+                        ))}
+                        {weekActivityCounts.map((d, idx) => (
+                          <div key={`b-${d.dateLabel}`} className="inline-flex items-center">
+                            <span className="glass-chip inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] text-slate-700">
+                              <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
+                              <span className="font-semibold text-slate-900">{d.dateLabel}</span>
+                              <span className="opacity-60">-</span>
+                              <span className="font-medium">{d.count} AIHs</span>
+                            </span>
+                            {idx !== weekActivityCounts.length - 1 && <span className="chip-sep" />}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
         </div>
             </CardHeader>
           <CardContent className="p-0">
