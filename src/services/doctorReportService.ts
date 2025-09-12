@@ -15,6 +15,7 @@ export interface ReportFilters {
 export interface PatientReportItem {
   patientId: string
   patientName: string
+  aihNumber?: string
   aihTotalReais: number
   procedures04: Array<ProcedurePaymentInfo>
   doctorReceivableReais: number
@@ -109,6 +110,7 @@ export async function getDoctorPatientReport(
     items.push({
       patientId,
       patientName: patient.patient_info?.name || 'Paciente',
+      aihNumber: (((patient as any)?.aih_info?.aih_number || '') as string).toString().replace(/\D/g, '') || undefined,
       aihTotalReais,
       procedures04,
       doctorReceivableReais,

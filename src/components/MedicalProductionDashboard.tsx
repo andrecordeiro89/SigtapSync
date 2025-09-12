@@ -55,6 +55,7 @@ import PatientAihInfoBadges from './PatientAihInfoBadges';
 import AihDatesBadges from './AihDatesBadges';
 import { isDoctorCoveredForOperaParana, computeIncrementForProcedures, hasAnyExcludedCodeInProcedures } from '../config/operaParana';
 import { sumProceduresBaseReais } from '@/utils/valueHelpers';
+import { exportAllPatientsExcel } from '../services/exportService'
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -1495,6 +1496,32 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   <span>Atualização automática</span>
                   <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
                 </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const hospitalIds = selectedHospitals && !selectedHospitals.includes('all') ? selectedHospitals : undefined;
+                      const dateFromISO = dateRange?.startDate ? new Date(dateRange.startDate) : null;
+                      const dateToISO = dateRange?.endDate ? new Date(dateRange.endDate) : null;
+                      await exportAllPatientsExcel({
+                        hospitalIds,
+                        dateFromISO: dateFromISO ? dateFromISO.toISOString() : undefined,
+                        dateToISO: dateToISO ? dateToISO.toISOString() : undefined,
+                        careCharacter: selectedCareCharacter && selectedCareCharacter !== 'all' ? selectedCareCharacter : undefined,
+                      });
+                      toast.success('Excel (Todos Pacientes) gerado com sucesso!');
+                    } catch (e) {
+                      console.error('Erro ao exportar Excel de todos os pacientes:', e);
+                      toast.error('Erro ao gerar Excel de todos os pacientes');
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+                  title="Gerar relatório Excel com todos os pacientes do período"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Relatório Todos Pacientes
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setRefreshTick(t => t + 1)}>
                   <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
                 </Button>
@@ -1861,6 +1888,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     className="pl-10 w-96"
                                   />
                                 </div>
+                                {/* Botão global movido para o cabeçalho superior */}
                                 
                                 {/* Paginação do header removida para dar espaço aos filtros */}
                               </div>

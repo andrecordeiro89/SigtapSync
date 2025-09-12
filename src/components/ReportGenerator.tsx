@@ -1157,13 +1157,14 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo');
 
     // Aba Pacientes
-    const header = ['#', 'Nome do Paciente', 'Data Alta (SUS)', 'Valor Total', 'Valor Médico'];
+    const header = ['#', 'Nome do Paciente', 'Nº AIH', 'Data Alta (SUS)', 'Valor Total', 'Valor Médico'];
     const body = report.items.map((item, idx) => {
       const d = item.dischargeDateISO || item.admissionDateISO;
       const dLabel = d ? format(new Date(d), 'dd/MM/yyyy') : '';
       return [
         idx + 1,
         item.patientName || 'Nome não informado',
+        item.aihNumber || '',
         dLabel,
         Number(item.aihTotalReais || 0),
         Number(item.doctorReceivableReais || 0),
@@ -1174,6 +1175,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     (wsPatients as any)['!cols'] = [
       { wch: 5 },
       { wch: 40 },
+      { wch: 18 },
       { wch: 16 },
       { wch: 18 },
       { wch: 22 },
