@@ -1708,7 +1708,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                          doctorName: doctor.doctor_info.name,
                                          // Passar período global quando disponível
                                          startDate: dateRange?.startDate,
-                                         endDate: dateRange?.endDate
+                                         endDate: dateRange?.endDate,
+                                         careSpecialty: selectedCareSpecialty && selectedCareSpecialty !== 'all' ? selectedCareSpecialty : undefined
                                        } as any);
                                        setReportModalOpen(true);
                                      }}
@@ -1725,7 +1726,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                          hospitalId: h,
                                          doctorName: doctor.doctor_info.name,
                                          startDate: dateRange?.startDate,
-                                         endDate: dateRange?.endDate
+                                         endDate: dateRange?.endDate,
+                                         careSpecialty: selectedCareSpecialty && selectedCareSpecialty !== 'all' ? selectedCareSpecialty : undefined
                                        } as any);
                                        setReportModalOpen(true);
                                        // O modal abrirá com o ReportGenerator, que possui o botão Excel (verde)
@@ -1845,7 +1847,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                        const desc = (proc.procedure_description || '').toLowerCase();
                                        return codeNorm.includes(procTerm) || desc.includes(procTermRaw);
                                      });
-                                     return matchesName && matchesProc;
+                                     const careSpecFilter = (selectedCareSpecialty || '').trim();
+                                     const patientCareSpec = (((patient as any)?.aih_info?.specialty || '') as string).trim();
+                                     const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toUpperCase();
+                                     const matchesCareSpec = !careSpecFilter || careSpecFilter === 'all' || (patientCareSpec && normalize(patientCareSpec) === normalize(careSpecFilter));
+                                     return matchesName && matchesProc && matchesCareSpec;
                                    }).length;
                                    return nameTerm || procTermRaw ? `${filteredCount} de ${doctor.patients.length}` : doctor.patients.length;
                                  })()})
@@ -1907,7 +1913,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     const desc = (proc.procedure_description || '').toLowerCase();
                                     return codeNorm.includes(procTerm) || desc.includes(procTermRaw);
                                   });
-                                  return matchesName && matchesProc;
+                                  const careSpecFilter = (selectedCareSpecialty || '').trim();
+                                  const patientCareSpec = (((patient as any)?.aih_info?.specialty || '') as string).trim();
+                                  const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toUpperCase();
+                                  const matchesCareSpec = !careSpecFilter || careSpecFilter === 'all' || (patientCareSpec && normalize(patientCareSpec) === normalize(careSpecFilter));
+                                  return matchesName && matchesProc && matchesCareSpec;
                                 });
                                 // Ordenar por data mais recente primeiro (Alta SUS; fallback para Admissão)
                                 const sortedPatients = [...filteredPatients].sort((a, b) => {
@@ -2064,6 +2074,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     <div className="font-bold text-slate-900">{formatCurrency(baseAih)}</div>
                                                     {hasIncrement && (
                                                       <>
+                                                        <div className="mt-1 text-xs text-emerald-700">Incremento</div>
+                                                        <div className="font-bold text-emerald-700">{formatCurrency(increment)}</div>
                                                         <div className="mt-1 text-xs text-emerald-700">AIH c/ Incremento</div>
                                                         <div className="font-bold text-emerald-700">{formatCurrency(withIncrement)}</div>
                                                       </>

@@ -97,8 +97,8 @@ export interface SimpleProcedureLike {
 
 /**
  * Calcula o incremento (apenas a parcela acrescida) para uma AIH a partir dos procedimentos e do caráter de atendimento.
- * - Eletivo (1): incremento de +150% no programa (UI por procedimento exibe total com fator 1.5),
- *   porém ESTA função retorna somente o acréscimo (ex.: 50% da base ⇒ base * 0.5).
+ * - Eletivo (1): incremento de +150% no programa (UI por procedimento exibe total com fator 2.5),
+ *   e ESTA função retorna somente o acréscimo (150% da base ⇒ base * 1.5).
  * - Urgência/Emergência (2): retorna somente o acréscimo de +20% (base * 0.2) sobre os elegíveis.
  * Retorna 0 quando não houver incremento aplicável.
  */
@@ -127,8 +127,8 @@ export const computeIncrementForProcedures = (
     const eligibleSum = procs.reduce((sum, p) => (
       isOperaParanaEligible(p.procedure_code, '1') ? sum + (p.value_reais || 0) : sum
     ), 0);
-    // Retornar apenas a PARCELA DO INCREMENTO (para somar à base na AIH): 50% da base elegível
-    return eligibleSum > 0 ? eligibleSum * 0.5 : 0;
+    // Retornar apenas a PARCELA DO INCREMENTO (para somar à base na AIH): 150% da base elegível
+    return eligibleSum > 0 ? eligibleSum * 1.5 : 0;
   }
 
   // Regra 2: Urgência/Emergência (20% sobre todos, exceto excluídos)
@@ -162,9 +162,9 @@ export const getProcedureIncrementMeta = (
   if (aihHasExcluded) {
     return null;
   }
-  // Prioridade: 150% eletivo, quando elegível e médico contemplado
+  // Prioridade: 150% eletivo, quando elegível e médico contemplado (total = 2.5x)
   if (isElectiveCare(careCharacter) && isDoctorCoveredForOperaParana(doctorName, hospitalId) && isOperaParanaEligible(procedureCode || '', '1')) {
-    return { factor: 1.5, label: 'Opera Paraná +150%' };
+    return { factor: 2.5, label: 'Opera Paraná +150%' };
   }
   // Urgência: 20% sobre cirúrgicos
   if (isUrgencySurgicalEligible(procedureCode, careCharacter)) {

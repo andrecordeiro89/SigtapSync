@@ -28,6 +28,7 @@ interface ReportPreset {
   lock?: boolean;
   startDate?: Date;
   endDate?: Date;
+  careSpecialty?: string;
 }
 
 interface ReportGeneratorProps {
@@ -1004,6 +1005,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
         hospitalIds: [selectedHospital],
         dateFromISO,
         dateToISO,
+        careSpecialty: preset?.careSpecialty && preset?.careSpecialty !== 'all' ? preset.careSpecialty : undefined,
       });
 
       if (!report || !report.items || report.items.length === 0) {
@@ -1095,6 +1097,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
         hospitalIds: [selectedHospital],
         dateFromISO,
         dateToISO,
+        careSpecialty: preset?.careSpecialty && preset?.careSpecialty !== 'all' ? preset.careSpecialty : undefined,
       });
 
       if (!report || !report.items || report.items.length === 0) {
@@ -1143,6 +1146,9 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     summaryRows.push(["Sistema", "SIGTAP Sync"]);
     summaryRows.push(["Médico", report.doctorName]);
     summaryRows.push(["Hospital", hospitalName || 'Hospital não informado']);
+    if (preset?.careSpecialty && preset.careSpecialty !== 'all') {
+      summaryRows.push(["Especialidade de Atendimento", preset.careSpecialty]);
+    }
     if (dateFromISO && dateToISO) {
       const periodLabel = `${format(new Date(dateFromISO), 'dd/MM/yyyy')} a ${format(new Date(dateToISO), 'dd/MM/yyyy')}`;
       summaryRows.push(["Período", periodLabel]);
@@ -1153,11 +1159,33 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     summaryRows.push(["Pacientes", report.totals.patients]);
     summaryRows.push(["Valor Total SUS", report.totals.aihTotalReais]);
     summaryRows.push(["Valor de Produção (Médico)", report.totals.doctorReceivableReais]);
+
+    // 🆕 Quebra por Especialidade de Atendimento
+    const specialtyTotals = report.items.reduce((acc, item) => {
+      const key = (item.aihCareSpecialty || 'Não informado').toString();
+      const curr = acc.get(key) || { patients: 0, totalAih: 0, totalDoctor: 0 };
+      curr.patients += 1;
+      curr.totalAih += Number(item.aihTotalReais || 0);
+      curr.totalDoctor += Number(item.doctorReceivableReais || 0);
+      acc.set(key, curr);
+      return acc;
+    }, new Map<string, { patients: number; totalAih: number; totalDoctor: number }>());
+
+    if (specialtyTotals.size > 0) {
+      summaryRows.push([]);
+      summaryRows.push(["Resumo por Especialidade de Atendimento"]);
+      summaryRows.push(["Especialidade", "Pacientes", "Valor Total SUS", "Valor de Produção (Médico)"]);
+      Array.from(specialtyTotals.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .forEach(([spec, v]) => {
+          summaryRows.push([spec, v.patients, v.totalAih, v.totalDoctor]);
+        });
+    }
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo');
 
     // Aba Pacientes
-    const header = ['#', 'Nome do Paciente', 'Nº AIH', 'Data Alta (SUS)', 'Valor Total', 'Valor Médico'];
+    const header = ['#', 'Nome do Paciente', 'Nº AIH', 'Especialidade de Atendimento', 'Data Alta (SUS)', 'Valor Total', 'Valor Médico'];
     const body = report.items.map((item, idx) => {
       const d = item.dischargeDateISO || item.admissionDateISO;
       const dLabel = d ? format(new Date(d), 'dd/MM/yyyy') : '';
@@ -1165,6 +1193,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
         idx + 1,
         item.patientName || 'Nome não informado',
         item.aihNumber || '',
+        item.aihCareSpecialty || '',
         dLabel,
         Number(item.aihTotalReais || 0),
         Number(item.doctorReceivableReais || 0),

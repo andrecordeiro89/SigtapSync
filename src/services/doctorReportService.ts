@@ -10,6 +10,8 @@ export interface ReportFilters {
   hospitalIds?: string[]
   dateFromISO?: string
   dateToISO?: string
+  // Filtro adicional: Especialidade de Atendimento (AIH)
+  careSpecialty?: string
 }
 
 export interface PatientReportItem {
@@ -17,6 +19,7 @@ export interface PatientReportItem {
   patientName: string
   aihNumber?: string
   aihTotalReais: number
+  aihCareSpecialty?: string
   procedures04: Array<ProcedurePaymentInfo>
   doctorReceivableReais: number
   appliedRule: string
@@ -45,6 +48,38 @@ export async function getDoctorPatientReport(
   doctorName: string,
   filters: ReportFilters = {}
 ): Promise<DoctorPatientReport> {
+  const normalize = (s: string): string =>
+    (s || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .trim()
+      .toUpperCase()
+
+  // Extrai Especialidade de Atendimento da AIH considerando variações de chave
+  const getPatientCareSpecialty = (patient: any): string => {
+    const aih = (patient?.aih_info || {}) as Record<string, unknown>
+    const raw = (
+      (aih as any).specialty ??
+      (aih as any).especialidade ??
+      (aih as any).care_specialty ??
+      (aih as any).careSpecialty ??
+      (aih as any).especialidade_atendimento ??
+      (aih as any).EspecialidadeAtendimento ??
+      (aih as any).Specialty ??
+      (aih as any).ESPECIALIDADE ??
+      ''
+    ) as string
+    return (raw || '').toString()
+  }
+
+  // Data de referência do paciente (alta preferencialmente; senão internação)
+  const getPatientReferenceDateISO = (patient: any): string | undefined => {
+    const aih = (patient?.aih_info || {}) as Record<string, unknown>
+    const discharge = (aih as any).discharge_date as string | undefined
+    const admission = (aih as any).admission_date as string | undefined
+    return discharge || admission || undefined
+  }
+
   const hierarchy = await DoctorsHierarchyV2Service.getDoctorsHierarchyV2(filters)
 
   // Normalizar comparação por nome (maiusc.)
@@ -76,6 +111,28 @@ export async function getDoctorPatientReport(
   const items: PatientReportItem[] = []
 
   for (const [patientId, patient] of patientMap.entries()) {
+    // Aplicar filtro por período, se fornecido
+    if (filters.dateFromISO && filters.dateToISO) {
+      const refISO = getPatientReferenceDateISO(patient)
+      if (refISO) {
+        const d = new Date(refISO).getTime()
+        const from = new Date(filters.dateFromISO).getTime()
+        const to = new Date(filters.dateToISO).getTime()
+        if (isFinite(d) && isFinite(from) && isFinite(to)) {
+          if (d < from || d > to) continue
+        }
+      }
+    }
+
+    // Aplicar filtro por Especialidade de Atendimento, se fornecido
+    const careSpecFilter = (filters.careSpecialty || '').trim()
+    if (careSpecFilter) {
+      const patientCareSpec = getPatientCareSpecialty(patient)
+      if (!patientCareSpec || normalize(patientCareSpec) !== normalize(careSpecFilter)) {
+        continue
+      }
+    }
+
     const aihTotalReais = Number(patient.total_value_reais || 0)
 
     // Selecionar procedimentos 04.* relevantes para cálculo (exclui anestesista 04.xxx)
@@ -112,6 +169,7 @@ export async function getDoctorPatientReport(
       patientName: patient.patient_info?.name || 'Paciente',
       aihNumber: (((patient as any)?.aih_info?.aih_number || '') as string).toString().replace(/\D/g, '') || undefined,
       aihTotalReais,
+      aihCareSpecialty: getPatientCareSpecialty(patient),
       procedures04,
       doctorReceivableReais,
       appliedRule,
