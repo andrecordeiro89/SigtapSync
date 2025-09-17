@@ -615,8 +615,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
 
   // Iniciar edição de valores - INTEGRADO COM REGRAS ESPECIAIS CORRIGIDAS
   const startEditingValues = (sequencia: number, procedure: ProcedureAIH) => {
-    // 🚫 BLOQUEAR EDIÇÃO DE ANESTESISTAS
-    if (procedure.isAnesthesiaProcedure) {
+    // 🚫 BLOQUEAR EDIÇÃO APENAS DE ANESTESIA NÃO CALCULÁVEL
+    if (procedure.isAnesthesiaProcedure && !shouldCalculateAnesthetistProcedure(procedure.cbo, procedure.procedimento)) {
       toast({
         title: "Edição bloqueada",
         description: "Anestesistas não podem ser editados. Use o botão lixeira para remover.",
@@ -655,7 +655,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
         const procedimentosParaRegra = aihCompleta.procedimentos
           .filter(p => p.sigtapProcedure && 
                       !isInstrument04Procedure(p.sigtapProcedure.registrationInstrument) &&
-                      !p.isAnesthesiaProcedure) // 🚫 EXCLUIR ANESTESISTAS
+                      !(p.isAnesthesiaProcedure && !shouldCalculateAnesthetistProcedure(p.cbo, p.procedimento))) // 🚫 EXCLUIR APENAS ANESTESIA NÃO CALCULÁVEL
           .sort((a, b) => a.sequencia - b.sequencia);
         
         const posicaoNaRegra = procedimentosParaRegra.findIndex(p => p.sequencia === sequencia);
@@ -667,7 +667,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           .filter(p => p.sigtapProcedure && 
                       !isInstrument04Procedure(p.sigtapProcedure.registrationInstrument) &&
                       !hasSpecialRule(p.procedimento) &&
-                      !p.isAnesthesiaProcedure) // 🚫 EXCLUIR ANESTESISTAS
+                      !(p.isAnesthesiaProcedure && !shouldCalculateAnesthetistProcedure(p.cbo, p.procedimento))) // 🚫 EXCLUIR APENAS ANESTESIA NÃO CALCULÁVEL
           .sort((a, b) => a.sequencia - b.sequencia);
         
         const posicaoEntreNormais = procedimentosNormais.findIndex(p => p.sequencia === sequencia) + 1;
@@ -698,8 +698,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     // 🎯 DETECTAR INSTRUMENTO 04 OU REGRA ESPECIAL
     const procedureToEdit = aihCompleta.procedimentos.find(p => p.sequencia === sequencia);
     
-    // 🚫 BLOQUEAR EDIÇÃO DE ANESTESISTAS (dupla proteção)
-    if (procedureToEdit?.isAnesthesiaProcedure) {
+    // 🚫 BLOQUEAR EDIÇÃO APENAS DE ANESTESIA NÃO CALCULÁVEL (dupla proteção)
+    if (procedureToEdit?.isAnesthesiaProcedure && !shouldCalculateAnesthetistProcedure(procedureToEdit.cbo, procedureToEdit.procedimento)) {
       toast({
         title: "Edição bloqueada",
         description: "Anestesistas não podem ser editados.",
@@ -762,7 +762,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           const procedimentosParaRegra = aihCompleta.procedimentos
             .filter(p => p.sigtapProcedure && 
                         !isInstrument04Procedure(p.sigtapProcedure.registrationInstrument) &&
-                        !p.isAnesthesiaProcedure) // 🚫 EXCLUIR ANESTESISTAS
+                        !(p.isAnesthesiaProcedure && !shouldCalculateAnesthetistProcedure(p.cbo, p.procedimento))) // 🚫 EXCLUIR APENAS ANESTESIA NÃO CALCULÁVEL
             .sort((a, b) => a.sequencia - b.sequencia);
           
           const posicaoNaRegra = procedimentosParaRegra.findIndex(p => p.sequencia === sequencia);
@@ -1298,32 +1298,50 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="text-center p-4 bg-gradient-to-r from-sky-50 to-sky-100 rounded-lg border-l-4 border-sky-400">
               <p className="text-sm text-gray-600">Total Extraído</p>
-              <p className="text-2xl font-bold text-blue-700">{aihCompleta.totalProcedimentos}</p>
+              <p className="text-2xl font-bold text-sky-700">{aihCompleta.totalProcedimentos}</p>
               <p className="text-xs text-gray-500">Todos os procedimentos</p>
             </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg border-l-4 border-green-500">
+            <div className="text-center p-4 bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-lg border-l-4 border-emerald-400">
               <p className="text-sm text-gray-600">Aprovados</p>
-              <p className="text-2xl font-bold text-green-700">{aihCompleta.procedimentosAprovados}</p>
+              <p className="text-2xl font-bold text-emerald-700">{aihCompleta.procedimentosAprovados}</p>
               <p className="text-xs text-gray-500">Incluindo anestesistas</p>
             </div>
             {/* ✅ NOVO: Card específico para anestesistas */}
-            <div className="text-center p-4 bg-red-50 rounded-lg border-l-4 border-red-500">
+            <div className="text-center p-4 bg-gradient-to-r from-rose-50 to-rose-100 rounded-lg border-l-4 border-rose-400">
               <p className="text-sm text-gray-600">Anestesistas</p>
-              <p className="text-2xl font-bold text-red-700">
+              <p className="text-2xl font-bold text-rose-700">
                 {aihCompleta.procedimentos.filter(p => p.isAnesthesiaProcedure).length}
               </p>
               <p className="text-xs text-gray-500">Marcados para remoção</p>
             </div>
-            <div className="text-center p-4 bg-green-100 rounded-lg border-l-4 border-green-600 relative">
+            <div className="text-center p-4 bg-gradient-to-r from-violet-50 to-violet-100 rounded-lg border-l-4 border-violet-400 relative">
               <p className="text-sm text-gray-600">Valor Total</p>
-              <p className="text-2xl font-bold text-green-800">
+              <p className="text-2xl font-bold text-violet-800">
                 {formatCurrency(aihCompleta.valorTotalCalculado || 0)}
               </p>
               <div className="absolute top-1 right-1">
-                <Badge variant="default" className="text-xs bg-green-600">Total</Badge>
+                <Badge variant="default" className="text-xs bg-violet-500">Total</Badge>
+              </div>
+            </div>
+            {/* ✅ NOVO: Valor Total com Anestesistas */}
+            <div className="text-center p-4 bg-gradient-to-r from-amber-50 to-amber-100 rounded-lg border-l-4 border-amber-400 relative">
+              <p className="text-sm text-gray-600">Valor Total (c/ Anest.)</p>
+              <p className="text-2xl font-bold text-amber-800">
+                {formatCurrency((() => {
+                  try {
+                    return (aihCompleta.procedimentos || [])
+                      .filter(p => p.aprovado !== false)
+                      .reduce((sum, p) => sum + (p.valorCalculado || 0), 0);
+                  } catch {
+                    return 0;
+                  }
+                })())}
+              </p>
+              <div className="absolute top-1 right-1">
+                <Badge variant="default" className="text-xs bg-amber-500">Total+</Badge>
               </div>
             </div>
           </div>
@@ -1615,7 +1633,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                       <TableCell>
                         {/* COLUNA VALORES - LÓGICA REFINADA PARA ANESTESISTAS */}
                         {(() => {
-                          const anesthetistInfo = getAnesthetistProcedureType(procedure.cbo, procedure.procedimento);
+                          const anesthetistInfo = getAnesthetistProcedureType((procedure as any).cbo || (procedure as any).professional_cbo, procedure.procedimento);
                           
                           if (anesthetistInfo.isAnesthetist && !anesthetistInfo.shouldCalculate) {
                             // 🚫 ANESTESISTA 04.xxx: Não exibir valores, apenas controle
@@ -1645,6 +1663,14 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                   {formatCurrency((procedure.valorCalculadoSH || 0) + (procedure.valorCalculadoSP || 0))}
                                 </div>
                                 <div className="flex flex-col items-center gap-1">
+                                  {anesthetistInfo.isAnesthetist && (
+                                    <Badge 
+                                      variant={anesthetistInfo.badgeVariant}
+                                      className={`${anesthetistInfo.badgeClass} text-xs px-2 py-0.5`}
+                                    >
+                                      {anesthetistInfo.badge}
+                                    </Badge>
+                                  )}
                                   <div className="text-xs text-gray-500">
                                     SP + SH {procedure.quantity && procedure.quantity > 1 && (
                                       <span className="text-blue-600 font-medium">
@@ -1678,6 +1704,14 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                                   {formatCurrency(procedure.valorCalculado)}
                                 </div>
                                 <div className="flex flex-col items-center gap-1">
+                                  {anesthetistInfo.isAnesthetist && (
+                                    <Badge 
+                                      variant={anesthetistInfo.badgeVariant}
+                                      className={`${anesthetistInfo.badgeClass} text-xs px-2 py-0.5`}
+                                    >
+                                      {anesthetistInfo.badge}
+                                    </Badge>
+                                  )}
                                   <div className="text-xs text-gray-500">
                                     Valor Total {procedure.quantity && procedure.quantity > 1 && (
                                       <span className="text-blue-600 font-medium">
