@@ -20,6 +20,7 @@ import { ProcedureRecordsService } from '@/services/simplifiedProcedureService';
 import { isMedicalProcedure } from '@/config/susCalculationRules';
 import { shouldCalculateAnesthetistProcedure } from '../utils/anesthetistLogic';
 import { getDoctorPatientReport, type DoctorPatientReport } from '@/services/doctorReportService';
+import { exportAnesthesiaExcel } from '@/services/exportService';
 
 interface ReportPreset {
   type?: 'sus-report';
@@ -1131,6 +1132,70 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     }
   };
 
+  // 🧾 Gera Excel de Anestesia (CBO 225151) agregando por paciente com colunas múltiplas
+  const generateAnesthesiaExcelReport = async (): Promise<void> => {
+    try {
+      if (!selectedHospital) {
+        toast({
+          title: "Selecione um hospital",
+          description: "É necessário selecionar um hospital para gerar o relatório de anestesia.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setIsGenerating(true);
+      toast({
+        title: "Gerando relatório de Anestesia (Excel)",
+        description: `Coletando dados de anestesias do hospital selecionado...`,
+      });
+
+      // Período
+      let dateFromISO: string | undefined;
+      let dateToISO: string | undefined;
+      if (customMode && customRange.startDate && customRange.endDate) {
+        const start = new Date(customRange.startDate);
+        const end = new Date(customRange.endDate);
+        end.setHours(23,59,59,999);
+        dateFromISO = start.toISOString();
+        dateToISO = end.toISOString();
+      } else if (preset?.startDate && preset?.endDate) {
+        const start = new Date(preset.startDate);
+        const end = new Date(preset.endDate);
+        end.setHours(23,59,59,999);
+        dateFromISO = start.toISOString();
+        dateToISO = end.toISOString();
+      } else {
+        const periodDays = parseInt(period);
+        const start = new Date();
+        start.setDate(start.getDate() - periodDays);
+        dateFromISO = start.toISOString();
+        dateToISO = new Date().toISOString();
+      }
+
+      await exportAnesthesiaExcel({
+        hospitalIds: [selectedHospital],
+        dateFromISO,
+        dateToISO,
+        maxColumnsPerPatient: 5,
+      });
+
+      toast({
+        title: "Relatório de Anestesia gerado!",
+        description: `Arquivo Excel baixado com sucesso.`,
+      });
+    } catch (error) {
+      console.error('Erro ao gerar relatório de Anestesia (Excel):', error);
+      toast({
+        title: "Erro ao gerar relatório",
+        description: "Ocorreu um erro ao gerar o relatório de anestesia.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // Renderiza o Excel SUS a partir do relatório consolidado
   const renderDoctorSUSExcelFromReport = async (
     report: DoctorPatientReport,
@@ -1578,10 +1643,10 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5 text-blue-600" />
-          Gerador de Relatórios em PDF
+          Gerador de Relatórios (PDF e Excel)
         </CardTitle>
         <CardDescription>
-          Configure e gere relatórios executivos personalizados
+          Configure e gere relatórios executivos em PDF e Excel (SUS PDF, SUS Excel e Anestesia Excel)
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -1742,38 +1807,34 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
           </>
         )}
 
-        <div className="flex gap-3 pt-4">
-          <Button 
-            onClick={handleGenerateReport}
-            disabled={
-              isGenerating || 
-              !reportType || 
-              (reportType === 'sus-report' && (!selectedHospital || !selectedDoctor))
-            }
-            className="flex-1"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Gerando...
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4 mr-2" />
-                Gerar Relatório PDF
-              </>
-            )}
-          </Button>
-          
-          {onClose && (
-            <Button variant="outline" onClick={onClose}>
-              Cancelar
+        <div className="pt-4">
+          <div className="flex flex-col gap-2">
+            <Button 
+              onClick={handleGenerateReport}
+              disabled={
+                isGenerating || 
+                !reportType || 
+                (reportType === 'sus-report' && (!selectedHospital || !selectedDoctor))
+              }
+              className="w-full"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Gerando...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Gerar Relatório PDF
+                </>
+              )}
             </Button>
-          )}
+          </div>
         </div>
 
         {reportType === 'sus-report' && (
-          <div className="pt-2">
+          <div className="pt-2 flex flex-col gap-2">
             <Button
               onClick={generateSUSExcelReport}
               disabled={isGenerating || !selectedHospital || !selectedDoctor}
@@ -1788,6 +1849,23 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
                 <>
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                   Gerar Relatório Excel
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={generateAnesthesiaExcelReport}
+              disabled={isGenerating || !selectedHospital}
+              className="w-full bg-fuchsia-600 hover:bg-fuchsia-700"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Gerando Anestesia...
+                </>
+              ) : (
+                <>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Relatório Anestesia (Excel)
                 </>
               )}
             </Button>

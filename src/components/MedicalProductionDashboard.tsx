@@ -1758,6 +1758,25 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                      <FileSpreadsheet className="h-4 w-4" />
                                      Gerar Relatório Excel
                                    </Button>
+                                  <Button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const h = doctor.hospitals?.[0]?.hospital_id || '';
+                                      setReportPreset({
+                                        hospitalId: h,
+                                        doctorName: doctor.doctor_info.name,
+                                        startDate: dateRange?.startDate,
+                                        endDate: dateRange?.endDate,
+                                        careSpecialty: selectedCareSpecialty && selectedCareSpecialty !== 'all' ? selectedCareSpecialty : undefined
+                                      } as any);
+                                      setReportModalOpen(true);
+                                    }}
+                                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-3 py-2 rounded-md text-sm flex items-center justify-center gap-2"
+                                  >
+                                    <FileSpreadsheet className="h-4 w-4" />
+                                    Relatório Anestesia (Excel)
+                                  </Button>
                                  </div>
                                </div>
                             </div>
