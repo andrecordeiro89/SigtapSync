@@ -8,7 +8,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity, CreditCard, Stethoscope } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { formatDateBrTz } from '@/lib/utils';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
 import { supabase } from '../lib/supabase';
 
@@ -781,7 +780,18 @@ const PatientManagement = () => {
     return <Badge variant="destructive" className="text-xs">❌ {score}%</Badge>;
   };
 
-  const formatDate = (date: string) => formatDateBrTz(date);
+  const formatDate = (date: string) => {
+    if (!date) return '—';
+    const s = date.trim();
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/); // YYYY-MM-DD
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    // Para ISO com horário, formatar em UTC para evitar deslocamento de dia
+    try {
+      return new Date(s).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+    } catch {
+      return s;
+    }
+  };
 
   // NOVA FUNÇÃO: Executar diagnóstico
   const handleRunDiagnostic = async () => {

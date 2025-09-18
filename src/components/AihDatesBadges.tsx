@@ -7,8 +7,17 @@ export interface AihDatesBadgesProps {
 	className?: string;
 }
 
-import { formatDateBrTz } from '@/lib/utils';
-const formatDate = (date?: string) => formatDateBrTz(date);
+const formatDate = (date?: string) => {
+	if (!date) return '—';
+	const s = date.trim();
+	const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+	if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+	try {
+		return new Date(s).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+	} catch {
+		return s;
+	}
+};
 
 const formatCompetencia = (competencia?: string, fallback?: string) => {
 	const ref = competencia || fallback;

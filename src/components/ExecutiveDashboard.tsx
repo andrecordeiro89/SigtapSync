@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { dayWindowIso } from '../lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -92,7 +91,7 @@ const getRealAIHData = async (dateRange?: DateRange) => {
       .select('*')
       .order('created_at', { ascending: false });
     
-    // Aplicar filtros de data por ALTA (janela do dia inteiro) com timezone padrão do sistema
+    // Aplicar filtros de data por ALTA (janela do dia inteiro)
     if (dateRange) {
       const startInclusiveISO = getStartOfDay(dateRange.startDate).toISOString();
       const endExclusiveISO = getStartOfNextDay(dateRange.endDate).toISOString();
@@ -278,7 +277,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [activeHospitalTab, setActiveHospitalTab] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  // Filtragem principal por Alta (discharge_date)
+  // Novo: permitir filtrar somente pela data final (alta do dia)
+  const [useOnlyEndDate, setUseOnlyEndDate] = useState<boolean>(false);
   // Removido: consolidado de todos os hospitais — fonte única: tabela AIHs filtrada por hospital
   // const [showReportGenerator, setShowReportGenerator] = useState(false);
   
@@ -623,7 +623,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     setIsLoading(true);
     try {
       const baseRange = dateRange || selectedDateRange;
-      const currentDateRange: DateRange = baseRange;
+      const currentDateRange: DateRange = useOnlyEndDate
+        ? { startDate: baseRange.endDate, endDate: baseRange.endDate }
+        : baseRange;
       console.log('📊 Carregando dados executivos reais...', {
         periodo: `${currentDateRange.startDate.toLocaleDateString('pt-BR')} - ${currentDateRange.endDate.toLocaleDateString('pt-BR')}`
       });
@@ -640,11 +642,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         billingStatsData = await getRealAIHData(currentDateRange);
       }
 
-      // Carregar dados das views de médicos/hospitais em paralelo (respeitando intervalo Admissão→Alta)
+      // Carregar dados das views de médicos/hospitais em paralelo
       const [doctorsResult, specialtiesData, hospitalsData] = await Promise.all([
-        DoctorsRevenueService.getDoctorsAggregated({ pageSize: 1000, dateFrom: currentDateRange.startDate, dateTo: currentDateRange.endDate }),
-        DoctorsRevenueService.getSpecialtyStats({ dateFrom: currentDateRange.startDate, dateTo: currentDateRange.endDate }),
-        DoctorsRevenueService.getHospitalStats({ dateFrom: currentDateRange.startDate, dateTo: currentDateRange.endDate })
+        DoctorsRevenueService.getDoctorsAggregated({ pageSize: 1000 }), // Todos os médicos
+        DoctorsRevenueService.getSpecialtyStats(),
+        DoctorsRevenueService.getHospitalStats()
       ]);
       
       // Atualizar estados com dados reais
@@ -725,8 +727,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       const activeDoctors = doctorsResult.doctors.filter(d => d.activity_status === 'ATIVO').length;
       
       // ✅ CABEÇALHO: usar RPC get_hospital_kpis (fonte única e agregada no banco)
-      const utils = await import('../lib/utils');
-      const { startIso: startDateISO, endIso: endDateISO } = utils.dayWindowIso(currentDateRange.endDate);
+      const startDateISO = currentDateRange.startDate.toISOString();
+      const endDateISO = currentDateRange.endDate.toISOString();
 
       // Garantir hospital ativo (fallback para aba atual)
       const activeHospitalId = (selectedHospitals.length > 0 && !selectedHospitals.includes('all'))
@@ -1083,43 +1085,33 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              {/* Admissão */}
+              {/* DATA INICIAL */}
               <div className="w-full md:w-[180px]">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Admissão</label>
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data Inicial</label>
                 <Input
                   type="date"
                   value={formatDateForInput(selectedDateRange.startDate)}
-                  max={formatDateForInput(selectedDateRange.endDate)}
                   onChange={(e) => {
                     const newStart = parseDateInputLocal(e.target.value);
-                    let newEnd = selectedDateRange.endDate;
-                    if (newStart > newEnd) {
-                      newEnd = newStart; // permitir igualdade e garantir start <= end
-                    }
-                    const updated = { startDate: newStart, endDate: newEnd };
+                    const updated = { startDate: newStart, endDate: selectedDateRange.endDate };
                     setSelectedDateRange(updated);
                     handleDateRangeChange(updated);
                   }}
-                  
+                  disabled={useOnlyEndDate}
                   className="h-9"
                 />
               </div>
 
-              {/* Alta */}
+              {/* DATA FINAL */}
               <div className="w-full md:w-[180px]">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Alta</label>
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data Final</label>
                 <Input
                   type="date"
                   value={formatDateForInput(selectedDateRange.endDate)}
                   max={formatDateForInput(new Date())}
-                  min={formatDateForInput(selectedDateRange.startDate)}
                   onChange={(e) => {
                     const newEnd = parseDateInputLocal(e.target.value);
-                    let newStart = selectedDateRange.startDate;
-                    if (newEnd < newStart) {
-                      newStart = newEnd; // permitir igualdade e garantir start <= end
-                    }
-                    const updated = { startDate: newStart, endDate: newEnd };
+                    const updated = { startDate: selectedDateRange.startDate, endDate: newEnd };
                     setSelectedDateRange(updated);
                     handleDateRangeChange(updated);
                   }}
@@ -1127,7 +1119,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 />
               </div>
 
-              {/* Toggle removido conforme solicitação */}
+              {/* TOGGLE: usar somente data final */}
+              <div className="w-full md:w-auto flex items-end">
+                <div className="flex items-center gap-2">
+                  <Switch checked={useOnlyEndDate} onCheckedChange={(v) => { setUseOnlyEndDate(!!v); setIsLoading(true); loadExecutiveData(); }} />
+                  <span className="text-xs text-gray-700">Filtrar somente pela data final</span>
+                </div>
+              </div>
 
               {/* BOTÃO LIMPAR FILTROS (compacto) */}
               <div className="flex items-end">
