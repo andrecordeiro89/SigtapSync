@@ -53,6 +53,9 @@ export const ENV_CONFIG = {
   ITEMS_PER_PAGE: 20,
   MAX_DESCRIPTION_LENGTH: 50,
   
+  // ===== TIMEZONE PADRÃO =====
+  DEFAULT_TIMEZONE: (import.meta.env.VITE_DEFAULT_TIMEZONE || 'America/Sao_Paulo') as string,
+  
   // ===== RECURSOS OPCIONAIS =====
   ENABLE_AUDIT_LOGS: import.meta.env.VITE_ENABLE_AUDIT_LOGS !== 'false',
   ENABLE_ANALYTICS: import.meta.env.VITE_ENABLE_ANALYTICS === 'true'

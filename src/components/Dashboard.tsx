@@ -97,32 +97,16 @@ const Dashboard = () => {
         const realStats = await persistenceService.getHospitalStats(hospitalId);
         
         // Calcular AIHs processadas hoje (usando limites do dia local)
+        // Buscar contagem de AIHs criadas hoje considerando timezone padrão do sistema
         const nowLocal = new Date();
-        const startOfTodayLocal = new Date(
-          nowLocal.getFullYear(),
-          nowLocal.getMonth(),
-          nowLocal.getDate(),
-          0,
-          0,
-          0,
-          0
-        );
-        const startOfTomorrowLocal = new Date(
-          nowLocal.getFullYear(),
-          nowLocal.getMonth(),
-          nowLocal.getDate() + 1,
-          0,
-          0,
-          0,
-          0
-        );
-        
-        // Buscar contagem de AIHs criadas hoje no sistema (usa count exato para evitar limite de linhas)
+        const { dayWindowIso } = await import('../lib/utils');
+        const { startIso: startOfTodayIso, endIso: startOfTomorrowIso } = dayWindowIso(nowLocal);
+
         let todayQuery = supabase
           .from('aihs')
           .select('id', { count: 'exact', head: true })
-          .gte('created_at', startOfTodayLocal.toISOString())
-          .lt('created_at', startOfTomorrowLocal.toISOString());
+          .gte('created_at', startOfTodayIso)
+          .lt('created_at', startOfTomorrowIso);
           
         // Se não é admin, filtrar por hospital
         if (!isAdminMode) {

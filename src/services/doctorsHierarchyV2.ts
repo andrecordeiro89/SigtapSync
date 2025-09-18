@@ -7,6 +7,7 @@ export interface HierarchyFilters {
   hospitalIds?: string[];
   dateFromISO?: string;
   dateToISO?: string;
+  endExclusiveISO?: string;
   careCharacter?: string; // '1' | '2' | '3' | '4' | 'all'
 }
 
@@ -47,7 +48,9 @@ export class DoctorsHierarchyV2Service {
       if (filters.dateFromISO) {
         query = query.gte('discharge_date', filters.dateFromISO);
       }
-      if (filters.dateToISO) {
+      if (filters.endExclusiveISO) {
+        query = query.lt('discharge_date', filters.endExclusiveISO);
+      } else if (filters.dateToISO) {
         const end = new Date(filters.dateToISO);
         end.setHours(23, 59, 59, 999);
         query = query.lte('discharge_date', end.toISOString());
