@@ -1289,6 +1289,23 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
   }, [filteredDoctors]);
 
+  // 🧮 NOVO KPI: Soma dos Pagamentos Médicos (por médico) para comparação
+  const aggregatedMedicalPayments = React.useMemo(() => {
+    try {
+      let totalPayments = 0;
+      for (const doctor of filteredDoctors) {
+        const stats = calculateDoctorStats(doctor);
+        const doctorPayment = (stats.calculatedPaymentValue && stats.calculatedPaymentValue > 0)
+          ? stats.calculatedPaymentValue
+          : (stats.medicalProceduresValue || 0);
+        totalPayments += doctorPayment;
+      }
+      return totalPayments;
+    } catch {
+      return 0;
+    }
+  }, [filteredDoctors]);
+
   // ✅ ATUALIZAR ESTATÍSTICAS NO COMPONENTE PAI (BASEADO NOS MÉDICOS FILTRADOS)
   useEffect(() => {
     if (onStatsUpdate && !isLoading) {
@@ -1529,8 +1546,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             </div>
           </CardTitle>
 
-          {/* 🧮 Totais Agregados - SIGTAP, Incrementos e Total */}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* 🧮 Totais Agregados - SIGTAP, Incrementos, Total e Pagamento Médico Total */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
             <div className="rounded-lg border border-slate-200 bg-white p-3">
               <div className="text-[11px] uppercase text-slate-500">Valor Total SIGTAP</div>
               <div className="text-xl font-extrabold text-slate-900">{formatCurrency(aggregatedOperaParanaTotals.totalBaseSigtap)}</div>
@@ -1542,6 +1559,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
               <div className="text-[11px] uppercase text-blue-700">Valor Total</div>
               <div className="text-xl font-extrabold text-blue-700">{formatCurrency(aggregatedOperaParanaTotals.totalWithIncrement)}</div>
+            </div>
+            <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+              <div className="text-[11px] uppercase text-green-700">Pagamento Médico Total</div>
+              <div className="text-xl font-extrabold text-green-700">{formatCurrency(aggregatedMedicalPayments)}</div>
             </div>
           </div>
         </CardHeader>
@@ -2214,47 +2235,23 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                       </div>
                                                       
                                                       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm text-slate-600">
-                                                        <div className="flex items-center gap-2">
-                                                          <Calendar className="h-4 w-4 text-slate-500" />
-                                                          <span className="font-medium">Data:</span>
-                                                          <span className="text-slate-800">
-                                                          {procedure.procedure_date ? new Date(procedure.procedure_date).toLocaleDateString('pt-BR') : 'Não informada'}
-                                                          </span>
-                                                        </div>
-                                                        
-
-                                                        
-                                                        {procedure.professional_name && (
-                                                          <div className="flex items-center gap-2">
-                                                            <Stethoscope className="h-4 w-4 text-slate-500" />
-                                                            <span className="font-medium">Executante:</span>
-                                                            <span className="truncate text-xs">{procedure.professional_name}</span>
-                                                          </div>
-                                                        )}
-                                                        
-                                                        {procedure.cbo && (
-                                                          <div className="flex items-center gap-2">
-                                                            <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 text-[10px]">
+                                                        <div className="flex items-center h-6 md:h-7 whitespace-nowrap">
+                                                          {procedure.cbo ? (
+                                                            <Badge
+                                                              variant="outline"
+                                                              className={`w-28 justify-center text-[10px] ${procedure.cbo === '225151' ? 'bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white border-0 shadow-sm' : 'bg-slate-100 text-slate-700 border-slate-300'}`}
+                                                            >
                                                               CBO: {procedure.cbo}
                                                             </Badge>
-                                                          </div>
-                                                        )}
-                                                        
-                                                        {procedure.participation && (
-                                                          <div className="flex items-center gap-2">
-                                                            <Users className="h-4 w-4 text-slate-500" />
-                                                            <span className="font-medium">Participação:</span>
-                                                            <span className="text-xs">{procedure.participation}</span>
-                                                          </div>
-                                                        )}
-                                                        
-                                                        {procedure.match_confidence && procedure.match_confidence > 0 && (
-                                                          <div className="flex items-center gap-2">
-                                                            <TrendingUp className="h-4 w-4 text-slate-500" />
-                                                            <span className="font-medium">Confiança:</span>
-                                                            <span className="text-xs">{(procedure.match_confidence * 100).toFixed(1)}%</span>
-                                                          </div>
-                                                        )}
+                                                          ) : (
+                                                            <span className="w-28" />
+                                                          )}
+                                                        </div>
+
+                                                        {/* Campo Confiança removido a pedido */}
+                                                        <div className="h-6 md:h-7" />
+
+                                                        <div className="h-6 md:h-7" />
                                                       </div>
                                                     </div>
                                                     

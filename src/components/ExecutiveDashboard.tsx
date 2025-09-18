@@ -91,19 +91,19 @@ const getRealAIHData = async (dateRange?: DateRange) => {
       .select('*')
       .order('created_at', { ascending: false });
     
-    // Aplicar filtros de data se fornecidos
+    // Aplicar filtros de data por ALTA (janela do dia inteiro)
     if (dateRange) {
-      const startDateISO = dateRange.startDate.toISOString();
-      const endDateISO = dateRange.endDate.toISOString();
+      const startInclusiveISO = getStartOfDay(dateRange.startDate).toISOString();
+      const endExclusiveISO = getStartOfNextDay(dateRange.endDate).toISOString();
       
-      console.log('📅 Aplicando filtros de data na consulta fallback:', {
-        inicio: startDateISO,
-        fim: endDateISO
+      console.log('📅 Aplicando filtros de ALTA (fallback):', {
+        inicio_inclusivo: startInclusiveISO,
+        fim_exclusivo: endExclusiveISO
       });
       
       query = query
-        .gte('discharge_date', startDateISO)
-        .lte('discharge_date', endDateISO);
+        .gte('discharge_date', startInclusiveISO)
+        .lt('discharge_date', endExclusiveISO);
     }
     
     const { data: aihs, error: aihsError } = await query;
@@ -277,6 +277,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [activeHospitalTab, setActiveHospitalTab] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  // Novo: permitir filtrar somente pela data final (alta do dia)
+  const [useOnlyEndDate, setUseOnlyEndDate] = useState<boolean>(false);
   // Removido: consolidado de todos os hospitais — fonte única: tabela AIHs filtrada por hospital
   // const [showReportGenerator, setShowReportGenerator] = useState(false);
   
@@ -595,15 +597,20 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 		return date.toISOString().split('T')[0];
 	};
 
-	// Parser seguro para datas de input em horário local (evita drift por timezone)
-	const parseDateInputLocal = (value: string): Date => {
-		try {
-			const [y, m, d] = value.split('-').map(Number);
-			return new Date(y, (m || 1) - 1, d || 1, 12, 0, 0, 0);
-		} catch {
-			return new Date(value);
-		}
-	};
+  // Parser seguro para datas de input em horário local (evita drift por timezone)
+  const parseDateInputLocal = (value: string): Date => {
+    try {
+      const [y, m, d] = value.split('-').map(Number);
+      // Retornamos meio-dia apenas como representação do dia; limites corretos são calculados nas queries
+      return new Date(y, (m || 1) - 1, d || 1, 12, 0, 0, 0);
+    } catch {
+      return new Date(value);
+    }
+  };
+
+  // Utilitários de janela do dia inteiro (início do dia, e início do dia seguinte)
+  const getStartOfDay = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+  const getStartOfNextDay = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1, 0, 0, 0, 0);
   
 
 
@@ -615,7 +622,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     
     setIsLoading(true);
     try {
-      const currentDateRange = dateRange || selectedDateRange;
+      const baseRange = dateRange || selectedDateRange;
+      const currentDateRange: DateRange = useOnlyEndDate
+        ? { startDate: baseRange.endDate, endDate: baseRange.endDate }
+        : baseRange;
       console.log('📊 Carregando dados executivos reais...', {
         periodo: `${currentDateRange.startDate.toLocaleDateString('pt-BR')} - ${currentDateRange.endDate.toLocaleDateString('pt-BR')}`
       });
@@ -1087,6 +1097,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     setSelectedDateRange(updated);
                     handleDateRangeChange(updated);
                   }}
+                  disabled={useOnlyEndDate}
                   className="h-9"
                 />
               </div>
@@ -1106,6 +1117,14 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   }}
                   className="h-9"
                 />
+              </div>
+
+              {/* TOGGLE: usar somente data final */}
+              <div className="w-full md:w-auto flex items-end">
+                <div className="flex items-center gap-2">
+                  <Switch checked={useOnlyEndDate} onCheckedChange={(v) => { setUseOnlyEndDate(!!v); setIsLoading(true); loadExecutiveData(); }} />
+                  <span className="text-xs text-gray-700">Filtrar somente pela data final</span>
+                </div>
               </div>
 
               {/* BOTÃO LIMPAR FILTROS (compacto) */}

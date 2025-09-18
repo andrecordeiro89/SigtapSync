@@ -154,15 +154,18 @@ export class AIHBillingService {
       if (dateRange) {
         console.log('📅 Consultando resumo com filtros de data...');
         
-        const startDateISO = dateRange.startDate.toISOString();
-        const endDateISO = dateRange.endDate.toISOString();
+        // Janela do dia inteiro por data de ALTA: [início do dia, início do dia seguinte)
+        const startOfDay = new Date(dateRange.startDate.getFullYear(), dateRange.startDate.getMonth(), dateRange.startDate.getDate(), 0, 0, 0, 0);
+        const startOfNextDay = new Date(dateRange.endDate.getFullYear(), dateRange.endDate.getMonth(), dateRange.endDate.getDate() + 1, 0, 0, 0, 0);
+        const startDateISO = startOfDay.toISOString();
+        const endExclusiveISO = startOfNextDay.toISOString();
         
         // Query customizada com filtros de data
         const { data, error } = await supabase
           .from('aihs')
           .select('calculated_total_value, processing_status, admission_date, discharge_date')
-          .gte('admission_date', startDateISO)
-          .lte('admission_date', endDateISO);
+          .gte('discharge_date', startDateISO)
+          .lt('discharge_date', endExclusiveISO);
           
         if (error) {
           console.error('❌ Erro ao buscar AIHs com filtro de data:', error);
@@ -645,13 +648,15 @@ export class AIHBillingService {
       let filteredSummary = summary;
       if (dateRange && (options?.hospitalIds || (options?.careCharacter && options.careCharacter !== 'all'))) {
         try {
-          const startDateISO = dateRange.startDate.toISOString();
-          const endDateISO = dateRange.endDate.toISOString();
+          const startOfDay = new Date(dateRange.startDate.getFullYear(), dateRange.startDate.getMonth(), dateRange.startDate.getDate(), 0, 0, 0, 0);
+          const startOfNextDay = new Date(dateRange.endDate.getFullYear(), dateRange.endDate.getMonth(), dateRange.endDate.getDate() + 1, 0, 0, 0, 0);
+          const startDateISO = startOfDay.toISOString();
+          const endExclusiveISO = startOfNextDay.toISOString();
           let q = supabase
             .from('aihs')
             .select('calculated_total_value, processing_status, admission_date, discharge_date, care_character, hospital_id')
-            .gte('admission_date', startDateISO)
-            .lte('admission_date', endDateISO);
+            .gte('discharge_date', startDateISO)
+            .lt('discharge_date', endExclusiveISO);
           if (options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all')) {
             q = q.in('hospital_id', options.hospitalIds);
           }
