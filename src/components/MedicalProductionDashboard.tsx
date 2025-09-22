@@ -1800,7 +1800,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
                                         const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
                                         const rows: Array<Array<string | number>> = [];
-                                        const header = ['#', 'Nome do Paciente', 'Nº AIH', 'Especialidade de Atendimento', 'Data Alta (SUS)', 'Valor Total', 'Médico', 'Hospital'];
+                                        const header = ['#', 'Nome do Paciente', 'Nº AIH', 'Caráter de Atendimento', 'Nome Comum Procedimento', 'Especialidade de Atendimento', 'Data Alta (SUS)', 'Valor Total', 'Médico', 'Hospital'];
                                         let idx = 1;
                                         const doctorName = doctor.doctor_info?.name || '';
                                         const hospitalName = doctor.hospitals?.[0]?.hospital_name || '';
@@ -1812,12 +1812,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           const name = p.patient_info?.name || 'Paciente';
                                           const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                                           const careSpec = (p?.aih_info?.specialty || '').toString();
+                                          const careCharacter = (() => {
+                                            const raw = (p?.aih_info?.care_character ?? '').toString();
+                                            try { return CareCharacterUtils.formatForDisplay(raw, false); } catch { return raw; }
+                                          })();
+                                          const commonName = (p?.common_name || '').toString();
                                           const disISO = p?.aih_info?.discharge_date || '';
                                           const disLabel = disISO
                                             ? (() => { const s = String(disISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
                                             : '';
                                           const total = Number(p.total_value_reais || 0);
-                                          rows.push([idx++, name, aih, careSpec, disLabel, total, doctorName, hospitalName]);
+                                          rows.push([idx++, name, aih, careCharacter, commonName, careSpec, disLabel, total, doctorName, hospitalName]);
                                         });
                                         const wb = XLSX.utils.book_new();
                                         const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
