@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
+import { format as formatDateFns } from 'date-fns';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
@@ -1554,45 +1556,64 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   <span>Atualização automática</span>
                   <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
                 </div>
+                <Button variant="outline" size="sm" onClick={() => setRefreshTick(t => t + 1)}>
+                  <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
+                </Button>
                 <Button
                   variant="default"
                   size="sm"
                   onClick={async () => {
                     try {
-                      const hospitalIds = selectedHospitals && !selectedHospitals.includes('all') ? selectedHospitals : undefined;
-                      const startOfDayUTC = (d?: Date | null) => {
-                        if (!d) return null;
-                        return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
-                      };
-                      // Respeitar modo "apenas data de alta" do container
                       const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
-                      const selectedEnd = dateRange?.endDate ? new Date(dateRange.endDate) : null;
-                      const selectedStart = dateRange?.startDate ? new Date(dateRange.startDate) : null;
-                      // Para o serviço, passamos o mesmo padrão do restante do app:
-                      // start inclusivo, end inclusivo (o serviço converterá para exclusivo onde necessário)
-                      const effectiveFrom = useOnlyEnd ? selectedEnd : selectedStart;
-                      const dateFromISO = startOfDayUTC(effectiveFrom);
-                      const dateToISO = startOfDayUTC(selectedEnd);
-                      await exportAllPatientsExcel({
-                        hospitalIds,
-                        dateFromISO: dateFromISO ? dateFromISO.toISOString() : undefined,
-                        dateToISO: dateToISO ? dateToISO.toISOString() : undefined,
-                        careCharacter: selectedCareCharacter && selectedCareCharacter !== 'all' ? selectedCareCharacter : undefined,
+                      const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
+                      const rows: Array<Array<string | number>> = [];
+                      const header = ['#', 'Nome do Paciente', 'Nº AIH', 'Especialidade de Atendimento', 'Data Alta (SUS)', 'Valor Total', 'Médico', 'Hospital'];
+                      let idx = 1;
+                      filteredDoctors.forEach((card: any) => {
+                        const doctorName = card.doctor_info?.name || '';
+                        const hospitalName = card.hospitals?.[0]?.hospital_name || '';
+                        (card.patients || []).forEach((p: any) => {
+                          if (useOnlyEnd && selectedEnd) {
+                            const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
+                            if (!discharge || !isSameUTCDate(discharge, selectedEnd)) return;
+                          }
+                          const name = p.patient_info?.name || 'Paciente';
+                          const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
+                          const careSpec = (p?.aih_info?.specialty || '').toString();
+                          const disISO = p?.aih_info?.discharge_date || '';
+                          const disLabel = disISO
+                            ? (() => { const s = String(disISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
+                            : '';
+                          const total = Number(p.total_value_reais || 0);
+                          rows.push([idx++, name, aih, careSpec, disLabel, total, doctorName, hospitalName]);
+                        });
                       });
-                      toast.success('Excel (Todos Pacientes) gerado com sucesso!');
+                      const wb = XLSX.utils.book_new();
+                      const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+                      (ws as any)['!cols'] = [
+                        { wch: 5 },
+                        { wch: 40 },
+                        { wch: 18 },
+                        { wch: 22 },
+                        { wch: 16 },
+                        { wch: 18 },
+                        { wch: 28 },
+                        { wch: 30 },
+                      ];
+                      XLSX.utils.book_append_sheet(wb, ws, 'Pacientes');
+                      const fileName = `Relatorio_Pacientes_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+                      XLSX.writeFile(wb, fileName);
+                      toast.success('Relatório Pacientes gerado com base no que está na tela.');
                     } catch (e) {
-                      console.error('Erro ao exportar Excel de todos os pacientes:', e);
-                      toast.error('Erro ao gerar Excel de todos os pacientes');
+                      console.error('Erro ao exportar Relatório Pacientes:', e);
+                      toast.error('Erro ao gerar Relatório Pacientes');
                     }
                   }}
                   className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
-                  title="Gerar relatório Excel com todos os pacientes do período"
+                  title="Gerar relatório Excel com os pacientes exibidos"
                 >
                   <FileSpreadsheet className="h-4 w-4" />
-                  Relatório Todos Pacientes
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setRefreshTick(t => t + 1)}>
-                  <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
+                  Relatório Pacientes
                 </Button>
               </div>
             </div>
@@ -1769,8 +1790,61 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                               
                               {/* ESTATÍSTICAS FINANCEIRAS */}
                                <div className="text-right">
-                                 {/* Botões Relatório SUS (PDF e Excel) */}
+                                 {/* Botões de Relatório por Médico */}
                                  <div className="mt-3 flex flex-col gap-2">
+                                  <Button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
+                                        const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
+                                        const rows: Array<Array<string | number>> = [];
+                                        const header = ['#', 'Nome do Paciente', 'Nº AIH', 'Especialidade de Atendimento', 'Data Alta (SUS)', 'Valor Total', 'Médico', 'Hospital'];
+                                        let idx = 1;
+                                        const doctorName = doctor.doctor_info?.name || '';
+                                        const hospitalName = doctor.hospitals?.[0]?.hospital_name || '';
+                                        (doctor.patients || []).forEach((p: any) => {
+                                          if (useOnlyEnd && selectedEnd) {
+                                            const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
+                                            if (!discharge || !isSameUTCDate(discharge, selectedEnd)) return;
+                                          }
+                                          const name = p.patient_info?.name || 'Paciente';
+                                          const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
+                                          const careSpec = (p?.aih_info?.specialty || '').toString();
+                                          const disISO = p?.aih_info?.discharge_date || '';
+                                          const disLabel = disISO
+                                            ? (() => { const s = String(disISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
+                                            : '';
+                                          const total = Number(p.total_value_reais || 0);
+                                          rows.push([idx++, name, aih, careSpec, disLabel, total, doctorName, hospitalName]);
+                                        });
+                                        const wb = XLSX.utils.book_new();
+                                        const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+                                        (ws as any)['!cols'] = [
+                                          { wch: 5 },
+                                          { wch: 40 },
+                                          { wch: 18 },
+                                          { wch: 22 },
+                                          { wch: 16 },
+                                          { wch: 18 },
+                                          { wch: 28 },
+                                          { wch: 30 },
+                                        ];
+                                        XLSX.utils.book_append_sheet(wb, ws, 'Pacientes');
+                                        const fileName = `Relatorio_Pacientes_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+                                        XLSX.writeFile(wb, fileName);
+                                        toast.success('Relatório Pacientes gerado com base no card do médico.');
+                                      } catch (err) {
+                                        console.error('Erro ao exportar Relatório Pacientes (card):', err);
+                                        toast.error('Erro ao gerar Relatório Pacientes');
+                                      }
+                                    }}
+                                    className="bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-3 py-2 rounded-md text-sm flex items-center justify-center gap-2"
+                                  >
+                                    <FileSpreadsheet className="h-4 w-4" />
+                                    Relatório Pacientes
+                                  </Button>
                                    <Button
                                      type="button"
                                      onClick={(e) => {
@@ -1788,28 +1862,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                      }}
                                      className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-3 py-2 rounded-md text-sm"
                                    >
-                                     Gerar Relatório SUS
+                                    Relatório Pacientes PDF
                                    </Button>
-                                   <Button
-                                     type="button"
-                                     onClick={(e) => {
-                                       e.stopPropagation();
-                                       const h = doctor.hospitals?.[0]?.hospital_id || '';
-                                       setReportPreset({
-                                         hospitalId: h,
-                                         doctorName: doctor.doctor_info.name,
-                                         startDate: dateRange?.startDate,
-                                         endDate: dateRange?.endDate,
-                                         careSpecialty: selectedCareSpecialty && selectedCareSpecialty !== 'all' ? selectedCareSpecialty : undefined
-                                       } as any);
-                                       setReportModalOpen(true);
-                                       // O modal abrirá com o ReportGenerator, que possui o botão Excel (verde)
-                                     }}
-                                     className="bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-3 py-2 rounded-md text-sm flex items-center justify-center gap-2"
-                                   >
-                                     <FileSpreadsheet className="h-4 w-4" />
-                                     Gerar Relatório Excel
-                                   </Button>
+                                  
                                   <Button
                                     type="button"
                                     onClick={(e) => {
@@ -1827,7 +1882,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-3 py-2 rounded-md text-sm flex items-center justify-center gap-2"
                                   >
                                     <FileSpreadsheet className="h-4 w-4" />
-                                    Relatório Anestesia (Excel)
+                                    Relatório Anestesistas
                                   </Button>
                                  </div>
                                </div>

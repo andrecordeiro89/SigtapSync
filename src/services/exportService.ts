@@ -2,7 +2,12 @@ import { DoctorsHierarchyV2Service, type HierarchyFilters } from './doctorsHiera
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 
-export interface AllPatientsExportFilters extends HierarchyFilters {}
+export interface AllPatientsExportFilters extends HierarchyFilters {
+  // Filtros visuais adicionais da tela de Profissionais
+  doctorSpecialty?: string;        // Especialidade do médico (selectedSpecialty)
+  careSpecialty?: string;          // Especialidade de atendimento da AIH (selectedCareSpecialty)
+  searchTerm?: string;             // Busca rápida (médico/procedimento)
+}
 
 export async function exportAllPatientsExcel(filters: AllPatientsExportFilters = {}): Promise<void> {
   // Normalizar janela de datas para respeitar regra de alta: [start, nextDayStart)
@@ -16,7 +21,48 @@ export async function exportAllPatientsExcel(filters: AllPatientsExportFilters =
     // Não avançar um dia aqui; o serviço DoctorsHierarchyV2 calculará endExclusive internamente
     normalized.dateToISO = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), e.getUTCDate(), 0, 0, 0, 0)).toISOString();
   }
-  const hierarchy = await DoctorsHierarchyV2Service.getDoctorsHierarchyV2(normalized);
+  let hierarchy = await DoctorsHierarchyV2Service.getDoctorsHierarchyV2(normalized);
+
+  // =============================================================
+  // Aplicar os mesmos filtros visuais da tela
+  // =============================================================
+  // 1) Especialidade do médico
+  if (filters.doctorSpecialty && filters.doctorSpecialty.trim().toLowerCase() !== 'all') {
+    const sel = filters.doctorSpecialty.trim().toLowerCase();
+    hierarchy = hierarchy.filter(card => (card.doctor_info?.specialty || '').toLowerCase() === sel);
+  }
+
+  // 2) Especialidade de atendimento (AIH) — filtra pacientes dentro do card
+  if (filters.careSpecialty && filters.careSpecialty.trim().toLowerCase() !== 'all') {
+    const selCare = filters.careSpecialty.trim().toLowerCase();
+    hierarchy = hierarchy
+      .map(card => {
+        const patients = (card.patients || []).filter(p => {
+          const spec = (((p as any).aih_info?.specialty) || ((p as any).aih_info?.especialidade) || '').toString().toLowerCase();
+          return spec === selCare;
+        });
+        return { ...card, patients };
+      })
+      .filter(card => (card.patients || []).length > 0);
+  }
+
+  // 3) Busca rápida (médico e procedimentos)
+  if (filters.searchTerm && filters.searchTerm.trim()) {
+    const raw = filters.searchTerm.trim().toLowerCase();
+    const norm = raw.replace(/[\.\s]/g, '');
+    hierarchy = hierarchy.filter(card => {
+      const name = (card.doctor_info?.name || '').toLowerCase();
+      const cns = (card.doctor_info?.cns || '').toLowerCase();
+      const crm = (card.doctor_info?.crm || '').toLowerCase();
+      const matchesDoctor = name.includes(raw) || cns.includes(raw) || crm.includes(raw);
+      const matchesProc = (card.patients || []).some(p => (p.procedures || []).some((pr: any) => {
+        const c = (pr?.procedure_code || '').toLowerCase().replace(/[\.\s]/g, '');
+        const d = (pr?.procedure_description || pr?.sigtap_description || '').toLowerCase();
+        return c.includes(norm) || d.includes(raw);
+      }));
+      return matchesDoctor || matchesProc;
+    });
+  }
 
   // =============================================================
   // Cabeçalho (Resumo dos Filtros)
