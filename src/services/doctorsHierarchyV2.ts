@@ -44,14 +44,20 @@ export class DoctorsHierarchyV2Service {
         query = query.in('hospital_id', filters.hospitalIds);
       }
       // Regra SUS: produção conta pela data de alta (discharge_date)
-      if (filters.dateFromISO) {
-        query = query.gte('discharge_date', filters.dateFromISO);
-      }
-      if (filters.dateToISO) {
-        const end = new Date(filters.dateToISO);
-        end.setHours(23, 59, 59, 999);
-        query = query.lte('discharge_date', end.toISOString());
-      }
+    if (filters.dateFromISO) {
+      query = query.gte('discharge_date', filters.dateFromISO);
+    }
+    if (filters.dateToISO) {
+      // Usar janela inclusiva no início e exclusiva no fim: [start, nextDayStart)
+      // Interpreta dateToISO como um instante e calcula o início do próximo dia em UTC
+      const end = new Date(filters.dateToISO);
+      const endExclusive = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate() + 1, 0, 0, 0, 0));
+      query = query.lt('discharge_date', endExclusive.toISOString());
+    }
+    // Quando houver filtro de data, excluir AIHs sem data de alta
+    if (filters.dateFromISO || filters.dateToISO) {
+      query = query.not('discharge_date', 'is', null);
+    }
       if (filters.careCharacter && filters.careCharacter !== 'all') {
         query = query.eq('care_character', filters.careCharacter);
       }

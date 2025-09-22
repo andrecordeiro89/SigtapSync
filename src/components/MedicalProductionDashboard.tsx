@@ -80,6 +80,19 @@ const formatNumber = (value: number | null | undefined): string => {
   return Math.round(value).toLocaleString('pt-BR');
 };
 
+// Helper para comparar datas por dia (UTC) e gerar chave YYYY-MM-DD
+const toUTCDateKey = (d: Date | string | undefined): string | null => {
+  try {
+    if (!d) return null;
+    const dt = typeof d === 'string' ? new Date(d) : d;
+    return new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate())).toISOString().slice(0, 10);
+  } catch { return null; }
+};
+const isSameUTCDate = (a?: Date, b?: Date): boolean => {
+  if (!a || !b) return false;
+  return toUTCDateKey(a) === toUTCDateKey(b);
+};
+
 const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   // 🚫 EXCLUIR ANESTESISTAS (apenas 04.xxx) da contagem de procedimentos
   const totalProcedures = doctorData.patients.reduce((sum, patient) => 
@@ -1957,7 +1970,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   const patientCareSpec = (((patient as any)?.aih_info?.specialty || '') as string).trim();
                                   const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toUpperCase();
                                   const matchesCareSpec = !careSpecFilter || careSpecFilter === 'all' || (patientCareSpec && normalize(patientCareSpec) === normalize(careSpecFilter));
-                                  return matchesName && matchesProc && matchesCareSpec;
+                                  // Filtro por data de alta (modo apenas por alta): mostrar somente pacientes com alta exatamente no dia selecionado
+                                  const filterByDischargeOnly = false; // será definido externamente
+                                  let matchesDischarge = true;
+                                  try {
+                                    const discharge = (patient as any)?.aih_info?.discharge_date ? new Date((patient as any).aih_info.discharge_date) : undefined;
+                                    const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
+                                    const selectedDischargeOnly = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
+                                    if (selectedDischargeOnly && selectedEnd) {
+                                      matchesDischarge = !!discharge && isSameUTCDate(discharge, selectedEnd);
+                                    }
+                                  } catch { matchesDischarge = true; }
+                                  return matchesName && matchesProc && matchesCareSpec && matchesDischarge;
                                 });
                                 // Ordenar por data mais recente primeiro (Alta SUS; fallback para Admissão)
                                 const sortedPatients = [...filteredPatients].sort((a, b) => {

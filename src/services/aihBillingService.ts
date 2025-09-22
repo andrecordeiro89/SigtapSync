@@ -164,8 +164,9 @@ export class AIHBillingService {
         const { data, error } = await supabase
           .from('aihs')
           .select('calculated_total_value, processing_status, admission_date, discharge_date')
-          .gte('discharge_date', startDateISO)
-          .lt('discharge_date', endExclusiveISO);
+        .gte('discharge_date', startDateISO)
+        .lt('discharge_date', endExclusiveISO)
+        .not('discharge_date', 'is', null);
           
         if (error) {
           console.error('❌ Erro ao buscar AIHs com filtro de data:', error);
@@ -656,7 +657,8 @@ export class AIHBillingService {
             .from('aihs')
             .select('calculated_total_value, processing_status, admission_date, discharge_date, care_character, hospital_id')
             .gte('discharge_date', startDateISO)
-            .lt('discharge_date', endExclusiveISO);
+            .lt('discharge_date', endExclusiveISO)
+            .not('discharge_date', 'is', null);
           if (options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all')) {
             q = q.in('hospital_id', options.hospitalIds);
           }

@@ -103,7 +103,8 @@ const getRealAIHData = async (dateRange?: DateRange) => {
       
       query = query
         .gte('discharge_date', startInclusiveISO)
-        .lt('discharge_date', endExclusiveISO);
+        .lt('discharge_date', endExclusiveISO)
+        .not('discharge_date', 'is', null);
     }
     
     const { data: aihs, error: aihsError } = await query;
@@ -326,6 +327,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     return { startDate: start, endDate: end };
   }, [selectedCompetency, selectedDateRange]);
 
+  // Recorte efetivo por ALTA: quando habilitado, considera somente o dia selecionado na Data de Alta
+  const dischargeEffectiveDateRange: DateRange = React.useMemo(() => {
+    return useOnlyEndDate
+      ? { startDate: selectedDateRange.endDate, endDate: selectedDateRange.endDate }
+      : selectedDateRange;
+  }, [useOnlyEndDate, selectedDateRange]);
+
   // Estados para dados reais das views
   const [doctorsData, setDoctorsData] = useState<DoctorAggregated[]>([]);
   const [specialtyStats, setSpecialtyStats] = useState<SpecialtyStats[]>([]);
@@ -446,9 +454,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     setIsLoading(true);
     // Carregar dados com o novo período
     if (hasExecutiveAccess) {
-      loadExecutiveData(range);
+      // Quando filtrar apenas por alta, passamos o recorte de alta (um dia)
+      const effective = useOnlyEndDate ? { startDate: range.endDate, endDate: range.endDate } : range;
+      loadExecutiveData(effective);
     }
-  }, [hasExecutiveAccess]);
+  }, [hasExecutiveAccess, useOnlyEndDate]);
 
   
   
@@ -843,9 +853,14 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   // Effects
   useEffect(() => {
     if (hasExecutiveAccess) {
+      // Expor estado de filtro por alta ao restante da árvore (solução simples, não invasiva)
+      try {
+        (window as any).__SIGTAP_USE_ONLY_END_DATE__ = useOnlyEndDate;
+        (window as any).__SIGTAP_SELECTED_END_DATE__ = selectedDateRange?.endDate;
+      } catch {}
       loadExecutiveData(selectedDateRange);
     }
-  }, [selectedTimeRange, selectedHospitals, selectedDateRange, selectedCompetency, hasExecutiveAccess]);
+  }, [selectedTimeRange, selectedHospitals, selectedDateRange, selectedCompetency, hasExecutiveAccess, useOnlyEndDate]);
 
   // Carregar TODAS as competências disponíveis (mês da alta) conforme hospitais selecionados
   useEffect(() => {
@@ -1085,15 +1100,19 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              {/* DATA INICIAL */}
+              {/* DATA DE ADMISSÃO */}
               <div className="w-full md:w-[180px]">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data Inicial</label>
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data de Admissão</label>
                 <Input
                   type="date"
                   value={formatDateForInput(selectedDateRange.startDate)}
                   onChange={(e) => {
                     const newStart = parseDateInputLocal(e.target.value);
-                    const updated = { startDate: newStart, endDate: selectedDateRange.endDate };
+                    // Garantir consistência: se start > end, alinhar end = start
+                    const endAligned = (selectedDateRange.endDate && newStart > selectedDateRange.endDate)
+                      ? newStart
+                      : selectedDateRange.endDate;
+                    const updated = { startDate: newStart, endDate: endAligned };
                     setSelectedDateRange(updated);
                     handleDateRangeChange(updated);
                   }}
@@ -1102,16 +1121,20 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 />
               </div>
 
-              {/* DATA FINAL */}
+              {/* DATA DE ALTA */}
               <div className="w-full md:w-[180px]">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data Final</label>
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data de Alta</label>
                 <Input
                   type="date"
                   value={formatDateForInput(selectedDateRange.endDate)}
                   max={formatDateForInput(new Date())}
                   onChange={(e) => {
                     const newEnd = parseDateInputLocal(e.target.value);
-                    const updated = { startDate: selectedDateRange.startDate, endDate: newEnd };
+                    // Garantir consistência: se end < start, alinhar start = end
+                    const startAligned = (selectedDateRange.startDate && newEnd < selectedDateRange.startDate)
+                      ? newEnd
+                      : selectedDateRange.startDate;
+                    const updated = { startDate: startAligned, endDate: newEnd };
                     setSelectedDateRange(updated);
                     handleDateRangeChange(updated);
                   }}
@@ -1123,8 +1146,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               <div className="w-full md:w-auto flex items-end">
                 <div className="flex items-center gap-2">
                   <Switch checked={useOnlyEndDate} onCheckedChange={(v) => { setUseOnlyEndDate(!!v); setIsLoading(true); loadExecutiveData(); }} />
-                  <span className="text-xs text-gray-700">Filtrar somente pela data final</span>
+                  <span className="text-xs text-gray-700">Filtrar apenas pela data de alta (dia selecionado)</span>
                 </div>
+              </div>
+
+              {/* Ajuda sobre o recorte de data */}
+              <div className="w-full md:w-auto text-[11px] text-gray-500 md:self-end">
+                Período aplica-se à <span className="font-medium">data de alta</span> (janela inclusiva no início e exclusiva no fim).
               </div>
 
               {/* BOTÃO LIMPAR FILTROS (compacto) */}

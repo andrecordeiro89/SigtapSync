@@ -1,4 +1,5 @@
 import React from 'react';
+import { Badge } from './ui/badge';
 
 export interface AihDatesBadgesProps {
 	admissionDate?: string;
@@ -46,7 +47,12 @@ const AihDatesBadges: React.FC<AihDatesBadgesProps> = ({ admissionDate, discharg
 		<div className={`flex flex-wrap items-center gap-2 ${className || ''}`}>
 			<span className="text-xs text-slate-700"><span className="font-semibold">Admissão:</span> {formatDate(admissionDate)}</span>
 			<span className="text-xs text-slate-700" title={dischargeDate ? undefined : 'Sem data de alta; período considera apenas internação'}>
-				<span className="font-semibold">Alta:</span> {dischargeDate ? formatDate(dischargeDate) : '—'}
+				<span className="font-semibold">Alta:</span>{' '}
+				{dischargeDate ? (
+					<Badge variant="outline" className="ml-1 bg-blue-50 text-blue-700 border-blue-200 text-[10px] px-2 py-0.5">
+						{formatDate(dischargeDate)}
+					</Badge>
+				) : '—'}
 			</span>
 			{compLabel && (
 				<span className="text-xs text-slate-700" title="Competência SUS"><span className="font-semibold">Competência:</span> {compLabel}</span>
