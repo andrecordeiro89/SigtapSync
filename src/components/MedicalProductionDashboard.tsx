@@ -94,12 +94,25 @@ const isSameUTCDate = (a?: Date, b?: Date): boolean => {
 };
 
 const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
+  // Recorte local para estatísticas: respeitar modo "apenas data de alta"
+  let patientsForStats = doctorData.patients;
+  try {
+    const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
+    const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
+    if (useOnlyEnd && selectedEnd) {
+      patientsForStats = doctorData.patients.filter(p => {
+        const discharge = (p as any)?.aih_info?.discharge_date ? new Date((p as any).aih_info.discharge_date) : undefined;
+        return !!discharge && isSameUTCDate(discharge, selectedEnd);
+      });
+    }
+  } catch {}
+
   // 🚫 EXCLUIR ANESTESISTAS (apenas 04.xxx) da contagem de procedimentos
-  const totalProcedures = doctorData.patients.reduce((sum, patient) => 
+  const totalProcedures = patientsForStats.reduce((sum, patient) => 
     sum + patient.procedures.filter(filterCalculableProcedures).length, 0);
   // ✅ CORREÇÃO: USAR patient.total_value_reais QUE VEM DO calculated_total_value DA AIH
-  const totalValue = doctorData.patients.reduce((sum, patient) => sum + patient.total_value_reais, 0);
-  const totalAIHs = doctorData.patients.length;
+  const totalValue = patientsForStats.reduce((sum, patient) => sum + patient.total_value_reais, 0);
+  const totalAIHs = patientsForStats.length;
   const avgTicket = totalAIHs > 0 ? totalValue / totalAIHs : 0;
   
   // 🔍 LOG PARA VERIFICAÇÃO DA CORREÇÃO
@@ -108,7 +121,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   }
   
   // 🚫 EXCLUIR ANESTESISTAS (apenas 04.xxx) dos procedimentos aprovados
-  const approvedProcedures = doctorData.patients.reduce((sum, patient) => 
+  const approvedProcedures = patientsForStats.reduce((sum, patient) => 
     sum + patient.procedures.filter(proc => 
       proc.approval_status === 'approved' && 
       shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
@@ -118,7 +131,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   
   // 🆕 CALCULAR valores específicos dos procedimentos médicos ("04") COM REGRAS DE PAGAMENTO
   // 🚫 EXCLUIR ANESTESISTAS 04.xxx dos procedimentos médicos (03.xxx são permitidos)
-  const medicalProceduresCount = doctorData.patients.reduce((sum, patient) => 
+  const medicalProceduresCount = patientsForStats.reduce((sum, patient) => 
     sum + patient.procedures.filter(proc => 
       isMedicalProcedure(proc.procedure_code) && 
       shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
@@ -127,7 +140,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   
   // 🆕 CALCULAR QUANTIDADE DE PROCEDIMENTOS DE ANESTESISTAS INICIADOS EM '04' POR MÉDICO
   // ✅ NOVA LÓGICA: Agrupar por paciente e contar apenas 1 procedimento por grupo de anestesia
-  const anesthetistProcedures04Count = doctorData.patients.reduce((sum, patient) => {
+  const anesthetistProcedures04Count = patientsForStats.reduce((sum, patient) => {
     // Verificar se o paciente tem pelo menos 1 procedimento de anestesia 04.xxx
     const hasAnesthesiaProcedures = patient.procedures.some(proc => 
       proc.cbo === '225151' && // É anestesista
@@ -144,7 +157,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   let calculatedPaymentValue = 0;
   
   // Calcular valor original de todos os procedimentos médicos (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
-  medicalProceduresValue = doctorData.patients.reduce((sum, patient) => 
+  medicalProceduresValue = patientsForStats.reduce((sum, patient) => 
     sum + patient.procedures
       .filter(proc => 
         isMedicalProcedure(proc.procedure_code) && 
@@ -174,7 +187,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
       console.log(`🎯 ${doctorData.doctor_info.name}: ${percentageCalculation.appliedRule}`);
     } else {
     // ✅ USAR REGRAS INDIVIDUAIS POR PROCEDIMENTO
-    calculatedPaymentValue = doctorData.patients.reduce((totalSum, patient) => {
+    calculatedPaymentValue = patientsForStats.reduce((totalSum, patient) => {
       // Coletar procedimentos médicos deste paciente (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
       const patientMedicalProcedures = patient.procedures
         .filter(proc => 
@@ -1155,6 +1168,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       }).filter(d => d.patients.length > 0);
     }
 
+    // Remover médicos sem pacientes no dia selecionado quando o toggle "apenas alta" estiver ativo
+    try {
+      const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
+      const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
+      if (useOnlyEnd && selectedEnd) {
+        filtered = filtered.map(d => {
+          const patientsFiltered = d.patients.filter(p => {
+            const discharge = (p as any)?.aih_info?.discharge_date ? new Date((p as any).aih_info.discharge_date) : undefined;
+            return !!discharge && isSameUTCDate(discharge, selectedEnd);
+          });
+          return { ...d, patients: patientsFiltered } as typeof d;
+        }).filter(d => d.patients.length > 0);
+      }
+    } catch {}
+
     setFilteredDoctors(filtered);
     
     // Reset da página atual quando filtros são aplicados
@@ -1532,8 +1560,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   onClick={async () => {
                     try {
                       const hospitalIds = selectedHospitals && !selectedHospitals.includes('all') ? selectedHospitals : undefined;
-                      const dateFromISO = dateRange?.startDate ? new Date(dateRange.startDate) : null;
-                      const dateToISO = dateRange?.endDate ? new Date(dateRange.endDate) : null;
+                      const startOfDayUTC = (d?: Date | null) => {
+                        if (!d) return null;
+                        return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
+                      };
+                      // Respeitar modo "apenas data de alta" do container
+                      const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
+                      const selectedEnd = dateRange?.endDate ? new Date(dateRange.endDate) : null;
+                      const selectedStart = dateRange?.startDate ? new Date(dateRange.startDate) : null;
+                      // Para o serviço, passamos o mesmo padrão do restante do app:
+                      // start inclusivo, end inclusivo (o serviço converterá para exclusivo onde necessário)
+                      const effectiveFrom = useOnlyEnd ? selectedEnd : selectedStart;
+                      const dateFromISO = startOfDayUTC(effectiveFrom);
+                      const dateToISO = startOfDayUTC(selectedEnd);
                       await exportAllPatientsExcel({
                         hospitalIds,
                         dateFromISO: dateFromISO ? dateFromISO.toISOString() : undefined,
@@ -1904,9 +1943,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                      const patientCareSpec = (((patient as any)?.aih_info?.specialty || '') as string).trim();
                                      const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toUpperCase();
                                      const matchesCareSpec = !careSpecFilter || careSpecFilter === 'all' || (patientCareSpec && normalize(patientCareSpec) === normalize(careSpecFilter));
-                                     return matchesName && matchesProc && matchesCareSpec;
+                                     // Filtro por data de alta (modo apenas por alta), mesmo critério da lista
+                                     let matchesDischarge = true;
+                                     try {
+                                       const discharge = (patient as any)?.aih_info?.discharge_date ? new Date((patient as any).aih_info.discharge_date) : undefined;
+                                       const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
+                                       const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
+                                       if (useOnlyEnd && selectedEnd) {
+                                         matchesDischarge = !!discharge && isSameUTCDate(discharge, selectedEnd);
+                                       }
+                                     } catch { matchesDischarge = true; }
+                                     return matchesName && matchesProc && matchesCareSpec && matchesDischarge;
                                    }).length;
-                                   return nameTerm || procTermRaw ? `${filteredCount} de ${doctor.patients.length}` : doctor.patients.length;
+                                   return nameTerm || procTermRaw ? `${filteredCount} de ${doctor.patients.length}` : filteredCount;
                                  })()})
                               </h4>
                               

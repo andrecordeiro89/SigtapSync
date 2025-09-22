@@ -5,12 +5,71 @@ import { format } from 'date-fns';
 export interface AllPatientsExportFilters extends HierarchyFilters {}
 
 export async function exportAllPatientsExcel(filters: AllPatientsExportFilters = {}): Promise<void> {
-  const hierarchy = await DoctorsHierarchyV2Service.getDoctorsHierarchyV2(filters);
+  // Normalizar janela de datas para respeitar regra de alta: [start, nextDayStart)
+  const normalized: AllPatientsExportFilters = { ...filters };
+  if (filters.dateFromISO) {
+    const s = new Date(filters.dateFromISO);
+    normalized.dateFromISO = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate(), 0, 0, 0, 0)).toISOString();
+  }
+  if (filters.dateToISO) {
+    const e = new Date(filters.dateToISO);
+    // Não avançar um dia aqui; o serviço DoctorsHierarchyV2 calculará endExclusive internamente
+    normalized.dateToISO = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth(), e.getUTCDate(), 0, 0, 0, 0)).toISOString();
+  }
+  const hierarchy = await DoctorsHierarchyV2Service.getDoctorsHierarchyV2(normalized);
+
+  // =============================================================
+  // Cabeçalho (Resumo dos Filtros)
+  // =============================================================
+  const fmt = (d?: string) => d ? format(new Date(d), 'dd/MM/yyyy') : '';
+  const startISO = normalized.dateFromISO;
+  const endExclusiveISO = normalized.dateToISO;
+  let periodLabel = 'Sem filtro de período';
+  let modeLabel = 'Período de Alta';
+  if (startISO && endExclusiveISO) {
+    const start = new Date(startISO);
+    const endExclusive = new Date(endExclusiveISO);
+    const endInclusive = new Date(endExclusive.getTime() - 1);
+    const isOneDay = (endExclusive.getTime() - start.getTime()) === 24 * 60 * 60 * 1000;
+    periodLabel = isOneDay
+      ? `Data de Alta: ${fmt(startISO)}`
+      : `Período de Alta: ${fmt(startISO)} a ${fmt(endInclusive.toISOString())}`;
+    modeLabel = isOneDay ? 'Modo: Apenas Data de Alta' : 'Modo: Intervalo de Alta';
+  }
+
+  // Hospitais (derivado do próprio resultado — nomes legíveis)
+  const hospitalNames = new Set<string>();
+  for (const card of hierarchy as any[]) {
+    const name = (card.hospitals && card.hospitals[0]?.hospital_name) || '';
+    if (name) hospitalNames.add(name);
+  }
+  let hospitalsLabel = 'Hospitais: Todos';
+  if (filters.hospitalIds && filters.hospitalIds.length > 0 && !filters.hospitalIds.includes('all')) {
+    const list = Array.from(hospitalNames);
+    if (list.length === 0) hospitalsLabel = 'Hospitais: Selecionados';
+    else if (list.length <= 6) hospitalsLabel = `Hospitais: ${list.join(' | ')}`;
+    else hospitalsLabel = `Hospitais: ${list.length} selecionados (ex.: ${list.slice(0, 6).join(' | ')} …)`;
+  }
+
+  // Caráter
+  const mapCare = (c?: string) => c === '1' ? 'Eletivo' : (c === '2' ? 'Urgência/Emergência' : (c || 'Todos'));
+  const careLabel = `Caráter: ${mapCare(filters.careCharacter as any)}`;
+
+  const generatedAt = `Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`;
 
   // Montar linhas únicas por paciente (por cartão). Não deduplica entre médicos/hospitais.
   const rows: Array<Array<string | number>> = [];
 
-  // Cabeçalho
+  // Cabeçalhos
+  const summaryHeader: string[] = ['Relatório — Pacientes do Período'];
+  const emptyRow: string[] = [''];
+  const filtersBlock: string[][] = [
+    [periodLabel],
+    [modeLabel],
+    [hospitalsLabel],
+    [careLabel],
+    [generatedAt],
+  ];
   const header = ['#', 'Nome do Paciente', 'Nº AIH', 'Data Alta (SUS)', 'Valor Total', 'Médico', 'Hospital'];
 
   let index = 1;
@@ -21,8 +80,19 @@ export async function exportAllPatientsExcel(filters: AllPatientsExportFilters =
       const patientName = p.patient_info?.name || 'Paciente';
       const aihNumberRaw = (p as any)?.aih_info?.aih_number || '';
       const aihNumberClean = aihNumberRaw.toString().replace(/\D/g, '');
-      const dischargeISO = (p as any)?.aih_info?.discharge_date || (p as any)?.aih_info?.admission_date;
-      const dischargeLabel = dischargeISO ? format(new Date(dischargeISO), 'dd/MM/yyyy') : '';
+      const dischargeISO = (p as any)?.aih_info?.discharge_date;
+      const dischargeLabel = (() => {
+        if (!dischargeISO) return '';
+        const s = String(dischargeISO);
+        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+        // Fallback seguro em UTC
+        const d = new Date(s);
+        const dd = String(d.getUTCDate()).padStart(2, '0');
+        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const yyyy = d.getUTCFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+      })();
       const totalReais = Number(p.total_value_reais || 0);
 
       rows.push([
@@ -38,7 +108,13 @@ export async function exportAllPatientsExcel(filters: AllPatientsExportFilters =
   }
 
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  const ws = XLSX.utils.aoa_to_sheet([
+    summaryHeader,
+    ...filtersBlock,
+    emptyRow,
+    header,
+    ...rows
+  ]);
   (ws as any)['!cols'] = [
     { wch: 5 },
     { wch: 40 },

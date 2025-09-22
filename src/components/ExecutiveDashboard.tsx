@@ -24,7 +24,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-  Search
+    Search,
+    X
 } from 'lucide-react';
 
 // Services
@@ -1142,36 +1143,32 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 />
               </div>
 
-              {/* TOGGLE: usar somente data final */}
-              <div className="w-full md:w-auto flex items-end">
+              {/* Linha 2: Toggle e botão de limpar filtros, ocupam largura completa */}
+              <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                 <div className="flex items-center gap-2">
                   <Switch checked={useOnlyEndDate} onCheckedChange={(v) => { setUseOnlyEndDate(!!v); setIsLoading(true); loadExecutiveData(); }} />
-                  <span className="text-xs text-gray-700">Filtrar apenas pela data de alta (dia selecionado)</span>
+                  <span className="text-xs text-gray-700">Filtrar apenas pela data de alta</span>
+                </div>
+                <div className="flex md:justify-end">
+                  <button
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedCareCharacter('all');
+                      setSelectedHospitals(['all']);
+                      setSelectedSpecialty('all');
+                      setSelectedCareSpecialty('all');
+                    }}
+                    className="inline-flex items-center gap-2 px-3 h-9 rounded-lg border border-gray-200 text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                    title="Limpar todos os filtros"
+                    aria-label="Limpar filtros"
+                  >
+                    <X className="h-4 w-4" />
+                    <span className="text-sm">Limpar filtros</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Ajuda sobre o recorte de data */}
-              <div className="w-full md:w-auto text-[11px] text-gray-500 md:self-end">
-                Período aplica-se à <span className="font-medium">data de alta</span> (janela inclusiva no início e exclusiva no fim).
-              </div>
-
-              {/* BOTÃO LIMPAR FILTROS (compacto) */}
-              <div className="flex items-end">
-                <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setSelectedCareCharacter('all');
-                    setSelectedHospitals(['all']);
-                    setSelectedSpecialty('all');
-                    setSelectedCareSpecialty('all');
-                  }}
-                  className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-                  title="Limpar todos os filtros"
-                  aria-label="Limpar filtros"
-                >
-                  ✕
-                </button>
-              </div>
+              
             </div>
 
             {/* Abas de Competência (mês da alta) — logo abaixo dos filtros */}
