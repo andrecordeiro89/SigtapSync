@@ -2174,6 +2174,7 @@ const AIHMultiPageTester = () => {
   const [aihCompleta, setAihCompleta] = useState<AIHComplete | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [aihSaved, setAihSaved] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const { toast } = useToast();
   const { procedures: sigtapProcedures, isLoading: sigtapLoading, totalProcedures } = useSigtapContext();
   const { user } = useAuth();
@@ -2189,12 +2190,66 @@ const AIHMultiPageTester = () => {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
-      setResult(null);
-      setAihCompleta(null);
-      // ✅ RESETAR STATUS DE SALVAMENTO QUANDO NOVO ARQUIVO É SELECIONADO
-      setAihSaved(false);
-      console.log('📄 Arquivo selecionado:', file.name, `(${file.size} bytes)`);
+      processSelectedFile(file);
+    }
+  };
+
+  const processSelectedFile = (file: File) => {
+    // Validar tipo de arquivo
+    if (!file.type.includes('pdf')) {
+      toast({
+        title: "❌ Arquivo inválido",
+        description: "Por favor, selecione apenas arquivos PDF.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validar tamanho (máximo 50MB)
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      toast({
+        title: "❌ Arquivo muito grande",
+        description: "O arquivo deve ter no máximo 50MB.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSelectedFile(file);
+    setResult(null);
+    setAihCompleta(null);
+    // ✅ RESETAR STATUS DE SALVAMENTO QUANDO NOVO ARQUIVO É SELECIONADO
+    setAihSaved(false);
+    console.log('📄 Arquivo selecionado:', file.name, `(${file.size} bytes)`);
+    
+    toast({
+      title: "✅ Arquivo carregado",
+      description: `${file.name} está pronto para processamento.`,
+    });
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+
+    const files = event.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      processSelectedFile(file);
     }
   };
 
@@ -2858,7 +2913,18 @@ const AIHMultiPageTester = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6 p-6">
-          <div className="relative border-2 border-dashed border-blue-300/60 bg-gradient-to-br from-blue-50/30 via-white to-blue-50/20 rounded-xl p-8 text-center hover:border-blue-400/80 hover:bg-blue-50/40 transition-all duration-300 group">
+          <div 
+            className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 group cursor-pointer ${
+              isDragOver 
+                ? 'border-blue-500 bg-blue-100/50 scale-102' 
+                : selectedFile
+                  ? 'border-green-400/80 bg-green-50/40 hover:border-green-500/80'
+                  : 'border-blue-300/60 bg-gradient-to-br from-blue-50/30 via-white to-blue-50/20 hover:border-blue-400/80 hover:bg-blue-50/40'
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             <input
               type="file"
               accept=".pdf"
@@ -2867,15 +2933,50 @@ const AIHMultiPageTester = () => {
               id="pdf-upload"
             />
             <label htmlFor="pdf-upload" className="cursor-pointer block">
-              <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl shadow-sm w-fit mx-auto mb-4 group-hover:scale-105 transition-transform duration-200">
-                <FileText className="w-12 h-12 text-blue-700" />
+              <div className={`p-3 rounded-xl shadow-sm w-fit mx-auto mb-4 group-hover:scale-105 transition-transform duration-200 ${
+                isDragOver 
+                  ? 'bg-gradient-to-br from-blue-200 to-blue-300' 
+                  : selectedFile
+                    ? 'bg-gradient-to-br from-green-100 to-green-200'
+                    : 'bg-gradient-to-br from-blue-100 to-blue-200'
+              }`}>
+                {isDragOver ? (
+                  <Upload className="w-12 h-12 text-blue-700 animate-bounce" />
+                ) : selectedFile ? (
+                  <CheckCircle className="w-12 h-12 text-green-700" />
+                ) : (
+                  <FileText className="w-12 h-12 text-blue-700" />
+                )}
               </div>
-              <p className="text-gray-700 font-medium text-lg mb-2">
-                {selectedFile ? selectedFile.name : 'Clique para selecionar PDF AIH'}
+              <p className={`font-medium text-lg mb-2 ${
+                isDragOver 
+                  ? 'text-blue-700' 
+                  : selectedFile
+                    ? 'text-green-700'
+                    : 'text-gray-700'
+              }`}>
+                {isDragOver 
+                  ? 'Solte o arquivo PDF aqui!' 
+                  : selectedFile 
+                    ? selectedFile.name 
+                    : 'Clique ou arraste o PDF AIH aqui'
+                }
               </p>
               <p className="text-sm text-gray-500">
-                Suporte para PDFs com múltiplas páginas (dados + procedimentos)
+                {isDragOver 
+                  ? 'Processamento automático após soltar o arquivo'
+                  : selectedFile
+                    ? `Arquivo carregado • ${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`
+                    : 'Suporte para PDFs com múltiplas páginas • Máximo 50MB'
+                }
               </p>
+              {selectedFile && (
+                <div className="mt-3">
+                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                    ✅ Pronto para processamento
+                  </Badge>
+                </div>
+              )}
             </label>
           </div>
 

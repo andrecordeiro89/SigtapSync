@@ -350,28 +350,19 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
   'FABIANE GREGORIO BATISTELA': {
     doctorName: 'FABIANE GREGORIO BATISTELA',
     rules: [
-      // Cirurgias Vasculares
-      {
-        procedureCode: '04.06.02.056-6',
-        standardValue: 1050.00,
-        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
-      },
-      {
-        procedureCode: '04.06.02.057-4',
-        standardValue: 1000.00,
-        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
-      },
-      // Cirurgias Gastrointestinais
-      {
-        procedureCode: '04.07.02.010-1',
-        standardValue: 1250.00,
-        description: 'SITO INTESTINAL (REVERSÃO DE COLOSTOMIA) - R$ 1.250,00'
-      },
+      // ================================================================
+      // 🏥 PROCEDIMENTO PRINCIPAL - COLECISTECTOMIA BASE
+      // ================================================================
       {
         procedureCode: '04.07.03.002-6',
         standardValue: 900.00,
-        description: 'COLECISTECTOMIA - R$ 900,00'
+        description: 'COLECISTECTOMIA (PRINCIPAL) - R$ 900,00'
       },
+      
+      // ================================================================
+      // 🔧 PROCEDIMENTOS SEQUENCIAIS - SOMAM À COLECISTECTOMIA
+      // Limite: até 4 procedimentos sequenciais
+      // ================================================================
       {
         procedureCode: '04.07.04.018-8',
         standardValue: 300.00,
@@ -397,21 +388,120 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         standardValue: 200.00,
         description: 'COLEDOCOPLASTIA - R$ 200,00'
       },
-      // Hérnias
-      {
-        procedureCode: '04.07.04.012-9',
-        standardValue: 300.00,
-        description: 'HERNIA UMBILICAL - R$ 300,00'
-      },
+      
+      // ================================================================
+      // 🏥 HÉRNIAS COMO PROCEDIMENTO PRINCIPAL - NOVOS VALORES
+      // ================================================================
       {
         procedureCode: '04.07.04.010-2',
-        standardValue: 300.00,
-        description: 'HERNIA INGUINAL - R$ 300,00'
+        standardValue: 700.00,
+        description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00'
+      },
+      {
+        procedureCode: '04.07.04.009-9',
+        standardValue: 700.00,
+        description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00'
+      },
+      {
+        procedureCode: '04.07.04.006-4',
+        standardValue: 800.00,
+        description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00'
+      },
+      {
+        procedureCode: '04.07.04.012-9',
+        standardValue: 450.00,
+        description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00'
       },
       {
         procedureCode: '04.07.04.008-0',
-        standardValue: 300.00,
-        description: 'HERNIA VENTRAL - R$ 300,00'
+        standardValue: 600.00,
+        description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00'
+      }
+    ],
+    
+    // ================================================================
+    // 🔗 REGRAS MÚLTIPLAS - COLECISTECTOMIA + SEQUENCIAIS
+    // Sistema: Colecistectomia R$ 900 + soma dos procedimentos sequenciais
+    // ================================================================
+    multipleRules: [
+      // Colecistectomia + 1 Sequencial
+      {
+        codes: ['04.07.03.002-6', '04.07.04.018-8'],
+        totalValue: 1200.00,
+        description: 'COLECISTECTOMIA + LIBERAÇÃO DE ADERÊNCIAS - R$ 1.200,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.04.002-1'],
+        totalValue: 1200.00,
+        description: 'COLECISTECTOMIA + DRENAGEM ABSCESSO SUBFRÊNICO - R$ 1.200,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.03.014-0'],
+        totalValue: 1200.00,
+        description: 'COLECISTECTOMIA + HEPATORRAFIA - R$ 1.200,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.03.006-9'],
+        totalValue: 1150.00,
+        description: 'COLECISTECTOMIA + COLEDOCOTOMIA - R$ 1.150,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.03.005-0'],
+        totalValue: 1100.00,
+        description: 'COLECISTECTOMIA + COLEDOCOPLASTIA - R$ 1.100,00'
+      },
+      
+      // Colecistectomia + Hérnias (soma valores originais)
+      {
+        codes: ['04.07.03.002-6', '04.07.04.010-2'],
+        totalValue: 1600.00,
+        description: 'COLECISTECTOMIA + HERNIOPLASTIA INGUINAL UNILATERAL - R$ 1.600,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.04.009-9'],
+        totalValue: 1600.00,
+        description: 'COLECISTECTOMIA + HERNIOPLASTIA INGUINAL BILATERAL - R$ 1.600,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.04.006-4'],
+        totalValue: 1700.00,
+        description: 'COLECISTECTOMIA + HERNIOPLASTIA EPIGÁSTRICA - R$ 1.700,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.04.012-9'],
+        totalValue: 1350.00,
+        description: 'COLECISTECTOMIA + HERNIOPLASTIA UMBILICAL - R$ 1.350,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.04.008-0'],
+        totalValue: 1500.00,
+        description: 'COLECISTECTOMIA + HERNIOPLASTIA INCISIONAL/VENTRAL - R$ 1.500,00'
+      },
+      
+      // Colecistectomia + 2 Sequenciais (exemplos principais)
+      {
+        codes: ['04.07.03.002-6', '04.07.04.018-8', '04.07.03.014-0'],
+        totalValue: 1500.00,
+        description: 'COLECISTECTOMIA + LIBERAÇÃO ADERÊNCIAS + HEPATORRAFIA - R$ 1.500,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.03.006-9', '04.07.03.005-0'],
+        totalValue: 1350.00,
+        description: 'COLECISTECTOMIA + COLEDOCOTOMIA + COLEDOCOPLASTIA - R$ 1.350,00'
+      },
+      
+      // Colecistectomia + 3 Sequenciais
+      {
+        codes: ['04.07.03.002-6', '04.07.04.018-8', '04.07.03.014-0', '04.07.04.002-1'],
+        totalValue: 1800.00,
+        description: 'COLECISTECTOMIA + LIBERAÇÃO + HEPATORRAFIA + DRENAGEM - R$ 1.800,00'
+      },
+      
+      // Colecistectomia + 4 Sequenciais (máximo)
+      {
+        codes: ['04.07.03.002-6', '04.07.04.018-8', '04.07.03.014-0', '04.07.04.002-1', '04.07.03.006-9'],
+        totalValue: 2050.00,
+        description: 'COLECISTECTOMIA + 4 SEQUENCIAIS (MÁXIMO) - R$ 2.050,00'
       }
     ]
   },
@@ -981,16 +1071,6 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.09.06.011-9',
         standardValue: 1200.00,
         description: 'HISTERECTOMIA C/ ANEXECTOMIA (UNI / BILATERAL) - R$ 1.200,00'
-      },
-      {
-        procedureCode: '04.09.06.021-6',
-        standardValue: 700.00,
-        description: 'OOFORECTOMIA / OOFOROPLASTIA - R$ 700,00'
-      },
-      {
-        procedureCode: '04.09.06.023-2',
-        standardValue: 900.00,
-        description: 'SALPINGECTOMIA UNI / BILATERAL - R$ 900,00'
       },
       {
         procedureCode: '04.09.06.018-6',
