@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity, CreditCard, Stethoscope } from 'lucide-react';
+import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity, CreditCard, Stethoscope, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
 import { supabase } from '../lib/supabase';
@@ -148,6 +148,7 @@ const PatientManagement = () => {
   
   // Filtros simplificados
   const [globalSearch, setGlobalSearch] = useState('');
+  const [selectedCareCharacter, setSelectedCareCharacter] = useState<string>('all');
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(0);
@@ -644,8 +645,14 @@ const PatientManagement = () => {
     if (competencyRange && refDate) {
       matchesCompetency = refDate >= competencyRange.start && refDate <= competencyRange.end;
     }
+
+    // 🏥 Filtro por caráter de atendimento
+    let matchesCareCharacter = true;
+    if (selectedCareCharacter && selectedCareCharacter !== 'all') {
+      matchesCareCharacter = item.care_character === selectedCareCharacter;
+    }
     
-    return matchesSearch && matchesDateRange && matchesCompetency;
+    return matchesSearch && matchesDateRange && matchesCompetency && matchesCareCharacter;
   });
 
   // Paginação unificada
@@ -754,6 +761,131 @@ const PatientManagement = () => {
     } catch (e) {
       console.error('Erro ao gerar PDF de pacientes por competência:', e);
       toast({ title: 'Erro ao gerar PDF', description: 'Tente novamente.', variant: 'destructive' });
+    }
+  };
+
+  // 📊 Gerar EXCEL com nomes dos pacientes por competência selecionada
+  const handleGeneratePatientsByCompetencyExcel = async () => {
+    try {
+      // Importar XLSX dinamicamente
+      const XLSX = await import('xlsx');
+      
+      // Montar rótulo da competência
+      const compLabel = (() => {
+        if (!selectedCompetency || selectedCompetency === 'all') return 'Todas as Competências';
+        const found = availableCompetencies.find(c => c.value === selectedCompetency);
+        if (found) return `Competência ${found.label}`;
+        const parts = selectedCompetency.split('-');
+        if (parts.length === 2) {
+          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+          return `Competência ${format(d, 'MMM', { locale: ptBR }).replace('.', '')}/${format(d, 'yy', { locale: ptBR })}`;
+        }
+        return 'Competência';
+      })();
+
+      const totalPacientes = filteredData.length;
+      const hospitalName = (() => {
+        if (canAccessAllHospitals()) return 'Todos os Hospitais';
+        const first = filteredData[0] as any;
+        return (first?.hospitals && (first.hospitals as any).name) || 'Hospital Atual';
+      })();
+      const userName = user?.full_name || user?.email || 'Usuário';
+
+      // Criar workbook
+      const wb = XLSX.utils.book_new();
+
+      // Dados do cabeçalho informativo
+      const headerData = [
+        ['SIGTAP Sync'],
+        ['RELATÓRIO SUS - PACIENTES POR COMPETÊNCIA'],
+        [''],
+        [`Hospital: ${hospitalName}`, '', '', `Operador: ${userName}`],
+        [`${compLabel}`, '', '', `Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`],
+        [`Total: ${totalPacientes} pacientes`],
+        [''],
+        ['Nome do Paciente', 'CNS', 'AIH', 'Admissão', 'Alta']
+      ];
+
+      // Dados dos pacientes
+      const patientRows = filteredData.map((i) => [
+        i.patients?.name || (i.patient as any)?.name || 'Paciente não identificado',
+        i.patients?.cns || (i.patient as any)?.cns || '',
+        i.aih_number || '',
+        i.admission_date ? formatDate(i.admission_date) : '—',
+        i.discharge_date ? formatDate(i.discharge_date) : '—',
+      ]);
+
+      // Combinar cabeçalho + dados
+      const allData = [...headerData, ...patientRows];
+
+      // Criar worksheet
+      const ws = XLSX.utils.aoa_to_sheet(allData);
+
+      // Configurar larguras das colunas
+      const colWidths = [
+        { wch: 50 }, // Nome do Paciente
+        { wch: 20 }, // CNS
+        { wch: 20 }, // AIH
+        { wch: 15 }, // Admissão
+        { wch: 15 }  // Alta
+      ];
+      ws['!cols'] = colWidths;
+
+      // Estilizar o cabeçalho (título principal)
+      if (ws['A1']) {
+        ws['A1'].s = {
+          font: { bold: true, sz: 16, color: { rgb: "2980B9" } },
+          alignment: { horizontal: "center" }
+        };
+      }
+
+      // Estilizar subtítulo
+      if (ws['A2']) {
+        ws['A2'].s = {
+          font: { bold: true, sz: 14 },
+          alignment: { horizontal: "center" }
+        };
+      }
+
+      // Estilizar cabeçalho da tabela (linha 8)
+      const headerRow = 8;
+      ['A', 'B', 'C', 'D', 'E'].forEach(col => {
+        const cellRef = `${col}${headerRow}`;
+        if (ws[cellRef]) {
+          ws[cellRef].s = {
+            font: { bold: true },
+            fill: { fgColor: { rgb: "2980B9" } },
+            font: { color: { rgb: "FFFFFF" }, bold: true }
+          };
+        }
+      });
+
+      // Mesclar células do título
+      ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, // Título principal
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }, // Subtítulo
+      ];
+
+      // Adicionar worksheet ao workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Pacientes por Competência');
+
+      // Nome do arquivo
+      const fileName = `relatorio-pacientes-${selectedCompetency === 'all' ? 'todas' : selectedCompetency}-${format(new Date(), 'yyyyMMdd-HHmm')}.xlsx`;
+
+      // Salvar arquivo
+      XLSX.writeFile(wb, fileName);
+
+      toast({ 
+        title: 'Relatório Excel gerado', 
+        description: `${totalPacientes} pacientes exportados para Excel.` 
+      });
+    } catch (e) {
+      console.error('Erro ao gerar Excel de pacientes por competência:', e);
+      toast({ 
+        title: 'Erro ao gerar Excel', 
+        description: 'Tente novamente.', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -973,6 +1105,36 @@ const PatientManagement = () => {
               />
             </div>
 
+            {/* Filtro de Caráter de Atendimento */}
+            <div className="space-y-3 w-full md:w-[180px]">
+              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+                <div className="p-1 bg-orange-100 rounded">
+                  <Activity className="w-3 h-3 text-orange-600" />
+                </div>
+                <span>Caráter</span>
+              </label>
+              <Select value={selectedCareCharacter} onValueChange={setSelectedCareCharacter}>
+                <SelectTrigger className="w-full border-gray-300 focus:border-orange-500 focus:ring-orange-500 bg-white/80 hover:bg-white transition-colors">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                      Eletivo
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                      Urgência/Emerg.
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Botão Limpar */}
             <div className="w-full md:w-[150px] flex items-end">
               <Button
@@ -983,6 +1145,7 @@ const PatientManagement = () => {
                   setStartDate('');
                   setEndDate('');
                   setSelectedCompetency('all');
+                  setSelectedCareCharacter('all');
                 }}
                 className="h-9 text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-gray-300 transition-colors w-full md:w-auto"
                 title="Limpar filtros"
@@ -1007,6 +1170,11 @@ const PatientManagement = () => {
                       <p className="text-xs text-gray-600">Gera Nome, CNS, AIH, Admissão e Alta da competência selecionada</p>
                     </div>
                     <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">Total: {filteredData.length}</Badge>
+                    {selectedCareCharacter !== 'all' && (
+                      <Badge variant="outline" className={`text-xs ${selectedCareCharacter === '1' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                        {selectedCareCharacter === '1' ? 'Eletivo' : 'Urgência/Emerg.'}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1032,14 +1200,22 @@ const PatientManagement = () => {
                     ))}
                   </TabsList>
                 </Tabs>
-                <div>
+                <div className="flex gap-2">
                   <Button
                     size="sm"
                     onClick={handleGeneratePatientsByCompetencyPDF}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     <Download className="w-4 h-4 mr-2" />
-                    Pacientes - Competência
+                    PDF - Competência
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleGeneratePatientsByCompetencyExcel}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Excel - Competência
                   </Button>
                 </div>
               </div>
