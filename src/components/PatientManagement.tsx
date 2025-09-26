@@ -734,7 +734,7 @@ const PatientManagement = () => {
       const tableBody = filteredData.map((i) => [
         i.patients?.name || (i.patient as any)?.name || 'Paciente não identificado',
         i.patients?.cns || (i.patient as any)?.cns || '',
-        i.aih_number || '',
+        (i.aih_number || '').replace('-', ''),
         i.admission_date ? formatDate(i.admission_date) : '—',
         i.discharge_date ? formatDate(i.discharge_date) : '—',
       ]);
@@ -810,7 +810,7 @@ const PatientManagement = () => {
       const patientRows = filteredData.map((i) => [
         i.patients?.name || (i.patient as any)?.name || 'Paciente não identificado',
         i.patients?.cns || (i.patient as any)?.cns || '',
-        i.aih_number || '',
+        (i.aih_number || '').replace('-', ''),
         i.admission_date ? formatDate(i.admission_date) : '—',
         i.discharge_date ? formatDate(i.discharge_date) : '—',
       ]);
