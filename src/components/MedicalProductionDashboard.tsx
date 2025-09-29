@@ -1665,6 +1665,38 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                            }
                         });
                       });
+                      
+                      // Ordenar por Data Alta (SUS) - mais recente primeiro
+                      rows.sort((a, b) => {
+                        const dateA = a[6] as string; // Data Alta (SUS) está na posição 6 (0-indexed)
+                        const dateB = b[6] as string;
+                        
+                        // Se não há data, colocar no final
+                        if (!dateA && !dateB) return 0;
+                        if (!dateA) return 1;
+                        if (!dateB) return -1;
+                        
+                        // Converter DD/MM/YYYY para Date para comparação
+                        const parseDate = (dateStr: string) => {
+                          const parts = dateStr.split('/');
+                          if (parts.length === 3) {
+                            return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                          }
+                          return new Date(0);
+                        };
+                        
+                        const parsedDateA = parseDate(dateA);
+                        const parsedDateB = parseDate(dateB);
+                        
+                        // Ordenar do mais recente para o mais antigo
+                        return parsedDateB.getTime() - parsedDateA.getTime();
+                      });
+                      
+                      // Renumerar após ordenação
+                      rows.forEach((row, index) => {
+                        row[0] = index + 1; // Atualizar numeração sequencial
+                      });
+                      
                       const wb = XLSX.utils.book_new();
                       const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
                       (ws as any)['!cols'] = [
