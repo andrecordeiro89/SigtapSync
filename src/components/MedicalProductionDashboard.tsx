@@ -1580,7 +1580,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                          'Médico', 
                          'Hospital',
                          'Valor Procedimento',
-                         'Valor AIH (Incrementos)'
+                         'AIH Seca',
+                         'Incremento',
+                         'AIH c/ Incremento'
                        ];
                       let idx = 1;
                       filteredDoctors.forEach((card: any) => {
@@ -1642,6 +1644,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                  doctorName, 
                                  hospitalName,
                                  procValue,
+                                 baseAih,
+                                 increment,
                                  aihWithIncrements
                                ]);
                              });
@@ -1660,6 +1664,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                doctorName, 
                                hospitalName,
                                0,
+                               baseAih,
+                               increment,
                                aihWithIncrements
                              ]);
                            }
@@ -1712,7 +1718,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         { wch: 30 },  // Médico
                         { wch: 35 },  // Hospital
                         { wch: 18 },  // Valor Procedimento
-                        { wch: 22 },  // Valor AIH (Incrementos)
+                        { wch: 18 },  // AIH Seca
+                        { wch: 18 },  // Incremento
+                        { wch: 20 },  // AIH c/ Incremento
                       ];
                       XLSX.utils.book_append_sheet(wb, ws, 'Pacientes');
                       const fileName = `Relatorio_Pacientes_Procedimentos_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
