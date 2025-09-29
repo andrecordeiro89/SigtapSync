@@ -1552,10 +1552,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-sm text-gray-700">
-                  <span>Atualização automática</span>
-                  <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
-                </div>
+                {/* Toggle de Atualização automática ocultado */}
                 <Button variant="outline" size="sm" onClick={() => setRefreshTick(t => t + 1)}>
                   <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
                 </Button>
@@ -1736,6 +1733,131 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 >
                   <FileSpreadsheet className="h-4 w-4" />
                   Relatório Pacientes Geral
+                </Button>
+                
+                {/* 🆕 NOVO: Relatório Pacientes Geral Simplificado */}
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
+                      const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
+                      const rows: Array<Array<string | number>> = [];
+                      const header = [
+                        '#', 
+                        'Nome do Paciente', 
+                        'Nº AIH', 
+                        'Data de Admissão',
+                        'Data de Alta'
+                      ];
+                      let idx = 1;
+                      
+                      // 🔧 CORREÇÃO: Coletar TODAS as AIHs (sem eliminar duplicatas)
+                      // Cada AIH é única, mesmo paciente pode ter múltiplas AIHs (reabordagem, retorno)
+                      const allPatients: any[] = [];
+                      let totalPatientsFound = 0;
+                      let excludedByDateFilter = 0;
+                      let excludedByEmptyAIH = 0;
+                      
+                      console.log('🔍 [RELATÓRIO SIMPLIFICADO] Iniciando coleta de dados...');
+                      console.log('🔍 [RELATÓRIO SIMPLIFICADO] Médicos filtrados:', filteredDoctors.length);
+                      
+                      filteredDoctors.forEach((card: any) => {
+                        const doctorName = card.doctor_info?.name || 'Médico não identificado';
+                        const doctorPatients = card.patients || [];
+                        console.log(`👨‍⚕️ [RELATÓRIO SIMPLIFICADO] Médico: ${doctorName} - Pacientes: ${doctorPatients.length}`);
+                        
+                        doctorPatients.forEach((p: any) => {
+                          totalPatientsFound++;
+                          
+                          // Filtro por data específica (modo "apenas alta")
+                          if (useOnlyEnd && selectedEnd) {
+                            const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
+                            if (!discharge || !isSameUTCDate(discharge, selectedEnd)) {
+                              excludedByDateFilter++;
+                              console.log(`📅 [RELATÓRIO SIMPLIFICADO] Excluído por filtro de data: ${p.patient_info?.name || 'Sem nome'} - AIH: ${p?.aih_info?.aih_number}`);
+                              return;
+                            }
+                          }
+                          
+                          // 🔧 CORREÇÃO: Pacientes podem não ter AIH gerada ainda - INCLUIR TODOS
+                          const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
+                          const aihDisplay = aih || 'Aguardando geração';
+                          
+                          if (!aih) {
+                            console.log(`⚠️ [RELATÓRIO SIMPLIFICADO] Paciente sem AIH incluído: ${p.patient_info?.name || 'Sem nome'}`);
+                          }
+                          
+                          const name = p.patient_info?.name || 'Paciente';
+                          const admissionISO = p?.aih_info?.admission_date || '';
+                          const admissionLabel = admissionISO
+                            ? (() => { const s = String(admissionISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
+                            : '';
+                          const dischargeISO = p?.aih_info?.discharge_date || '';
+                          const dischargeLabel = dischargeISO
+                            ? (() => { const s = String(dischargeISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
+                            : '';
+                          
+                          allPatients.push({
+                            name,
+                            aih: aihDisplay, // Usar aihDisplay que inclui "Aguardando geração" se vazio
+                            admissionLabel,
+                            dischargeLabel
+                          });
+                        });
+                      });
+                      
+                      console.log('📊 [RELATÓRIO SIMPLIFICADO] ESTATÍSTICAS:');
+                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Total encontrado: ${totalPatientsFound}`);
+                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Excluídos por data: ${excludedByDateFilter}`);
+                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Pacientes sem AIH incluídos: ${allPatients.filter(p => p.aih === 'Aguardando geração').length}`);
+                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Incluídos no relatório: ${allPatients.length}`);
+                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Diferença esperada vs real: ${323 - allPatients.length}`);
+                      
+                      // Ordenar por nome do paciente, depois por AIH
+                      const patientsArray = allPatients;
+                      patientsArray.sort((a, b) => {
+                        const nameCompare = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+                        if (nameCompare !== 0) return nameCompare;
+                        // Se nomes iguais, ordenar por AIH
+                        return a.aih.localeCompare(b.aih);
+                      });
+                      
+                      // Criar linhas do Excel
+                      patientsArray.forEach((patient) => {
+                        rows.push([
+                          idx++,
+                          patient.name,
+                          patient.aih,
+                          patient.admissionLabel,
+                          patient.dischargeLabel
+                        ]);
+                      });
+                      
+                      const wb = XLSX.utils.book_new();
+                      const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+                      (ws as any)['!cols'] = [
+                        { wch: 5 },   // #
+                        { wch: 40 },  // Nome do Paciente
+                        { wch: 18 },  // Nº AIH
+                        { wch: 18 },  // Data de Admissão
+                        { wch: 18 },  // Data de Alta
+                      ];
+                      XLSX.utils.book_append_sheet(wb, ws, 'Pacientes Simplificado');
+                      const fileName = `Relatorio_Pacientes_Simplificado_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+                      XLSX.writeFile(wb, fileName);
+                      toast.success('Relatório simplificado de pacientes gerado com sucesso!');
+                    } catch (e) {
+                      console.error('Erro ao exportar Relatório Simplificado:', e);
+                      toast.error('Erro ao gerar Relatório Simplificado');
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                  title="Gerar relatório simplificado de pacientes"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Relatório Pacientes Geral Simplificado
                 </Button>
               </div>
             </div>
