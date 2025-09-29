@@ -269,6 +269,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   });
   const [selectedHospitals, setSelectedHospitals] = useState<string[]>(['all']);
   const [searchTerm, setSearchTerm] = useState('');
+  const [patientSearchTerm, setPatientSearchTerm] = useState(''); // 🆕 NOVO: Busca por nome do paciente
   const [selectedCareCharacter, setSelectedCareCharacter] = useState('all');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
   const [selectedCareSpecialty, setSelectedCareSpecialty] = useState<string>('all');
@@ -1001,9 +1002,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           <CardContent className="space-y-6">
             {/* FILTROS EM LINHA (Busca maior) */}
             <div className="flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
-              {/* BUSCA RÁPIDA (maior largura) */}
+              {/* BUSCA RÁPIDA MÉDICOS */}
               <div className="flex-1 min-w-[240px]">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Busca Rápida</label>
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Buscar Médico</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
@@ -1017,6 +1018,29 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       onClick={() => setSearchTerm('')}
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                       title="Limpar busca"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 🆕 NOVO: BUSCA POR NOME DO PACIENTE */}
+              <div className="flex-1 min-w-[240px]">
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Buscar Paciente</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-green-400" />
+                  <Input
+                    placeholder="Nome do paciente..."
+                    value={patientSearchTerm}
+                    onChange={(e) => setPatientSearchTerm(e.target.value)}
+                    className="pl-10 h-9 border-gray-200 focus:border-green-500 focus:ring-green-500/20 text-sm"
+                  />
+                  {patientSearchTerm && (
+                    <button
+                      onClick={() => setPatientSearchTerm('')}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      title="Limpar busca de paciente"
                     >
                       ✕
                     </button>
@@ -1230,12 +1254,17 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {/* Abas de Competência duplicadas removidas */}
 
             {/* INDICADORES DE FILTROS ATIVOS */}
-            {(searchTerm || selectedCareCharacter !== 'all' || selectedSpecialty !== 'all' || selectedCareSpecialty !== 'all' || !selectedHospitals.includes('all')) && (
+            {(searchTerm || patientSearchTerm || selectedCareCharacter !== 'all' || selectedSpecialty !== 'all' || selectedCareSpecialty !== 'all' || !selectedHospitals.includes('all')) && (
               <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                 <div className="flex items-center gap-2">
                   {searchTerm && (
+                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                      👨‍⚕️ Médico: {searchTerm}
+                    </Badge>
+                  )}
+                  {patientSearchTerm && (
                     <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                      🔍 Busca: {searchTerm}
+                      🧑‍🦱 Paciente: {patientSearchTerm}
                     </Badge>
                   )}
                   {!selectedHospitals.includes('all') && (
@@ -1281,6 +1310,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             onDateRangeChange={handleDateRangeChange}
             selectedHospitals={selectedHospitals}
             searchTerm={searchTerm}
+            patientSearchTerm={patientSearchTerm} // 🆕 NOVO: Busca por nome do paciente
             selectedCareCharacter={selectedCareCharacter}
             selectedSpecialty={selectedSpecialty}
             selectedCareSpecialty={selectedCareSpecialty}

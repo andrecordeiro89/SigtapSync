@@ -1537,7 +1537,7 @@ export class AIHPersistenceService {
         if (filters.useCompetencyFilter) {
           query = query.gte('discharge_date', filters.dateFrom);
         } else {
-          query = query.gte('admission_date', filters.dateFrom);
+        query = query.gte('admission_date', filters.dateFrom);
         }
       }
       
@@ -1545,7 +1545,7 @@ export class AIHPersistenceService {
         if (filters.useCompetencyFilter) {
           query = query.lte('discharge_date', filters.dateTo);
         } else {
-          query = query.lte('admission_date', filters.dateTo);
+        query = query.lte('admission_date', filters.dateTo);
         }
       }
       

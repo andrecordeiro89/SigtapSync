@@ -464,7 +464,8 @@ interface MedicalProductionDashboardProps {
   dateRange?: DateRange;
   onDateRangeChange?: (range: DateRange) => void;
   selectedHospitals?: string[]; // 🆕 FILTROS GLOBAIS DE HOSPITAL
-  searchTerm?: string; // 🆕 BUSCA GLOBAL
+  searchTerm?: string; // 🆕 BUSCA GLOBAL MÉDICOS
+  patientSearchTerm?: string; // 🆕 NOVO: BUSCA GLOBAL PACIENTES
   selectedCareCharacter?: string; // 🆕 FILTRO GLOBAL DE CARÁTER DE ATENDIMENTO
   selectedSpecialty?: string; // 🆕 FILTRO GLOBAL DE ESPECIALIDADE
   selectedCareSpecialty?: string; // 🆕 NOVO: ESPECIALIDADE DE ATENDIMENTO (AIH)
@@ -476,7 +477,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   dateRange, 
   onDateRangeChange,
   selectedHospitals = ['all'], // 🆕 FILTROS GLOBAIS DE HOSPITAL
-  searchTerm = '', // 🆕 BUSCA GLOBAL
+  searchTerm = '', // 🆕 BUSCA GLOBAL MÉDICOS
+  patientSearchTerm = '', // 🆕 NOVO: BUSCA GLOBAL PACIENTES
   selectedCareCharacter = 'all', // 🆕 FILTRO GLOBAL DE CARÁTER DE ATENDIMENTO
   selectedSpecialty = 'all', // 🆕 FILTRO GLOBAL DE ESPECIALIDADE
   selectedCareSpecialty = 'all' // 🆕 NOVO: ESPECIALIDADE DE ATENDIMENTO (AIH)
@@ -521,7 +523,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [reportPreset, setReportPreset] = useState<{ hospitalId?: string; doctorName?: string } | null>(null);
   // 🆕 ESTADOS PARA PAGINAÇÃO DE PACIENTES
   const [currentPatientPage, setCurrentPatientPage] = useState<Map<string, number>>(new Map());
-  const [patientSearchTerm, setPatientSearchTerm] = useState<Map<string, string>>(new Map());
+  const [localPatientSearchTerm, setLocalPatientSearchTerm] = useState<Map<string, string>>(new Map());
   const [procedureSearchTerm, setProcedureSearchTerm] = useState<Map<string, string>>(new Map());
   const PATIENTS_PER_PAGE = 10;
   
@@ -1141,7 +1143,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     // Auditoria: NÃO filtrar pacientes por caráter de atendimento; manter todos
     
-    // Filtrar por termo de busca
+    // 👨‍⚕️ FILTRAR POR TERMO DE BUSCA DE MÉDICO
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(doctor => {
@@ -1150,6 +1152,29 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                doctor.doctor_info.crm?.toLowerCase().includes(searchLower) ||
                doctor.doctor_info.specialty?.toLowerCase().includes(searchLower);
       });
+    }
+
+    // 🧑‍🦱 NOVO: FILTRAR POR NOME DO PACIENTE
+    if (patientSearchTerm.trim()) {
+      const patientSearchLower = patientSearchTerm.toLowerCase();
+      console.log('🔍 [FILTRO PACIENTE] Buscando por:', patientSearchTerm);
+      
+      filtered = filtered.map(doctor => {
+        // Filtrar apenas os pacientes que coincidem com a busca
+        const matchingPatients = doctor.patients.filter(patient => {
+          const patientName = patient.patient_info?.name || '';
+          const matches = patientName.toLowerCase().includes(patientSearchLower);
+          if (matches) {
+            console.log(`✅ [FILTRO PACIENTE] Encontrado: ${patientName} (Médico: ${doctor.doctor_info.name})`);
+          }
+          return matches;
+        });
+        
+        // Retornar médico apenas se tiver pacientes que coincidem
+        return { ...doctor, patients: matchingPatients };
+      }).filter(doctor => doctor.patients.length > 0); // Remover médicos sem pacientes correspondentes
+      
+      console.log(`🔍 [FILTRO PACIENTE] Resultado: ${filtered.length} médicos com pacientes correspondentes`);
     }
 
     // Filtrar por especialidade MÉDICA (global)
@@ -1189,7 +1214,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     // Reset da página atual quando filtros são aplicados
     setCurrentDoctorPage(1);
-  }, [searchTerm, selectedSpecialty, selectedCareSpecialty, doctors, selectedHospitals, selectedCareCharacter, dateRange]);
+  }, [searchTerm, patientSearchTerm, selectedSpecialty, selectedCareSpecialty, doctors, selectedHospitals, selectedCareCharacter, dateRange]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
   const toggleDoctorExpansion = (doctorKey: string) => {
@@ -1771,19 +1796,48 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         doctorPatients.forEach((p: any) => {
                           totalPatientsFound++;
                           
-                          // Filtro por data específica (modo "apenas alta")
-                          if (useOnlyEnd && selectedEnd) {
+                          // 🔧 CORREÇÃO: Usar filtro de intervalo de data em vez de data específica
+                          // Isso resolve o problema de final de mês (31 → 01)
+                          if (dateRange && dateRange.startDate && dateRange.endDate) {
                             const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
-                            if (!discharge || !isSameUTCDate(discharge, selectedEnd)) {
+                            if (!discharge) {
                               excludedByDateFilter++;
-                              console.log(`📅 [RELATÓRIO SIMPLIFICADO] Excluído por filtro de data: ${p.patient_info?.name || 'Sem nome'} - AIH: ${p?.aih_info?.aih_number}`);
+                              console.log(`📅 [RELATÓRIO SIMPLIFICADO] Excluído por falta de data de alta: ${p.patient_info?.name || 'Sem nome'} - AIH: ${p?.aih_info?.aih_number}`);
                               return;
                             }
+                            
+                            // Normalizar datas para comparação (início do dia para startDate, fim do dia para endDate)
+                            const startOfPeriod = new Date(dateRange.startDate);
+                            startOfPeriod.setHours(0, 0, 0, 0);
+                            
+                            const endOfPeriod = new Date(dateRange.endDate);
+                            endOfPeriod.setHours(23, 59, 59, 999);
+                            
+                            const dischargeDate = new Date(discharge);
+                            
+                            if (dischargeDate < startOfPeriod || dischargeDate > endOfPeriod) {
+                              excludedByDateFilter++;
+                              console.log(`📅 [RELATÓRIO SIMPLIFICADO] Excluído por estar fora do período: ${p.patient_info?.name || 'Sem nome'} - Alta: ${dischargeDate.toLocaleDateString('pt-BR')} (Período: ${startOfPeriod.toLocaleDateString('pt-BR')} a ${endOfPeriod.toLocaleDateString('pt-BR')})`);
+                              return;
+                            }
+                            
+                            console.log(`✅ [RELATÓRIO SIMPLIFICADO] Incluído no período: ${p.patient_info?.name || 'Sem nome'} - Alta: ${dischargeDate.toLocaleDateString('pt-BR')}`);
                           }
                           
                           // 🔧 CORREÇÃO: Pacientes podem não ter AIH gerada ainda - INCLUIR TODOS
                           const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                           const aihDisplay = aih || 'Aguardando geração';
+                          
+                          // 🤱 LOG ESPECÍFICO PARA PARTOS CESAREANOS
+                          const procedures = p.procedures || [];
+                          const hasCesarean = procedures.some((proc: any) => {
+                            const code = proc.procedure_code || '';
+                            return code === '04.11.01.003-4' || code === '04.11.01.004-2';
+                          });
+                          
+                          if (hasCesarean) {
+                            console.log(`🤱 [RELATÓRIO SIMPLIFICADO] PARTO CESARIANO INCLUÍDO: ${p.patient_info?.name || 'Sem nome'} - AIH: ${aihDisplay} - Médico: ${doctorName}`);
+                          }
                           
                           if (!aih) {
                             console.log(`⚠️ [RELATÓRIO SIMPLIFICADO] Paciente sem AIH incluído: ${p.patient_info?.name || 'Sem nome'}`);
@@ -1808,10 +1862,24 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         });
                       });
                       
+                      // 🤱 CONTAGEM DE PARTOS CESAREANOS
+                      let cesareanCount = 0;
+                      filteredDoctors.forEach((card: any) => {
+                        (card.patients || []).forEach((p: any) => {
+                          const procedures = p.procedures || [];
+                          const hasCesarean = procedures.some((proc: any) => {
+                            const code = proc.procedure_code || '';
+                            return code === '04.11.01.003-4' || code === '04.11.01.004-2';
+                          });
+                          if (hasCesarean) cesareanCount++;
+                        });
+                      });
+                      
                       console.log('📊 [RELATÓRIO SIMPLIFICADO] ESTATÍSTICAS:');
                       console.log(`📊 [RELATÓRIO SIMPLIFICADO] Total encontrado: ${totalPatientsFound}`);
                       console.log(`📊 [RELATÓRIO SIMPLIFICADO] Excluídos por data: ${excludedByDateFilter}`);
                       console.log(`📊 [RELATÓRIO SIMPLIFICADO] Pacientes sem AIH incluídos: ${allPatients.filter(p => p.aih === 'Aguardando geração').length}`);
+                      console.log(`🤱 [RELATÓRIO SIMPLIFICADO] Partos cesareanos identificados: ${cesareanCount}`);
                       console.log(`📊 [RELATÓRIO SIMPLIFICADO] Incluídos no relatório: ${allPatients.length}`);
                       console.log(`📊 [RELATÓRIO SIMPLIFICADO] Diferença esperada vs real: ${323 - allPatients.length}`);
                       
@@ -2233,7 +2301,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 </div>
                                 Pacientes Atendidos ({(() => {
                                    const doctorKey = doctor.doctor_info.cns;
-                                   const nameTerm = (patientSearchTerm.get(doctorKey) || '').toLowerCase().trim();
+                                   const nameTerm = (localPatientSearchTerm.get(doctorKey) || '').toLowerCase().trim();
                                    const procTermRaw = (procedureSearchTerm.get(doctorKey) || '').toLowerCase().trim();
                                    const procTerm = procTermRaw.replace(/[\.\s]/g, '');
                                    const filteredCount = doctor.patients.filter(patient => {
@@ -2269,11 +2337,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                                   <Input
                                     placeholder="Buscar paciente..."
-                                    value={patientSearchTerm.get(doctor.doctor_info.cns) || ''}
+                                    value={localPatientSearchTerm.get(doctor.doctor_info.cns) || ''}
                                     onChange={(e) => {
-                                      const newSearchTerms = new Map(patientSearchTerm);
+                                      const newSearchTerms = new Map(localPatientSearchTerm);
                                       newSearchTerms.set(doctor.doctor_info.cns, e.target.value);
-                                      setPatientSearchTerm(newSearchTerms);
+                                      setLocalPatientSearchTerm(newSearchTerms);
                                       // Reset para primeira página ao buscar
                                       const newPages = new Map(currentPatientPage);
                                       newPages.set(doctor.doctor_info.cns, 1);
@@ -2309,7 +2377,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             <div className="space-y-4">
                               {(() => {
                                 const doctorKey = doctor.doctor_info.cns;
-                                const nameTerm = (patientSearchTerm.get(doctorKey) || '').toLowerCase().trim();
+                                const nameTerm = (localPatientSearchTerm.get(doctorKey) || '').toLowerCase().trim();
                                 const procTermRaw = (procedureSearchTerm.get(doctorKey) || '').toLowerCase().trim();
                                 const procTerm = procTermRaw.replace(/[\.\s]/g, '');
                                 const filteredPatients = doctor.patients.filter(patient => {
