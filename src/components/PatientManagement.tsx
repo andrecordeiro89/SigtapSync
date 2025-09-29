@@ -326,6 +326,13 @@ const PatientManagement = () => {
     }
   }, [currentHospitalId]);
 
+  // 🔧 CORREÇÃO: Recarregar dados quando competência mudar
+  useEffect(() => {
+    if (currentHospitalId) {
+      loadAIHs(); // Recarregar AIHs com novo filtro de competência
+    }
+  }, [selectedCompetency, competencyRange]);
+
   // Resetar página quando filtros mudarem + atualizar contagem
   useEffect(() => {
     setCurrentPage(0);
@@ -371,10 +378,24 @@ const PatientManagement = () => {
       let offset = 0;
       const all: any[] = [];
 
+      // 🔧 CORREÇÃO: Aplicar filtro de competência na fonte de dados
+      const useCompetencyFilter = selectedCompetency && selectedCompetency !== 'all';
+      let dateFromISO: string | undefined;
+      let dateToISO: string | undefined;
+      
+      if (useCompetencyFilter && competencyRange) {
+        dateFromISO = competencyRange.start.toISOString();
+        dateToISO = competencyRange.end.toISOString();
+        console.log('🗓️ Aplicando filtro de competência na fonte:', selectedCompetency, dateFromISO, '→', dateToISO);
+      }
+
       while (true) {
         const batch = await persistenceService.getAIHs(currentHospitalId || 'ALL', {
           limit: pageSize,
           offset,
+          useCompetencyFilter,
+          dateFrom: dateFromISO,
+          dateTo: dateToISO,
         } as any);
         const batchLen = batch?.length || 0;
         if (batchLen === 0) break;
@@ -386,7 +407,7 @@ const PatientManagement = () => {
       }
 
       setAIHs(all);
-      console.log('📊 AIHs carregadas (todas):', all.length);
+      console.log('📊 AIHs carregadas:', all.length, useCompetencyFilter ? '(com filtro de competência)' : '(todas)');
     } catch (error) {
       console.error('❌ Erro ao carregar AIHs:', error);
       toast({
@@ -621,9 +642,20 @@ const PatientManagement = () => {
       ) ||
       (item.patient?.cns && item.patient.cns.includes(globalSearch));
     
-    // Datas de referência comuns (sempre usar a mesma base do badge: alta; fallback admissão)
-    const refStr = (item as any).competencia || item.discharge_date || item.admission_date;
-    const refDate = refStr ? new Date(refStr) : null;
+    // 🔧 CORREÇÃO: Para filtros de competência, usar APENAS discharge_date (igual Analytics)
+    let refStr: string | null = null;
+    let refDate: Date | null = null;
+    
+    if (competencyRange) {
+      // Para filtros de competência: usar APENAS discharge_date
+      refStr = item.discharge_date;
+      if (!refStr) return false; // Excluir pacientes sem alta quando filtro de competência ativo
+      refDate = new Date(refStr);
+    } else {
+      // Para filtros de data normal: manter fallback original
+      refStr = (item as any).competencia || item.discharge_date || item.admission_date;
+      refDate = refStr ? new Date(refStr) : null;
+    }
 
     // Filtro por intervalo de datas
     let matchesDateRange = true;
@@ -640,7 +672,7 @@ const PatientManagement = () => {
       }
     }
 
-    // 🗓️ Filtro por competência (mês da alta; fallback admissão) via range mensal
+    // 🗓️ Filtro por competência (mês da alta) via range mensal
     let matchesCompetency = true;
     if (competencyRange && refDate) {
       matchesCompetency = refDate >= competencyRange.start && refDate <= competencyRange.end;

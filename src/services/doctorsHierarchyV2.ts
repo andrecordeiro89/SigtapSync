@@ -28,6 +28,7 @@ export class DoctorsHierarchyV2Service {
         care_character,
         calculated_total_value,
         cns_responsavel,
+        competencia,
         patients (
           id,
           name,
@@ -43,21 +44,11 @@ export class DoctorsHierarchyV2Service {
       if (filters.hospitalIds && filters.hospitalIds.length > 0 && !filters.hospitalIds.includes('all')) {
         query = query.in('hospital_id', filters.hospitalIds);
       }
-      // Regra SUS: produção conta pela data de alta (discharge_date)
-    if (filters.dateFromISO) {
-      query = query.gte('discharge_date', filters.dateFromISO);
-    }
-    if (filters.dateToISO) {
-      // Usar janela inclusiva no início e exclusiva no fim: [start, nextDayStart)
-      // Interpreta dateToISO como um instante e calcula o início do próximo dia em UTC
-      const end = new Date(filters.dateToISO);
-      const endExclusive = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate() + 1, 0, 0, 0, 0));
-      query = query.lt('discharge_date', endExclusive.toISOString());
-    }
-    // Quando houver filtro de data, excluir AIHs sem data de alta
-    if (filters.dateFromISO || filters.dateToISO) {
-      query = query.not('discharge_date', 'is', null);
-    }
+      
+      // 🔧 CORREÇÃO: Usar mesma lógica da tela Pacientes para consistência
+      // Não aplicar filtro rígido aqui - será aplicado após carregamento
+      // para permitir fallback competencia → discharge_date → admission_date
+      
       if (filters.careCharacter && filters.careCharacter !== 'all') {
         query = query.eq('care_character', filters.careCharacter);
       }
@@ -229,7 +220,39 @@ export class DoctorsHierarchyV2Service {
       }
     }
 
-    return cards.map(({ key, ...rest }) => rest);
+    // 🔧 FILTRO POR DATA: Usar APENAS discharge_date para filtros de competência
+    let filteredCards = cards;
+    if (filters.dateFromISO || filters.dateToISO) {
+      const startDate = filters.dateFromISO ? new Date(filters.dateFromISO) : null;
+      const endDate = filters.dateToISO ? new Date(filters.dateToISO) : null;
+      
+      // ❌ REMOVIDO: Ajuste duplo de horário (já vem ajustado do ExecutiveDashboard)
+
+      filteredCards = cards.map(card => {
+        const filteredPatients = card.patients.filter((patient: any) => {
+          // 🔧 CORREÇÃO: Para filtros de competência, usar APENAS discharge_date
+          // Isso garante que apenas pacientes com alta no período sejam incluídos
+          const refStr = patient.aih_info?.discharge_date;
+          if (!refStr) return false; // Excluir pacientes sem alta
+          
+          const refDate = new Date(refStr);
+          
+          let matches = true;
+          if (startDate) {
+            matches = matches && refDate >= startDate;
+          }
+          if (endDate) {
+            matches = matches && refDate <= endDate;
+          }
+          
+          return matches;
+        });
+        
+        return { ...card, patients: filteredPatients };
+      }).filter(card => card.patients.length > 0); // Remover cards sem pacientes
+    }
+
+    return filteredCards.map(({ key, ...rest }) => rest);
   }
 }
 

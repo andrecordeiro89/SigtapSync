@@ -1489,6 +1489,7 @@ export class AIHPersistenceService {
     processedBy?: string;
     limit?: number;
     offset?: number;
+    useCompetencyFilter?: boolean; // 🆕 Novo: indica se deve usar discharge_date para competência
   }) {
     try {
       let query = supabase
@@ -1531,12 +1532,26 @@ export class AIHPersistenceService {
         query = query.eq('processing_status', filters.status);
       }
       
+      // 🔧 CORREÇÃO: Usar discharge_date para filtros de competência
       if (filters?.dateFrom) {
-        query = query.gte('admission_date', filters.dateFrom);
+        if (filters.useCompetencyFilter) {
+          query = query.gte('discharge_date', filters.dateFrom);
+        } else {
+          query = query.gte('admission_date', filters.dateFrom);
+        }
       }
       
       if (filters?.dateTo) {
-        query = query.lte('admission_date', filters.dateTo);
+        if (filters.useCompetencyFilter) {
+          query = query.lte('discharge_date', filters.dateTo);
+        } else {
+          query = query.lte('admission_date', filters.dateTo);
+        }
+      }
+      
+      // 🔧 Para filtros de competência, excluir AIHs sem alta
+      if (filters?.useCompetencyFilter && (filters?.dateFrom || filters?.dateTo)) {
+        query = query.not('discharge_date', 'is', null);
       }
       
       if (filters?.aihNumber) {

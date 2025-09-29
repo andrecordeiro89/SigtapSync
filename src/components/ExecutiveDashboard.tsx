@@ -321,10 +321,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     const year = Number(yearStr);
     const month = Number(monthStr);
     if (!year || !month) return selectedDateRange;
-    const start = new Date(year, month - 1, 1);
-    const end = new Date(year, month, 0);
-    // Garantir fim do dia
-    end.setHours(23, 59, 59, 999);
+    
+    // 🔧 CORREÇÃO: Usar UTC para evitar problemas de timezone
+    const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+    
     return { startDate: start, endDate: end };
   }, [selectedCompetency, selectedDateRange]);
 
