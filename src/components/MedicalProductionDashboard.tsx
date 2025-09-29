@@ -1567,7 +1567,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
                       const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
                       const rows: Array<Array<string | number>> = [];
-                      const header = ['#', 'Nome do Paciente', 'Nº AIH', 'Especialidade de Atendimento', 'Data Alta (SUS)', 'Valor Total', 'Médico', 'Hospital'];
+                      const header = [
+                        '#', 
+                        'Nome do Paciente', 
+                        'Nº AIH', 
+                        'Especialidade de Atendimento', 
+                        'Data Alta (SUS)', 
+                        'Valor Total Paciente', 
+                        'Médico', 
+                        'Hospital',
+                        'Código Procedimento',
+                        'Descrição Procedimento', 
+                        'Data Procedimento',
+                        'Valor Procedimento'
+                      ];
                       let idx = 1;
                       filteredDoctors.forEach((card: any) => {
                         const doctorName = card.doctor_info?.name || '';
@@ -1584,36 +1597,88 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           const disLabel = disISO
                             ? (() => { const s = String(disISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
                             : '';
-                          const total = Number(p.total_value_reais || 0);
-                          rows.push([idx++, name, aih, careSpec, disLabel, total, doctorName, hospitalName]);
+                          const totalPaciente = Number(p.total_value_reais || 0);
+                          
+                          // Se o paciente tem procedimentos, criar uma linha para cada procedimento
+                          const procedures = p.procedures || [];
+                          if (procedures.length > 0) {
+                            procedures.forEach((proc: any) => {
+                              const procCode = proc.procedure_code || '';
+                              const procDesc = proc.procedure_description || proc.sigtap_description || '';
+                              const procDate = proc.procedure_date || '';
+                              const procDateLabel = procDate 
+                                ? (() => { 
+                                    const s = String(procDate); 
+                                    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); 
+                                    return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); 
+                                  })()
+                                : '';
+                              const procValue = Number(proc.value_reais || 0);
+                              
+                              rows.push([
+                                idx++, 
+                                name, 
+                                aih, 
+                                careSpec, 
+                                disLabel, 
+                                totalPaciente, 
+                                doctorName, 
+                                hospitalName,
+                                procCode,
+                                procDesc,
+                                procDateLabel,
+                                procValue
+                              ]);
+                            });
+                          } else {
+                            // Se não tem procedimentos, criar uma linha sem dados de procedimento
+                            rows.push([
+                              idx++, 
+                              name, 
+                              aih, 
+                              careSpec, 
+                              disLabel, 
+                              totalPaciente, 
+                              doctorName, 
+                              hospitalName,
+                              '',
+                              'Nenhum procedimento encontrado',
+                              '',
+                              0
+                            ]);
+                          }
                         });
                       });
                       const wb = XLSX.utils.book_new();
                       const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
                       (ws as any)['!cols'] = [
-                        { wch: 5 },
-                        { wch: 40 },
-                        { wch: 18 },
-                        { wch: 22 },
-                        { wch: 16 },
-                        { wch: 18 },
-                        { wch: 28 },
-                        { wch: 30 },
+                        { wch: 5 },   // #
+                        { wch: 35 },  // Nome do Paciente
+                        { wch: 18 },  // Nº AIH
+                        { wch: 25 },  // Especialidade de Atendimento
+                        { wch: 16 },  // Data Alta (SUS)
+                        { wch: 18 },  // Valor Total Paciente
+                        { wch: 30 },  // Médico
+                        { wch: 35 },  // Hospital
+                        { wch: 20 },  // Código Procedimento
+                        { wch: 45 },  // Descrição Procedimento
+                        { wch: 16 },  // Data Procedimento
+                        { wch: 18 },  // Valor Procedimento
                       ];
                       XLSX.utils.book_append_sheet(wb, ws, 'Pacientes');
-                      const fileName = `Relatorio_Pacientes_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+                      const fileName = `Relatorio_Pacientes_Procedimentos_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
                       XLSX.writeFile(wb, fileName);
-                      toast.success('Relatório Pacientes gerado com base no que está na tela.');
+                      toast.success('Relatório Pacientes Geral com procedimentos gerado com sucesso!');
                     } catch (e) {
                       console.error('Erro ao exportar Relatório Pacientes:', e);
                       toast.error('Erro ao gerar Relatório Pacientes');
                     }
                   }}
                   className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
-                  title="Gerar relatório Excel com os pacientes exibidos"
+                  title="Gerar relatório Excel detalhado com pacientes e todos os procedimentos associados"
                 >
                   <FileSpreadsheet className="h-4 w-4" />
-                  Relatório Pacientes
+                  Relatório Pacientes Geral
                 </Button>
               </div>
             </div>
