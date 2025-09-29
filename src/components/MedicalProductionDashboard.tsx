@@ -1883,13 +1883,34 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       console.log(`📊 [RELATÓRIO SIMPLIFICADO] Incluídos no relatório: ${allPatients.length}`);
                       console.log(`📊 [RELATÓRIO SIMPLIFICADO] Diferença esperada vs real: ${323 - allPatients.length}`);
                       
-                      // Ordenar por nome do paciente, depois por AIH
+                      // 🔄 CORREÇÃO: Ordenar por data de alta (do mais antigo para o mais recente)
                       const patientsArray = allPatients;
                       patientsArray.sort((a, b) => {
-                        const nameCompare = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-                        if (nameCompare !== 0) return nameCompare;
-                        // Se nomes iguais, ordenar por AIH
-                        return a.aih.localeCompare(b.aih);
+                        // Converter datas de DD/MM/YYYY para Date para comparação
+                        const parseDate = (dateStr: string): Date | null => {
+                          if (!dateStr || dateStr === '') return null;
+                          const parts = dateStr.split('/');
+                          if (parts.length === 3) {
+                            // DD/MM/YYYY -> YYYY-MM-DD
+                            return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+                          }
+                          return null;
+                        };
+                        
+                        const dateA = parseDate(a.dischargeLabel);
+                        const dateB = parseDate(b.dischargeLabel);
+                        
+                        // Se uma das datas não existe, colocar no final
+                        if (!dateA && !dateB) return 0;
+                        if (!dateA) return 1;
+                        if (!dateB) return -1;
+                        
+                        // Ordenar do mais antigo para o mais recente
+                        const dateCompare = dateA.getTime() - dateB.getTime();
+                        if (dateCompare !== 0) return dateCompare;
+                        
+                        // Se datas iguais, ordenar por nome do paciente
+                        return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
                       });
                       
                       // Criar linhas do Excel
