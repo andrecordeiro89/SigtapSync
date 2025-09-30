@@ -1607,90 +1607,114 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                          'AIH c/ Incremento'
                        ];
                       let idx = 1;
+                      // 🔧 CORREÇÃO: Incluir TODOS os registros, mesmo sem AIH gerada
+                      let totalPatientsFound = 0;
+                      let excludedByDateFilter = 0;
+                      let patientsWithoutAIH = 0;
+                      
+                      console.log('🔍 [RELATÓRIO GERAL] Iniciando coleta de dados...');
+                      console.log('🔍 [RELATÓRIO GERAL] Médicos filtrados:', filteredDoctors.length);
+                      
                       filteredDoctors.forEach((card: any) => {
                         const doctorName = card.doctor_info?.name || '';
                         const hospitalName = card.hospitals?.[0]?.hospital_name || '';
+                        console.log(`👨‍⚕️ [RELATÓRIO GERAL] Médico: ${doctorName} - Pacientes: ${(card.patients || []).length}`);
+                        
                         (card.patients || []).forEach((p: any) => {
+                          totalPatientsFound++;
+                          
                           if (useOnlyEnd && selectedEnd) {
                             const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
-                            if (!discharge || !isSameUTCDate(discharge, selectedEnd)) return;
+                            if (!discharge || !isSameUTCDate(discharge, selectedEnd)) {
+                              excludedByDateFilter++;
+                              return;
+                            }
                           }
-                           const name = p.patient_info?.name || 'Paciente';
-                           const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
-                           const careSpec = (p?.aih_info?.specialty || '').toString();
-                           const careCharacter = (() => {
-                             const raw = (p?.aih_info?.care_character ?? '').toString();
-                             try { 
-                               return CareCharacterUtils.formatForDisplay(raw, false); 
-                             } catch { 
-                               return raw; 
-                             }
-                           })();
-                           const disISO = p?.aih_info?.discharge_date || '';
-                           const disLabel = disISO
-                             ? (() => { const s = String(disISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
-                             : '';
-                           
-                           // Calcular valor da AIH com incrementos Opera Paraná
-                           const baseAih = Number(p.total_value_reais || 0);
-                           const doctorCovered = isDoctorCoveredForOperaParana(doctorName, card.hospitals?.[0]?.hospital_id);
-                           const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0;
-                           const aihWithIncrements = baseAih + increment;
-                           
-                           // Se o paciente tem procedimentos, criar uma linha para cada procedimento
-                           const procedures = p.procedures || [];
-                           if (procedures.length > 0) {
-                             procedures.forEach((proc: any) => {
-                               const procCode = proc.procedure_code || '';
-                               const procDesc = proc.procedure_description || proc.sigtap_description || '';
-                               const procDate = proc.procedure_date || '';
-                               const procDateLabel = procDate 
-                                 ? (() => { 
-                                     const s = String(procDate); 
-                                     const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); 
-                                     return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); 
-                                   })()
-                                 : '';
-                               const procValue = Number(proc.value_reais || 0);
-                               
-                               rows.push([
-                                 idx++, 
-                                 name, 
-                                 aih, 
-                                 procCode,
-                                 procDesc,
-                                 procDateLabel,
-                                 disLabel, 
-                                 careSpec, 
-                                 careCharacter,
-                                 doctorName, 
-                                 hospitalName,
-                                 procValue,
-                                 baseAih,
-                                 increment,
-                                 aihWithIncrements
-                               ]);
-                             });
-                           } else {
-                             // Se não tem procedimentos, criar uma linha sem dados de procedimento
-                             rows.push([
-                               idx++, 
-                               name, 
-                               aih, 
-                               '',
-                               'Nenhum procedimento encontrado',
-                               '',
-                               disLabel, 
-                               careSpec, 
-                               careCharacter,
-                               doctorName, 
-                               hospitalName,
-                               0,
-                               baseAih,
-                               increment,
-                               aihWithIncrements
-                             ]);
-                           }
+                          
+                          const name = p.patient_info?.name || 'Paciente';
+                          // 🔧 CORREÇÃO: Incluir pacientes sem AIH com aviso
+                          const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
+                          const aih = aihRaw || 'Aguardando geração';
+                          
+                          if (!aihRaw) {
+                            patientsWithoutAIH++;
+                            console.log(`⚠️ [RELATÓRIO GERAL] Paciente sem AIH incluído: ${name}`);
+                          }
+                          
+                          const careSpec = (p?.aih_info?.specialty || '').toString();
+                          const careCharacter = (() => {
+                            const raw = (p?.aih_info?.care_character ?? '').toString();
+                            try { 
+                              return CareCharacterUtils.formatForDisplay(raw, false); 
+                            } catch { 
+                              return raw; 
+                            }
+                          })();
+                          const disISO = p?.aih_info?.discharge_date || '';
+                          const disLabel = disISO
+                            ? (() => { const s = String(disISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
+                            : '';
+                          
+                          // Calcular valor da AIH com incrementos Opera Paraná
+                          const baseAih = Number(p.total_value_reais || 0);
+                          const doctorCovered = isDoctorCoveredForOperaParana(doctorName, card.hospitals?.[0]?.hospital_id);
+                          const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0;
+                          const aihWithIncrements = baseAih + increment;
+                          
+                          // Se o paciente tem procedimentos, criar uma linha para cada procedimento
+                          const procedures = p.procedures || [];
+                          if (procedures.length > 0) {
+                            procedures.forEach((proc: any) => {
+                              const procCode = proc.procedure_code || '';
+                              const procDesc = proc.procedure_description || proc.sigtap_description || '';
+                              const procDate = proc.procedure_date || '';
+                              const procDateLabel = procDate 
+                                ? (() => { 
+                                    const s = String(procDate); 
+                                    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); 
+                                    return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); 
+                                  })()
+                                : '';
+                              const procValue = Number(proc.value_reais || 0);
+                              
+                              rows.push([
+                                idx++, 
+                                name, 
+                                aih, // Usar aih que pode ser "Aguardando geração"
+                                procCode,
+                                procDesc,
+                                procDateLabel,
+                                disLabel, 
+                                careSpec, 
+                                careCharacter,
+                                doctorName, 
+                                hospitalName,
+                                procValue,
+                                baseAih,
+                                increment,
+                                aihWithIncrements
+                              ]);
+                            });
+                          } else {
+                            // Se não tem procedimentos, criar uma linha sem dados de procedimento
+                            rows.push([
+                              idx++, 
+                              name, 
+                              aih, // Usar aih que pode ser "Aguardando geração"
+                              '',
+                              'Nenhum procedimento encontrado',
+                              '',
+                              disLabel, 
+                              careSpec, 
+                              careCharacter,
+                              doctorName, 
+                              hospitalName,
+                              0,
+                              baseAih,
+                              increment,
+                              aihWithIncrements
+                            ]);
+                          }
                         });
                       });
                       
@@ -1720,6 +1744,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         return parsedDateB.getTime() - parsedDateA.getTime();
                       });
                       
+                      // 🔧 AVISO: Exibir estatísticas sobre registros incluídos
+                      console.log('📊 [RELATÓRIO GERAL] Estatísticas finais:');
+                      console.log(`📊 [RELATÓRIO GERAL] Total de pacientes encontrados: ${totalPatientsFound}`);
+                      console.log(`📊 [RELATÓRIO GERAL] Excluídos por filtro de data: ${excludedByDateFilter}`);
+                      console.log(`📊 [RELATÓRIO GERAL] Pacientes sem AIH incluídos: ${patientsWithoutAIH}`);
+                      console.log(`📊 [RELATÓRIO GERAL] Total de linhas no relatório: ${rows.length}`);
+                      
                       // Renumerar após ordenação
                       rows.forEach((row, index) => {
                         row[0] = index + 1; // Atualizar numeração sequencial
@@ -1747,7 +1778,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       XLSX.utils.book_append_sheet(wb, ws, 'Pacientes');
                       const fileName = `Relatorio_Pacientes_Procedimentos_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
                       XLSX.writeFile(wb, fileName);
-                      toast.success('Relatório geral de pacientes gerado com sucesso!');
+                      
+                      // 🔧 AVISO: Notificar sobre registros sem AIH incluídos
+                      if (patientsWithoutAIH > 0) {
+                        toast.success(`Relatório geral gerado com sucesso! ⚠️ ${patientsWithoutAIH} registro(s) sem AIH foram incluídos com "Aguardando geração".`);
+                      } else {
+                        toast.success('Relatório geral de pacientes gerado com sucesso!');
+                      }
                     } catch (e) {
                       console.error('Erro ao exportar Relatório Pacientes:', e);
                       toast.error('Erro ao gerar Relatório Pacientes');
