@@ -26,6 +26,7 @@ import { isLikelyProcedureString, sanitizePatientName } from '@/utils/patientNam
 import { PatientService } from '@/services/supabaseService';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import PatientAihInfoBadges from './PatientAihInfoBadges';
 import AihDatesBadges from './AihDatesBadges';
 
@@ -164,8 +165,6 @@ const PatientManagement = () => {
   
   // 🎯 NOVO: Estado para valores totais recalculados dinamicamente
   const [aihTotalValues, setAihTotalValues] = useState<{[aihId: string]: number}>({});
-  // 🆕 Estado: habilitar/desabilitar edição da competência por AIH
-  const [editingCompetency, setEditingCompetency] = useState<{[aihId: string]: boolean}>({});
 
   // Estados para exclusão completa
   const [completeDeleteDialogOpen, setCompleteDeleteDialogOpen] = useState(false);
@@ -239,63 +238,7 @@ const PatientManagement = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // 🗓️ Competência (mês da alta) — 'all' ou 'YYYY-MM'
-  const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
-
-  // Quando competência estiver ativa, evitar interseção com filtros de período
-  useEffect(() => {
-    if (selectedCompetency && selectedCompetency !== 'all') {
-      setStartDate('');
-      setEndDate('');
-    }
-  }, [selectedCompetency]);
-
-  // Range mensal derivado da competência selecionada (UTC)
-  const competencyRange = React.useMemo(() => {
-    if (!selectedCompetency || selectedCompetency === 'all') return null as null | { start: Date; end: Date };
-    const m = selectedCompetency.match(/^(\d{4})-(\d{2})$/);
-    if (!m) return null;
-    const y = Number(m[1]);
-    const mo = Number(m[2]) - 1;
-    const start = new Date(Date.UTC(y, mo, 1, 0, 0, 0, 0));
-    const end = new Date(Date.UTC(y, mo + 1, 0, 23, 59, 59, 999));
-    return { start, end };
-  }, [selectedCompetency]);
-
-  // Lista de competências disponíveis com base nas AIHs (mês da alta; fallback para admissão)
-  const availableCompetencies = React.useMemo(() => {
-    try {
-      // Helpers seguros para data-only (YYYY-MM-DD)
-      const getYM = (s: string): string | null => {
-        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-        if (m) return `${m[1]}-${m[2]}`;
-        const d = new Date(s);
-        if (isNaN(d.getTime())) return null;
-        // Usar UTC para evitar deslocamentos de fuso
-        const y = d.getUTCFullYear();
-        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-        return `${y}-${mm}`;
-      };
-
-      const setYM = new Set<string>();
-      aihs.forEach((aih) => {
-        const ref = (aih as any).competencia || aih.discharge_date || aih.admission_date;
-        if (!ref) return;
-        const ym = getYM(ref);
-        if (ym) setYM.add(ym);
-      });
-      const arr = Array.from(setYM);
-      arr.sort((a, b) => (a < b ? 1 : -1)); // Descendente (mais recente primeiro)
-      return arr.map((ym) => {
-        const [y, m] = ym.split('-');
-        const dateObj = new Date(Number(y), Number(m) - 1, 1);
-        const label = `${format(dateObj, 'MMM', { locale: ptBR }).replace('.', '')}/${format(dateObj, 'yy', { locale: ptBR })}`;
-        return { value: ym, label };
-      });
-    } catch {
-      return [] as Array<{ value: string; label: string }>;
-    }
-  }, [aihs]);
+  // Removido: Range mensal e lista de competências não são mais necessários
 
   // 🎯 NOVA FUNÇÃO: Recalcular valor total da AIH baseado nos procedimentos ativos
   const recalculateAIHTotal = (aihId: string, procedures: any[]) => {
@@ -329,9 +272,9 @@ const PatientManagement = () => {
   // 🔧 CORREÇÃO: Recarregar dados quando competência mudar
   useEffect(() => {
     if (currentHospitalId) {
-      loadAIHs(); // Recarregar AIHs com novo filtro de competência
+      loadAIHs(); // Recarregar AIHs
     }
-  }, [selectedCompetency, competencyRange]);
+  }, [currentHospitalId]);
 
   // Resetar página quando filtros mudarem + atualizar contagem
   useEffect(() => {
@@ -378,16 +321,10 @@ const PatientManagement = () => {
       let offset = 0;
       const all: any[] = [];
 
-      // 🔧 CORREÇÃO: Aplicar filtro de competência na fonte de dados
-      const useCompetencyFilter = selectedCompetency && selectedCompetency !== 'all';
+      // Removido: filtro de competência não é mais aplicado
+      const useCompetencyFilter = false;
       let dateFromISO: string | undefined;
       let dateToISO: string | undefined;
-      
-      if (useCompetencyFilter && competencyRange) {
-        dateFromISO = competencyRange.start.toISOString();
-        dateToISO = competencyRange.end.toISOString();
-        console.log('🗓️ Aplicando filtro de competência na fonte:', selectedCompetency, dateFromISO, '→', dateToISO);
-      }
 
       while (true) {
         const batch = await persistenceService.getAIHs(currentHospitalId || 'ALL', {
@@ -642,41 +579,35 @@ const PatientManagement = () => {
       ) ||
       (item.patient?.cns && item.patient.cns.includes(globalSearch));
     
-    // 🔧 CORREÇÃO: Para filtros de competência, usar APENAS discharge_date (igual Analytics)
-    let refStr: string | null = null;
-    let refDate: Date | null = null;
-    
-    if (competencyRange) {
-      // Para filtros de competência: usar APENAS discharge_date
-      refStr = item.discharge_date;
-      if (!refStr) return false; // Excluir pacientes sem alta quando filtro de competência ativo
-      refDate = new Date(refStr);
-    } else {
-      // Para filtros de data normal: manter fallback original
-      refStr = (item as any).competencia || item.discharge_date || item.admission_date;
-      refDate = refStr ? new Date(refStr) : null;
-    }
-
-    // Filtro por intervalo de datas
+    // Filtro por data - usar admission_date e discharge_date especificamente
     let matchesDateRange = true;
-    const applyDateRange = !competencyRange; // não aplicar intervalo quando competência estiver ativa
-    if (applyDateRange && (startDate || endDate) && refDate) {
-      if (startDate) {
+    
+    // Se há filtro de data de início (Admissão), verificar admission_date
+    if (startDate) {
+      const admissionDate = item.admission_date ? new Date(item.admission_date) : null;
+      if (admissionDate) {
         const start = new Date(startDate);
-        matchesDateRange = matchesDateRange && refDate >= start;
+        matchesDateRange = matchesDateRange && admissionDate >= start;
+      } else {
+        // Se não há data de admissão, não passa no filtro de admissão
+        matchesDateRange = false;
       }
-      if (endDate) {
+    }
+    
+    // Se há filtro de data de fim (Alta), verificar discharge_date
+    if (endDate && matchesDateRange) {
+      const dischargeDate = item.discharge_date ? new Date(item.discharge_date) : null;
+      if (dischargeDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        matchesDateRange = matchesDateRange && refDate <= end;
+        matchesDateRange = matchesDateRange && dischargeDate <= end;
+      } else {
+        // Se não há data de alta, não passa no filtro de alta
+        matchesDateRange = false;
       }
     }
 
-    // 🗓️ Filtro por competência (mês da alta) via range mensal
-    let matchesCompetency = true;
-    if (competencyRange && refDate) {
-      matchesCompetency = refDate >= competencyRange.start && refDate <= competencyRange.end;
-    }
+    // Removido: filtro por competência não é mais necessário
 
     // 🏥 Filtro por caráter de atendimento
     let matchesCareCharacter = true;
@@ -684,7 +615,25 @@ const PatientManagement = () => {
       matchesCareCharacter = item.care_character === selectedCareCharacter;
     }
     
-    return matchesSearch && matchesDateRange && matchesCompetency && matchesCareCharacter;
+    return matchesSearch && matchesDateRange && matchesCareCharacter;
+  }).sort((a, b) => {
+    // Ordenação por data de alta (discharge_date) do mais recente para o mais antigo
+    const dateA = a.discharge_date ? new Date(a.discharge_date).getTime() : 0;
+    const dateB = b.discharge_date ? new Date(b.discharge_date).getTime() : 0;
+    
+    // Se ambos têm data de alta, ordenar do mais recente para o mais antigo
+    if (dateA && dateB) {
+      return dateB - dateA;
+    }
+    
+    // Se apenas um tem data de alta, priorizar o que tem data
+    if (dateA && !dateB) return -1;
+    if (!dateA && dateB) return 1;
+    
+    // Se nenhum tem data de alta, ordenar por data de admissão como fallback
+    const admissionA = a.admission_date ? new Date(a.admission_date).getTime() : 0;
+    const admissionB = b.admission_date ? new Date(b.admission_date).getTime() : 0;
+    return admissionB - admissionA;
   });
 
   // Paginação unificada
@@ -693,233 +642,7 @@ const PatientManagement = () => {
     (currentPage + 1) * itemsPerPage
   );
 
-  // 📄 Gerar PDF com nomes dos pacientes por competência selecionada
-  const handleGeneratePatientsByCompetencyPDF = async () => {
-    try {
-      const patientsAll = filteredData.map(i => ({
-        name: (i.patient as any)?.name || i.patients?.name || 'Paciente não identificado',
-      }));
-
-      // Montar rótulo da competência
-      const compLabel = (() => {
-        if (!selectedCompetency || selectedCompetency === 'all') return 'Todas as Competências';
-        const found = availableCompetencies.find(c => c.value === selectedCompetency);
-        if (found) return `Competência ${found.label}`;
-        const parts = selectedCompetency.split('-');
-        if (parts.length === 2) {
-          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
-          return `Competência ${format(d, 'MMM', { locale: ptBR }).replace('.', '')}/${format(d, 'yy', { locale: ptBR })}`;
-        }
-        return 'Competência';
-      })();
-
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      doc.setFontSize(20);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(41, 128, 185);
-      doc.text('SIGTAP Sync', pageWidth / 2, 25, { align: 'center' });
-
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('RELATÓRIO SUS - PACIENTES POR COMPETÊNCIA', pageWidth / 2, 35, { align: 'center' });
-
-      doc.setDrawColor(220, 220, 220);
-      doc.setLineWidth(0.5);
-      doc.line(20, 42, 190, 42);
-
-      const totalPacientes = filteredData.length;
-      const hospitalName = (() => {
-        if (canAccessAllHospitals()) return 'Todos os Hospitais';
-        const first = filteredData[0] as any;
-        return (first?.hospitals && (first.hospitals as any).name) || 'Hospital Atual';
-      })();
-      const userName = user?.full_name || user?.email || 'Usuário';
-
-      const leftX = 20;
-      const rightX = doc.internal.pageSize.getWidth() - 20;
-
-      // Esquerda: Hospital (seminegrito) e Competência abaixo; Total abaixo
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(40, 40, 40);
-      doc.text(`${hospitalName}`, leftX, 55);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(80, 80, 80);
-      doc.text(`${compLabel}`, leftX, 62);
-      doc.text(`Total: ${totalPacientes}`, leftX, 69);
-
-      // Direita: Operador (seminegrito) e Gerado em abaixo
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(40, 40, 40);
-      doc.text(`${userName}`, rightX, 55, { align: 'right' });
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(10);
-      doc.setTextColor(80, 80, 80);
-      doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`, rightX, 62, { align: 'right' });
-
-      const tableBody = filteredData.map((i) => [
-        i.patients?.name || (i.patient as any)?.name || 'Paciente não identificado',
-        i.patients?.cns || (i.patient as any)?.cns || '',
-        (i.aih_number || '').replace('-', ''),
-        i.admission_date ? formatDate(i.admission_date) : '—',
-        i.discharge_date ? formatDate(i.discharge_date) : '—',
-      ]);
-
-      autoTable(doc, {
-        head: [['Nome do Paciente', 'CNS', 'AIH', 'Admissão', 'Alta']],
-        body: tableBody,
-        startY: 70,
-        margin: { left: 20, right: 20 },
-        headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-        styles: { fontSize: 9, overflow: 'ellipsize', cellPadding: 2 },
-        columnStyles: {
-          0: { cellWidth: 60, overflow: 'linebreak' }, // Nome pode quebrar linha
-          1: { cellWidth: 32, overflow: 'ellipsize' }, // CNS em uma linha
-          2: { cellWidth: 32, overflow: 'ellipsize' }, // AIH em uma linha
-          3: { cellWidth: 23, overflow: 'ellipsize', halign: 'center' }, // Admissão centralizada
-          4: { cellWidth: 23, overflow: 'ellipsize', halign: 'center' }, // Alta centralizada
-        },
-      });
-
-      const fileName = `relatorio-pacientes-${selectedCompetency === 'all' ? 'todas' : selectedCompetency}.pdf`;
-      doc.save(fileName);
-      toast({ title: 'Relatório gerado', description: `${patientsAll.length} pacientes exportados.` });
-    } catch (e) {
-      console.error('Erro ao gerar PDF de pacientes por competência:', e);
-      toast({ title: 'Erro ao gerar PDF', description: 'Tente novamente.', variant: 'destructive' });
-    }
-  };
-
-  // 📊 Gerar EXCEL com nomes dos pacientes por competência selecionada
-  const handleGeneratePatientsByCompetencyExcel = async () => {
-    try {
-      // Importar XLSX dinamicamente
-      const XLSX = await import('xlsx');
-      
-      // Montar rótulo da competência
-      const compLabel = (() => {
-        if (!selectedCompetency || selectedCompetency === 'all') return 'Todas as Competências';
-        const found = availableCompetencies.find(c => c.value === selectedCompetency);
-        if (found) return `Competência ${found.label}`;
-        const parts = selectedCompetency.split('-');
-        if (parts.length === 2) {
-          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
-          return `Competência ${format(d, 'MMM', { locale: ptBR }).replace('.', '')}/${format(d, 'yy', { locale: ptBR })}`;
-        }
-        return 'Competência';
-      })();
-
-      const totalPacientes = filteredData.length;
-      const hospitalName = (() => {
-        if (canAccessAllHospitals()) return 'Todos os Hospitais';
-        const first = filteredData[0] as any;
-        return (first?.hospitals && (first.hospitals as any).name) || 'Hospital Atual';
-      })();
-      const userName = user?.full_name || user?.email || 'Usuário';
-
-      // Criar workbook
-      const wb = XLSX.utils.book_new();
-
-      // Dados do cabeçalho informativo
-      const headerData = [
-        ['SIGTAP Sync'],
-        ['RELATÓRIO SUS - PACIENTES POR COMPETÊNCIA'],
-        [''],
-        [`Hospital: ${hospitalName}`, '', '', `Operador: ${userName}`],
-        [`${compLabel}`, '', '', `Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: ptBR })}`],
-        [`Total: ${totalPacientes} pacientes`],
-        [''],
-        ['Nome do Paciente', 'CNS', 'AIH', 'Admissão', 'Alta']
-      ];
-
-      // Dados dos pacientes
-      const patientRows = filteredData.map((i) => [
-        i.patients?.name || (i.patient as any)?.name || 'Paciente não identificado',
-        i.patients?.cns || (i.patient as any)?.cns || '',
-        (i.aih_number || '').replace('-', ''),
-        i.admission_date ? formatDate(i.admission_date) : '—',
-        i.discharge_date ? formatDate(i.discharge_date) : '—',
-      ]);
-
-      // Combinar cabeçalho + dados
-      const allData = [...headerData, ...patientRows];
-
-      // Criar worksheet
-      const ws = XLSX.utils.aoa_to_sheet(allData);
-
-      // Configurar larguras das colunas
-      const colWidths = [
-        { wch: 50 }, // Nome do Paciente
-        { wch: 20 }, // CNS
-        { wch: 20 }, // AIH
-        { wch: 15 }, // Admissão
-        { wch: 15 }  // Alta
-      ];
-      ws['!cols'] = colWidths;
-
-      // Estilizar o cabeçalho (título principal)
-      if (ws['A1']) {
-        ws['A1'].s = {
-          font: { bold: true, sz: 16, color: { rgb: "2980B9" } },
-          alignment: { horizontal: "center" }
-        };
-      }
-
-      // Estilizar subtítulo
-      if (ws['A2']) {
-        ws['A2'].s = {
-          font: { bold: true, sz: 14 },
-          alignment: { horizontal: "center" }
-        };
-      }
-
-      // Estilizar cabeçalho da tabela (linha 8)
-      const headerRow = 8;
-      ['A', 'B', 'C', 'D', 'E'].forEach(col => {
-        const cellRef = `${col}${headerRow}`;
-        if (ws[cellRef]) {
-          ws[cellRef].s = {
-            font: { bold: true },
-            fill: { fgColor: { rgb: "2980B9" } },
-            font: { color: { rgb: "FFFFFF" }, bold: true }
-          };
-        }
-      });
-
-      // Mesclar células do título
-      ws['!merges'] = [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }, // Título principal
-        { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } }, // Subtítulo
-      ];
-
-      // Adicionar worksheet ao workbook
-      XLSX.utils.book_append_sheet(wb, ws, 'Pacientes por Competência');
-
-      // Nome do arquivo
-      const fileName = `relatorio-pacientes-${selectedCompetency === 'all' ? 'todas' : selectedCompetency}-${format(new Date(), 'yyyyMMdd-HHmm')}.xlsx`;
-
-      // Salvar arquivo
-      XLSX.writeFile(wb, fileName);
-
-      toast({ 
-        title: 'Relatório Excel gerado', 
-        description: `${totalPacientes} pacientes exportados para Excel.` 
-      });
-    } catch (e) {
-      console.error('Erro ao gerar Excel de pacientes por competência:', e);
-      toast({ 
-        title: 'Erro ao gerar Excel', 
-        description: 'Tente novamente.', 
-        variant: 'destructive' 
-      });
-    }
-  };
+  // Funções de relatório por competência removidas - não são mais necessárias
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -954,6 +677,109 @@ const PatientManagement = () => {
       return new Date(s).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
     } catch {
       return s;
+    }
+  };
+
+  // NOVA FUNÇÃO: Gerar Relatório de Pacientes em Excel
+  const handleGeneratePatientsExcelReport = async () => {
+    try {
+      // Usar filteredData para garantir que apenas os dados filtrados sejam incluídos
+      let dataToExport = [...filteredData];
+      
+      if (dataToExport.length === 0) {
+        toast({
+          title: "Nenhum dado para exportar",
+          description: "Não há pacientes para incluir no relatório.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Ordenar dados por data de Alta (mais recente para mais antigo)
+      dataToExport.sort((a, b) => {
+        const dateA = a.discharge_date ? new Date(a.discharge_date) : null;
+        const dateB = b.discharge_date ? new Date(b.discharge_date) : null;
+        
+        // Priorizar itens com discharge_date
+        if (dateA && !dateB) return -1;
+        if (!dateA && dateB) return 1;
+        if (!dateA && !dateB) {
+          // Se ambos não têm discharge_date, ordenar por admission_date
+          const admissionA = new Date(a.admission_date);
+          const admissionB = new Date(b.admission_date);
+          return admissionB.getTime() - admissionA.getTime();
+        }
+        
+        // Ambos têm discharge_date, ordenar do mais recente para o mais antigo
+        return dateB!.getTime() - dateA!.getTime();
+      });
+
+      // Cabeçalho do Excel (removidas colunas Procedimentos e Nome do Médico)
+      const header = [
+        'Nome Paciente',
+        'Nº AIH', 
+        'Caráter de Atendimento',
+        'Hospital',
+        'Admissão',
+        'Alta'
+      ];
+
+      // Preparar dados para o Excel
+      const rows: Array<Array<string | number>> = [];
+      
+      for (const item of dataToExport) {
+        const patientName = (item.patient || item.patients)?.name || 'N/A';
+        const aihNumber = item.aih_number || 'N/A';
+        const careCharacter = CareCharacterUtils.getDescription(item.care_character) || item.care_character || 'N/A';
+        const hospitalName = item.hospitals?.name || 'N/A';
+        const admissionDate = item.admission_date ? formatDate(item.admission_date) : 'N/A';
+        const dischargeDate = item.discharge_date ? formatDate(item.discharge_date) : 'N/A';
+
+        rows.push([
+          patientName,
+          aihNumber,
+          careCharacter,
+          hospitalName,
+          admissionDate,
+          dischargeDate
+        ]);
+      }
+
+      // Criar workbook e worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+
+      // Configurar largura das colunas (ajustadas para as novas colunas)
+      (ws as any)['!cols'] = [
+        { wch: 30 }, // Nome Paciente
+        { wch: 15 }, // Nº AIH
+        { wch: 20 }, // Caráter de Atendimento
+        { wch: 25 }, // Hospital
+        { wch: 12 }, // Admissão
+        { wch: 12 }  // Alta
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Relatório Pacientes');
+
+      // Gerar nome do arquivo com timestamp
+      const timestamp = format(new Date(), 'yyyyMMdd_HHmm');
+      const fileName = `Relatorio_Pacientes_${timestamp}.xlsx`;
+      
+      // Salvar arquivo
+      XLSX.writeFile(wb, fileName);
+
+      toast({
+        title: "Relatório Excel gerado",
+        description: `${dataToExport.length} pacientes exportados para Excel.`,
+      });
+
+    } catch (error) {
+      console.error('❌ Erro ao gerar relatório Excel:', error);
+      toast({
+        title: "Erro ao gerar Excel",
+        description: "Ocorreu um erro ao gerar o relatório. Tente novamente.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -1105,13 +931,13 @@ const PatientManagement = () => {
               {/* espaço vazio para manter espaçamento vertical uniforme no mobile */}
             </div>
 
-            {/* Data Início */}
+            {/* Admissão */}
             <div className="space-y-3 w-full md:w-[170px]">
               <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
                 <div className="p-1 bg-green-100 rounded">
                   <Calendar className="w-3 h-3 text-green-600" />
                 </div>
-                <span>Data Início</span>
+                <span>Admissão</span>
               </label>
               <Input
                 type="date"
@@ -1121,13 +947,13 @@ const PatientManagement = () => {
               />
             </div>
 
-            {/* Data Fim */}
+            {/* Alta */}
             <div className="space-y-3 w-full md:w-[170px]">
               <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
                 <div className="p-1 bg-purple-100 rounded">
                   <Calendar className="w-3 h-3 text-purple-600" />
                 </div>
-                <span>Data Fim</span>
+                <span>Alta</span>
               </label>
               <Input
                 type="date"
@@ -1176,7 +1002,6 @@ const PatientManagement = () => {
                   setGlobalSearch('');
                   setStartDate('');
                   setEndDate('');
-                  setSelectedCompetency('all');
                   setSelectedCareCharacter('all');
                 }}
                 className="h-9 text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-gray-300 transition-colors w-full md:w-auto"
@@ -1188,71 +1013,7 @@ const PatientManagement = () => {
             </div>
           </div>
 
-          {/* 🗓️ Abas de Competência (mês da alta) — posicionadas abaixo dos filtros */}
-          {availableCompetencies.length > 0 && (
-            <div className="mt-6 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-1 bg-blue-100 rounded">
-                    <FileText className="w-4 h-4 text-blue-700" />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">Relatório - Pacientes por Competência</p>
-                      <p className="text-xs text-gray-600">Gera Nome, CNS, AIH, Admissão e Alta da competência selecionada</p>
-                    </div>
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">Total: {filteredData.length}</Badge>
-                    {selectedCareCharacter !== 'all' && (
-                      <Badge variant="outline" className={`text-xs ${selectedCareCharacter === '1' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                        {selectedCareCharacter === '1' ? 'Eletivo' : 'Urgência/Emerg.'}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <Tabs value={selectedCompetency} onValueChange={setSelectedCompetency}>
-                  <TabsList className="h-auto flex flex-wrap gap-1 bg-muted rounded-md p-1">
-                    <TabsTrigger
-                      value="all"
-                      className="text-xs px-2 py-1 rounded data-[state=active]:bg-background data-[state=active]:text-foreground"
-                      title="Todas as competências"
-                    >
-                      Todos
-                    </TabsTrigger>
-                    {availableCompetencies.map((c) => (
-                      <TabsTrigger
-                        key={c.value}
-                        value={c.value}
-                        className="text-xs px-2 py-1 rounded data-[state=active]:bg-background data-[state=active]:text-foreground"
-                        title={`Competência ${c.label}`}
-                      >
-                        {c.label}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleGeneratePatientsByCompetencyPDF}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    PDF - Competência
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleGeneratePatientsByCompetencyExcel}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    Excel - Competência
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Seção de competências removida */}
 
           {/* Rodapé dos filtros removido conforme solicitação */}
         </CardContent>
@@ -1261,11 +1022,22 @@ const PatientManagement = () => {
       {/* Lista Unificada de AIHs */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-xl">
-            <FileText className="w-5 h-5" />
-            <span>
-              AIHs Processadas ({selectedCompetency !== 'all' ? filteredData.length : totalAIHsCount})
-            </span>
+          <CardTitle className="flex items-center justify-between text-xl">
+            <div className="flex items-center space-x-2">
+              <FileText className="w-5 h-5" />
+              <span>
+                AIHs Processadas ({filteredData.length})
+              </span>
+            </div>
+            <Button
+              onClick={handleGeneratePatientsExcelReport}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 bg-green-600 text-white border-green-600 hover:bg-green-700 hover:border-green-700"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Relatório Pacientes
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1365,63 +1137,6 @@ const PatientManagement = () => {
                                     </Badge>
                                   );
                                 })()}
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-[11px] h-7 px-3 py-0 border-blue-200 text-blue-700"
-                                  title={editingCompetency[item.id] ? 'Desativar edição de competência' : 'Ativar edição de competência'}
-                                  onClick={() => setEditingCompetency(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
-                                >
-                                  {editingCompetency[item.id] ? 'Editar competência' : 'Editar competência'}
-                                </Button>
-                                <select
-                                  className="text-[11px] h-7 px-2 py-0.5 border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                  title="Alterar competência desta AIH"
-                                  value={(() => {
-                                    const ref2 = (item as any).competencia || item.discharge_date || item.admission_date;
-                                    const m2 = String(ref2 || '').match(/^(\d{4})-(\d{2})/);
-                                    if (m2) return `${m2[1]}-${m2[2]}`;
-                                    try {
-                                      const d = ref2 ? new Date(ref2) : null;
-                                      if (d && !isNaN(d.getTime())) {
-                                        const y = d.getUTCFullYear();
-                                        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-                                        return `${y}-${mm}`;
-                                      }
-                                    } catch {}
-                                    return '';
-                                  })()}
-                                  disabled={!editingCompetency[item.id]}
-                                  onChange={async (e) => {
-                                    try {
-                                      const ym = e.target.value; // YYYY-MM
-                                      const newComp = `${ym}-01`;
-                                      const { error } = await supabase
-                                        .from('aihs')
-                                        .update({ competencia: newComp })
-                                        .eq('id', item.id);
-                                      if (error) throw error;
-                                      setAIHs(prev => prev.map(a => a.id === item.id ? ({ ...a, competencia: newComp } as any) : a));
-                                      toast({ title: 'Competência atualizada', description: `Nova competência: ${ym}` });
-                                    } catch (err:any) {
-                                      console.error('Erro ao atualizar competência:', err);
-                                      toast({ title: 'Erro ao atualizar competência', description: err.message || 'Tente novamente.', variant: 'destructive' });
-                                    }
-                                  }}
-                                >
-                                  <option value="" disabled>Alterar</option>
-                                  {(() => {
-                                    const options: JSX.Element[] = [];
-                                    const year = new Date().getFullYear();
-                                    for (let mOpt = 1; mOpt <= 12; mOpt++) {
-                                      const d2 = new Date(year, mOpt - 1, 1);
-                                      const ym2 = `${year}-${String(mOpt).padStart(2, '0')}`;
-                                      const lbl2 = `${format(d2, 'MMM', { locale: ptBR }).replace('.', '')}/${format(d2, 'yy', { locale: ptBR })}`;
-                                      options.push(<option key={ym2} value={ym2}>{lbl2}</option>);
-                                    }
-                                    return options;
-                                  })()}
-                                </select>
                               </div>
                             </div>
                             {/* Removido: nome do hospital abaixo do nome do paciente */}
@@ -1433,33 +1148,13 @@ const PatientManagement = () => {
 
                           
 
-                          {/* Datas padronizadas + info compacta (2 colunas: Admissão/Alta e Competência/Hospital) */}
+                          {/* Datas padronizadas + info compacta (2 colunas: Admissão/Alta e Hospital) */}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2 ml-0">
                             <div className="grid grid-cols-2 gap-1 sm:gap-2">
                               <div className="text-[11px]"><span className="text-gray-500">Admissão:</span> {formatDate(item.admission_date)}</div>
                               <div className="text-[11px]"><span className="text-gray-500">Alta:</span> {item.discharge_date ? formatDate(item.discharge_date) : 'N/A'}</div>
                             </div>
-                            <div className="grid grid-cols-2 gap-1 sm:gap-2">
-                              <div className="text-[11px] whitespace-nowrap flex items-center gap-1">
-                                <span className="text-gray-500">Competência:</span>
-                                {(() => {
-                                  const ref = (item as any).competencia || item.discharge_date || item.admission_date;
-                                  let label = 'N/A';
-                                  try {
-                                    const d = ref ? new Date(ref) : null;
-                                    if (d && !isNaN(d.getTime())) {
-                                      const y = d.getUTCFullYear();
-                                      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-                                      label = `${m}/${String(y).slice(-2)}`;
-                                    }
-                                  } catch {}
-                                  return (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] bg-blue-50 border-blue-200 text-blue-700">
-                                      {label}
-                                    </span>
-                                  );
-                                })()}
-                              </div>
+                            <div className="grid grid-cols-1 gap-1 sm:gap-2">
                               <div className="text-[11px] truncate"><span className="text-gray-500">Hospital:</span> <span className="truncate inline-block align-bottom max-w-[260px] sm:max-w-[360px] font-semibold">{item.hospitals?.name || 'N/A'}</span></div>
                             </div>
                           </div>
