@@ -35,7 +35,6 @@ const Dashboard = () => {
     totalAIHs: 0,
     processedToday: 0
   });
-  const [recentAuditLogs, setRecentAuditLogs] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [weekActivityCounts, setWeekActivityCounts] = useState<Array<{ dateLabel: string; count: number }>>([]);
@@ -46,18 +45,25 @@ const Dashboard = () => {
     return ['admin', 'ti', 'coordinator', 'director', 'auditor', 'developer'].includes(user.role);
   };
 
+  // ✅ Função para formatar número com separador de milhares
+  const formatNumber = (num: number): string => {
+    return num.toLocaleString('pt-BR');
+  };
+
+  // ✅ CORREÇÃO: Armazenar hospital_id como valor, não função
+  const currentHospitalId = getCurrentHospital();
+
   // Carregar informações do hospital atual
   useEffect(() => {
     const loadHospitalInfo = async () => {
-      const currentHospital = getCurrentHospital();
       // Não carregar se não há hospital ou se é 'ALL' (acesso total)
-      if (!currentHospital || currentHospital === 'ALL') return;
+      if (!currentHospitalId || currentHospitalId === 'ALL') return;
     
       try {
         const { data, error } = await supabase
           .from('hospitals')
           .select('id, name, cnpj, city, state, is_active')
-          .eq('id', currentHospital)
+          .eq('id', currentHospitalId)
           .single();
 
         if (error) {
@@ -73,7 +79,7 @@ const Dashboard = () => {
     };
 
     loadHospitalInfo();
-  }, [getCurrentHospital]);
+  }, [currentHospitalId]); // ✅ CORREÇÃO: Usar valor do hospital_id, não função
 
   // Carregar estatísticas e logs
   useEffect(() => {
@@ -185,7 +191,7 @@ const Dashboard = () => {
           action: 'AIH_CREATED',
           aih_number: aih.aih_number,
           user_name: aih.processed_by_name || 'Sistema',
-          user_email: 'operador@sistema.com',
+          user_email: aih.processed_by_email || user.email || 'sistema@sistema.com', // ✅ CORREÇÃO: Email real do operador
           hospital_name: isAdminMode 
             ? (aih.hospitals?.name || 'Hospital N/A')
             : (hospitalInfo?.name || 'Hospital'),
@@ -196,7 +202,6 @@ const Dashboard = () => {
         }));
 
         setRecentActivity(processedActivity);
-        setRecentAuditLogs(processedActivity);
 
         // 🔎 Diagnóstico: contagem de hospitais únicos na coluna "Hospital" da Atividade Recente
         try {
@@ -276,10 +281,11 @@ const Dashboard = () => {
   }, [user, canAccessAllHospitals]);
 
   const getActionIcon = (action: string) => {
-    if (action.includes('LOGIN')) return <ShieldCheck className="h-4 w-4 text-green-600" />;
-    if (action.includes('AIH')) return <FileText className="h-4 w-4 text-blue-600" />;
-    if (action.includes('ERROR')) return <AlertCircle className="h-4 w-4 text-red-600" />;
-    return <Activity className="h-4 w-4 text-gray-600" />;
+    // ✅ Ícones sem cor definida - a cor será controlada pelo componente pai
+    if (action.includes('LOGIN')) return <ShieldCheck className="h-4 w-4" />;
+    if (action.includes('AIH')) return <FileText className="h-4 w-4" />;
+    if (action.includes('ERROR')) return <AlertCircle className="h-4 w-4" />;
+    return <Activity className="h-4 w-4" />;
   };
 
   const getActionLabel = (action: string) => {
@@ -447,34 +453,33 @@ const Dashboard = () => {
       {/* ✅ Estatísticas Principais - Apenas para Diretoria - Versão compacta */}
       {isManagementRole() && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="hover:shadow-md transition-shadow border-l-4 border-l-blue-500 h-[120px] flex flex-col">
-            <CardContent className="p-4 flex-1 flex items-center">
+          <Card className="hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
+            <CardContent className="p-3 flex items-center">
               <div className="flex items-center space-x-3 w-full">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <FileText className="h-6 w-6 text-blue-600" />
+                <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                  <FileText className="h-5 w-5 text-blue-600" />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total de AIHs</p>
-                  <p className="text-2xl font-bold text-gray-900">{loading ? '...' : stats.totalAIHs}</p>
-                  {/* Indicador de hospitais removido a pedido: manter apenas o total de AIHs */}
+                  <p className="text-xl font-bold text-gray-900">{loading ? '...' : formatNumber(stats.totalAIHs)}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow border-l-4 border-l-green-500 h-[120px] flex flex-col">
-            <CardContent className="p-4 flex-1 flex items-center">
+          <Card className="hover:shadow-md transition-shadow border-l-4 border-l-green-500">
+            <CardContent className="p-3 flex items-center">
               <div className="flex items-center space-x-3 w-full">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <Clock className="h-6 w-6 text-green-600" />
+                <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
+                  <Clock className="h-5 w-5 text-green-600" />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Processadas Hoje</p>
-                  <p className="text-2xl font-bold text-gray-900">{loading ? '...' : stats.processedToday}</p>
-                  <p className="text-xs text-green-600 mt-1">
+                  <p className="text-xl font-bold text-gray-900">{loading ? '...' : formatNumber(stats.processedToday)}</p>
+                  <p className="text-xs text-green-600 mt-0.5">
                     {stats.is_admin_mode 
                       ? `Todos os hospitais` 
-                      : (stats.processedToday > 0 ? `${stats.processedToday} nova${stats.processedToday !== 1 ? 's' : ''} hoje` : 'Nenhuma hoje')
+                      : (stats.processedToday > 0 ? `${formatNumber(stats.processedToday)} nova${stats.processedToday !== 1 ? 's' : ''} hoje` : 'Nenhuma hoje')
                     }
                   </p>
                 </div>
@@ -493,95 +498,104 @@ const Dashboard = () => {
 
       {/* ✅ Atividade Recente - Layout Completo - Apenas para Diretoria */}
       {isManagementRole() && (
-        <Card className="bg-gradient-to-r from-slate-50 via-white to-slate-50/50 border-slate-200/60 shadow-md hover:shadow-lg transition-all duration-300">
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-blue-50 border-b border-purple-100">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg shadow-sm">
-                  <Activity className="h-6 w-6 text-purple-700" />
+        <Card className="border-gray-200 shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-b border-gray-200/60 py-4">
+            <div className="flex items-center justify-between gap-4">
+              {/* Lado Esquerdo: Título e Descrição */}
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg opacity-10 blur-sm"></div>
+                  <div className="relative p-2.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-sm">
+                    <Activity className="h-5 w-5 text-white" />
+                  </div>
                 </div>
-                    <div>
-                  <CardTitle className="text-xl font-bold text-gray-900">Atividade Recente</CardTitle>
-                  <CardDescription className="text-sm text-gray-600">
-                    Últimas operações realizadas no sistema
+                <div>
+                  <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    Atividade Recente
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
+                      Últimas 8
+                    </span>
+                  </CardTitle>
+                  <CardDescription className="text-xs text-gray-600 mt-0.5">
+                    Operações realizadas no sistema
                   </CardDescription>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {weekActivityCounts.length > 0 && (
-                  <div className="hidden md:block ml-1">
-                    <style>{`
-                      @keyframes tickerMove { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-                      .ticker-container:hover .ticker-track { animation-play-state: paused; }
-                      .glass-chip { 
-                        background: linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.65) 100%);
-                        border: 1px solid rgba(148,163,184,0.35); /* slate-300/35 */
-                        box-shadow: 0 2px 6px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.6);
-                        backdrop-filter: blur(6px);
-                      }
-                      .chip-sep { height: 14px; width: 1px; background: rgba(148,163,184,0.35); margin: 0 6px; }
-                      .chip-title { 
-                        background: linear-gradient(180deg, rgba(30,64,175,0.12) 0%, rgba(37,99,235,0.10) 100%);
-                        color: rgb(30,58,138);
-                        border: 1px solid rgba(30,64,175,0.25);
-                      }
-                      .chip-low { 
-                        background: linear-gradient(180deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.08) 100%);
-                        border: 1px solid rgba(16,185,129,0.25);
-                        color: rgb(22,101,52);
-                      }
-                      .chip-mid { 
-                        background: linear-gradient(180deg, rgba(234,179,8,0.14) 0%, rgba(234,179,8,0.10) 100%);
-                        border: 1px solid rgba(234,179,8,0.28);
-                        color: rgb(133,77,14);
-                      }
-                      .chip-high { 
-                        background: linear-gradient(180deg, rgba(239,68,68,0.14) 0%, rgba(239,68,68,0.10) 100%);
-                        border: 1px solid rgba(239,68,68,0.28);
-                        color: rgb(127,29,29);
-                      }
-                    `}</style>
-                    <div className="relative w-[640px] max-w-[60vw] overflow-hidden ticker-container">
-                      <div className="absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-slate-50 via-slate-50/60 to-transparent pointer-events-none" />
-                      <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-slate-50 via-slate-50/60 to-transparent pointer-events-none" />
-                      <div className="ticker-track inline-flex items-center gap-2 whitespace-nowrap will-change-transform" style={{ animation: 'tickerMove 22s linear infinite' }}>
-                        {/* Chip título */}
-                        <span className="glass-chip chip-title inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold">
-                          Últimos 7 dias
-                        </span>
-                        <span className="chip-sep" />
-                        {weekActivityCounts.map((d, idx) => (
-                          <div key={`a-${d.dateLabel}`} className="inline-flex items-center">
-                            <span className={`glass-chip ${getChipVariant(d.count)} inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px]`}>
-                              <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
-                              <span className="font-semibold text-slate-900">{d.dateLabel}</span>
-                              <span className="opacity-60">-</span>
-                              <span className="font-medium">{d.count} AIHs</span>
-                            </span>
-                            {idx !== weekActivityCounts.length - 1 && <span className="chip-sep" />}
-                          </div>
-                        ))}
-                        {/* Segunda sequência para loop infinito */}
-                        <span className="glass-chip chip-title inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold">
-                          Últimos 7 dias
-                        </span>
-                        <span className="chip-sep" />
-                        {weekActivityCounts.map((d, idx) => (
-                          <div key={`b-${d.dateLabel}`} className="inline-flex items-center">
-                            <span className={`glass-chip ${getChipVariant(d.count)} inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px]`}>
-                              <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
-                              <span className="font-semibold text-slate-900">{d.dateLabel}</span>
-                              <span className="opacity-60">-</span>
-                              <span className="font-medium">{d.count} AIHs</span>
-                            </span>
-                            {idx !== weekActivityCounts.length - 1 && <span className="chip-sep" />}
-                          </div>
-                        ))}
-                      </div>
+
+              {/* Lado Direito: Ticker Animado */}
+              {weekActivityCounts.length > 0 && (
+                <div className="hidden md:block">
+                  <style>{`
+                    @keyframes tickerMove { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+                    .ticker-container:hover .ticker-track { animation-play-state: paused; }
+                    .modern-chip { 
+                      background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.75) 100%);
+                      border: 1px solid rgba(148,163,184,0.3);
+                      box-shadow: 0 1px 3px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8);
+                      backdrop-filter: blur(8px);
+                    }
+                    .chip-divider { height: 12px; width: 1px; background: rgba(148,163,184,0.3); margin: 0 8px; }
+                    .chip-header { 
+                      background: linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(99,102,241,0.12) 100%);
+                      border: 1px solid rgba(59,130,246,0.3);
+                      color: rgb(30,58,138);
+                    }
+                    .chip-low { 
+                      background: linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.10) 100%);
+                      border: 1px solid rgba(16,185,129,0.3);
+                      color: rgb(6,78,59);
+                    }
+                    .chip-mid { 
+                      background: linear-gradient(135deg, rgba(245,158,11,0.12) 0%, rgba(217,119,6,0.10) 100%);
+                      border: 1px solid rgba(245,158,11,0.3);
+                      color: rgb(120,53,15);
+                    }
+                    .chip-high { 
+                      background: linear-gradient(135deg, rgba(239,68,68,0.12) 0%, rgba(220,38,38,0.10) 100%);
+                      border: 1px solid rgba(239,68,68,0.3);
+                      color: rgb(127,29,29);
+                    }
+                  `}</style>
+                  <div className="relative w-[580px] max-w-[55vw] overflow-hidden rounded-lg ticker-container bg-white/40 backdrop-blur-sm border border-white/60 shadow-sm py-2">
+                    <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-blue-50/90 via-blue-50/60 to-transparent pointer-events-none z-10" />
+                    <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-purple-50/90 via-purple-50/60 to-transparent pointer-events-none z-10" />
+                    <div className="ticker-track inline-flex items-center gap-2 whitespace-nowrap will-change-transform px-4" style={{ animation: 'tickerMove 24s linear infinite' }}>
+                      {/* Primeira sequência */}
+                      <span className="modern-chip chip-header inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide">
+                        📊 Últimos 7 dias
+                      </span>
+                      <span className="chip-divider" />
+                      {weekActivityCounts.map((d, idx) => (
+                        <div key={`a-${d.dateLabel}`} className="inline-flex items-center">
+                          <span className={`modern-chip ${getChipVariant(d.count)} inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px]`}>
+                            <CalendarDays className="h-3 w-3 text-blue-600" />
+                            <span className="font-bold text-gray-900">{d.dateLabel}</span>
+                            <span className="opacity-40">•</span>
+                            <span className="font-semibold">{d.count}</span>
+                          </span>
+                          {idx !== weekActivityCounts.length - 1 && <span className="chip-divider" />}
+                        </div>
+                      ))}
+                      {/* Segunda sequência para loop infinito */}
+                      <span className="modern-chip chip-header inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide">
+                        📊 Últimos 7 dias
+                      </span>
+                      <span className="chip-divider" />
+                      {weekActivityCounts.map((d, idx) => (
+                        <div key={`b-${d.dateLabel}`} className="inline-flex items-center">
+                          <span className={`modern-chip ${getChipVariant(d.count)} inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px]`}>
+                            <CalendarDays className="h-3 w-3 text-blue-600" />
+                            <span className="font-bold text-gray-900">{d.dateLabel}</span>
+                            <span className="opacity-40">•</span>
+                            <span className="font-semibold">{d.count}</span>
+                          </span>
+                          {idx !== weekActivityCounts.length - 1 && <span className="chip-divider" />}
+                        </div>
+                      ))}
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
         </div>
             </CardHeader>
           <CardContent className="p-0">
@@ -594,107 +608,85 @@ const Dashboard = () => {
                 </div>
                 </div>
               ) : recentActivity.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                    <tr>
-                      <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Ação</th>
-                      <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">AIH / Paciente</th>
-                      <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Hospital</th>
-                      <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Operador</th>
-                      <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Data/Hora</th>
-                      <th className="text-center py-3 px-6 text-sm font-semibold text-gray-700">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {recentActivity.slice(0, 8).map((log, index) => (
-                      <tr key={log.id} className="hover:bg-gradient-to-r hover:from-blue-50/30 hover:to-purple-50/30 transition-colors">
-                        <td className="py-4 px-6">
-                          <div className="flex items-center space-x-3">
-                            <div className="p-2 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg shadow-sm">
-                        {getActionIcon(log.action)}
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">
-                              {getActionLabel(log.action)}
-                            </p>
-                              <p className="text-xs text-gray-500">
-                              {log.operation_type}
-                              </p>
-                            </div>
+              <div className="p-6">
+                <div className="space-y-2.5">
+                  {recentActivity.slice(0, 8).map((log, index) => (
+                    <div 
+                      key={log.id} 
+                      className="group relative bg-white border border-gray-200 rounded-lg p-4 hover:shadow-lg hover:border-blue-300 transition-all duration-200"
+                    >
+                      <div className="flex items-center gap-4">
+                        {/* Ícone */}
+                        <div className="flex-shrink-0 p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-sm">
+                          <div className="text-white">
+                            {getActionIcon(log.action)}
                           </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="space-y-1">
-                          {log.aih_number && (
-                              <p className="text-sm font-mono text-blue-700 bg-blue-50 px-2 py-1 rounded w-fit">
-                                {log.aih_number}
-                            </p>
-                          )}
-                          {log.patient_name && (
-                              <div className="flex items-center gap-2 text-xs text-gray-700">
-                                <Badge 
-                                  variant="secondary" 
-                                  className="px-2 py-0.5 h-5 text-[10px] bg-blue-100 text-blue-700 border border-blue-200"
-                                >
-                                  Paciente
-                                </Badge>
-                                <span>{log.patient_name}</span>
-                            </div>
-                          )}
-                          {log.doctor_name && (
-                              <div className="flex items-center gap-2 text-xs text-gray-700">
-                                <Badge 
-                                  variant="secondary" 
-                                  className="px-2 py-0.5 h-5 text-[10px] bg-green-100 text-green-700 border border-green-200"
-                                >
-                                  Médico
-                                </Badge>
-                                <span>{log.doctor_name}</span>
-                            </div>
-                          )}
-                          </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <p className="text-sm text-gray-700">
-                            {log.hospital_name || 'N/A'}
-                          </p>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div>
-                            <p className="text-sm text-gray-700 font-medium">
-                              {log.user_name || 'Sistema'}
-                            </p>
-                            {log.user_email && (
-                              <p className="text-xs text-gray-500">
-                                {log.user_email}
-                            </p>
-                          )}
                         </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <p className="text-sm text-gray-700">
-                            {formatTime(log.created_at)}
-                          </p>
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <Badge 
-                            variant={log.action.includes('ERROR') ? 'destructive' : 'default'}
-                            className={`
-                              text-xs px-2 py-1 
-                              ${log.action.includes('SUCCESS') ? 'bg-green-100 text-green-800' : ''}
-                              ${log.action.includes('ERROR') ? 'bg-red-100 text-red-800' : ''}
-                              ${!log.action.includes('SUCCESS') && !log.action.includes('ERROR') ? 'bg-blue-100 text-blue-800' : ''}
-                            `}
-                          >
-                            {log.action.includes('SUCCESS') ? 'Sucesso' : 
-                             log.action.includes('ERROR') ? 'Erro' : 'Processado'}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+                        {/* Conteúdo: Linha única com todas as informações */}
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
+                          
+                          {/* Coluna 1: AIH e Nomes */}
+                          <div className="space-y-1">
+                            {log.aih_number && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-blue-600">AIH</span>
+                                <span className="text-xs font-mono font-semibold text-gray-900">{log.aih_number}</span>
+                              </div>
+                            )}
+                            {log.patient_name && (
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-1 h-1 rounded-full bg-blue-500 flex-shrink-0"></div>
+                                <span className="text-xs text-gray-700 truncate">{log.patient_name}</span>
+                              </div>
+                            )}
+                            {log.doctor_name && (
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-1 h-1 rounded-full bg-green-500 flex-shrink-0"></div>
+                                <span className="text-xs text-gray-600 truncate">Dr. {log.doctor_name}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Coluna 2: Hospital */}
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                            <span className="text-sm font-medium text-gray-900 truncate">
+                              {log.hospital_name || 'N/A'}
+                            </span>
+                          </div>
+
+                          {/* Coluna 3: Operador */}
+                          <div className="flex items-center gap-2">
+                            <Users className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {log.user_name || 'Sistema'}
+                              </p>
+                              {log.user_email && (
+                                <p className="text-xs text-gray-500 truncate">
+                                  {log.user_email}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Coluna 4: Data/Hora */}
+                          <div className="flex items-center gap-1.5 md:justify-end">
+                            <Clock className="h-3.5 w-3.5 text-gray-400" />
+                            <span className="text-xs text-gray-600 whitespace-nowrap">
+                              {formatTime(log.created_at)}
+                            </span>
+                          </div>
+
+                        </div>
+                      </div>
+
+                      {/* Indicador de hover */}
+                      <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                    </div>
+                  ))}
+                </div>
                 </div>
               ) : (
               <div className="text-center py-12 text-gray-500">
