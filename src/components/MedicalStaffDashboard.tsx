@@ -7,11 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 import { 
   Stethoscope, 
   Users, 
   Building2, 
   Search,
+  Trash2,
   DollarSign,
   UserCheck,
   FileText,
@@ -109,6 +112,21 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
   
   // 🆕 Estado para debounce da busca
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+  // 🆕 Estados do modal de cadastro de médico
+  const [isAddDoctorModalOpen, setIsAddDoctorModalOpen] = useState(false);
+  const [isCreatingDoctor, setIsCreatingDoctor] = useState(false);
+  const [newDoctorData, setNewDoctorData] = useState({
+    name: '',
+    cns: '',
+    specialty: '',
+    hospitalId: ''
+  });
+
+  // 🆕 Estados do modal de confirmação de exclusão
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [doctorToDelete, setDoctorToDelete] = useState<MedicalDoctor | null>(null);
+  const [isDeletingDoctor, setIsDeletingDoctor] = useState(false);
 
   // 🔄 DEBOUNCE DA BUSCA - Aguarda 500ms após última digitação
   useEffect(() => {
@@ -282,6 +300,172 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
       title: "Filtros limpos",
       description: "Todos os filtros foram removidos"
     });
+  };
+
+  // 🆕 CRIAR NOVO MÉDICO
+  const handleCreateDoctor = async () => {
+    try {
+      // Validações
+      if (!newDoctorData.name.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Nome obrigatório",
+          description: "Por favor, informe o nome do médico"
+        });
+        return;
+      }
+
+      if (!newDoctorData.cns.trim()) {
+        toast({
+          variant: "destructive",
+          title: "CNS obrigatório",
+          description: "Por favor, informe o CNS do médico"
+        });
+        return;
+      }
+
+      // Validar CNS (15 dígitos)
+      const cnsClean = newDoctorData.cns.replace(/\D/g, '');
+      if (cnsClean.length !== 15) {
+        toast({
+          variant: "destructive",
+          title: "CNS inválido",
+          description: "O CNS deve conter exatamente 15 dígitos"
+        });
+        return;
+      }
+
+      if (!newDoctorData.specialty.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Especialidade obrigatória",
+          description: "Por favor, informe a especialidade do médico"
+        });
+        return;
+      }
+
+      if (!newDoctorData.hospitalId.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Hospital obrigatório",
+          description: "Por favor, selecione o hospital do médico"
+        });
+        return;
+      }
+
+      setIsCreatingDoctor(true);
+
+      console.log('🩺 Iniciando cadastro de médico:', newDoctorData.name);
+
+      // 1. Criar médico usando o serviço
+      const doctorResult = await DoctorsCrudService.createDoctor({
+        name: newDoctorData.name.trim(),
+        cns: cnsClean,
+        crm: '', // CRM não é obrigatório no momento
+        specialty: newDoctorData.specialty.trim()
+      }, user?.id);
+
+      if (!doctorResult.success || !doctorResult.data) {
+        toast({
+          variant: "destructive",
+          title: "Erro ao cadastrar médico",
+          description: doctorResult.error || "Ocorreu um erro desconhecido"
+        });
+        return;
+      }
+
+      console.log('✅ Médico criado com sucesso. ID:', doctorResult.data.id);
+      console.log('🔗 Criando vínculo com hospital...');
+
+      // 2. Criar vínculo com hospital na tabela doctor_hospital
+      const linkResult = await DoctorsCrudService.linkDoctorToHospital({
+        doctor_id: doctorResult.data.id,
+        hospital_id: newDoctorData.hospitalId,
+        role: 'Responsável',
+        is_primary_hospital: false
+      }, user?.id);
+
+      if (!linkResult.success) {
+        console.warn('⚠️ Médico criado mas erro ao vincular hospital:', linkResult.error);
+        toast({
+          title: "Médico cadastrado parcialmente",
+          description: `${newDoctorData.name} foi criado mas não foi possível vinculá-lo ao hospital. Faça o vínculo manualmente.`,
+          variant: "destructive"
+        });
+      } else {
+        console.log('✅ Vínculo hospital-médico criado com sucesso');
+        toast({
+          title: "Médico cadastrado com sucesso!",
+          description: `${newDoctorData.name} foi adicionado ao sistema e vinculado ao hospital`
+        });
+      }
+
+      // Limpar formulário
+      setNewDoctorData({
+        name: '',
+        cns: '',
+        specialty: '',
+        hospitalId: ''
+      });
+
+      // Fechar modal
+      setIsAddDoctorModalOpen(false);
+
+      // Recarregar lista de médicos
+      await loadRealData();
+
+    } catch (error) {
+      console.error('❌ Erro ao criar médico:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao cadastrar médico",
+        description: "Ocorreu um erro inesperado. Tente novamente."
+      });
+    } finally {
+      setIsCreatingDoctor(false);
+    }
+  };
+
+  // 🆕 DELETAR MÉDICO
+  const handleDeleteDoctor = async () => {
+    if (!doctorToDelete) return;
+
+    try {
+      setIsDeletingDoctor(true);
+      console.log('🗑️ Iniciando exclusão do médico:', doctorToDelete.name);
+
+      // Usar deleteDoctor que já tem CASCADE no banco
+      const result = await DoctorsCrudService.deleteDoctor(doctorToDelete.id);
+
+      if (result.success) {
+        toast({
+          title: "Médico excluído com sucesso!",
+          description: `${doctorToDelete.name} foi removido do sistema`
+        });
+
+        // Fechar modal
+        setIsDeleteAlertOpen(false);
+        setDoctorToDelete(null);
+
+        // Recarregar lista
+        await loadRealData();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erro ao excluir médico",
+          description: result.error || "Ocorreu um erro ao excluir o médico"
+        });
+      }
+    } catch (error) {
+      console.error('❌ Erro ao deletar médico:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao excluir médico",
+        description: "Ocorreu um erro inesperado. Tente novamente."
+      });
+    } finally {
+      setIsDeletingDoctor(false);
+    }
   };
 
   // 🔁 ORDENAR POR HOSPITAL (primário) E PROFISSIONAL (secundário), 1 linha por vínculo
@@ -598,6 +782,14 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 <Download className="h-4 w-4 mr-2" />
                 Exportar
               </Button>
+              <Button
+                onClick={() => setIsAddDoctorModalOpen(true)}
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Adicionar Médico
+              </Button>
             </div>
           </CardTitle>
         </CardHeader>
@@ -821,12 +1013,13 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                     <TableHead>Profissional</TableHead>
                     <TableHead>Especialidade</TableHead>
                     <TableHead>Hospital</TableHead>
+                    <TableHead className="w-24 text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentDoctors.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-12">
+                      <TableCell colSpan={5} className="text-center py-12">
                         <div className="flex flex-col items-center justify-center text-gray-500">
                           <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
                             <Users className="h-8 w-8 text-slate-400" />
@@ -908,10 +1101,25 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                           <TableCell>
                             <div className="text-sm font-medium text-gray-700">{hospital || 'Não informado'}</div>
                           </TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDoctorToDelete(doctor);
+                                setIsDeleteAlertOpen(true);
+                              }}
+                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 text-gray-500"
+                              title="Excluir médico"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                         {isExpanded && (
                           <TableRow>
-                            <TableCell colSpan={4} className="bg-slate-50 border-t">
+                            <TableCell colSpan={5} className="bg-slate-50 border-t">
                               <div className="py-4 space-y-3">
                                 <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
                                   <MessageSquare className="h-4 w-4 text-slate-600" />
@@ -1059,6 +1267,201 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             </div>
           )}
       </div>
+
+      {/* MODAL DE CADASTRO DE MÉDICO */}
+      <Dialog open={isAddDoctorModalOpen} onOpenChange={setIsAddDoctorModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-green-600" />
+              Adicionar Novo Médico
+            </DialogTitle>
+            <DialogDescription>
+              Preencha os dados do médico para cadastrá-lo no sistema
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Nome do Médico */}
+            <div className="space-y-2">
+              <Label htmlFor="doctor-name" className="text-sm font-medium">
+                Nome do Médico <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="doctor-name"
+                placeholder="Ex: Dr. João Silva"
+                value={newDoctorData.name}
+                onChange={(e) => setNewDoctorData(prev => ({ ...prev, name: e.target.value }))}
+                disabled={isCreatingDoctor}
+                className="w-full"
+              />
+            </div>
+
+            {/* CNS */}
+            <div className="space-y-2">
+              <Label htmlFor="doctor-cns" className="text-sm font-medium">
+                CNS (Cartão Nacional de Saúde) <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="doctor-cns"
+                placeholder="Ex: 123456789012345 (15 dígitos)"
+                value={newDoctorData.cns}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 15);
+                  setNewDoctorData(prev => ({ ...prev, cns: value }));
+                }}
+                disabled={isCreatingDoctor}
+                className="w-full"
+                maxLength={15}
+              />
+              <p className="text-xs text-gray-500">
+                {newDoctorData.cns.length}/15 dígitos
+              </p>
+            </div>
+
+            {/* Especialidade */}
+            <div className="space-y-2">
+              <Label htmlFor="doctor-specialty" className="text-sm font-medium">
+                Especialidade <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="doctor-specialty"
+                placeholder="Ex: Cardiologia"
+                value={newDoctorData.specialty}
+                onChange={(e) => setNewDoctorData(prev => ({ ...prev, specialty: e.target.value }))}
+                disabled={isCreatingDoctor}
+                className="w-full"
+              />
+            </div>
+
+            {/* Hospital */}
+            <div className="space-y-2">
+              <Label htmlFor="doctor-hospital" className="text-sm font-medium">
+                Hospital <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={newDoctorData.hospitalId}
+                onValueChange={(value) => setNewDoctorData(prev => ({ ...prev, hospitalId: value }))}
+                disabled={isCreatingDoctor}
+              >
+                <SelectTrigger id="doctor-hospital" className="w-full">
+                  <SelectValue placeholder="Selecione o hospital" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableHospitals.length === 0 ? (
+                    <SelectItem value="no-hospitals" disabled>
+                      Nenhum hospital disponível
+                    </SelectItem>
+                  ) : (
+                    availableHospitals.map((hospital) => (
+                      <SelectItem key={hospital.id} value={hospital.id}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-3 w-3" />
+                          {hospital.name}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-blue-800">
+                  O CNS é único e não pode ser alterado após o cadastro. Certifique-se de informar o número correto.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddDoctorModalOpen(false);
+                setNewDoctorData({ name: '', cns: '', specialty: '', hospitalId: '' });
+              }}
+              disabled={isCreatingDoctor}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateDoctor}
+              disabled={isCreatingDoctor || !newDoctorData.name.trim() || !newDoctorData.cns.trim() || !newDoctorData.specialty.trim() || !newDoctorData.hospitalId.trim()}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {isCreatingDoctor ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Cadastrando...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Cadastrar Médico
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ALERT DIALOG DE CONFIRMAÇÃO DE EXCLUSÃO */}
+      <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Confirmar Exclusão
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 pt-2">
+              <p>
+                Você está prestes a excluir o médico:
+              </p>
+              {doctorToDelete && (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1">
+                  <div className="font-semibold text-slate-900">{doctorToDelete.name}</div>
+                  <div className="text-sm text-slate-600">CNS: {doctorToDelete.cns}</div>
+                  <div className="text-sm text-slate-600">Especialidade: {doctorToDelete.speciality}</div>
+                </div>
+              )}
+              <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                <p className="text-sm text-red-800 font-medium">
+                  ⚠️ Esta ação é permanente e não pode ser desfeita!
+                </p>
+                <p className="text-xs text-red-700 mt-1">
+                  O médico e todos os seus vínculos com hospitais serão removidos do sistema.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingDoctor}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteDoctor}
+              disabled={isDeletingDoctor}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isDeletingDoctor ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Sim, Excluir
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

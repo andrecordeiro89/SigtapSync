@@ -426,10 +426,10 @@ export class DoctorsCrudService {
       console.log('➕ [REAL] Criando novo médico:', doctorData.name);
 
       // Validações básicas
-      if (!doctorData.name || !doctorData.cns || !doctorData.crm || !doctorData.specialty) {
+      if (!doctorData.name || !doctorData.cns || !doctorData.specialty) {
         return {
           success: false,
-          error: 'Campos obrigatórios: nome, CNS, CRM e especialidade'
+          error: 'Campos obrigatórios: nome, CNS e especialidade'
         };
       }
 
