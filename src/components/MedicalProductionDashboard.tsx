@@ -1609,8 +1609,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   size="sm"
                   onClick={async () => {
                     try {
-                      const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
-                      const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
                       const rows: Array<Array<string | number>> = [];
                        const header = [
                          '#', 
@@ -1630,13 +1628,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                          'AIH c/ Incremento'
                        ];
                       let idx = 1;
-                      // 🔧 CORREÇÃO: Incluir TODOS os registros, mesmo sem AIH gerada
                       let totalPatientsFound = 0;
                       let excludedByDateFilter = 0;
                       let patientsWithoutAIH = 0;
                       
                       console.log('🔍 [RELATÓRIO GERAL] Iniciando coleta de dados...');
                       console.log('🔍 [RELATÓRIO GERAL] Médicos filtrados:', filteredDoctors.length);
+                      console.log('🔍 [RELATÓRIO GERAL] Filtro de data:', dateRange ? `${dateRange.startDate.toLocaleDateString('pt-BR')} a ${dateRange.endDate.toLocaleDateString('pt-BR')}` : 'Sem filtro');
                       
                       filteredDoctors.forEach((card: any) => {
                         const doctorName = card.doctor_info?.name || '';
@@ -1646,9 +1644,25 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         (card.patients || []).forEach((p: any) => {
                           totalPatientsFound++;
                           
-                          if (useOnlyEnd && selectedEnd) {
+                          // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo filtro do relatório simplificado)
+                          if (dateRange && dateRange.startDate && dateRange.endDate) {
                             const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
-                            if (!discharge || !isSameUTCDate(discharge, selectedEnd)) {
+                            
+                            if (!discharge) {
+                              excludedByDateFilter++;
+                              return;
+                            }
+                            
+                            // Normalizar datas para comparação (início do dia para startDate, fim do dia para endDate)
+                            const startOfPeriod = new Date(dateRange.startDate);
+                            startOfPeriod.setHours(0, 0, 0, 0);
+                            
+                            const endOfPeriod = new Date(dateRange.endDate);
+                            endOfPeriod.setHours(23, 59, 59, 999);
+                            
+                            const dischargeDate = new Date(discharge);
+                            
+                            if (dischargeDate < startOfPeriod || dischargeDate > endOfPeriod) {
                               excludedByDateFilter++;
                               return;
                             }
@@ -1847,6 +1861,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       
                       console.log('🔍 [RELATÓRIO SIMPLIFICADO] Iniciando coleta de dados...');
                       console.log('🔍 [RELATÓRIO SIMPLIFICADO] Médicos filtrados:', filteredDoctors.length);
+                      console.log('🔍 [RELATÓRIO SIMPLIFICADO] Filtro de data:', dateRange ? `${dateRange.startDate.toLocaleDateString('pt-BR')} a ${dateRange.endDate.toLocaleDateString('pt-BR')}` : 'Sem filtro');
                       
                       filteredDoctors.forEach((card: any) => {
                         const doctorName = card.doctor_info?.name || 'Médico não identificado';
@@ -1856,13 +1871,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         doctorPatients.forEach((p: any) => {
                           totalPatientsFound++;
                           
-                          // 🔧 CORREÇÃO: Usar filtro de intervalo de data em vez de data específica
-                          // Isso resolve o problema de final de mês (31 → 01)
+                          // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo do relatório geral)
                           if (dateRange && dateRange.startDate && dateRange.endDate) {
                             const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
+                            
                             if (!discharge) {
                               excludedByDateFilter++;
-                              console.log(`📅 [RELATÓRIO SIMPLIFICADO] Excluído por falta de data de alta: ${p.patient_info?.name || 'Sem nome'} - AIH: ${p?.aih_info?.aih_number}`);
                               return;
                             }
                             
@@ -1877,11 +1891,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             
                             if (dischargeDate < startOfPeriod || dischargeDate > endOfPeriod) {
                               excludedByDateFilter++;
-                              console.log(`📅 [RELATÓRIO SIMPLIFICADO] Excluído por estar fora do período: ${p.patient_info?.name || 'Sem nome'} - Alta: ${dischargeDate.toLocaleDateString('pt-BR')} (Período: ${startOfPeriod.toLocaleDateString('pt-BR')} a ${endOfPeriod.toLocaleDateString('pt-BR')})`);
                               return;
                             }
-                            
-                            console.log(`✅ [RELATÓRIO SIMPLIFICADO] Incluído no período: ${p.patient_info?.name || 'Sem nome'} - Alta: ${dischargeDate.toLocaleDateString('pt-BR')}`);
                           }
                           
                           // 🔧 CORREÇÃO: Pacientes podem não ter AIH gerada ainda - INCLUIR TODOS
@@ -2190,44 +2201,180 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       try {
-                                        const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
-                                        const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
                                         const rows: Array<Array<string | number>> = [];
-                                        const header = ['#', 'Nome do Paciente', 'Nº AIH', 'Caráter de Atendimento', 'Nome Comum Procedimento', 'Especialidade de Atendimento', 'Data Alta (SUS)', 'Valor Total', 'Médico', 'Hospital'];
+                                        // ✅ MESMAS 15 COLUNAS DO RELATÓRIO GERAL
+                                        const header = [
+                                          '#', 
+                                          'Nome do Paciente', 
+                                          'Nº AIH', 
+                                          'Código Procedimento',
+                                          'Descrição Procedimento', 
+                                          'Data Procedimento',
+                                          'Data Alta (SUS)', 
+                                          'Especialidade de Atendimento', 
+                                          'Caráter de Atendimento',
+                                          'Médico', 
+                                          'Hospital',
+                                          'Valor Procedimento',
+                                          'AIH Seca',
+                                          'Incremento',
+                                          'AIH c/ Incremento'
+                                        ];
                                         let idx = 1;
                                         const doctorName = doctor.doctor_info?.name || '';
                                         const hospitalName = doctor.hospitals?.[0]?.hospital_name || '';
+                                        const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                        
+                                        console.log(`📊 [RELATÓRIO MÉDICO] Gerando relatório para ${doctorName}`);
+                                        console.log(`📊 [RELATÓRIO MÉDICO] Filtro de data:`, dateRange ? `${dateRange.startDate.toLocaleDateString('pt-BR')} a ${dateRange.endDate.toLocaleDateString('pt-BR')}` : 'Sem filtro');
+                                        
                                         (doctor.patients || []).forEach((p: any) => {
-                                          if (useOnlyEnd && selectedEnd) {
+                                          // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo dos relatórios gerais)
+                                          if (dateRange && dateRange.startDate && dateRange.endDate) {
                                             const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
-                                            if (!discharge || !isSameUTCDate(discharge, selectedEnd)) return;
+                                            
+                                            if (!discharge) return;
+                                            
+                                            const startOfPeriod = new Date(dateRange.startDate);
+                                            startOfPeriod.setHours(0, 0, 0, 0);
+                                            
+                                            const endOfPeriod = new Date(dateRange.endDate);
+                                            endOfPeriod.setHours(23, 59, 59, 999);
+                                            
+                                            const dischargeDate = new Date(discharge);
+                                            
+                                            if (dischargeDate < startOfPeriod || dischargeDate > endOfPeriod) {
+                                              return;
+                                            }
                                           }
+                                          
                                           const name = p.patient_info?.name || 'Paciente';
-                                          const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
+                                          const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
+                                          const aih = aihRaw || 'Aguardando geração';
                                           const careSpec = (p?.aih_info?.specialty || '').toString();
                                           const careCharacter = (() => {
                                             const raw = (p?.aih_info?.care_character ?? '').toString();
                                             try { return CareCharacterUtils.formatForDisplay(raw, false); } catch { return raw; }
                                           })();
-                                          const commonName = (p?.common_name || '').toString();
                                           const disISO = p?.aih_info?.discharge_date || '';
                                           const disLabel = disISO
                                             ? (() => { const s = String(disISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
                                             : '';
-                                          const total = Number(p.total_value_reais || 0);
-                                          rows.push([idx++, name, aih, careCharacter, commonName, careSpec, disLabel, total, doctorName, hospitalName]);
+                                          
+                                          // ✅ CÁLCULOS FINANCEIROS (mesma lógica do relatório geral)
+                                          const baseAih = Number(p.total_value_reais || 0);
+                                          const doctorCovered = isDoctorCoveredForOperaParana(doctorName, hospitalId);
+                                          const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, hospitalId) : 0;
+                                          const aihWithIncrements = baseAih + increment;
+                                          
+                                          // ✅ DETALHAMENTO POR PROCEDIMENTO (mesma lógica do relatório geral)
+                                          const procedures = p.procedures || [];
+                                          if (procedures.length > 0) {
+                                            procedures.forEach((proc: any) => {
+                                              const procCode = proc.procedure_code || '';
+                                              const procDesc = proc.procedure_description || proc.sigtap_description || '';
+                                              const procDate = proc.procedure_date || '';
+                                              const procDateLabel = procDate 
+                                                ? (() => { 
+                                                    const s = String(procDate); 
+                                                    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); 
+                                                    return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); 
+                                                  })()
+                                                : '';
+                                              const procValue = Number(proc.value_reais || 0);
+                                              
+                                              rows.push([
+                                                idx++, 
+                                                name, 
+                                                aih,
+                                                procCode,
+                                                procDesc,
+                                                procDateLabel,
+                                                disLabel, 
+                                                careSpec, 
+                                                careCharacter,
+                                                doctorName, 
+                                                hospitalName,
+                                                procValue,
+                                                baseAih,
+                                                increment,
+                                                aihWithIncrements
+                                              ]);
+                                            });
+                                          } else {
+                                            // Paciente sem procedimentos
+                                            rows.push([
+                                              idx++, 
+                                              name, 
+                                              aih,
+                                              '',
+                                              'Nenhum procedimento encontrado',
+                                              '',
+                                              disLabel, 
+                                              careSpec, 
+                                              careCharacter,
+                                              doctorName, 
+                                              hospitalName,
+                                              0,
+                                              baseAih,
+                                              increment,
+                                              aihWithIncrements
+                                            ]);
+                                          }
                                         });
+                                        
+                                        // ✅ ORDENAÇÃO: Por Data de Alta (mais recente primeiro)
+                                        rows.sort((a, b) => {
+                                          const dateA = a[6] as string; // Data Alta (SUS) está na posição 6
+                                          const dateB = b[6] as string;
+                                          
+                                          // Sem data → final
+                                          if (!dateA && !dateB) return 0;
+                                          if (!dateA) return 1;
+                                          if (!dateB) return -1;
+                                          
+                                          // Converter DD/MM/YYYY para Date
+                                          const parseDate = (dateStr: string) => {
+                                            const parts = dateStr.split('/');
+                                            if (parts.length === 3) {
+                                              return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                                            }
+                                            return new Date(0);
+                                          };
+                                          
+                                          const parsedDateA = parseDate(dateA);
+                                          const parsedDateB = parseDate(dateB);
+                                          
+                                          // DESCENDENTE (mais recente primeiro)
+                                          return parsedDateB.getTime() - parsedDateA.getTime();
+                                        });
+                                        
+                                        // Renumerar após ordenação
+                                        rows.forEach((row, index) => {
+                                          row[0] = index + 1;
+                                        });
+                                        
+                                        console.log(`📊 [RELATÓRIO MÉDICO] Total de linhas geradas: ${rows.length} (ordenadas por data de alta DESC)`);
+                                        
                                         const wb = XLSX.utils.book_new();
                                         const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+                                        // ✅ LARGURAS DAS COLUNAS (mesmas do relatório geral)
                                         (ws as any)['!cols'] = [
-                                          { wch: 5 },
-                                          { wch: 40 },
-                                          { wch: 18 },
-                                          { wch: 22 },
-                                          { wch: 16 },
-                                          { wch: 18 },
-                                          { wch: 28 },
-                                          { wch: 30 },
+                                          { wch: 5 },   // #
+                                          { wch: 35 },  // Nome do Paciente
+                                          { wch: 18 },  // Nº AIH
+                                          { wch: 20 },  // Código Procedimento
+                                          { wch: 45 },  // Descrição Procedimento
+                                          { wch: 16 },  // Data Procedimento
+                                          { wch: 16 },  // Data Alta (SUS)
+                                          { wch: 25 },  // Especialidade
+                                          { wch: 22 },  // Caráter de Atendimento
+                                          { wch: 30 },  // Médico
+                                          { wch: 35 },  // Hospital
+                                          { wch: 18 },  // Valor Procedimento
+                                          { wch: 18 },  // AIH Seca
+                                          { wch: 18 },  // Incremento
+                                          { wch: 20 },  // AIH c/ Incremento
                                         ];
                                         XLSX.utils.book_append_sheet(wb, ws, 'Pacientes');
                                         const fileName = `Relatorio_Pacientes_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
@@ -2238,7 +2385,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         toast.error('Erro ao gerar relatório do médico');
                                       }
                                     }}
-                                    className="bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-3 py-2 rounded-md text-sm flex items-center justify-center gap-2"
+                                    className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
                                   >
                                     <FileSpreadsheet className="h-4 w-4" />
                                     Relatório Pacientes
@@ -2247,37 +2394,289 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                      type="button"
                                      onClick={(e) => {
                                        e.stopPropagation();
-                                       const h = doctor.hospitals?.[0]?.hospital_id || '';
-                                       setReportPreset({
-                                         hospitalId: h,
-                                         doctorName: doctor.doctor_info.name,
-                                         // Passar período global quando disponível
-                                         startDate: dateRange?.startDate,
-                                         endDate: dateRange?.endDate,
-                                         careSpecialty: selectedCareSpecialty && selectedCareSpecialty !== 'all' ? selectedCareSpecialty : undefined
-                                       } as any);
-                                       setReportModalOpen(true);
+                                       try {
+                                         const rows: Array<Array<string | number>> = [];
+                                         // ✅ MESMAS 5 COLUNAS DO RELATÓRIO GERAL SIMPLIFICADO
+                                         const header = [
+                                           '#', 
+                                           'Nome do Paciente', 
+                                           'Nº AIH', 
+                                           'Data de Admissão',
+                                           'Data de Alta'
+                                         ];
+                                         let idx = 1;
+                                         const doctorName = doctor.doctor_info?.name || '';
+                                         
+                                         console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO] Gerando para ${doctorName}`);
+                                         console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO] Filtro de data:`, dateRange ? `${dateRange.startDate.toLocaleDateString('pt-BR')} a ${dateRange.endDate.toLocaleDateString('pt-BR')}` : 'Sem filtro');
+                                         
+                                         (doctor.patients || []).forEach((p: any) => {
+                                           // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo dos outros relatórios)
+                                           if (dateRange && dateRange.startDate && dateRange.endDate) {
+                                             const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
+                                             
+                                             if (!discharge) return;
+                                             
+                                             const startOfPeriod = new Date(dateRange.startDate);
+                                             startOfPeriod.setHours(0, 0, 0, 0);
+                                             
+                                             const endOfPeriod = new Date(dateRange.endDate);
+                                             endOfPeriod.setHours(23, 59, 59, 999);
+                                             
+                                             const dischargeDate = new Date(discharge);
+                                             
+                                             if (dischargeDate < startOfPeriod || dischargeDate > endOfPeriod) {
+                                               return;
+                                             }
+                                           }
+                                           
+                                           const name = p.patient_info?.name || 'Paciente';
+                                           const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
+                                           const aihDisplay = aih || 'Aguardando geração';
+                                           
+                                           const admissionISO = p?.aih_info?.admission_date || '';
+                                           const admissionLabel = admissionISO
+                                             ? (() => { const s = String(admissionISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
+                                             : '';
+                                           const dischargeISO = p?.aih_info?.discharge_date || '';
+                                           const dischargeLabel = dischargeISO
+                                             ? (() => { const s = String(dischargeISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
+                                             : '';
+                                           
+                                           rows.push([
+                                             idx++,
+                                             name,
+                                             aihDisplay,
+                                             admissionLabel,
+                                             dischargeLabel
+                                           ]);
+                                         });
+                                         
+                                         // ✅ ORDENAÇÃO: Por Data de Alta (mais recente primeiro)
+                                         rows.sort((a, b) => {
+                                           const dateA = a[4] as string; // Data de Alta está na posição 4
+                                           const dateB = b[4] as string;
+                                           
+                                           // Sem data → final
+                                           if (!dateA && !dateB) return 0;
+                                           if (!dateA) return 1;
+                                           if (!dateB) return -1;
+                                           
+                                           // Converter DD/MM/YYYY para Date
+                                           const parseDate = (dateStr: string) => {
+                                             const parts = dateStr.split('/');
+                                             if (parts.length === 3) {
+                                               return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                                             }
+                                             return new Date(0);
+                                           };
+                                           
+                                           const parsedDateA = parseDate(dateA);
+                                           const parsedDateB = parseDate(dateB);
+                                           
+                                           // DESCENDENTE (mais recente primeiro)
+                                           return parsedDateB.getTime() - parsedDateA.getTime();
+                                         });
+                                         
+                                         // Renumerar após ordenação
+                                         rows.forEach((row, index) => {
+                                           row[0] = index + 1;
+                                         });
+                                         
+                                         console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO] Total de linhas: ${rows.length} (ordenadas por data de alta DESC)`);
+                                         
+                                         const wb = XLSX.utils.book_new();
+                                         const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+                                         // ✅ LARGURAS DAS COLUNAS (mesmas do relatório geral simplificado)
+                                         (ws as any)['!cols'] = [
+                                           { wch: 5 },   // #
+                                           { wch: 40 },  // Nome do Paciente
+                                           { wch: 18 },  // Nº AIH
+                                           { wch: 18 },  // Data de Admissão
+                                           { wch: 18 },  // Data de Alta
+                                         ];
+                                         XLSX.utils.book_append_sheet(wb, ws, 'Pacientes Simplificado');
+                                         const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+                                         XLSX.writeFile(wb, fileName);
+                                         toast.success('Relatório simplificado do médico gerado com sucesso!');
+                                       } catch (err) {
+                                         console.error('Erro ao exportar Relatório Simplificado (card):', err);
+                                         toast.error('Erro ao gerar relatório simplificado do médico');
+                                       }
                                      }}
-                                     className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-3 py-2 rounded-md text-sm"
+                                     className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
                                    >
-                                    Relatório Pacientes PDF
+                                    <FileSpreadsheet className="h-4 w-4" />
+                                    Relatório Pacientes Simplificado
                                    </Button>
                                   
                                   <Button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      const h = doctor.hospitals?.[0]?.hospital_id || '';
-                                      setReportPreset({
-                                        hospitalId: h,
-                                        doctorName: doctor.doctor_info.name,
-                                        startDate: dateRange?.startDate,
-                                        endDate: dateRange?.endDate,
-                                        careSpecialty: selectedCareSpecialty && selectedCareSpecialty !== 'all' ? selectedCareSpecialty : undefined
-                                      } as any);
-                                      setReportModalOpen(true);
+                                      try {
+                                        const rows: Array<Array<string | number>> = [];
+                                        // ✅ RELATÓRIO DE ANESTESISTAS: Foco em CONTAGEM de procedimentos
+                                        const header = [
+                                          '#', 
+                                          'Nome do Paciente', 
+                                          'Nº AIH',
+                                          'Código Proc. Anestésico',
+                                          'Descrição Proc. Anestésico',
+                                          'Data Procedimento',
+                                          'Data Alta (SUS)',
+                                          'Anestesista',
+                                          'CBO',
+                                          'Médico Cirurgião',
+                                          'Hospital'
+                                        ];
+                                        let idx = 1;
+                                        const doctorName = doctor.doctor_info?.name || '';
+                                        const hospitalName = doctor.hospitals?.[0]?.hospital_name || '';
+                                        
+                                        console.log(`🎯 [RELATÓRIO ANESTESISTAS] Gerando para médico: ${doctorName}`);
+                                        console.log(`🎯 [RELATÓRIO ANESTESISTAS] Filtro de data:`, dateRange ? `${dateRange.startDate.toLocaleDateString('pt-BR')} a ${dateRange.endDate.toLocaleDateString('pt-BR')}` : 'Sem filtro');
+                                        
+                                        let totalAnesthesiaProcedures = 0;
+                                        
+                                        (doctor.patients || []).forEach((p: any) => {
+                                          // ✅ FILTRO UNIFICADO: Intervalo de datas
+                                          if (dateRange && dateRange.startDate && dateRange.endDate) {
+                                            const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
+                                            
+                                            if (!discharge) return;
+                                            
+                                            const startOfPeriod = new Date(dateRange.startDate);
+                                            startOfPeriod.setHours(0, 0, 0, 0);
+                                            
+                                            const endOfPeriod = new Date(dateRange.endDate);
+                                            endOfPeriod.setHours(23, 59, 59, 999);
+                                            
+                                            const dischargeDate = new Date(discharge);
+                                            
+                                            if (dischargeDate < startOfPeriod || dischargeDate > endOfPeriod) {
+                                              return;
+                                            }
+                                          }
+                                          
+                                          const name = p.patient_info?.name || 'Paciente';
+                                          const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
+                                          const aih = aihRaw || 'Aguardando geração';
+                                          const disISO = p?.aih_info?.discharge_date || '';
+                                          const disLabel = disISO
+                                            ? (() => { const s = String(disISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
+                                            : '';
+                                          
+                                          // ✅ FILTRAR APENAS PROCEDIMENTOS ANESTÉSICOS
+                                          const procedures = p.procedures || [];
+                                          const anesthesiaProcedures = procedures.filter((proc: any) => {
+                                            const cbo = proc.cbo;
+                                            const procCode = proc.procedure_code || '';
+                                            
+                                            // Verificar se é anestesista (CBO 225151)
+                                            if (cbo !== '225151') return false;
+                                            
+                                            // Procedimentos 03.xxx sempre são contados
+                                            if (procCode.startsWith('03')) return true;
+                                            
+                                            // Exceções de cesarianas (04.17.01.001-0 e 04.17.01.005-2)
+                                            if (procCode === '04.17.01.001-0' || procCode === '04.17.01.005-2') return true;
+                                            
+                                            // Demais procedimentos 04.xxx de anestesistas NÃO são contados
+                                            return false;
+                                          });
+                                          
+                                          // ✅ GERAR UMA LINHA PARA CADA PROCEDIMENTO ANESTÉSICO
+                                          if (anesthesiaProcedures.length > 0) {
+                                            anesthesiaProcedures.forEach((proc: any) => {
+                                              const procCode = proc.procedure_code || '';
+                                              const procDesc = proc.procedure_description || proc.sigtap_description || '';
+                                              const procDate = proc.procedure_date || '';
+                                              const procDateLabel = procDate 
+                                                ? (() => { 
+                                                    const s = String(procDate); 
+                                                    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); 
+                                                    return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); 
+                                                  })()
+                                                : '';
+                                              const anesthetistName = proc.professional_name || 'Anestesista não identificado';
+                                              const cbo = proc.cbo || '225151';
+                                              
+                                              rows.push([
+                                                idx++,
+                                                name,
+                                                aih,
+                                                procCode,
+                                                procDesc,
+                                                procDateLabel,
+                                                disLabel,
+                                                anesthetistName,
+                                                cbo,
+                                                doctorName,
+                                                hospitalName
+                                              ]);
+                                              
+                                              totalAnesthesiaProcedures++;
+                                            });
+                                          }
+                                        });
+                                        
+                                        // ✅ ORDENAÇÃO: Por Data de Alta (mais recente primeiro)
+                                        rows.sort((a, b) => {
+                                          const dateA = a[6] as string; // Data Alta está na posição 6
+                                          const dateB = b[6] as string;
+                                          
+                                          if (!dateA && !dateB) return 0;
+                                          if (!dateA) return 1;
+                                          if (!dateB) return -1;
+                                          
+                                          const parseDate = (dateStr: string) => {
+                                            const parts = dateStr.split('/');
+                                            if (parts.length === 3) {
+                                              return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                                            }
+                                            return new Date(0);
+                                          };
+                                          
+                                          const parsedDateA = parseDate(dateA);
+                                          const parsedDateB = parseDate(dateB);
+                                          
+                                          return parsedDateB.getTime() - parsedDateA.getTime();
+                                        });
+                                        
+                                        // Renumerar após ordenação
+                                        rows.forEach((row, index) => {
+                                          row[0] = index + 1;
+                                        });
+                                        
+                                        console.log(`🎯 [RELATÓRIO ANESTESISTAS] Total de procedimentos anestésicos: ${totalAnesthesiaProcedures}`);
+                                        console.log(`🎯 [RELATÓRIO ANESTESISTAS] Total de linhas geradas: ${rows.length} (ordenadas por data de alta DESC)`);
+                                        
+                                        const wb = XLSX.utils.book_new();
+                                        const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+                                        (ws as any)['!cols'] = [
+                                          { wch: 5 },   // #
+                                          { wch: 35 },  // Nome do Paciente
+                                          { wch: 18 },  // Nº AIH
+                                          { wch: 20 },  // Código Proc. Anestésico
+                                          { wch: 45 },  // Descrição Proc. Anestésico
+                                          { wch: 16 },  // Data Procedimento
+                                          { wch: 16 },  // Data Alta (SUS)
+                                          { wch: 35 },  // Anestesista
+                                          { wch: 12 },  // CBO
+                                          { wch: 30 },  // Médico Cirurgião
+                                          { wch: 35 },  // Hospital
+                                        ];
+                                        XLSX.utils.book_append_sheet(wb, ws, 'Anestesistas');
+                                        const fileName = `Relatorio_Anestesistas_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+                                        XLSX.writeFile(wb, fileName);
+                                        toast.success(`Relatório de anestesistas gerado! ${totalAnesthesiaProcedures} procedimento(s).`);
+                                      } catch (err) {
+                                        console.error('Erro ao exportar Relatório Anestesistas (card):', err);
+                                        toast.error('Erro ao gerar relatório de anestesistas');
+                                      }
                                     }}
-                                    className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-3 py-2 rounded-md text-sm flex items-center justify-center gap-2"
+                                    className="inline-flex items-center gap-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
                                   >
                                     <FileSpreadsheet className="h-4 w-4" />
                                     Relatório Anestesistas
