@@ -230,6 +230,7 @@ interface KPIData {
 interface HospitalStats {
   id: string;
   name: string;
+  cnes?: string; // ✅ CNES (identificador SUS)
   aihCount: number;
   revenue: number;
   approvalRate: number;
@@ -520,12 +521,16 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     }
   }, [hospitalStats]);
 
-  // Nome completo do hospital selecionado para exibição no cabeçalho
+  // Nome completo do hospital selecionado para exibição no cabeçalho (incluindo CNES)
   const currentHospitalFullName = React.useMemo(() => {
     try {
       if (!activeHospitalTab) return null;
       const h = hospitalStats.find((hs) => hs.id === activeHospitalTab);
-      return h?.name || null;
+      if (!h) return null;
+      
+      // ✅ Incluir CNES (identificador SUS) se disponível
+      const cnesInfo = h.cnes ? ` - CNES: ${h.cnes}` : '';
+      return `${h.name}${cnesInfo}`;
     } catch {
       return null;
     }
@@ -775,10 +780,30 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         totalProcedures: 0
       });
 
-      // Converter dados dos hospitais para o formato atual com valores normalizados
+      // ✅ Buscar CNES dos hospitais da tabela hospitals
+      const hospitalIds = hospitalsData.map(h => h.hospital_id).filter(Boolean);
+      let hospitalCnesMap = new Map<string, string>();
+      
+      if (hospitalIds.length > 0) {
+        const { data: hospitalsWithCnes } = await supabase
+          .from('hospitals')
+          .select('id, cnes')
+          .in('id', hospitalIds);
+        
+        if (hospitalsWithCnes) {
+          hospitalsWithCnes.forEach(h => {
+            if (h.cnes) {
+              hospitalCnesMap.set(h.id, h.cnes);
+            }
+          });
+        }
+      }
+      
+      // Converter dados dos hospitais para o formato atual com valores normalizados + CNES
       const hospitalStatsConverted: HospitalStats[] = hospitalsData.map(hospital => ({
         id: hospital.hospital_id || '',
         name: hospital.hospital_name || 'Nome não informado',
+        cnes: hospitalCnesMap.get(hospital.hospital_id || ''), // ✅ Incluir CNES
         aihCount: hospital.total_procedures || 0,
         revenue: safeValue(hospital.total_hospital_revenue_reais || 0),
         approvalRate: hospital.avg_payment_rate || 0,

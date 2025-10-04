@@ -34,7 +34,8 @@ import {
   Database,
   RefreshCw,
   Building,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Loader2
 } from 'lucide-react';
 
 import { DoctorPatientService, type DoctorWithPatients } from '../services/doctorPatientService';
@@ -487,7 +488,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
   const [filteredDoctors, setFilteredDoctors] = useState<DoctorWithPatients[]>([]);
   // searchTerm e selectedCareCharacter agora são controlados globalmente via props
-  const [availableHospitals, setAvailableHospitals] = useState<Array<{id: string, name: string}>>([]);
+  const [availableHospitals, setAvailableHospitals] = useState<Array<{id: string, name: string, cnes?: string}>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
   const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set());
@@ -550,17 +551,35 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       // Buscar hospitais adicionais da tabela hospitals se necessário
       const { data: hospitalsFromDB } = await supabase
         .from('hospitals')
-        .select('id, name')
+        .select('id, name, cnes') // ✅ Incluir CNES (identificador SUS)
         .order('name');
       
       if (hospitalsFromDB) {
+        // Criar mapa para armazenar também o CNES
+        const hospitalCnesMap = new Map<string, string>();
         hospitalsFromDB.forEach(hospital => {
           hospitalSet.add(hospital.id);
           hospitalMap.set(hospital.id, hospital.name);
+          if (hospital.cnes) {
+            hospitalCnesMap.set(hospital.id, hospital.cnes);
+          }
         });
+        
+        // Converter para array ordenado incluindo CNES
+        const hospitalsList = Array.from(hospitalSet)
+          .map(id => ({ 
+            id, 
+            name: hospitalMap.get(id) || `Hospital ${id}`,
+            cnes: hospitalCnesMap.get(id) // ✅ Incluir CNES
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        
+        setAvailableHospitals(hospitalsList);
+        console.log('🏥 Hospitais disponíveis:', hospitalsList);
+        return; // Early return após processar hospitais do DB
       }
       
-      // Converter para array ordenado
+      // Fallback se não houver hospitais do DB
       const hospitalsList = Array.from(hospitalSet)
         .map(id => ({ id, name: hospitalMap.get(id) || `Hospital ${id}` }))
         .sort((a, b) => a.name.localeCompare(b.name));
@@ -953,14 +972,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       
       console.log(`🎯 RESULTADO: ${totalProceduresAssociated} procedimentos associados aos pacientes`);
       
-      if (totalProceduresAssociated > 0) {
-        toast.success(`✅ Carregados ${totalProceduresAssociated} procedimentos!`);
-      } else {
-        toast.warning('⚠️ Nenhum procedimento associado. Verifique o console para debug.');
+      // ✅ Log de informação - sem toast (carregamento automático, não precisa notificar usuário)
+      if (totalProceduresAssociated === 0) {
+        console.warn('⚠️ Nenhum procedimento associado. Verifique os dados.');
       }
       
     } catch (error) {
       console.error('❌ Erro ao carregar procedimentos separadamente:', error);
+      // ✅ Toast apenas para erro crítico (impacta visualização de dados)
       toast.error('Erro ao carregar procedimentos');
     }
   };
@@ -1056,9 +1075,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         setDoctors(explodedByHospital);
         setFilteredDoctors(explodedByHospital);
         
-        const message = `${explodedByHospital.length} cartões (médico×hospital) carregados`;
-        
-        toast.success(message);
+        // ✅ Log de informação - sem toast (carregamento inicial automático)
+        console.log(`✅ ${explodedByHospital.length} cartões (médico×hospital) carregados`);
       } catch (error) {
         console.error('❌ Erro ao carregar dados dos médicos:', error);
         toast.error('Erro ao carregar dados dos médicos');
@@ -1386,13 +1404,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
   }, [filteredStats, onStatsUpdate, isLoading]);
 
-  // 🏥 Nome do hospital selecionado para exibir como badge no título
+  // 🏥 Nome do hospital selecionado para exibir como badge no título (incluindo CNES)
   const selectedHospitalName = React.useMemo(() => {
     try {
       if (selectedHospitals && selectedHospitals.length > 0 && !selectedHospitals.includes('all')) {
         const id = selectedHospitals[0];
         const match = availableHospitals.find(h => h.id === id);
-        return match?.name || 'Hospital selecionado';
+        if (match) {
+          // ✅ Incluir CNES (identificador SUS) se disponível
+          const cnesInfo = match.cnes ? ` - CNES: ${match.cnes}` : '';
+          return `${match.name}${cnesInfo}`;
+        }
+        return 'Hospital selecionado';
       }
       return 'Todos os hospitais';
     } catch {
@@ -1404,7 +1427,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <Activity className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
           <div className="text-lg font-semibold">Carregando dados dos médicos...</div>
           <div className="text-sm text-gray-600">Aguarde um momento</div>
         </div>
@@ -1779,15 +1802,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       const fileName = `Relatorio_Pacientes_Procedimentos_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
                       XLSX.writeFile(wb, fileName);
                       
-                      // 🔧 AVISO: Notificar sobre registros sem AIH incluídos
+                      // ✅ Notificação única e clara
                       if (patientsWithoutAIH > 0) {
-                        toast.success(`Relatório geral gerado com sucesso! ⚠️ ${patientsWithoutAIH} registro(s) sem AIH foram incluídos com "Aguardando geração".`);
+                        toast.success(`Relatório geral gerado! ${patientsWithoutAIH} registro(s) sem AIH incluído(s).`);
                       } else {
-                        toast.success('Relatório geral de pacientes gerado com sucesso!');
+                        toast.success('Relatório geral gerado com sucesso!');
                       }
                     } catch (e) {
                       console.error('Erro ao exportar Relatório Pacientes:', e);
-                      toast.error('Erro ao gerar Relatório Pacientes');
+                      toast.error('Erro ao gerar relatório geral');
                     }
                   }}
                   className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
@@ -1973,10 +1996,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       XLSX.utils.book_append_sheet(wb, ws, 'Pacientes Simplificado');
                       const fileName = `Relatorio_Pacientes_Simplificado_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
                       XLSX.writeFile(wb, fileName);
-                      toast.success('Relatório simplificado de pacientes gerado com sucesso!');
+                      toast.success('Relatório simplificado gerado com sucesso!');
                     } catch (e) {
                       console.error('Erro ao exportar Relatório Simplificado:', e);
-                      toast.error('Erro ao gerar Relatório Simplificado');
+                      toast.error('Erro ao gerar relatório simplificado');
                     }
                   }}
                   className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
@@ -2003,7 +2026,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               <div className="text-[11px] uppercase text-blue-700">Valor Total</div>
               <div className="text-xl font-extrabold text-blue-700">{formatCurrency(aggregatedOperaParanaTotals.totalWithIncrement)}</div>
             </div>
-            <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+            <div className="rounded-lg border-2 border-green-500 bg-green-50 p-3 shadow-sm">
               <div className="text-[11px] uppercase text-green-700">Pagamento Médico Total</div>
               <div className="text-xl font-extrabold text-green-700">{formatCurrency(aggregatedMedicalPayments)}</div>
             </div>
@@ -2209,10 +2232,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         XLSX.utils.book_append_sheet(wb, ws, 'Pacientes');
                                         const fileName = `Relatorio_Pacientes_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
                                         XLSX.writeFile(wb, fileName);
-                                        toast.success('Relatório Pacientes gerado com base no card do médico.');
+                                        toast.success('Relatório de pacientes do médico gerado com sucesso!');
                                       } catch (err) {
                                         console.error('Erro ao exportar Relatório Pacientes (card):', err);
-                                        toast.error('Erro ao gerar Relatório Pacientes');
+                                        toast.error('Erro ao gerar relatório do médico');
                                       }
                                     }}
                                     className="bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all duration-300 px-3 py-2 rounded-md text-sm flex items-center justify-center gap-2"

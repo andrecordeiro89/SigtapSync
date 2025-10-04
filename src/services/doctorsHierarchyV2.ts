@@ -12,6 +12,13 @@ export interface HierarchyFilters {
 
 export class DoctorsHierarchyV2Service {
   static async getDoctorsHierarchyV2(filters: HierarchyFilters = {}): Promise<DoctorWithPatients[]> {
+    console.log('🚀 [HIERARCHY V2] Iniciando carregamento com filtros:', {
+      hospitalIds: filters.hospitalIds,
+      dateFromISO: filters.dateFromISO,
+      dateToISO: filters.dateToISO,
+      careCharacter: filters.careCharacter
+    });
+    
     // 1) AIHs com paciente — paginação para evitar limite padrão (1000)
     const baseSelect = `
         id,
@@ -41,17 +48,30 @@ export class DoctorsHierarchyV2Service {
 
     const applyFilters = (q: any) => {
       let query = q;
+      
+      // Filtro de Hospital
       if (filters.hospitalIds && filters.hospitalIds.length > 0 && !filters.hospitalIds.includes('all')) {
         query = query.in('hospital_id', filters.hospitalIds);
       }
       
-      // 🔧 CORREÇÃO: Usar mesma lógica da tela Pacientes para consistência
-      // Não aplicar filtro rígido aqui - será aplicado após carregamento
-      // para permitir fallback competencia → discharge_date → admission_date
+      // ✅ OTIMIZADO: Filtros de data aplicados no SQL (igual PatientManagement)
+      // dateFromISO → filtra admission_date (Data de Admissão)
+      if (filters.dateFromISO) {
+        query = query.gte('admission_date', filters.dateFromISO);
+      }
       
+      // dateToISO → filtra discharge_date (Data de Alta)
+      if (filters.dateToISO) {
+        query = query.lte('discharge_date', filters.dateToISO);
+        // Se filtrar por alta, excluir AIHs sem discharge_date
+        query = query.not('discharge_date', 'is', null);
+      }
+      
+      // Filtro de Caráter de Atendimento
       if (filters.careCharacter && filters.careCharacter !== 'all') {
         query = query.eq('care_character', filters.careCharacter);
       }
+      
       return query;
     };
 
@@ -63,7 +83,7 @@ export class DoctorsHierarchyV2Service {
       let pageQuery = supabase
         .from('aihs')
         .select(baseSelect)
-        .order('discharge_date', { ascending: false })
+        .order('updated_at', { ascending: false }) // ✅ Ordenar por updated_at (processados mais recentes)
         .range(page * pageSize, (page + 1) * pageSize - 1);
       pageQuery = applyFilters(pageQuery);
       const { data, error } = await pageQuery;
@@ -81,7 +101,12 @@ export class DoctorsHierarchyV2Service {
     }
 
     const aihs = aihsAll;
-    if (!aihs || aihs.length === 0) return [];
+    console.log(`✅ [HIERARCHY V2] Carregadas ${aihs.length} AIHs do banco (após filtros SQL)`);
+    
+    if (!aihs || aihs.length === 0) {
+      console.log('⚠️ [HIERARCHY V2] Nenhuma AIH encontrada com os filtros aplicados');
+      return [];
+    }
 
     // 2) Referenciais (médicos e hospitais)
     // Normalizar CNS (trim) para evitar chaves diferentes por espaços/formatos
@@ -220,39 +245,14 @@ export class DoctorsHierarchyV2Service {
       }
     }
 
-    // 🔧 FILTRO POR DATA: Usar APENAS discharge_date para filtros de competência
-    let filteredCards = cards;
-    if (filters.dateFromISO || filters.dateToISO) {
-      const startDate = filters.dateFromISO ? new Date(filters.dateFromISO) : null;
-      const endDate = filters.dateToISO ? new Date(filters.dateToISO) : null;
-      
-      // ❌ REMOVIDO: Ajuste duplo de horário (já vem ajustado do ExecutiveDashboard)
-
-      filteredCards = cards.map(card => {
-        const filteredPatients = card.patients.filter((patient: any) => {
-          // 🔧 CORREÇÃO: Para filtros de competência, usar APENAS discharge_date
-          // Isso garante que apenas pacientes com alta no período sejam incluídos
-          const refStr = patient.aih_info?.discharge_date;
-          if (!refStr) return false; // Excluir pacientes sem alta
-          
-          const refDate = new Date(refStr);
-          
-          let matches = true;
-          if (startDate) {
-            matches = matches && refDate >= startDate;
-          }
-          if (endDate) {
-            matches = matches && refDate <= endDate;
-          }
-          
-          return matches;
-        });
-        
-        return { ...card, patients: filteredPatients };
-      }).filter(card => card.patients.length > 0); // Remover cards sem pacientes
-    }
-
-    return filteredCards.map(({ key, ...rest }) => rest);
+    // ✅ OTIMIZADO: Filtros de data já aplicados no SQL - não é necessário filtrar novamente
+    // Backend já retorna apenas AIHs que atendem aos critérios de data
+    // (admission_date >= dateFromISO AND discharge_date <= dateToISO)
+    
+    const finalResult = cards.map(({ key, ...rest }) => rest);
+    console.log(`🎯 [HIERARCHY V2] Resultado final: ${finalResult.length} médicos com ${finalResult.reduce((sum, d) => sum + d.patients.length, 0)} pacientes`);
+    
+    return finalResult;
   }
 }
 
