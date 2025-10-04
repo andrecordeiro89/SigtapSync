@@ -204,9 +204,7 @@ const PatientManagement = () => {
         updated_at: new Date().toISOString()
       } as any);
 
-      // Sincronizar na lista local de pacientes
-      setPatients(prev => prev.map(p => p.id === patientId ? { ...p, name: cleaned } as any : p));
-      // Sincronizar na lista de AIHs (nested join visual) por id OU cns
+      // ✅ OTIMIZADO: Sincronizar apenas na lista de AIHs (patients vêm do JOIN)
       setAIHs(prev => prev.map(a => {
         const nested: any = (a as any).patients;
         if (!nested) return a;
@@ -220,8 +218,6 @@ const PatientManagement = () => {
 
       setInlineNameEdit(prev => { const copy = { ...prev }; delete copy[patientId]; return copy; });
       toast({ title: 'Nome atualizado', description: 'Paciente atualizado com sucesso.' });
-      // Recarregar pacientes em background para garantir consistência
-      try { await loadPatients(); } catch {}
     } catch (e:any) {
       toast({ title: 'Erro ao salvar', description: e?.message || 'Falha ao atualizar o nome', variant: 'destructive' });
     } finally {
@@ -269,12 +265,12 @@ const PatientManagement = () => {
     }
   }, [currentHospitalId]);
 
-  // 🔧 CORREÇÃO: Recarregar dados quando competência mudar
+  // ✅ OTIMIZADO: Recarregar dados quando filtros de backend mudarem
   useEffect(() => {
     if (currentHospitalId) {
-      loadAIHs(); // Recarregar AIHs
+      loadAIHs(); // Recarregar AIHs com filtros aplicados no SQL
     }
-  }, [currentHospitalId]);
+  }, [currentHospitalId, startDate, endDate, selectedCareCharacter]);
 
   // Resetar página quando filtros mudarem + atualizar contagem
   useEffect(() => {
@@ -285,8 +281,9 @@ const PatientManagement = () => {
   const loadAllData = async () => {
     setIsLoading(true);
     try {
+      // ✅ OTIMIZADO: Removida loadPatients() - dados já vêm no JOIN de AIHs
       await Promise.all([
-        loadPatients(),
+        // loadPatients(), // ⚠️ DESABILITADO: Dados de pacientes já vêm em loadAIHs()
         loadAIHs(),
         loadStats()
       ]);
@@ -316,23 +313,35 @@ const PatientManagement = () => {
 
   const loadAIHs = async () => {
     try {
-      console.log('🔍 Carregando AIHs (com paginação) para hospital:', currentHospitalId);
+      console.log('🔍 Carregando AIHs (com paginação e filtros) para hospital:', currentHospitalId);
       const pageSize = 1000; // Supabase limita a 1000 por request
       let offset = 0;
       const all: any[] = [];
 
-      // Removido: filtro de competência não é mais aplicado
-      const useCompetencyFilter = false;
+      // ✅ OTIMIZADO: Aplicar filtros de data no backend (SQL)
       let dateFromISO: string | undefined;
       let dateToISO: string | undefined;
+
+      // Aplicar filtros de data se existirem
+      // startDate → filtra admission_date (Admissão)
+      if (startDate) {
+        dateFromISO = `${startDate}T00:00:00`;
+      }
+      // endDate → filtra discharge_date (Alta)
+      if (endDate) {
+        dateToISO = `${endDate}T23:59:59.999`;
+      }
+
+      // Preparar filtro de caráter de atendimento
+      const careCharacterFilter = selectedCareCharacter !== 'all' ? selectedCareCharacter : undefined;
 
       while (true) {
         const batch = await persistenceService.getAIHs(currentHospitalId || 'ALL', {
           limit: pageSize,
           offset,
-          useCompetencyFilter,
-          dateFrom: dateFromISO,
-          dateTo: dateToISO,
+          dateFrom: dateFromISO, // ✅ Filtra admission_date >= dateFrom
+          dateTo: dateToISO,     // ✅ Filtra discharge_date <= dateTo
+          careCharacter: careCharacterFilter,
         } as any);
         const batchLen = batch?.length || 0;
         if (batchLen === 0) break;
@@ -344,7 +353,16 @@ const PatientManagement = () => {
       }
 
       setAIHs(all);
-      console.log('📊 AIHs carregadas:', all.length, useCompetencyFilter ? '(com filtro de competência)' : '(todas)');
+      
+      // Log detalhado dos filtros aplicados
+      const filterLog = [];
+      if (dateFromISO) filterLog.push(`Admissão >= ${startDate}`);
+      if (dateToISO) filterLog.push(`Alta <= ${endDate}`);
+      if (careCharacterFilter) filterLog.push(`Caráter: ${careCharacterFilter === '1' ? 'Eletivo' : 'Urgência/Emergência'}`);
+      
+      console.log('📊 AIHs carregadas:', all.length, 
+        filterLog.length > 0 ? `(Filtros: ${filterLog.join(', ')})` : '(sem filtros)',
+        '| Ordenação: updated_at DESC (mais recentes primeiro)');
     } catch (error) {
       console.error('❌ Erro ao carregar AIHs:', error);
       toast({
@@ -473,6 +491,58 @@ const PatientManagement = () => {
     }
   };
 
+  // ✅ OTIMIZADO: Prefetch de procedimentos em lote (resolver N+1)
+  const prefetchProceduresForVisibleAIHs = async (aihIds: string[]) => {
+    // Filtrar apenas AIHs que ainda não têm procedimentos carregados
+    const idsToLoad = aihIds.filter(id => !proceduresData[id] && !loadingProcedures[id]);
+    if (idsToLoad.length === 0) return;
+
+    console.log(`🚀 Prefetching procedimentos para ${idsToLoad.length} AIHs...`);
+    
+    // Marcar como "carregando" para evitar duplicação
+    setLoadingProcedures(prev => {
+      const newState = { ...prev };
+      idsToLoad.forEach(id => newState[id] = true);
+      return newState;
+    });
+
+    try {
+      // Carregar todos em paralelo (máximo 5 por vez para não sobrecarregar)
+      const batchSize = 5;
+      for (let i = 0; i < idsToLoad.length; i += batchSize) {
+        const batch = idsToLoad.slice(i, i + batchSize);
+        const results = await Promise.all(
+          batch.map(id => persistenceService.getAIHProcedures(id).catch(() => []))
+        );
+        
+        // Atualizar estado com resultados
+        setProceduresData(prev => {
+          const newData = { ...prev };
+          batch.forEach((id, index) => {
+            newData[id] = results[index] || [];
+          });
+          return newData;
+        });
+
+        // Recalcular totais
+        batch.forEach((id, index) => {
+          recalculateAIHTotal(id, results[index] || []);
+        });
+      }
+      
+      console.log(`✅ Prefetch completo para ${idsToLoad.length} AIHs`);
+    } catch (error) {
+      console.error('❌ Erro no prefetch de procedimentos:', error);
+    } finally {
+      // Desmarcar "carregando"
+      setLoadingProcedures(prev => {
+        const newState = { ...prev };
+        idsToLoad.forEach(id => delete newState[id]);
+        return newState;
+      });
+    }
+  };
+
   // Ações inline para procedimentos
   // Botão de inativar removido
 
@@ -558,82 +628,45 @@ const PatientManagement = () => {
     }
   };
 
-  // Dados unificados: AIHs com informações dos pacientes
+  // ✅ OTIMIZADO: Dados unificados usando diretamente o JOIN de patients
+  // Não é necessário buscar no array separado pois os dados já vêm em aih.patients
   const unifiedData: UnifiedAIHData[] = aihs.map(aih => {
-    const patient = patients.find(p => p.cns === aih.patients?.cns);
     return {
       ...aih,
-      patient: patient || null,
+      patient: aih.patients || null, // ✅ Usar diretamente do JOIN
       matches: aih.aih_matches || []
     };
   });
 
-  // Filtros aplicados
+  // ✅ OTIMIZADO: Filtros aplicados (backend já filtrou data e caráter)
   const filteredData = unifiedData.filter(item => {
-    // Filtro de busca por texto
-    const matchesSearch = 
-      item.aih_number.toLowerCase().includes(globalSearch.toLowerCase()) ||
-      (
-        (item.patient?.name && item.patient.name.toLowerCase().includes(globalSearch.toLowerCase())) ||
-        (item.patients?.name && item.patients.name.toLowerCase().includes(globalSearch.toLowerCase()))
-      ) ||
-      (item.patient?.cns && item.patient.cns.includes(globalSearch));
+    // Apenas filtro de busca textual (frontend) - os demais já foram aplicados no SQL
+    if (!globalSearch) return true;
     
-    // Filtro por data - usar admission_date e discharge_date especificamente
-    let matchesDateRange = true;
-    
-    // Se há filtro de data de início (Admissão), verificar admission_date
-    if (startDate) {
-      const admissionDate = item.admission_date ? new Date(item.admission_date) : null;
-      if (admissionDate) {
-        const start = new Date(startDate);
-        matchesDateRange = matchesDateRange && admissionDate >= start;
-      } else {
-        // Se não há data de admissão, não passa no filtro de admissão
-        matchesDateRange = false;
-      }
-    }
-    
-    // Se há filtro de data de fim (Alta), verificar discharge_date
-    if (endDate && matchesDateRange) {
-      const dischargeDate = item.discharge_date ? new Date(item.discharge_date) : null;
-      if (dischargeDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        matchesDateRange = matchesDateRange && dischargeDate <= end;
-      } else {
-        // Se não há data de alta, não passa no filtro de alta
-        matchesDateRange = false;
-      }
-    }
-
-    // Removido: filtro por competência não é mais necessário
-
-    // 🏥 Filtro por caráter de atendimento
-    let matchesCareCharacter = true;
-    if (selectedCareCharacter && selectedCareCharacter !== 'all') {
-      matchesCareCharacter = item.care_character === selectedCareCharacter;
-    }
-    
-    return matchesSearch && matchesDateRange && matchesCareCharacter;
+    const searchLower = globalSearch.toLowerCase();
+    return (
+      item.aih_number.toLowerCase().includes(searchLower) ||
+      (item.patient?.name && item.patient.name.toLowerCase().includes(searchLower)) ||
+      (item.patient?.cns && item.patient.cns.includes(globalSearch))
+    );
   }).sort((a, b) => {
-    // Ordenação por data de alta (discharge_date) do mais recente para o mais antigo
-    const dateA = a.discharge_date ? new Date(a.discharge_date).getTime() : 0;
-    const dateB = b.discharge_date ? new Date(b.discharge_date).getTime() : 0;
+    // ✅ Ordenação por updated_at (processados mais recentemente primeiro)
+    const updatedA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+    const updatedB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
     
-    // Se ambos têm data de alta, ordenar do mais recente para o mais antigo
-    if (dateA && dateB) {
-      return dateB - dateA;
+    // Se ambos têm updated_at, ordenar do mais recente para o mais antigo
+    if (updatedA && updatedB) {
+      return updatedB - updatedA;
     }
     
-    // Se apenas um tem data de alta, priorizar o que tem data
-    if (dateA && !dateB) return -1;
-    if (!dateA && dateB) return 1;
+    // Se apenas um tem updated_at, priorizar o que tem
+    if (updatedA && !updatedB) return -1;
+    if (!updatedA && updatedB) return 1;
     
-    // Se nenhum tem data de alta, ordenar por data de admissão como fallback
-    const admissionA = a.admission_date ? new Date(a.admission_date).getTime() : 0;
-    const admissionB = b.admission_date ? new Date(b.admission_date).getTime() : 0;
-    return admissionB - admissionA;
+    // Fallback: ordenar por created_at se não houver updated_at
+    const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return createdB - createdA;
   });
 
   // Paginação unificada
@@ -641,6 +674,14 @@ const PatientManagement = () => {
     currentPage * itemsPerPage,
     (currentPage + 1) * itemsPerPage
   );
+
+  // ✅ OTIMIZADO: Prefetch automático de procedimentos ao trocar página
+  useEffect(() => {
+    const visibleAIHIds = paginatedData.slice(0, 5).map(item => item.id); // Prefetch dos 5 primeiros
+    if (visibleAIHIds.length > 0) {
+      prefetchProceduresForVisibleAIHs(visibleAIHIds);
+    }
+  }, [currentPage, paginatedData.length]); // Executar quando mudar página ou dados
 
   // Funções de relatório por competência removidas - não são mais necessárias
 
@@ -695,23 +736,23 @@ const PatientManagement = () => {
         return;
       }
 
-      // Ordenar dados por data de Alta (mais recente para mais antigo)
+      // ✅ Ordenar dados por updated_at (processados mais recentemente primeiro)
       dataToExport.sort((a, b) => {
-        const dateA = a.discharge_date ? new Date(a.discharge_date) : null;
-        const dateB = b.discharge_date ? new Date(b.discharge_date) : null;
+        const updatedA = a.updated_at ? new Date(a.updated_at) : null;
+        const updatedB = b.updated_at ? new Date(b.updated_at) : null;
         
-        // Priorizar itens com discharge_date
-        if (dateA && !dateB) return -1;
-        if (!dateA && dateB) return 1;
-        if (!dateA && !dateB) {
-          // Se ambos não têm discharge_date, ordenar por admission_date
-          const admissionA = new Date(a.admission_date);
-          const admissionB = new Date(b.admission_date);
-          return admissionB.getTime() - admissionA.getTime();
+        // Priorizar itens com updated_at
+        if (updatedA && !updatedB) return -1;
+        if (!updatedA && updatedB) return 1;
+        if (!updatedA && !updatedB) {
+          // Se ambos não têm updated_at, ordenar por created_at
+          const createdA = a.created_at ? new Date(a.created_at) : new Date(0);
+          const createdB = b.created_at ? new Date(b.created_at) : new Date(0);
+          return createdB.getTime() - createdA.getTime();
         }
         
-        // Ambos têm discharge_date, ordenar do mais recente para o mais antigo
-        return dateB!.getTime() - dateA!.getTime();
+        // Ambos têm updated_at, ordenar do mais recente para o mais antigo
+        return updatedB!.getTime() - updatedA!.getTime();
       });
 
       // Cabeçalho do Excel (removidas colunas Procedimentos e Nome do Médico)

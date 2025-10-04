@@ -1482,14 +1482,14 @@ export class AIHPersistenceService {
    */
   async getAIHs(hospitalId: string, filters?: {
     status?: string;
-    dateFrom?: string;
-    dateTo?: string;
+    dateFrom?: string;   // ✅ Filtra admission_date >= dateFrom (Data de Admissão)
+    dateTo?: string;     // ✅ Filtra discharge_date <= dateTo (Data de Alta)
     patientName?: string;
     aihNumber?: string;
     processedBy?: string;
     limit?: number;
     offset?: number;
-    useCompetencyFilter?: boolean; // 🆕 Novo: indica se deve usar discharge_date para competência
+    careCharacter?: string; // ✅ Filtro de caráter de atendimento (1=Eletivo, 2=Urgência/Emergência)
   }) {
     try {
       let query = supabase
@@ -1525,37 +1525,34 @@ export class AIHPersistenceService {
         query = query.eq('hospital_id', hospitalId);
       }
       
-      query = query.order('created_at', { ascending: false });
+      // ✅ Ordenar por updated_at (processados mais recentes primeiro)
+      query = query.order('updated_at', { ascending: false });
 
       // Aplicar filtros
       if (filters?.status) {
         query = query.eq('processing_status', filters.status);
       }
       
-      // 🔧 CORREÇÃO: Usar discharge_date para filtros de competência
+      // ✅ CORREÇÃO: Filtros independentes de Admissão e Alta
+      // dateFrom → sempre filtra admission_date (Data de Admissão)
       if (filters?.dateFrom) {
-        if (filters.useCompetencyFilter) {
-          query = query.gte('discharge_date', filters.dateFrom);
-        } else {
         query = query.gte('admission_date', filters.dateFrom);
-        }
       }
       
+      // dateTo → sempre filtra discharge_date (Data de Alta)
       if (filters?.dateTo) {
-        if (filters.useCompetencyFilter) {
-          query = query.lte('discharge_date', filters.dateTo);
-        } else {
-        query = query.lte('admission_date', filters.dateTo);
-        }
-      }
-      
-      // 🔧 Para filtros de competência, excluir AIHs sem alta
-      if (filters?.useCompetencyFilter && (filters?.dateFrom || filters?.dateTo)) {
+        query = query.lte('discharge_date', filters.dateTo);
+        // Se filtrar por alta, excluir AIHs sem discharge_date
         query = query.not('discharge_date', 'is', null);
       }
       
       if (filters?.aihNumber) {
         query = query.ilike('aih_number', `%${filters.aihNumber}%`);
+      }
+
+      // ✅ OTIMIZADO: Filtro de caráter de atendimento
+      if (filters?.careCharacter) {
+        query = query.eq('care_character', filters.careCharacter);
       }
 
       // Aplicar paginação

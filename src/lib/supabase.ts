@@ -153,6 +153,7 @@ export interface AIHDB {
   estimated_original_value?: number
   
   created_at: string
+  updated_at?: string  // ✅ Data da última atualização
   processed_at?: string
   created_by?: string
 }
