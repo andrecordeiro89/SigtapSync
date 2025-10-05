@@ -393,12 +393,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
       <div className="w-full max-w-md">
         {/* Logo e Header */}
         <div className="text-center mb-8">
-          <div className="flex justify-center items-center mb-4">
-            <div className="p-3 rounded-2xl bg-white shadow-sm border border-slate-200">
-              <Building2 className="h-8 w-8 text-slate-700" />
-            </div>
-          </div>
-          <h1 className="text-3xl font-semibold text-slate-800 mb-2">SIGTAP Sync</h1>
+          <h1 className="text-4xl font-semibold mb-2 bg-gradient-to-r from-slate-700 via-blue-600 to-slate-700 bg-clip-text text-transparent">
+            SIGTAP Sync
+          </h1>
           <p className="text-slate-500 text-sm">Sistema de Faturamento Hospitalar</p>
         </div>
 
