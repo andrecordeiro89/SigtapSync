@@ -110,9 +110,10 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
     }
   } catch {}
 
-  // 🚫 EXCLUIR ANESTESISTAS (apenas 04.xxx) da contagem de procedimentos
+  // 🚀 OTIMIZAÇÃO #4: Usar procedimentos pré-filtrados (calculable_procedures)
   const totalProcedures = patientsForStats.reduce((sum, patient) => 
-    sum + patient.procedures.filter(filterCalculableProcedures).length, 0);
+    sum + ((patient as any).calculable_procedures?.length || patient.procedures.filter(filterCalculableProcedures).length), 0);
+  
   // ✅ CORREÇÃO: USAR patient.total_value_reais QUE VEM DO calculated_total_value DA AIH
   const totalValue = patientsForStats.reduce((sum, patient) => sum + patient.total_value_reais, 0);
   const totalAIHs = patientsForStats.length;
@@ -123,13 +124,11 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
     console.log(`💰 Médico ${doctorData.doctor_info.name}: R$ ${totalValue.toFixed(2)} (usando patient.total_value_reais)`);
   }
   
-  // 🚫 EXCLUIR ANESTESISTAS (apenas 04.xxx) dos procedimentos aprovados
-  const approvedProcedures = patientsForStats.reduce((sum, patient) => 
-    sum + patient.procedures.filter(proc => 
-      proc.approval_status === 'approved' && 
-      shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
-    ).length, 0
-  );
+  // 🚀 OTIMIZAÇÃO #4: Usar procedimentos pré-filtrados para aprovados
+  const approvedProcedures = patientsForStats.reduce((sum, patient) => {
+    const calculable = (patient as any).calculable_procedures || patient.procedures.filter(filterCalculableProcedures);
+    return sum + calculable.filter((proc: any) => proc.approval_status === 'approved').length;
+  }, 0);
   const approvalRate = totalProcedures > 0 ? (approvedProcedures / totalProcedures) * 100 : 0;
   
   // 🆕 CALCULAR valores específicos dos procedimentos médicos ("04") COM REGRAS DE PAGAMENTO

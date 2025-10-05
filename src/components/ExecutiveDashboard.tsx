@@ -755,11 +755,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
       // ✅ Atualizar apenas KPIs padrões no state (sem cards de valores)
       setTimeout(() => {
-        const aihsAverageTicket = aihsCount > 0 ? aihsTotalRevenue / aihsCount : 0;
         setKpiData({
-          totalRevenue: aihsTotalRevenue,
-          totalAIHs: aihsCount,
-          averageTicket: aihsAverageTicket,
+          totalRevenue: totalRevenue,
+          totalAIHs: totalAIHs,
+          averageTicket: averageTicket,
           approvalRate,
           activeHospitals: hospitalsData.length,
           activeDoctors: activeDoctors,

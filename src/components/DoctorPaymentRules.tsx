@@ -78,6 +78,12 @@ interface DoctorPaymentRulesProps {
 // 🏥 REGRAS DE PAGAMENTO POR HOSPITAL - ESTRUTURA HIERÁRQUICA
 // ================================================================
 
+// 🚀 OTIMIZAÇÃO #3: CACHE DE REGRAS PARA BUSCA O(1)
+// Maps indexados por médico para acesso instantâneo
+let FIXED_RULES_CACHE: Map<string, { amount: number; description: string; hospitalId?: string }> | null = null;
+let PERCENTAGE_RULES_CACHE: Map<string, { percentage: number; description: string; hospitalId?: string }> | null = null;
+let INDIVIDUAL_RULES_CACHE: Map<string, DoctorPaymentRule> | null = null;
+
 const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaymentRule>> = {
   // ================================================================
   // HOSPITAL TORAO TOKUDA - APUCARANA (APU)
@@ -2400,8 +2406,71 @@ export function calculateDoctorPayment(
 }
 
 /**
+ * 🚀 OTIMIZAÇÃO #3: INICIALIZAR CACHE DE REGRAS
+ * Cria Maps indexados para busca O(1) ao invés de O(n)
+ */
+function initializeRulesCache() {
+  if (FIXED_RULES_CACHE && PERCENTAGE_RULES_CACHE && INDIVIDUAL_RULES_CACHE) {
+    return; // Já inicializado
+  }
+
+  console.log('🚀 [OTIMIZAÇÃO] Inicializando cache de regras de pagamento...');
+  const startTime = performance.now();
+
+  FIXED_RULES_CACHE = new Map();
+  PERCENTAGE_RULES_CACHE = new Map();
+  INDIVIDUAL_RULES_CACHE = new Map();
+
+  // Percorrer todos os hospitais e médicos
+  Object.entries(DOCTOR_PAYMENT_RULES_BY_HOSPITAL).forEach(([hospitalKey, hospitalRules]) => {
+    Object.entries(hospitalRules).forEach(([doctorName, rule]) => {
+      const cacheKey = `${doctorName}::${hospitalKey}`;
+      
+      // Indexar regras fixas
+      if (rule.fixedPaymentRule) {
+        FIXED_RULES_CACHE!.set(cacheKey, {
+          amount: rule.fixedPaymentRule.amount,
+          description: rule.fixedPaymentRule.description,
+          hospitalId: hospitalKey
+        });
+        // Também indexar sem hospital para fallback
+        FIXED_RULES_CACHE!.set(doctorName, {
+          amount: rule.fixedPaymentRule.amount,
+          description: rule.fixedPaymentRule.description,
+          hospitalId: hospitalKey
+        });
+      }
+
+      // Indexar regras de percentual
+      if (rule.percentageRule) {
+        PERCENTAGE_RULES_CACHE!.set(cacheKey, {
+          percentage: rule.percentageRule.percentage,
+          description: rule.percentageRule.description,
+          hospitalId: hospitalKey
+        });
+        // Também indexar sem hospital para fallback
+        PERCENTAGE_RULES_CACHE!.set(doctorName, {
+          percentage: rule.percentageRule.percentage,
+          description: rule.percentageRule.description,
+          hospitalId: hospitalKey
+        });
+      }
+
+      // Indexar regras individuais
+      INDIVIDUAL_RULES_CACHE!.set(cacheKey, rule);
+      INDIVIDUAL_RULES_CACHE!.set(doctorName, rule);
+    });
+  });
+
+  const totalTime = performance.now() - startTime;
+  console.log(`✅ [OTIMIZAÇÃO] Cache inicializado em ${totalTime.toFixed(2)}ms`);
+  console.log(`   📊 ${FIXED_RULES_CACHE.size} regras fixas, ${PERCENTAGE_RULES_CACHE.size} regras de percentual, ${INDIVIDUAL_RULES_CACHE.size} regras individuais`);
+}
+
+/**
  * 💰 CALCULAR VALOR BASEADO EM VALOR FIXO
  * Para médicos que têm regra de valor fixo independente de procedimentos
+ * 🚀 OTIMIZADO: Usa cache Map para busca O(1)
  */
 export function calculateFixedPayment(
   doctorName: string,
@@ -2411,11 +2480,22 @@ export function calculateFixedPayment(
   appliedRule: string;
   hasFixedRule: boolean;
 } {
+  // 🚀 Inicializar cache se necessário
+  initializeRulesCache();
+
+  // 🚀 BUSCA O(1) no cache
   const hospitalKey = detectHospitalFromContext(doctorName, hospitalId);
-  const hospitalRules = DOCTOR_PAYMENT_RULES_BY_HOSPITAL[hospitalKey];
-  const rule = hospitalRules?.[doctorName.toUpperCase()];
+  const cacheKey = `${doctorName.toUpperCase()}::${hospitalKey}`;
   
-  if (!rule || !rule.fixedPaymentRule) {
+  // Tentar buscar com hospital específico primeiro
+  let rule = FIXED_RULES_CACHE!.get(cacheKey);
+  
+  // Fallback: buscar sem hospital
+  if (!rule) {
+    rule = FIXED_RULES_CACHE!.get(doctorName.toUpperCase());
+  }
+  
+  if (!rule) {
     return {
       calculatedPayment: 0,
       appliedRule: 'Nenhuma regra de valor fixo definida',
@@ -2424,8 +2504,8 @@ export function calculateFixedPayment(
   }
 
   return {
-    calculatedPayment: rule.fixedPaymentRule.amount,
-    appliedRule: rule.fixedPaymentRule.description,
+    calculatedPayment: rule.amount,
+    appliedRule: rule.description,
     hasFixedRule: true
   };
 }
@@ -2433,6 +2513,7 @@ export function calculateFixedPayment(
 /**
  * 🆕 CALCULAR VALOR BASEADO EM PERCENTUAL DO TOTAL
  * Para médicos que têm regra de percentual sobre o valor total
+ * 🚀 OTIMIZADO: Usa cache Map para busca O(1)
  */
 export function calculatePercentagePayment(
   doctorName: string,
@@ -2443,11 +2524,22 @@ export function calculatePercentagePayment(
   appliedRule: string;
   hasPercentageRule: boolean;
 } {
+  // 🚀 Inicializar cache se necessário
+  initializeRulesCache();
+
+  // 🚀 BUSCA O(1) no cache
   const hospitalKey = detectHospitalFromContext(doctorName, hospitalId);
-  const hospitalRules = DOCTOR_PAYMENT_RULES_BY_HOSPITAL[hospitalKey];
-  const rule = hospitalRules?.[doctorName.toUpperCase()];
+  const cacheKey = `${doctorName.toUpperCase()}::${hospitalKey}`;
   
-  if (!rule || !rule.percentageRule) {
+  // Tentar buscar com hospital específico primeiro
+  let rule = PERCENTAGE_RULES_CACHE!.get(cacheKey);
+  
+  // Fallback: buscar sem hospital
+  if (!rule) {
+    rule = PERCENTAGE_RULES_CACHE!.get(doctorName.toUpperCase());
+  }
+  
+  if (!rule) {
     return {
       calculatedPayment: 0,
       appliedRule: 'Nenhuma regra de percentual definida',
@@ -2455,11 +2547,11 @@ export function calculatePercentagePayment(
     };
   }
 
-  const calculatedPayment = (totalValue * rule.percentageRule.percentage) / 100;
+  const calculatedPayment = (totalValue * rule.percentage) / 100;
   
   return {
     calculatedPayment,
-    appliedRule: `${rule.percentageRule.description} (${rule.percentageRule.percentage}% de R$ ${totalValue.toFixed(2)} = R$ ${calculatedPayment.toFixed(2)})`,
+    appliedRule: `${rule.description} (${rule.percentage}% de R$ ${totalValue.toFixed(2)} = R$ ${calculatedPayment.toFixed(2)})`,
     hasPercentageRule: true
   };
 }

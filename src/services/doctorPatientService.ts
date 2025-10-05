@@ -111,9 +111,11 @@ export class DoctorPatientService {
     dateToISO?: string;
   }): Promise<DoctorWithPatients[]> {
     try {
-      console.log('📥 [TABELAS] Carregando dados diretamente de aihs + patients + procedure_records...', options);
+      console.log('📥 [TABELAS - OTIMIZADO] Carregando dados em paralelo...', options);
+      const startTime = performance.now();
 
-      // 1) AIHs com join de paciente (fonte do vínculo Médico → Paciente)
+      // 🚀 OTIMIZAÇÃO #1: PREPARAR QUERIES EM PARALELO
+      // Construir query de AIHs
       let aihsQuery = supabase
         .from('aihs')
         .select(`
@@ -146,25 +148,58 @@ export class DoctorPatientService {
         aihsQuery = aihsQuery.lte('admission_date', options.dateToISO);
       }
 
+      // 🚀 EXECUTAR QUERY DE AIHs PRIMEIRO (necessária para obter IDs)
       const { data: aihs, error: aihsError } = await aihsQuery.order('admission_date', { ascending: false });
       if (aihsError) {
         console.error('❌ [TABELAS] Erro ao consultar AIHs:', aihsError);
         return [];
       }
-      if (!aihs || aihs.length === 0) return [];
+      if (!aihs || aihs.length === 0) {
+        console.log('⚠️ Nenhuma AIH encontrada com os filtros aplicados');
+        return [];
+      }
 
-      // 2) Montar mapa de médicos (CNS responsável)
-      const doctorMap = new Map<string, DoctorWithPatients & { key: string; hospitalIds: Set<string> }>();
+      console.log(`✅ ${aihs.length} AIHs carregadas em ${(performance.now() - startTime).toFixed(0)}ms`);
 
-      // 2.1) Pré-carregar procedimentos em lote
+      // 2) Extrair IDs para queries dependentes
       const patientIds = Array.from(new Set(aihs.map(a => a.patient_id).filter(Boolean)));
       const aihIds = Array.from(new Set(aihs.map(a => a.id).filter(Boolean)));
+      const doctorCnsList = Array.from(new Set(aihs.map(a => a.cns_responsavel).filter(Boolean)));
+
+      // 🚀 OTIMIZAÇÃO #1: EXECUTAR QUERIES DEPENDENTES EM PARALELO
       const { ProcedureRecordsService } = await import('./simplifiedProcedureService');
-      const [procsResult, procsByAih] = await Promise.all([
+      
+      const parallelStart = performance.now();
+      const [procsResult, procsByAih, doctorsData, hospitalsData] = await Promise.all([
+        // Query 1: Procedimentos por paciente
         ProcedureRecordsService.getProceduresByPatientIds(patientIds),
-        ProcedureRecordsService.getProceduresByAihIds(aihIds)
+        // Query 2: Procedimentos por AIH (fallback)
+        ProcedureRecordsService.getProceduresByAihIds(aihIds),
+        // Query 3: Dados dos médicos (CNS, nome, especialidade)
+        supabase
+          .from('doctors')
+          .select('id, name, cns, crm, specialty, is_active')
+          .in('cns', doctorCnsList),
+        // Query 4: Dados dos hospitais
+        options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all')
+          ? supabase
+              .from('hospitals')
+              .select('id, name, cnes')
+              .in('id', options.hospitalIds)
+          : supabase
+              .from('hospitals')
+              .select('id, name, cnes')
       ]);
+
+      console.log(`✅ Queries paralelas executadas em ${(performance.now() - parallelStart).toFixed(0)}ms`);
+
+      // Processar resultados
       const procsByPatient = procsResult.success ? procsResult.proceduresByPatientId : new Map<string, any[]>();
+      const doctorsMap = new Map((doctorsData.data || []).map(d => [d.cns, d]));
+      const hospitalsMap = new Map((hospitalsData.data || []).map(h => [h.id, h]));
+
+      // 3) Montar mapa de médicos (CNS responsável)
+      const doctorMap = new Map<string, DoctorWithPatients & { key: string; hospitalIds: Set<string> }>();
 
       for (const aih of aihs as any[]) {
         const doctorCns = aih.cns_responsavel || 'NAO_IDENTIFICADO';
@@ -172,15 +207,24 @@ export class DoctorPatientService {
         const hospitalId = aih.hospital_id;
 
         if (!doctorMap.has(doctorKey)) {
+          // 🚀 OTIMIZAÇÃO: Usar dados reais dos médicos carregados em paralelo
+          const doctorData = doctorsMap.get(doctorCns);
+          const hospitalData = hospitalsMap.get(hospitalId);
+          
           doctorMap.set(doctorKey, {
             key: doctorKey,
             doctor_info: {
-              name: `Dr(a). ${doctorCns}`,
+              name: doctorData?.name || `Dr(a). ${doctorCns}`,
               cns: doctorCns,
-              crm: '',
-              specialty: ''
+              crm: doctorData?.crm || '',
+              specialty: doctorData?.specialty || ''
             },
-            hospitals: hospitalId ? [{ hospital_id: hospitalId, hospital_name: '', is_active: true } as any] : [],
+            hospitals: hospitalId ? [{ 
+              hospital_id: hospitalId, 
+              hospital_name: hospitalData?.name || '', 
+              cnes: hospitalData?.cnes,
+              is_active: true 
+            } as any] : [],
             patients: [],
             hospitalIds: new Set(hospitalId ? [hospitalId] : [])
           } as any);
@@ -190,8 +234,16 @@ export class DoctorPatientService {
         }
 
         const doctor = doctorMap.get(doctorKey)! as any;
-        // Garantir hospitais únicos
-        doctor.hospitals = Array.from(doctor.hospitalIds).map((hid: string) => ({ hospital_id: hid, hospital_name: '', is_active: true }));
+        // Garantir hospitais únicos com dados reais
+        doctor.hospitals = Array.from(doctor.hospitalIds).map((hid: string) => {
+          const hospitalData = hospitalsMap.get(hid);
+          return { 
+            hospital_id: hid, 
+            hospital_name: hospitalData?.name || '', 
+            cnes: hospitalData?.cnes,
+            is_active: true 
+          };
+        });
 
         // Paciente
         const patientId = aih.patient_id;
@@ -227,27 +279,49 @@ export class DoctorPatientService {
         if (procs.length === 0 && aih.id) {
           procs = (procsByAih.success ? (procsByAih.proceduresByAihId.get(aih.id) || []) : []);
         }
-        const mapped = procs.map((p: any) => ({
-          procedure_id: p.id,
-          procedure_code: p.procedure_code,
-          procedure_description: p.procedure_description || p.procedure_name || 'Descrição não disponível',
-          procedure_date: p.procedure_date,
-          value_reais: typeof p.total_value === 'number' ? p.total_value / 100 : 0,
-          value_cents: typeof p.total_value === 'number' ? p.total_value : 0,
-          approved: p.billing_status === 'approved' || p.match_status === 'approved' || p.billing_status === 'paid',
-          approval_status: p.billing_status || p.match_status,
-          sequence: p.sequencia,
-          aih_id: p.aih_id,
-          match_confidence: p.match_confidence || 0,
-          sigtap_description: p.procedure_description,
-          complexity: p.complexity,
-          professional_name: p.professional_name,
-          cbo: p.professional_cbo,
-          participation: 'Responsável'
-        }));
+        const mapped = procs.map((p: any) => {
+          const code = p.procedure_code || '';
+          const cbo = p.professional_cbo || '';
+          
+          // 🚀 OTIMIZAÇÃO #4: Pré-calcular se é anestesista 04.xxx (exceto cesariana)
+          const isAnesthetist04 = cbo === '225151' && 
+                                   typeof code === 'string' && 
+                                   code.startsWith('04') && 
+                                   code !== '04.17.01.001-0';
+          
+          // Ajustar valor para anestesistas (zerado para não contar em cálculos)
+          const rawCents = typeof p.total_value === 'number' ? p.total_value : 0;
+          const value_cents = isAnesthetist04 ? 0 : rawCents;
+          
+          return {
+            procedure_id: p.id,
+            procedure_code: code,
+            procedure_description: p.procedure_description || p.procedure_name || 'Descrição não disponível',
+            procedure_date: p.procedure_date,
+            value_reais: value_cents / 100,
+            value_cents,
+            approved: p.billing_status === 'approved' || p.match_status === 'approved' || p.billing_status === 'paid',
+            approval_status: p.billing_status || p.match_status,
+            sequence: p.sequencia,
+            aih_id: p.aih_id,
+            match_confidence: p.match_confidence || 0,
+            sigtap_description: p.procedure_description,
+            complexity: p.complexity,
+            professional_name: p.professional_name,
+            cbo,
+            participation: isAnesthetist04 ? 'Anestesia (qtd)' : 'Responsável',
+            is_anesthetist_04: isAnesthetist04 // 🚀 Flag pré-calculada
+          };
+        });
+        
         patient.procedures = mapped.sort((a: any, b: any) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime());
-        patient.total_procedures = patient.procedures.length;
-        patient.approved_procedures = patient.procedures.filter((pp: any) => pp.approved).length;
+        
+        // 🚀 OTIMIZAÇÃO #4: Pré-filtrar procedimentos calculáveis (cache no objeto)
+        const { filterCalculableProcedures } = await import('../utils/anesthetistLogic');
+        (patient as any).calculable_procedures = patient.procedures.filter(filterCalculableProcedures);
+        
+        patient.total_procedures = (patient as any).calculable_procedures.length;
+        patient.approved_procedures = (patient as any).calculable_procedures.filter((pp: any) => pp.approved).length;
         // 🆕 Resolver Nome Comum com base nos códigos do paciente
         try {
           const { resolveCommonProcedureName } = await import('../utils/commonProcedureName');
@@ -263,7 +337,10 @@ export class DoctorPatientService {
         patients: d.patients
       })) as DoctorWithPatients[];
 
-      console.log(`✅ [TABELAS] Montados ${result.length} médicos a partir de aihs + patients + procedure_records`);
+      const totalTime = performance.now() - startTime;
+      console.log(`✅ [TABELAS - OTIMIZADO] Montados ${result.length} médicos em ${totalTime.toFixed(0)}ms`);
+      console.log(`   📊 Performance: ${aihs.length} AIHs, ${patientIds.length} pacientes, ${doctorCnsList.length} médicos`);
+      
       return result;
 
     } catch (e) {
