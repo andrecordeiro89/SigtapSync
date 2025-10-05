@@ -381,13 +381,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const selectedHospital = hospitals.find(h => h.id === formData.hospital_id);
 
   return (
-    <div className="min-h-screen relative bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex items-center justify-center p-4">
+    <div className="min-h-screen relative bg-gradient-to-br from-slate-50 via-emerald-50/40 to-green-50 flex items-center justify-center p-4">
       {/* Padrão de fundo sutil */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-        <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-blue-100/40 blur-3xl" />
-        <div className="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-slate-200/40 blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-gradient-to-br from-blue-50/20 to-slate-100/20 blur-3xl" />
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-200/50 to-transparent" />
+        <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-emerald-100/40 blur-3xl" />
+        <div className="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-green-100/40 blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-gradient-to-br from-emerald-50/30 to-slate-100/20 blur-3xl" />
       </div>
       
       <div className="w-full max-w-md">
