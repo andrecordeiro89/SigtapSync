@@ -381,28 +381,34 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
   const selectedHospital = hospitals.find(h => h.id === formData.hospital_id);
 
   return (
-    <div className="min-h-screen relative bg-gradient-to-br from-blue-900 via-indigo-900 to-blue-900 flex items-center justify-center p-4">
+    <div className="min-h-screen relative bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex items-center justify-center p-4">
+      {/* Padrão de fundo sutil */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-16 -left-16 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
-        <div className="absolute -bottom-16 -right-16 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+        <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-blue-100/40 blur-3xl" />
+        <div className="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-slate-200/40 blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-gradient-to-br from-blue-50/20 to-slate-100/20 blur-3xl" />
       </div>
+      
       <div className="w-full max-w-md">
         {/* Logo e Header */}
         <div className="text-center mb-8">
           <div className="flex justify-center items-center mb-4">
-            <Building2 className="h-12 w-12 text-white" />
+            <div className="p-3 rounded-2xl bg-white shadow-sm border border-slate-200">
+              <Building2 className="h-8 w-8 text-slate-700" />
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">SIGTAP Sync</h1>
-          <p className="text-blue-200">Sistema de Faturamento Hospitalar</p>
+          <h1 className="text-3xl font-semibold text-slate-800 mb-2">SIGTAP Sync</h1>
+          <p className="text-slate-500 text-sm">Sistema de Faturamento Hospitalar</p>
         </div>
 
-        <Card className="shadow-2xl border-0">
-          <CardHeader className="text-center">
-            <CardTitle className="flex items-center justify-center gap-2">
-              <LogIn className="h-5 w-5" />
+        <Card className="shadow-lg border border-slate-200/60 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="text-center pb-6">
+            <CardTitle className="flex items-center justify-center gap-2 text-slate-800 text-xl">
+              <LogIn className="h-5 w-5 text-slate-600" />
               Fazer Login
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-slate-500">
               {userClassification?.full_access 
                 ? "Acesso administrativo detectado" 
                 : "Selecione seu hospital e insira seu email"}
@@ -414,16 +420,16 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               
               {/* Campo de Email */}
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" className="text-slate-700 text-sm font-medium">Email</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     id="email"
                     type="email"
                     placeholder="seu@sigtap.com"
                     value={formData.email}
                     onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="pl-10"
+                    className="pl-10 border-slate-200 focus:border-slate-400 focus:ring-slate-400"
                     required
                   />
                 </div>
@@ -431,25 +437,25 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
 
               {/* Classificação do Usuário */}
               {userClassification && (
-                <div className={`p-3 rounded-lg border ${
+                <div className={`p-3.5 rounded-lg border ${
                   userClassification.full_access 
-                    ? 'bg-purple-50 border-purple-200' 
-                    : 'bg-green-50 border-green-200'
+                    ? 'bg-slate-50 border-slate-200' 
+                    : 'bg-blue-50/50 border-blue-100'
                 }`}>
                   <div className="flex items-center gap-2 mb-1">
                     {userClassification.full_access ? (
-                      <Shield className="h-4 w-4 text-purple-600" />
+                      <Shield className="h-4 w-4 text-slate-600" />
                     ) : (
-                      <Users className="h-4 w-4 text-green-600" />
+                      <Users className="h-4 w-4 text-blue-600" />
                     )}
                     <span className={`text-sm font-medium ${
-                      userClassification.full_access ? 'text-purple-900' : 'text-green-900'
+                      userClassification.full_access ? 'text-slate-700' : 'text-blue-700'
                     }`}>
                       {userClassification.full_access ? 'Acesso Administrativo' : 'Usuário de Hospital'}
                     </span>
                   </div>
                   <p className={`text-xs ${
-                    userClassification.full_access ? 'text-purple-700' : 'text-green-700'
+                    userClassification.full_access ? 'text-slate-600' : 'text-blue-600'
                   }`}>
                     Perfil: {userClassification.role.toUpperCase()}
                   </p>
@@ -458,13 +464,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               
               {/* Seleção de Hospital */}
               <div className="space-y-2">
-                <Label htmlFor="hospital">
+                <Label htmlFor="hospital" className="text-slate-700 text-sm font-medium">
                   {userClassification?.full_access ? "Acesso" : "Hospital"}
                 </Label>
                 {loadingHospitals ? (
-                  <div className="flex items-center justify-center p-3 border rounded-md">
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    <span className="text-sm text-gray-500">Carregando hospitais...</span>
+                  <div className="flex items-center justify-center p-3 border border-slate-200 rounded-md bg-slate-50/50">
+                    <Loader2 className="h-4 w-4 animate-spin mr-2 text-slate-400" />
+                    <span className="text-sm text-slate-500">Carregando hospitais...</span>
                   </div>
                 ) : (
                   <Select 
@@ -484,10 +490,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
                         <SelectItem value="ALL">
                           <div className="flex flex-col items-start">
                             <div className="flex items-center gap-2">
-                              <Shield className="h-4 w-4 text-purple-600" />
-                              <span className="font-medium text-purple-700">TODOS OS HOSPITAIS</span>
+                              <Shield className="h-4 w-4 text-slate-600" />
+                              <span className="font-medium text-slate-700">TODOS OS HOSPITAIS</span>
                             </div>
-                            <span className="text-xs text-purple-600">Acesso completo ao sistema</span>
+                            <span className="text-xs text-slate-500">Acesso completo ao sistema</span>
                           </div>
                         </SelectItem>
                       )}
@@ -496,8 +502,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
                       {hospitals.map((hospital) => (
                         <SelectItem key={hospital.id} value={hospital.id}>
                           <div className="flex flex-col items-start">
-                            <span className="font-medium">{hospital.name}</span>
-                            <span className="text-xs text-gray-500">
+                            <span className="font-medium text-slate-700">{hospital.name}</span>
+                            <span className="text-xs text-slate-500">
                               {hospital.city && hospital.state && (
                                 <>
                                   <MapPin className="h-3 w-3 inline mr-1" />
@@ -515,28 +521,28 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
 
               {/* Informações do Hospital/Acesso Selecionado */}
               {formData.hospital_id === 'ALL' ? (
-                <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                  <h4 className="text-sm font-medium text-purple-900 mb-1">Acesso Administrativo:</h4>
-                  <p className="text-sm text-purple-700 font-medium">TODOS OS HOSPITAIS</p>
-                  <p className="text-xs text-purple-600">
+                <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200">
+                  <h4 className="text-sm font-medium text-slate-700 mb-1">Acesso Administrativo:</h4>
+                  <p className="text-sm text-slate-800 font-medium">TODOS OS HOSPITAIS</p>
+                  <p className="text-xs text-slate-600 mt-1">
                     <Shield className="h-3 w-3 inline mr-1" />
                     Controle total sobre {hospitals.length} hospitais
                   </p>
-                  <Badge variant="secondary" className="mt-2 text-xs bg-purple-100 text-purple-700">
+                  <Badge variant="secondary" className="mt-2 text-xs bg-slate-100 text-slate-700 border-slate-200">
                     ADMINISTRADOR
                   </Badge>
                 </div>
               ) : selectedHospital && (
-                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="text-sm font-medium text-blue-900 mb-1">Hospital Selecionado:</h4>
-                  <p className="text-sm text-blue-700 font-medium">{selectedHospital.name}</p>
+                <div className="p-3.5 bg-blue-50/50 rounded-lg border border-blue-100">
+                  <h4 className="text-sm font-medium text-slate-700 mb-1">Hospital Selecionado:</h4>
+                  <p className="text-sm text-slate-800 font-medium">{selectedHospital.name}</p>
                   {selectedHospital.city && selectedHospital.state && (
-                    <p className="text-xs text-blue-600">
+                    <p className="text-xs text-slate-600 mt-1">
                       <MapPin className="h-3 w-3 inline mr-1" />
                       {selectedHospital.city}, {selectedHospital.state}
                     </p>
                   )}
-                  <Badge variant="secondary" className="mt-2 text-xs">
+                  <Badge variant="secondary" className="mt-2 text-xs bg-blue-100 text-blue-700 border-blue-200">
                     CNPJ: {selectedHospital.cnpj}
                   </Badge>
                 </div>
@@ -552,7 +558,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
               {/* Botão de Login */}
               <Button 
                 type="submit" 
-                className="w-full"
+                className="w-full bg-slate-700 hover:bg-slate-800 text-white shadow-sm"
                 disabled={loading || loadingHospitals}
               >
                 {loading ? (
@@ -570,13 +576,25 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
             </form>
 
             {/* Informações do Sistema */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
-              <h3 className="text-sm font-medium text-gray-900 mb-2">Sistema de Rastreabilidade:</h3>
-              <div className="space-y-1 text-xs text-gray-600">
-                <p>✅ Todas as ações são registradas</p>
-                <p>✅ Controle de acesso por hospital</p>
-                <p>✅ Auditoria completa de processamento</p>
-                <p>✅ Acesso administrativo para diretoria</p>
+            <div className="mt-6 p-4 bg-slate-50/50 rounded-lg border border-slate-200">
+              <h3 className="text-sm font-medium text-slate-700 mb-2.5">Sistema de Rastreabilidade:</h3>
+              <div className="space-y-1.5 text-xs text-slate-600">
+                <p className="flex items-center gap-1.5">
+                  <span className="text-slate-400">•</span>
+                  Todas as ações são registradas
+                </p>
+                <p className="flex items-center gap-1.5">
+                  <span className="text-slate-400">•</span>
+                  Controle de acesso por hospital
+                </p>
+                <p className="flex items-center gap-1.5">
+                  <span className="text-slate-400">•</span>
+                  Auditoria completa de processamento
+                </p>
+                <p className="flex items-center gap-1.5">
+                  <span className="text-slate-400">•</span>
+                  Acesso administrativo para diretoria
+                </p>
               </div>
             </div>
           </CardContent>
@@ -584,7 +602,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
 
         {/* Footer */}
         <div className="text-center mt-6">
-          <p className="text-blue-200 text-sm">
+          <p className="text-slate-600 text-sm">
             {hospitals.length} {hospitals.length === 1 ? 'hospital ativo' : 'hospitais ativos'}
             {userClassification?.full_access && ' • Acesso Total Autorizado'}
           </p>
