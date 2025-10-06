@@ -88,6 +88,7 @@ interface AIH {
   care_modality?: string;
   requesting_physician?: string;
   professional_cbo?: string;
+  competencia?: string; // ✅ Competência SUS (YYYY-MM-DD)
   hospitals?: { name: string };
   processed_at?: string;
   processed_by_name?: string;
@@ -150,6 +151,8 @@ const PatientManagement = () => {
   // Filtros simplificados
   const [globalSearch, setGlobalSearch] = useState('');
   const [selectedCareCharacter, setSelectedCareCharacter] = useState<string>('all');
+  const [selectedCompetencia, setSelectedCompetencia] = useState<string>('all');
+  const [availableCompetencias, setAvailableCompetencias] = useState<string[]>([]);
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(0);
@@ -174,6 +177,11 @@ const PatientManagement = () => {
   // Estado para edição rápida de nome do paciente
   const [inlineNameEdit, setInlineNameEdit] = useState<{ [patientId: string]: string }>({});
   const [savingName, setSavingName] = useState<{ [patientId: string]: boolean }>({});
+
+  // Estados para edição de competência
+  const [editingCompetencia, setEditingCompetencia] = useState<{ [aihId: string]: boolean }>({});
+  const [competenciaValue, setCompetenciaValue] = useState<{ [aihId: string]: string }>({});
+  const [savingCompetencia, setSavingCompetencia] = useState<{ [aihId: string]: boolean }>({});
 
   const handleStartEditName = (patientId: string, currentName: string) => {
     setInlineNameEdit(prev => (prev[patientId] === undefined ? ({ ...prev, [patientId]: currentName || '' }) : prev));
@@ -222,6 +230,94 @@ const PatientManagement = () => {
       toast({ title: 'Erro ao salvar', description: e?.message || 'Falha ao atualizar o nome', variant: 'destructive' });
     } finally {
       setSavingName(prev => ({ ...prev, [patientId]: false }));
+    }
+  };
+
+  // Funções para edição de competência
+  const handleStartEditCompetencia = (aihId: string, currentCompetencia: string | undefined) => {
+    setEditingCompetencia(prev => ({ ...prev, [aihId]: true }));
+    // Converter YYYY-MM-DD para YYYY-MM (formato do input type="month")
+    if (currentCompetencia) {
+      const match = currentCompetencia.match(/^(\d{4})-(\d{2})/);
+      if (match) {
+        setCompetenciaValue(prev => ({ ...prev, [aihId]: `${match[1]}-${match[2]}` }));
+      }
+    } else {
+      // Se não houver competência, usar mês atual
+      const now = new Date();
+      const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      setCompetenciaValue(prev => ({ ...prev, [aihId]: yearMonth }));
+    }
+  };
+
+  const handleCancelEditCompetencia = (aihId: string) => {
+    setEditingCompetencia(prev => ({ ...prev, [aihId]: false }));
+    setCompetenciaValue(prev => { const copy = { ...prev }; delete copy[aihId]; return copy; });
+  };
+
+  const handleSaveCompetencia = async (aihId: string) => {
+    try {
+      const newCompetencia = competenciaValue[aihId];
+      if (!newCompetencia) {
+        toast({
+          title: 'Competência inválida',
+          description: 'Selecione uma competência válida.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Validar formato YYYY-MM
+      const match = newCompetencia.match(/^(\d{4})-(\d{2})$/);
+      if (!match) {
+        toast({
+          title: 'Formato inválido',
+          description: 'Use o formato MM/AAAA.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      setSavingCompetencia(prev => ({ ...prev, [aihId]: true }));
+
+      // Converter YYYY-MM para YYYY-MM-01 (primeiro dia do mês)
+      const competenciaDate = `${newCompetencia}-01`;
+
+      // Atualizar no banco usando Supabase direto
+      const { error } = await supabase
+        .from('aihs')
+        .update({ 
+          competencia: competenciaDate,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', aihId);
+
+      if (error) throw error;
+
+      // Atualizar estado local
+      setAIHs(prev => prev.map(aih => 
+        aih.id === aihId 
+          ? { ...aih, competencia: competenciaDate, updated_at: new Date().toISOString() }
+          : aih
+      ));
+
+      // Limpar estados de edição
+      setEditingCompetencia(prev => ({ ...prev, [aihId]: false }));
+      setCompetenciaValue(prev => { const copy = { ...prev }; delete copy[aihId]; return copy; });
+
+      toast({ 
+        title: '✅ Competência atualizada', 
+        description: `Nova competência: ${formatCompetencia(competenciaDate)}` 
+      });
+    } catch (e: any) {
+      console.error('Erro ao atualizar competência:', e);
+      toast({ 
+        title: 'Erro ao salvar', 
+        description: e?.message || 'Falha ao atualizar a competência', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setSavingCompetencia(prev => ({ ...prev, [aihId]: false }));
     }
   };
   const [diagnosticModalOpen, setDiagnosticModalOpen] = useState(false);
@@ -276,7 +372,21 @@ const PatientManagement = () => {
   useEffect(() => {
     setCurrentPage(0);
     loadAIHsCount();
-  }, [globalSearch, startDate, endDate]);
+  }, [globalSearch, startDate, endDate, selectedCompetencia]);
+
+  // Carregar competências disponíveis quando AIHs mudarem
+  useEffect(() => {
+    if (aihs.length > 0) {
+      const competencias = new Set<string>();
+      aihs.forEach(aih => {
+        if (aih.competencia) {
+          competencias.add(aih.competencia);
+        }
+      });
+      const sorted = Array.from(competencias).sort((a, b) => b.localeCompare(a)); // Mais recente primeiro
+      setAvailableCompetencias(sorted);
+    }
+  }, [aihs]);
 
   const loadAllData = async () => {
     setIsLoading(true);
@@ -640,6 +750,13 @@ const PatientManagement = () => {
 
   // ✅ OTIMIZADO: Filtros aplicados (backend já filtrou data e caráter)
   const filteredData = unifiedData.filter(item => {
+    // Filtro de competência (frontend)
+    if (selectedCompetencia !== 'all') {
+      if (!item.competencia || item.competencia !== selectedCompetencia) {
+        return false;
+      }
+    }
+    
     // Apenas filtro de busca textual (frontend) - os demais já foram aplicados no SQL
     if (!globalSearch) return true;
     
@@ -716,6 +833,23 @@ const PatientManagement = () => {
     // Para ISO com horário, formatar em UTC para evitar deslocamento de dia
     try {
       return new Date(s).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+    } catch {
+      return s;
+    }
+  };
+
+  // Função para formatar competência (YYYY-MM-DD → MM/YYYY)
+  const formatCompetencia = (competencia: string | undefined) => {
+    if (!competencia) return '—';
+    const s = competencia.trim();
+    const m = s.match(/^(\d{4})-(\d{2})-\d{2}$/); // YYYY-MM-DD
+    if (m) return `${m[2]}/${m[1]}`; // MM/YYYY
+    // Tentar parsear ISO
+    try {
+      const date = new Date(s);
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const year = date.getUTCFullYear();
+      return `${month}/${year}`;
     } catch {
       return s;
     }
@@ -1034,6 +1168,36 @@ const PatientManagement = () => {
               </Select>
             </div>
 
+            {/* Filtro de Competência */}
+            <div className="space-y-3 w-full md:w-[180px]">
+              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+                <div className="p-1 bg-indigo-100 rounded">
+                  <Calendar className="w-3 h-3 text-indigo-600" />
+                </div>
+                <span>Competência</span>
+              </label>
+              <Select value={selectedCompetencia} onValueChange={setSelectedCompetencia}>
+                <SelectTrigger className="w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white/80 hover:bg-white transition-colors">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    <div className="flex items-center gap-2">
+                      Todas
+                    </div>
+                  </SelectItem>
+                  {availableCompetencias.map(comp => (
+                    <SelectItem key={comp} value={comp}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                        {formatCompetencia(comp)}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Botão Limpar */}
             <div className="w-full md:w-[150px] flex items-end">
               <Button
@@ -1044,6 +1208,7 @@ const PatientManagement = () => {
                   setStartDate('');
                   setEndDate('');
                   setSelectedCareCharacter('all');
+                  setSelectedCompetencia('all');
                 }}
                 className="h-9 text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-gray-300 transition-colors w-full md:w-auto"
                 title="Limpar filtros"
@@ -1068,6 +1233,11 @@ const PatientManagement = () => {
               <FileText className="w-5 h-5" />
               <span>
                 AIHs Processadas ({filteredData.length})
+                {selectedCompetencia !== 'all' && (
+                  <span className="ml-2 text-sm font-normal text-indigo-600">
+                    • Competência: {formatCompetencia(selectedCompetencia)}
+                  </span>
+                )}
               </span>
             </div>
             <Button
@@ -1189,11 +1359,17 @@ const PatientManagement = () => {
 
                           
 
-                          {/* Datas padronizadas + info compacta (2 colunas: Admissão/Alta e Hospital) */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2 ml-0">
+                          {/* Datas padronizadas + info compacta (3 colunas: Admissão/Alta, Competência e Hospital) */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 sm:gap-2 ml-0">
                             <div className="grid grid-cols-2 gap-1 sm:gap-2">
                               <div className="text-[11px]"><span className="text-gray-500">Admissão:</span> {formatDate(item.admission_date)}</div>
                               <div className="text-[11px]"><span className="text-gray-500">Alta:</span> {item.discharge_date ? formatDate(item.discharge_date) : 'N/A'}</div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-1 sm:gap-2">
+                              <div className="text-[11px]">
+                                <span className="text-gray-500">Competência:</span>{' '}
+                                <span className="font-semibold text-blue-600">{formatCompetencia(item.competencia)}</span>
+                              </div>
                             </div>
                             <div className="grid grid-cols-1 gap-1 sm:gap-2">
                               <div className="text-[11px] truncate"><span className="text-gray-500">Hospital:</span> <span className="truncate inline-block align-bottom max-w-[260px] sm:max-w-[360px] font-semibold">{item.hospitals?.name || 'N/A'}</span></div>
@@ -1215,7 +1391,7 @@ const PatientManagement = () => {
                       </div>
 
                       {/* Lado Direito: Ações */}
-                      <div className="flex items-end space-x-3">
+                      <div className="flex flex-col items-end space-y-2">
                         {/* Botão de Exclusão */}
                         {(() => {
                           const userRole = user?.role as string;
@@ -1226,15 +1402,94 @@ const PatientManagement = () => {
                               size="sm"
                               variant="outline"
                               onClick={() => handleDeleteRequest('aih', item.id, item.aih_number)}
-                              className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors h-7 px-3 py-0 ml-2 flex items-center"
+                              className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors h-7 px-3 py-0 flex items-center"
                             >
                               <Trash2 className="w-4 h-4" />
+                            </Button>
+                          );
+                        })()}
+                        
+                        {/* Botão de Editar Competência */}
+                        {(() => {
+                          const userRole = user?.role as string;
+                          const hasPermission = (['user', 'operator', 'coordinator', 'director', 'admin'] as const).includes(userRole as any);
+                          
+                          return hasPermission && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStartEditCompetencia(item.id, item.competencia)}
+                              disabled={savingCompetencia[item.id]}
+                              className="text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300 hover:bg-blue-50 transition-colors h-7 px-3 py-0 flex items-center"
+                              title="Editar competência"
+                            >
+                              {savingCompetencia[item.id] ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                              ) : (
+                                <Calendar className="w-4 h-4" />
+                              )}
                             </Button>
                           );
                         })()}
                       </div>
                     </div>
                   </div>
+
+                  {/* Modal de Edição de Competência */}
+                  {editingCompetencia[item.id] && (
+                    <div className="bg-blue-50 border-t border-blue-200 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-5 h-5 text-blue-600" />
+                          <h4 className="text-sm font-semibold text-blue-900">Editar Competência</h4>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-end space-x-3">
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-blue-700 mb-1">
+                            Selecione o mês/ano da competência
+                          </label>
+                          <input
+                            type="month"
+                            value={competenciaValue[item.id] || ''}
+                            onChange={(e) => setCompetenciaValue(prev => ({ ...prev, [item.id]: e.target.value }))}
+                            className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                            disabled={savingCompetencia[item.id]}
+                          />
+                          <p className="mt-1 text-xs text-blue-600">
+                            Competência atual: <strong>{formatCompetencia(item.competencia)}</strong>
+                          </p>
+                        </div>
+                        
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveCompetencia(item.id)}
+                          disabled={savingCompetencia[item.id]}
+                          className="bg-blue-600 hover:bg-blue-700 text-white h-10"
+                        >
+                          {savingCompetencia[item.id] ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              Salvando...
+                            </>
+                          ) : (
+                            'Salvar'
+                          )}
+                        </Button>
+                        
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCancelEditCompetencia(item.id)}
+                          disabled={savingCompetencia[item.id]}
+                          className="h-10"
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
                   {expandedItems.has(item.id) && (
                     <div className="bg-gray-50/50 p-4 space-y-3">
@@ -1309,7 +1564,7 @@ const PatientManagement = () => {
                             <p className="font-medium text-gray-900">{item.main_cid || 'N/A'}</p>
                           </div>
 
-                          {/* Linha 4: Admissão, Alta, Especialidade, Modalidade */}
+                          {/* Linha 4: Admissão, Alta, Competência, Especialidade, Modalidade */}
                           <div className="col-span-6 md:col-span-3">
                             <span className="text-[11px] text-gray-500">Admissão</span>
                             <p className="font-medium text-gray-900">{formatDate(item.admission_date)}</p>
@@ -1320,6 +1575,10 @@ const PatientManagement = () => {
                               <p className="font-medium text-gray-900">{formatDate(item.discharge_date)}</p>
                             </div>
                           )}
+                          <div className="col-span-6 md:col-span-3">
+                            <span className="text-[11px] text-gray-500">Competência</span>
+                            <p className="font-semibold text-blue-700">{formatCompetencia(item.competencia)}</p>
+                          </div>
                           {item.specialty && (
                             <div className="col-span-6 md:col-span-3">
                               <span className="text-[11px] text-gray-500">Especialidade</span>
