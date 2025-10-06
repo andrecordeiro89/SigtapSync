@@ -187,7 +187,8 @@ export class DoctorsHierarchyV2Service {
             requesting_physician: aih.requesting_physician,
             professional_cbo: aih.professional_cbo,
             care_character: aih.care_character, // manter valor original para auditoria
-            hospital_id: aih.hospital_id
+            hospital_id: aih.hospital_id,
+            competencia: aih.competencia
           },
           total_value_reais: (aih.calculated_total_value || 0) / 100,
           procedures: [],

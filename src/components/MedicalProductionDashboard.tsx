@@ -7,6 +7,7 @@ import { Switch } from './ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { isOperaParanaEligible as isOperaEligibleConfig } from '../config/operaParana';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
@@ -81,6 +82,32 @@ const formatCurrency = (value: number | null | undefined): string => {
 const formatNumber = (value: number | null | undefined): string => {
   if (value == null || isNaN(value)) return '0';
   return Math.round(value).toLocaleString('pt-BR');
+};
+
+// Função para formatar competência (YYYY-MM-DD para MM/YYYY)
+const formatCompetencia = (competencia: string | undefined): string => {
+  if (!competencia) return '—';
+  
+  try {
+    // Formato esperado: YYYY-MM-DD ou YYYY-MM
+    const match = competencia.match(/^(\d{4})-(\d{2})/);
+    if (match) {
+      const [, year, month] = match;
+      return `${month}/${year}`;
+    }
+    
+    // Tentar parsear como data
+    const date = new Date(competencia);
+    if (!isNaN(date.getTime())) {
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${month}/${year}`;
+    }
+    
+    return competencia;
+  } catch {
+    return competencia;
+  }
 };
 
 // Helper para comparar datas por dia (UTC) e gerar chave YYYY-MM-DD
@@ -500,6 +527,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   // 🆕 MODAL RELATÓRIO SUS
   const [reportModalOpen, setReportModalOpen] = useState<boolean>(false);
+  // 🆕 FILTRO DE COMPETÊNCIA
+  const [selectedCompetencia, setSelectedCompetencia] = useState<string>('all');
+  const [availableCompetencias, setAvailableCompetencias] = useState<string[]>([]);
 
   // 🆕 FUNÇÃO PARA DETERMINAR HOSPITAL CORRETO BASEADO NO CONTEXTO
   const getDoctorContextualHospitalId = (doctor: DoctorWithPatients): string | undefined => {
@@ -1087,6 +1117,23 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     loadDoctorsData();
   }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, dateRange, refreshTick, selectedCareCharacter]);
 
+  // 🆕 CARREGAR COMPETÊNCIAS DISPONÍVEIS
+  useEffect(() => {
+    if (doctors.length > 0) {
+      const competencias = new Set<string>();
+      doctors.forEach(doctor => {
+        doctor.patients.forEach(patient => {
+          const comp = (patient as any)?.aih_info?.competencia;
+          if (comp) competencias.add(comp);
+        });
+      });
+      const sorted = Array.from(competencias).sort((a, b) => b.localeCompare(a));
+      setAvailableCompetencias(sorted);
+    } else {
+      setAvailableCompetencias([]);
+    }
+  }, [doctors]);
+
   // 🆕 SUBSCRIÇÃO REALTIME: AIHs e PROCEDURE_RECORDS (apenas inserts)
   useEffect(() => {
     if (!autoRefresh) return; // não assinar realtime se desligado
@@ -1212,6 +1259,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       }).filter(d => d.patients.length > 0);
     }
 
+    // 🆕 FILTRAR POR COMPETÊNCIA no nível de pacientes dentro de cada médico
+    if (selectedCompetencia && selectedCompetencia !== 'all') {
+      filtered = filtered.map(doctor => {
+        const patientsFiltered = doctor.patients.filter(p => {
+          const comp = (p as any)?.aih_info?.competencia;
+          return comp === selectedCompetencia;
+        });
+        return { ...doctor, patients: patientsFiltered } as typeof doctor;
+      }).filter(d => d.patients.length > 0);
+    }
+
     // Remover médicos sem pacientes no dia selecionado quando o toggle "apenas alta" estiver ativo
     try {
       const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
@@ -1231,7 +1289,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     // Reset da página atual quando filtros são aplicados
     setCurrentDoctorPage(1);
-  }, [searchTerm, patientSearchTerm, selectedSpecialty, selectedCareSpecialty, doctors, selectedHospitals, selectedCareCharacter, dateRange]);
+  }, [searchTerm, patientSearchTerm, selectedSpecialty, selectedCareSpecialty, selectedCompetencia, doctors, selectedHospitals, selectedCareCharacter, dateRange]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
   const toggleDoctorExpansion = (doctorKey: string) => {
@@ -2044,6 +2102,70 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         </CardHeader>
         <CardContent className="space-y-6">
 
+          {/* 🆕 FILTROS LOCAIS DE PRODUÇÃO MÉDICA */}
+          <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 p-4 rounded-xl border border-slate-200">
+            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Filtros de Produção Médica
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Filtro de Competência */}
+              <div>
+                <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1.5">
+                  <div className="p-1 bg-indigo-100 rounded">
+                    <Calendar className="w-3 h-3 text-indigo-600" />
+                  </div>
+                  <span>Competência</span>
+                </label>
+                <Select value={selectedCompetencia} onValueChange={setSelectedCompetencia}>
+                  <SelectTrigger className="w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white/80 hover:bg-white transition-colors">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      <div className="flex items-center gap-2">
+                        Todas as Competências
+                      </div>
+                    </SelectItem>
+                    {availableCompetencias.map(comp => (
+                      <SelectItem key={comp} value={comp}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                          {formatCompetencia(comp)}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Limpar Filtros */}
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedCompetencia('all');
+                  }}
+                  className="w-full border-slate-300 hover:bg-slate-100"
+                >
+                  Limpar Filtros Locais
+                </Button>
+              </div>
+            </div>
+            
+            {/* Indicador de filtros ativos */}
+            {selectedCompetencia !== 'all' && (
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-slate-600">Filtros ativos:</span>
+                {selectedCompetencia !== 'all' && (
+                  <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
+                    📅 Competência: {formatCompetencia(selectedCompetencia)}
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* ✅ LISTA DE MÉDICOS COM PAGINAÇÃO */}
           <div className="space-y-4">
