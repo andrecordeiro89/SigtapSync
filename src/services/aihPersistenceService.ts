@@ -1159,6 +1159,59 @@ export class AIHPersistenceService {
   }
 
   /**
+   * ✅ NOVO: Verifica qualidade dos dados de AIHs (competencia, médico, etc.)
+   * Usado para identificar discrepâncias entre telas
+   */
+  static async checkAIHDataQuality(hospitalId: string = 'ALL'): Promise<{
+    total_aihs: number;
+    missing_competencia: number;
+    missing_doctor: number;
+    missing_discharge_date: number;
+    cross_month_admission_discharge: number;
+    percentual_sem_competencia: number;
+    percentual_sem_medico: number;
+  }> {
+    try {
+      const { data, error } = await supabase.rpc('check_aih_quality', {
+        p_hospital_id: hospitalId
+      });
+
+      if (error) {
+        console.warn('⚠️ Função check_aih_quality não existe. Execute database/fix_missing_competencia.sql primeiro.');
+        
+        // Fallback: Query direta se a função não existir
+        let query = supabase.from('aihs').select('*', { count: 'exact', head: false });
+        
+        if (hospitalId && hospitalId !== 'ALL') {
+          query = query.eq('hospital_id', hospitalId);
+        }
+        
+        const { data: aihs } = await query;
+        
+        const total = aihs?.length || 0;
+        const missing_comp = aihs?.filter(a => !a.competencia).length || 0;
+        const missing_doc = aihs?.filter(a => !a.cns_responsavel).length || 0;
+        const missing_discharge = aihs?.filter(a => !a.discharge_date).length || 0;
+        
+        return {
+          total_aihs: total,
+          missing_competencia: missing_comp,
+          missing_doctor: missing_doc,
+          missing_discharge_date: missing_discharge,
+          cross_month_admission_discharge: 0,
+          percentual_sem_competencia: total > 0 ? Math.round((missing_comp / total) * 100 * 100) / 100 : 0,
+          percentual_sem_medico: total > 0 ? Math.round((missing_doc / total) * 100 * 100) / 100 : 0
+        };
+      }
+
+      return data as any;
+    } catch (error) {
+      console.error('❌ Erro ao verificar qualidade dos dados:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Atualiza status de uma AIH
    */
   static async updateAIHStatus(

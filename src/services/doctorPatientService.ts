@@ -38,6 +38,7 @@ export interface PatientWithProcedures {
     aih_number: string;
     care_character?: string;
     hospital_id?: string;
+    competencia?: string; // ✅ NOVO: Competência da AIH
   };
   // 🆕 Nome Comum de procedimentos (rótulo amigável): ex. "A+A"
   common_name?: string | null;
@@ -107,8 +108,7 @@ export class DoctorPatientService {
    */
   static async getDoctorsWithPatientsFromProceduresView(options?: {
     hospitalIds?: string[];
-    dateFromISO?: string;
-    dateToISO?: string;
+    competencia?: string; // ✅ NOVO: Usar competência em vez de datas
   }): Promise<DoctorWithPatients[]> {
     try {
       console.log('📥 [TABELAS - OTIMIZADO] Carregando dados em paralelo...', options);
@@ -128,6 +128,7 @@ export class DoctorPatientService {
           care_character,
           calculated_total_value,
           cns_responsavel,
+          competencia,
           patients (
             id,
             name,
@@ -141,11 +142,11 @@ export class DoctorPatientService {
       if (options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all')) {
         aihsQuery = aihsQuery.in('hospital_id', options.hospitalIds);
       }
-      if (options?.dateFromISO) {
-        aihsQuery = aihsQuery.gte('admission_date', options.dateFromISO);
-      }
-      if (options?.dateToISO) {
-        aihsQuery = aihsQuery.lte('admission_date', options.dateToISO);
+      
+      // ✅ SIMPLIFICADO: Filtrar APENAS por competência (sem filtros de data)
+      if (options?.competencia && options.competencia !== 'all') {
+        aihsQuery = aihsQuery.eq('competencia', options.competencia);
+        console.log('🗓️ Filtrando por competência:', options.competencia);
       }
 
       // 🚀 EXECUTAR QUERY DE AIHs PRIMEIRO (necessária para obter IDs)
@@ -263,7 +264,8 @@ export class DoctorPatientService {
               discharge_date: aih.discharge_date,
               aih_number: aih.aih_number,
               care_character: aih.care_character,
-              hospital_id: aih.hospital_id
+              hospital_id: aih.hospital_id,
+              competencia: aih.competencia // ✅ NOVO: Incluir competência
             },
             total_value_reais: (aih.calculated_total_value || 0) / 100,
             procedures: [],
@@ -932,14 +934,16 @@ export class DoctorPatientService {
         
         aihsForThisDoctor.forEach((aih, index) => {
           const patientId = aih.patient_id;
+          const aihId = aih.id; // ✅ USAR AIH_ID COMO CHAVE PARA PERMITIR MÚLTIPLAS AIHs DO MESMO PACIENTE
           const patient = aih.patients as any;
           
           console.log(`     AIH ${index + 1}: ${aih.id} → Paciente: ${patientId}`);
           console.log(`       Nome: ${patient?.name || 'Nome não disponível'}`);
           
-          // ✅ GARANTIR 1 AIH = 1 PACIENTE (sem duplicatas)
-          if (patient && patientId && !patientsMap.has(patientId) && !globalPatientsProcessed.has(patientId)) {
-            patientsMap.set(patientId, {
+          // ✅ CORREÇÃO: USAR AIH_ID COMO CHAVE (não patient_id) para permitir múltiplas AIHs do mesmo paciente
+          // Isso alinha com a tela Pacientes que mostra todas as AIHs, não pacientes únicos
+          if (patient && patientId && aihId && !patientsMap.has(aihId)) {
+            patientsMap.set(aihId, {
               patient_id: patientId,
               patient_info: {
                 name: patient.name,
@@ -961,35 +965,33 @@ export class DoctorPatientService {
               approved_procedures: 0
             });
             
-                    // 🔍 LOG ESPECÍFICO PARA CLEUZA
-        if (patient.name && patient.name.toUpperCase().includes('CLEUZA')) {
-          console.log(`🔍 CLEUZA DETECTADA!`);
-          console.log(`   Patient ID: ${patientId} (${typeof patientId})`);
-          console.log(`   Nome: ${patient.name}`);
-          console.log(`   CNS: ${patient.cns}`);
-          console.log(`   Valor AIH: R$ ${((aih.calculated_total_value || 0) / 100).toFixed(2)}`);
-          console.log(`   Procedures array inicializado: ${Array.isArray(patientsMap.get(patientId)?.procedures)}`);
-          console.log(`   🏥 ASSOCIADA AO MÉDICO: ${doctor.doctor_info.name} (CNS: ${doctor.doctor_info.cns})`);
-        }
+            // 🔍 LOG ESPECÍFICO PARA CLEUZA
+            if (patient.name && patient.name.toUpperCase().includes('CLEUZA')) {
+              console.log(`🔍 CLEUZA DETECTADA!`);
+              console.log(`   Patient ID: ${patientId} (${typeof patientId})`);
+              console.log(`   AIH ID: ${aihId} (${typeof aihId})`);
+              console.log(`   Nome: ${patient.name}`);
+              console.log(`   CNS: ${patient.cns}`);
+              console.log(`   Valor AIH: R$ ${((aih.calculated_total_value || 0) / 100).toFixed(2)}`);
+              console.log(`   Procedures array inicializado: ${Array.isArray(patientsMap.get(aihId)?.procedures)}`);
+              console.log(`   🏥 ASSOCIADA AO MÉDICO: ${doctor.doctor_info.name} (CNS: ${doctor.doctor_info.cns})`);
+            }
             
-            globalPatientsProcessed.add(patientId);
-                            console.log(`       ✅ Paciente adicionado com valor R$ ${((aih.calculated_total_value || 0) / 100).toFixed(2)} da AIH`);
-          } else if (patientsMap.has(patientId)) {
-            console.log(`       ⚠️  Paciente já existe para este médico`);
-          } else if (globalPatientsProcessed.has(patientId)) {
-            console.log(`       ⚠️  Paciente já processado por outro médico`);
+            console.log(`       ✅ AIH ${aih.aih_number} adicionada com valor R$ ${((aih.calculated_total_value || 0) / 100).toFixed(2)}`);
+          } else if (patientsMap.has(aihId)) {
+            console.log(`       ⚠️  AIH já existe para este médico`);
           } else {
-            console.log(`       ❌ Dados do paciente inválidos`);
+            console.log(`       ❌ Dados do paciente/AIH inválidos`);
           }
         });
         
-        console.log(`   👥 Resultado: ${patientsMap.size} pacientes únicos para este médico`);
+        console.log(`   👥 Resultado: ${patientsMap.size} AIHs para este médico`);
         
         if (patientsMap.size > 0) {
-          console.log(`   🔍 AMOSTRA DOS PRIMEIROS 3 PACIENTES DESTE MÉDICO:`);
-          const patientEntries = Array.from(patientsMap.entries()).slice(0, 3);
-          patientEntries.forEach(([patientId, patient], index) => {
-            console.log(`      ${index + 1}. Patient_ID: ${patientId} (${typeof patientId}) | Nome: ${patient.patient_info?.name}`);
+          console.log(`   🔍 AMOSTRA DAS PRIMEIRAS 3 AIHs DESTE MÉDICO:`);
+          const aihEntries = Array.from(patientsMap.entries()).slice(0, 3);
+          aihEntries.forEach(([aihKey, patientData], index) => {
+            console.log(`      ${index + 1}. AIH_ID: ${aihKey} (${typeof aihKey}) | Paciente: ${patientData.patient_info?.name} | AIH: ${patientData.aih_info?.aih_number}`);
           });
         }
 

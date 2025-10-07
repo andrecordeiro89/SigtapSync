@@ -124,18 +124,8 @@ const isSameUTCDate = (a?: Date, b?: Date): boolean => {
 };
 
 const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
-  // Recorte local para estatísticas: respeitar modo "apenas data de alta"
+  // ✅ SIMPLIFICADO: Usar TODOS os pacientes (sem filtro de data)
   let patientsForStats = doctorData.patients;
-  try {
-    const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
-    const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
-    if (useOnlyEnd && selectedEnd) {
-      patientsForStats = doctorData.patients.filter(p => {
-        const discharge = (p as any)?.aih_info?.discharge_date ? new Date((p as any).aih_info.discharge_date) : undefined;
-        return !!discharge && isSameUTCDate(discharge, selectedEnd);
-      });
-    }
-  } catch {}
 
   // 🚀 OTIMIZAÇÃO #4: Usar procedimentos pré-filtrados (calculable_procedures)
   const totalProcedures = patientsForStats.reduce((sum, patient) => 
@@ -480,7 +470,7 @@ const DataDiagnostics: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   );
 };
 
-// ✅ INTERFACE PARA PROPS DO COMPONENTE
+// ✅ INTERFACE PARA PROPS DO COMPONENTE - SIMPLIFICADA
 interface MedicalProductionDashboardProps {
   onStatsUpdate?: (stats: {
     totalRevenue: number;
@@ -488,32 +478,23 @@ interface MedicalProductionDashboardProps {
     totalPatients: number;
     totalProcedures: number;
   }) => void;
-  dateRange?: DateRange;
-  onDateRangeChange?: (range: DateRange) => void;
-  selectedHospitals?: string[]; // 🆕 FILTROS GLOBAIS DE HOSPITAL
-  searchTerm?: string; // 🆕 BUSCA GLOBAL MÉDICOS
-  patientSearchTerm?: string; // 🆕 NOVO: BUSCA GLOBAL PACIENTES
-  selectedCareCharacter?: string; // 🆕 FILTRO GLOBAL DE CARÁTER DE ATENDIMENTO
-  selectedSpecialty?: string; // 🆕 FILTRO GLOBAL DE ESPECIALIDADE
-  selectedCareSpecialty?: string; // 🆕 NOVO: ESPECIALIDADE DE ATENDIMENTO (AIH)
+  selectedHospitals?: string[]; // Filtro de hospital
+  searchTerm?: string; // Busca de médicos
+  patientSearchTerm?: string; // Busca de pacientes
+  selectedCompetencia?: string; // ✅ NOVO: Filtro de competência
 }
 
-// ✅ COMPONENTE PRINCIPAL
+// ✅ COMPONENTE PRINCIPAL - SIMPLIFICADO
 const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({ 
   onStatsUpdate, 
-  dateRange, 
-  onDateRangeChange,
-  selectedHospitals = ['all'], // 🆕 FILTROS GLOBAIS DE HOSPITAL
-  searchTerm = '', // 🆕 BUSCA GLOBAL MÉDICOS
-  patientSearchTerm = '', // 🆕 NOVO: BUSCA GLOBAL PACIENTES
-  selectedCareCharacter = 'all', // 🆕 FILTRO GLOBAL DE CARÁTER DE ATENDIMENTO
-  selectedSpecialty = 'all', // 🆕 FILTRO GLOBAL DE ESPECIALIDADE
-  selectedCareSpecialty = 'all' // 🆕 NOVO: ESPECIALIDADE DE ATENDIMENTO (AIH)
+  selectedHospitals = ['all'],
+  searchTerm = '',
+  patientSearchTerm = '',
+  selectedCompetencia = 'all'
 }) => {
   const { user, canAccessAllHospitals, hasFullAccess } = useAuth();
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
   const [filteredDoctors, setFilteredDoctors] = useState<DoctorWithPatients[]>([]);
-  // searchTerm e selectedCareCharacter agora são controlados globalmente via props
   const [availableHospitals, setAvailableHospitals] = useState<Array<{id: string, name: string, cnes?: string}>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
@@ -527,8 +508,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   // 🆕 MODAL RELATÓRIO SUS
   const [reportModalOpen, setReportModalOpen] = useState<boolean>(false);
-  // 🆕 FILTRO DE COMPETÊNCIA
-  const [selectedCompetencia, setSelectedCompetencia] = useState<string>('all');
+  // ✅ COMPETÊNCIA VEM DO PROP (não precisa de estado local)
   const [availableCompetencias, setAvailableCompetencias] = useState<string[]>([]);
 
   // 🆕 FUNÇÃO PARA DETERMINAR HOSPITAL CORRETO BASEADO NO CONTEXTO
@@ -1055,19 +1035,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         // Usa fonte real do banco (aihs + patients), via serviço agregador
         let mergedDoctors = doctorsData;
         try {
-          // NOVO: usar caminho direto nas tabelas (aihs + patients + procedure_records)
-          const dateFromISO = dateRange ? dateRange.startDate.toISOString() : undefined;
-          const dateToISO = dateRange ? dateRange.endDate.toISOString() : undefined;
+          // ✅ SIMPLIFICADO: Usar APENAS competência como filtro (sem filtros de data)
           const selectedHospitalIds = (selectedHospitals && !selectedHospitals.includes('all')) ? selectedHospitals : undefined;
-          const doctorsWithPatients = await DoctorsHierarchyV2Service.getDoctorsHierarchyV2({
+          const competenciaFilter = (selectedCompetencia && selectedCompetencia !== 'all') ? selectedCompetencia : undefined;
+          
+          console.log('🗓️ Carregando dados com filtro de competência:', competenciaFilter || 'TODAS');
+          
+          const doctorsWithPatients = await DoctorPatientService.getDoctorsWithPatientsFromProceduresView({
             hospitalIds: selectedHospitalIds,
-            dateFromISO,
-            dateToISO,
-            careCharacter: selectedCareCharacter
+            competencia: competenciaFilter
           });
           // Usar diretamente a fonte das tabelas, garantindo pacientes e procedimentos
           mergedDoctors = doctorsWithPatients;
-          console.log('✅ Associação Médicos → Pacientes carregada direto das tabelas:', mergedDoctors.filter(d => d.patients.length > 0).length, 'médicos com pacientes');
+          console.log('✅ Associação Médicos → Pacientes carregada:', mergedDoctors.filter(d => d.patients.length > 0).length, 'médicos com pacientes');
         } catch (assocErr) {
           console.warn('⚠️ Falha ao carregar associação de pacientes; mantendo lista de médicos sem pacientes.', assocErr);
         }
@@ -1115,7 +1095,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     };
 
     loadDoctorsData();
-  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, dateRange, refreshTick, selectedCareCharacter]);
+  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, refreshTick, selectedCompetencia]);
 
   // 🆕 CARREGAR COMPETÊNCIAS DISPONÍVEIS
   useEffect(() => {
@@ -1146,13 +1126,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           if (selectedHospitals && !selectedHospitals.includes('all')) {
             if (!selectedHospitals.includes(row.hospital_id)) return;
           }
-          if (dateRange) {
-            const adm = new Date(row.admission_date);
-            const start = dateRange.startDate;
-            const end = new Date(dateRange.endDate);
-            end.setHours(23, 59, 59, 999);
-            if (adm < start || adm > end) return;
-          }
+          // ✅ REMOVIDO: Filtro de data
         } catch {}
         if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
         realtimeDebounceRef.current = setTimeout(() => setRefreshTick((t) => t + 1), 800);
@@ -1164,13 +1138,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           if (selectedHospitals && !selectedHospitals.includes('all')) {
             if (!selectedHospitals.includes(row.hospital_id)) return;
           }
-          if (dateRange) {
-            const procDate = new Date(row.procedure_date);
-            const start = dateRange.startDate;
-            const end = new Date(dateRange.endDate);
-            end.setHours(23, 59, 59, 999);
-            if (procDate < start || procDate > end) return;
-          }
+          // ✅ REMOVIDO: Filtro de data
         } catch {}
         if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
         realtimeDebounceRef.current = setTimeout(() => setRefreshTick((t) => t + 1), 800);
@@ -1181,7 +1149,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       try { supabase.removeChannel(channel); } catch {}
       if (realtimeDebounceRef.current) clearTimeout(realtimeDebounceRef.current);
     };
-  }, [autoRefresh, selectedHospitals, dateRange]);
+  }, [autoRefresh, selectedHospitals]);
 
   // 🕒 POLLING DE BACKUP: desativado por padrão para evitar recargas
   // useEffect(() => {
@@ -1241,55 +1209,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       console.log(`🔍 [FILTRO PACIENTE] Resultado: ${filtered.length} médicos com pacientes correspondentes`);
     }
 
-    // Filtrar por especialidade MÉDICA (global)
-    if (selectedSpecialty && selectedSpecialty !== 'all') {
-      const sel = selectedSpecialty.toLowerCase();
-      filtered = filtered.filter(doctor => (doctor.doctor_info.specialty || '').toLowerCase() === sel);
-    }
-
-    // Filtrar por Especialidade de Atendimento (AIH) no nível de pacientes dentro de cada médico
-    if (selectedCareSpecialty && selectedCareSpecialty !== 'all') {
-      const selCare = selectedCareSpecialty.toLowerCase();
-      filtered = filtered.map(doctor => {
-        const patientsFiltered = doctor.patients.filter(p => {
-          const aihSpec = (((p as any).aih_info?.specialty) || ((p as any).aih_info?.especialidade) || '').toString();
-          return aihSpec.toLowerCase() === selCare;
-        });
-        return { ...doctor, patients: patientsFiltered } as typeof doctor;
-      }).filter(d => d.patients.length > 0);
-    }
-
-    // 🆕 FILTRAR POR COMPETÊNCIA no nível de pacientes dentro de cada médico
-    if (selectedCompetencia && selectedCompetencia !== 'all') {
-      filtered = filtered.map(doctor => {
-        const patientsFiltered = doctor.patients.filter(p => {
-          const comp = (p as any)?.aih_info?.competencia;
-          return comp === selectedCompetencia;
-        });
-        return { ...doctor, patients: patientsFiltered } as typeof doctor;
-      }).filter(d => d.patients.length > 0);
-    }
-
-    // Remover médicos sem pacientes no dia selecionado quando o toggle "apenas alta" estiver ativo
-    try {
-      const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
-      const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
-      if (useOnlyEnd && selectedEnd) {
-        filtered = filtered.map(d => {
-          const patientsFiltered = d.patients.filter(p => {
-            const discharge = (p as any)?.aih_info?.discharge_date ? new Date((p as any).aih_info.discharge_date) : undefined;
-            return !!discharge && isSameUTCDate(discharge, selectedEnd);
-          });
-          return { ...d, patients: patientsFiltered } as typeof d;
-        }).filter(d => d.patients.length > 0);
-      }
-    } catch {}
+    // ✅ REMOVIDO: Filtros de especialidade médica e especialidade de atendimento
+    
+    // ✅ SIMPLIFICADO: Filtro de competência removido (já aplicado no backend)
+    // A competência já é filtrada no carregamento dos dados via DoctorPatientService
 
     setFilteredDoctors(filtered);
     
     // Reset da página atual quando filtros são aplicados
     setCurrentDoctorPage(1);
-  }, [searchTerm, patientSearchTerm, selectedSpecialty, selectedCareSpecialty, selectedCompetencia, doctors, selectedHospitals, selectedCareCharacter, dateRange]);
+  }, [searchTerm, patientSearchTerm, selectedCompetencia, doctors, selectedHospitals]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
   const toggleDoctorExpansion = (doctorKey: string) => {
@@ -1691,7 +1620,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       
                       console.log('🔍 [RELATÓRIO GERAL] Iniciando coleta de dados...');
                       console.log('🔍 [RELATÓRIO GERAL] Médicos filtrados:', filteredDoctors.length);
-                      console.log('🔍 [RELATÓRIO GERAL] Filtro de data:', dateRange ? `${dateRange.startDate.toLocaleDateString('pt-BR')} a ${dateRange.endDate.toLocaleDateString('pt-BR')}` : 'Sem filtro');
+                      console.log('🔍 [RELATÓRIO GERAL] Sem filtro de data');
                       
                       filteredDoctors.forEach((card: any) => {
                         const doctorName = card.doctor_info?.name || '';
@@ -1702,7 +1631,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           totalPatientsFound++;
                           
                           // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo filtro do relatório simplificado)
-                          if (dateRange && dateRange.startDate && dateRange.endDate) {
+                          if (false) {
                             const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
                             
                             if (!discharge) {
@@ -1711,10 +1640,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             }
                             
                             // Normalizar datas para comparação (início do dia para startDate, fim do dia para endDate)
-                            const startOfPeriod = new Date(dateRange.startDate);
-                            startOfPeriod.setHours(0, 0, 0, 0);
-                            
-                            const endOfPeriod = new Date(dateRange.endDate);
+                            const startOfPeriod = new Date();
+                            const endOfPeriod = new Date();
                             endOfPeriod.setHours(23, 59, 59, 999);
                             
                             const dischargeDate = new Date(discharge);
@@ -1897,8 +1824,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   size="sm"
                   onClick={async () => {
                     try {
-                      const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
-                      const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
+                      // ✅ SIMPLIFICADO: Sem filtros de data (apenas competência)
                       const rows: Array<Array<string | number>> = [];
                       const header = [
                         '#', 
@@ -1918,7 +1844,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       
                       console.log('🔍 [RELATÓRIO SIMPLIFICADO] Iniciando coleta de dados...');
                       console.log('🔍 [RELATÓRIO SIMPLIFICADO] Médicos filtrados:', filteredDoctors.length);
-                      console.log('🔍 [RELATÓRIO SIMPLIFICADO] Filtro de data:', dateRange ? `${dateRange.startDate.toLocaleDateString('pt-BR')} a ${dateRange.endDate.toLocaleDateString('pt-BR')}` : 'Sem filtro');
+                      console.log('🔍 [RELATÓRIO SIMPLIFICADO] Sem filtro de data');
                       
                       filteredDoctors.forEach((card: any) => {
                         const doctorName = card.doctor_info?.name || 'Médico não identificado';
@@ -1929,7 +1855,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           totalPatientsFound++;
                           
                           // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo do relatório geral)
-                          if (dateRange && dateRange.startDate && dateRange.endDate) {
+                          if (false) {
                             const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
                             
                             if (!discharge) {
@@ -1938,10 +1864,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             }
                             
                             // Normalizar datas para comparação (início do dia para startDate, fim do dia para endDate)
-                            const startOfPeriod = new Date(dateRange.startDate);
-                            startOfPeriod.setHours(0, 0, 0, 0);
-                            
-                            const endOfPeriod = new Date(dateRange.endDate);
+                            const startOfPeriod = new Date();
+                            const endOfPeriod = new Date();
                             endOfPeriod.setHours(23, 59, 59, 999);
                             
                             const dischargeDate = new Date(discharge);
@@ -2102,70 +2026,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         </CardHeader>
         <CardContent className="space-y-6">
 
-          {/* 🆕 FILTROS LOCAIS DE PRODUÇÃO MÉDICA */}
-          <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 p-4 rounded-xl border border-slate-200">
-            <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              Filtros de Produção Médica
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Filtro de Competência */}
-              <div>
-                <label className="text-xs font-medium text-slate-600 mb-1.5 flex items-center gap-1.5">
-                  <div className="p-1 bg-indigo-100 rounded">
-                    <Calendar className="w-3 h-3 text-indigo-600" />
-                  </div>
-                  <span>Competência</span>
-                </label>
-                <Select value={selectedCompetencia} onValueChange={setSelectedCompetencia}>
-                  <SelectTrigger className="w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white/80 hover:bg-white transition-colors">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">
-                      <div className="flex items-center gap-2">
-                        Todas as Competências
-                      </div>
-                    </SelectItem>
-                    {availableCompetencias.map(comp => (
-                      <SelectItem key={comp} value={comp}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-                          {formatCompetencia(comp)}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* Limpar Filtros */}
-              <div className="flex items-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedCompetencia('all');
-                  }}
-                  className="w-full border-slate-300 hover:bg-slate-100"
-                >
-                  Limpar Filtros Locais
-                </Button>
+          {/* ✅ COMPETÊNCIA É CONTROLADA PELO EXECUTIVEDASHBOARD (filtro global) */}
+          {selectedCompetencia !== 'all' && (
+            <div className="bg-gradient-to-br from-indigo-50 to-blue-50/30 p-3 rounded-xl border border-indigo-200">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-indigo-600" />
+                <span className="text-sm font-medium text-indigo-700">
+                  Filtro ativo: Competência {formatCompetencia(selectedCompetencia)}
+                </span>
               </div>
             </div>
-            
-            {/* Indicador de filtros ativos */}
-            {selectedCompetencia !== 'all' && (
-              <div className="mt-3 flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-slate-600">Filtros ativos:</span>
-                {selectedCompetencia !== 'all' && (
-                  <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
-                    📅 Competência: {formatCompetencia(selectedCompetencia)}
-                  </Badge>
-                )}
-              </div>
-            )}
-          </div>
+          )}
 
           {/* ✅ LISTA DE MÉDICOS COM PAGINAÇÃO */}
           <div className="space-y-4">
@@ -2347,20 +2218,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         const hospitalId = doctor.hospitals?.[0]?.hospital_id;
                                         
                                         console.log(`📊 [RELATÓRIO MÉDICO] Gerando relatório para ${doctorName}`);
-                                        console.log(`📊 [RELATÓRIO MÉDICO] Filtro de data:`, dateRange ? `${dateRange.startDate.toLocaleDateString('pt-BR')} a ${dateRange.endDate.toLocaleDateString('pt-BR')}` : 'Sem filtro');
+                                        console.log(`📊 [RELATÓRIO MÉDICO] Sem filtro de data`);
                                         
                                         (doctor.patients || []).forEach((p: any) => {
                                           // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo dos relatórios gerais)
-                                          if (dateRange && dateRange.startDate && dateRange.endDate) {
+                                          if (false) {
                                             const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
                                             
                                             if (!discharge) return;
                                             
-                                            const startOfPeriod = new Date(dateRange.startDate);
-                                            startOfPeriod.setHours(0, 0, 0, 0);
-                                            
-                                            const endOfPeriod = new Date(dateRange.endDate);
-                                            endOfPeriod.setHours(23, 59, 59, 999);
+                                            const startOfPeriod = new Date();
+                                            const endOfPeriod = new Date();
                                             
                                             const dischargeDate = new Date(discharge);
                                             
@@ -2529,20 +2397,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                          const doctorName = doctor.doctor_info?.name || '';
                                          
                                          console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO] Gerando para ${doctorName}`);
-                                         console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO] Filtro de data:`, dateRange ? `${dateRange.startDate.toLocaleDateString('pt-BR')} a ${dateRange.endDate.toLocaleDateString('pt-BR')}` : 'Sem filtro');
+                                         console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO] Sem filtro de data`);
                                          
                                          (doctor.patients || []).forEach((p: any) => {
                                            // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo dos outros relatórios)
-                                           if (dateRange && dateRange.startDate && dateRange.endDate) {
+                                           if (false) {
                                              const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
                                              
                                              if (!discharge) return;
                                              
-                                             const startOfPeriod = new Date(dateRange.startDate);
-                                             startOfPeriod.setHours(0, 0, 0, 0);
-                                             
-                                             const endOfPeriod = new Date(dateRange.endDate);
-                                             endOfPeriod.setHours(23, 59, 59, 999);
+                                             const startOfPeriod = new Date();
+                                             const endOfPeriod = new Date();
                                              
                                              const dischargeDate = new Date(discharge);
                                              
@@ -2656,22 +2521,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         const hospitalName = doctor.hospitals?.[0]?.hospital_name || '';
                                         
                                         console.log(`🎯 [RELATÓRIO ANESTESISTAS] Gerando para médico: ${doctorName}`);
-                                        console.log(`🎯 [RELATÓRIO ANESTESISTAS] Filtro de data:`, dateRange ? `${dateRange.startDate.toLocaleDateString('pt-BR')} a ${dateRange.endDate.toLocaleDateString('pt-BR')}` : 'Sem filtro');
+                                        console.log(`🎯 [RELATÓRIO ANESTESISTAS] Sem filtro de data`);
                                         
                                         let totalAnesthesiaProcedures = 0;
                                         
                                         (doctor.patients || []).forEach((p: any) => {
                                           // ✅ FILTRO UNIFICADO: Intervalo de datas
-                                          if (dateRange && dateRange.startDate && dateRange.endDate) {
+                                          if (false) {
                                             const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
                                             
                                             if (!discharge) return;
                                             
-                                            const startOfPeriod = new Date(dateRange.startDate);
-                                            startOfPeriod.setHours(0, 0, 0, 0);
-                                            
-                                            const endOfPeriod = new Date(dateRange.endDate);
-                                            endOfPeriod.setHours(23, 59, 59, 999);
+                                            const startOfPeriod = new Date();
+                                            const endOfPeriod = new Date();
                                             
                                             const dischargeDate = new Date(discharge);
                                             
@@ -2912,21 +2774,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                        const desc = (proc.procedure_description || '').toLowerCase();
                                        return codeNorm.includes(procTerm) || desc.includes(procTermRaw);
                                      });
-                                     const careSpecFilter = (selectedCareSpecialty || '').trim();
-                                     const patientCareSpec = (((patient as any)?.aih_info?.specialty || '') as string).trim();
-                                     const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toUpperCase();
-                                     const matchesCareSpec = !careSpecFilter || careSpecFilter === 'all' || (patientCareSpec && normalize(patientCareSpec) === normalize(careSpecFilter));
-                                     // Filtro por data de alta (modo apenas por alta), mesmo critério da lista
-                                     let matchesDischarge = true;
-                                     try {
-                                       const discharge = (patient as any)?.aih_info?.discharge_date ? new Date((patient as any).aih_info.discharge_date) : undefined;
-                                       const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
-                                       const useOnlyEnd = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
-                                       if (useOnlyEnd && selectedEnd) {
-                                         matchesDischarge = !!discharge && isSameUTCDate(discharge, selectedEnd);
-                                       }
-                                     } catch { matchesDischarge = true; }
-                                     return matchesName && matchesProc && matchesCareSpec && matchesDischarge;
+                                     // ✅ SIMPLIFICADO: Sem filtros de data (apenas competência)
+                                     return matchesName && matchesProc;
                                    }).length;
                                    return nameTerm || procTermRaw ? `${filteredCount} de ${doctor.patients.length}` : filteredCount;
                                  })()})
@@ -2988,22 +2837,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     const desc = (proc.procedure_description || '').toLowerCase();
                                     return codeNorm.includes(procTerm) || desc.includes(procTermRaw);
                                   });
-                                  const careSpecFilter = (selectedCareSpecialty || '').trim();
-                                  const patientCareSpec = (((patient as any)?.aih_info?.specialty || '') as string).trim();
-                                  const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toUpperCase();
-                                  const matchesCareSpec = !careSpecFilter || careSpecFilter === 'all' || (patientCareSpec && normalize(patientCareSpec) === normalize(careSpecFilter));
-                                  // Filtro por data de alta (modo apenas por alta): mostrar somente pacientes com alta exatamente no dia selecionado
-                                  const filterByDischargeOnly = false; // será definido externamente
-                                  let matchesDischarge = true;
-                                  try {
-                                    const discharge = (patient as any)?.aih_info?.discharge_date ? new Date((patient as any).aih_info.discharge_date) : undefined;
-                                    const selectedEnd = (window as any).__SIGTAP_SELECTED_END_DATE__ as Date | undefined;
-                                    const selectedDischargeOnly = (window as any).__SIGTAP_USE_ONLY_END_DATE__ as boolean | undefined;
-                                    if (selectedDischargeOnly && selectedEnd) {
-                                      matchesDischarge = !!discharge && isSameUTCDate(discharge, selectedEnd);
-                                    }
-                                  } catch { matchesDischarge = true; }
-                                  return matchesName && matchesProc && matchesCareSpec && matchesDischarge;
+                                  // ✅ SIMPLIFICADO: Sem filtros de data (apenas competência)
+                                  return matchesName && matchesProc;
                                 });
                                 // Ordenar por data mais recente primeiro (Alta SUS; fallback para Admissão)
                                 const sortedPatients = [...filteredPatients].sort((a, b) => {
@@ -3068,7 +2903,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     const color = isElective ? 'text-blue-600' : (isUrgent ? 'text-red-600' : 'text-slate-700');
                                                     return (
                                                       <Badge
-                                                        variant="ghost"
+                                                        variant="outline"
                                                         className={`inline-flex items-center gap-1 rounded-md border-0 bg-transparent px-0 py-0 h-auto ${color} text-[11px]`}
                                                       >
                                                         <span className="h-1.5 w-1.5 rounded-full bg-current" />
@@ -3223,7 +3058,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   const careCharStr = typeof careCharRaw === 'string' ? careCharRaw.trim() : String(careCharRaw ?? '');
                                                   const isMedical04 = !!(procedure?.procedure_code || '').toString().trim().startsWith('04');
                                                   const isPrincipal = Number((procedure as any)?.sequence ?? (procedure as any)?.procedure_sequence ?? 0) === 1;
-                                                  const effectiveCareChar = selectedCareCharacter === 'all' ? careCharStr : selectedCareCharacter;
+                                                  const effectiveCareChar = careCharStr;
                                                   const aihHasExcluded = hasAnyExcludedCodeInProcedures(patient.procedures as any);
                                                   const operaEligible = !aihHasExcluded && isOperaEligibleConfig(procedure.procedure_code, effectiveCareChar);
                                                   const diagReason = (() => {

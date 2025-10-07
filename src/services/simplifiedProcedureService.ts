@@ -23,7 +23,7 @@ export interface ProcedureRecord {
   
   // Financial Information  
   value_charged?: number;
-  value_original?: number;
+  valor_original?: number; // ✅ CORRIGIDO: coluna no banco é valor_original (português)
   porcentagem_sus?: number;
   total_value?: number;
   unit_value?: number;
@@ -98,7 +98,7 @@ export class ProcedureRecordsService {
           procedure_description,
           procedure_code_original,
           value_charged,
-          value_original,
+          valor_original,
           total_value,
           unit_value,
           professional,
@@ -197,7 +197,7 @@ export class ProcedureRecordsService {
             procedure_description,
             procedure_code_original,
             value_charged,
-            value_original,
+            valor_original,
             total_value,
             unit_value,
             professional,

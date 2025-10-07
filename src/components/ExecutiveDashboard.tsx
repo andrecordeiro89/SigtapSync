@@ -261,19 +261,12 @@ interface AlertItem {
 }
 
 const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
-  // State Management
-  const [selectedTimeRange, setSelectedTimeRange] = useState('7d');
-  const [selectedDateRange, setSelectedDateRange] = useState<DateRange>(() => {
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return { startDate: sevenDaysAgo, endDate: now };
-  });
+  // State Management - SIMPLIFICADO: Apenas competência
   const [selectedHospitals, setSelectedHospitals] = useState<string[]>(['all']);
   const [searchTerm, setSearchTerm] = useState('');
-  const [patientSearchTerm, setPatientSearchTerm] = useState(''); // 🆕 NOVO: Busca por nome do paciente
-  const [selectedCareCharacter, setSelectedCareCharacter] = useState('all');
+  const [patientSearchTerm, setPatientSearchTerm] = useState(''); // Busca por nome do paciente
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
-  const [selectedCareSpecialty, setSelectedCareSpecialty] = useState<string>('all');
+  const [selectedCareSpecialty, setSelectedCareSpecialty] = useState<string>('all'); // Mantido temporariamente
   const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -281,8 +274,6 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [activeHospitalTab, setActiveHospitalTab] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  // Novo: permitir filtrar somente pela data final (alta do dia)
-  const [useOnlyEndDate, setUseOnlyEndDate] = useState<boolean>(false);
   // Removido: consolidado de todos os hospitais — fonte única: tabela AIHs filtrada por hospital
   // const [showReportGenerator, setShowReportGenerator] = useState(false);
   
@@ -312,31 +303,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   // Competência (mês de alta)
   const [selectedCompetency, setSelectedCompetency] = useState<string>('all');
   const [availableCompetencies, setAvailableCompetencies] = useState<Array<{ value: string; label: string }>>([]);
-  const showCompetencyTabs = false;
-
-  // Removido: Totais agregados no cabeçalho (mantidos apenas na Produção Médica)
-
-  // Intervalo efetivo para a TABELA de Produção Médica (Médicos) — filtra por mês da alta
-  const productionEffectiveDateRange: DateRange = React.useMemo(() => {
-    if (!selectedCompetency || selectedCompetency === 'all') return selectedDateRange;
-    const [yearStr, monthStr] = selectedCompetency.split('-');
-    const year = Number(yearStr);
-    const month = Number(monthStr);
-    if (!year || !month) return selectedDateRange;
-    
-    // 🔧 CORREÇÃO: Usar UTC para evitar problemas de timezone
-    const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
-    const end = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
-    
-    return { startDate: start, endDate: end };
-  }, [selectedCompetency, selectedDateRange]);
-
-  // Recorte efetivo por ALTA: quando habilitado, considera somente o dia selecionado na Data de Alta
-  const dischargeEffectiveDateRange: DateRange = React.useMemo(() => {
-    return useOnlyEndDate
-      ? { startDate: selectedDateRange.endDate, endDate: selectedDateRange.endDate }
-      : selectedDateRange;
-  }, [useOnlyEndDate, selectedDateRange]);
+  const showCompetencyTabs = true; // ✅ Ativado para carregar competências
 
   // Estados para dados reais das views
   const [doctorsData, setDoctorsData] = useState<DoctorAggregated[]>([]);
@@ -448,21 +415,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     setLastUpdate(new Date());
   }, []);
 
-  // Função para lidar com mudanças no filtro de data
-  const handleDateRangeChange = useCallback((range: DateRange) => {
-    console.log('📅 Alterando período de análise:', {
-      inicio: range.startDate.toLocaleDateString('pt-BR'),
-      fim: range.endDate.toLocaleDateString('pt-BR')
-    });
-    setSelectedDateRange(range);
-    setIsLoading(true);
-    // Carregar dados com o novo período
-    if (hasExecutiveAccess) {
-      // Quando filtrar apenas por alta, passamos o recorte de alta (um dia)
-      const effective = useOnlyEndDate ? { startDate: range.endDate, endDate: range.endDate } : range;
-      loadExecutiveData(effective);
-    }
-  }, [hasExecutiveAccess, useOnlyEndDate]);
+  // ✅ SIMPLIFICADO: Sem manipulação de datas
 
   
   
@@ -554,16 +507,16 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           const apuHospital = sortedHospitalStats.find(h => getHospitalTabLabel(h.name) === 'APU');
           const firstHospitalId = apuHospital ? apuHospital.id : sortedHospitalStats[0].id;
           
-          console.log('🎯 Selecionando hospital padrão:', {
+          console.log('🎯 Hospital padrão disponível:', {
             apuFound: !!apuHospital,
             selectedId: firstHospitalId,
             selectedName: sortedHospitalStats.find(h => h.id === firstHospitalId)?.name,
             selectedLabel: getHospitalTabLabel(sortedHospitalStats.find(h => h.id === firstHospitalId)?.name || '')
           });
           
-          setActiveHospitalTab(firstHospitalId);
-          // Forçar filtragem SEMPRE por hospital
-          setSelectedHospitals([firstHospitalId]);
+          // ✅ CORREÇÃO: NÃO forçar seleção de hospital único - manter 'all' como padrão
+          // setActiveHospitalTab(firstHospitalId);
+          // setSelectedHospitals([firstHospitalId]);
         }
       }
     } catch (e) {
@@ -578,32 +531,24 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     setSelectedHospitals([hospitalId]);
     // Recarregar dados com o novo hospital aplicado
     setIsLoading(true);
-    loadExecutiveData(selectedDateRange);
+    loadExecutiveData();
   };
 
-  // Sincronizar dropdown de hospitais com a aba ativa (impede 'all')
+  // ✅ CORREÇÃO: Removido useEffect que forçava mudança de 'all' para hospital específico
+  // Agora permite que o usuário selecione "Todos os Hospitais" ao iniciar
   useEffect(() => {
     if (!hospitalStats || hospitalStats.length === 0) return;
-    const defaultId = activeHospitalTab || sortedHospitalStats[0]?.id;
     
-    console.log('🔄 Sincronizando dropdown:', {
+    console.log('🔄 Estado atual de hospitais:', {
       activeHospitalTab,
       selectedHospitals,
-      defaultId,
       hospitalStatsLength: hospitalStats.length
     });
     
-    // Se usuário selecionar "all" no dropdown, manter aba ativa
-    if (selectedHospitals.includes('all')) {
-      if (selectedHospitals.length !== 1 || selectedHospitals[0] !== defaultId) {
-        console.log('📝 Ajustando selectedHospitals para:', [defaultId]);
-        setSelectedHospitals([defaultId]);
-      }
-      return;
-    }
-    // Se houver um único hospital selecionado diferente da aba, alinhar aba
-    if (selectedHospitals.length >= 1 && selectedHospitals[0] !== defaultId) {
-      console.log('🏥 Mudando activeHospitalTab para:', selectedHospitals[0]);
+    // ✅ PERMITIR 'all' - não forçar mudança para hospital específico
+    // Se houver um único hospital selecionado (não 'all'), alinhar aba
+    if (selectedHospitals.length >= 1 && !selectedHospitals.includes('all') && selectedHospitals[0] !== activeHospitalTab) {
+      console.log('🏥 Alinhando activeHospitalTab para:', selectedHospitals[0]);
       setActiveHospitalTab(selectedHospitals[0]);
     }
   }, [selectedHospitals, activeHospitalTab, hospitalStats, sortedHospitalStats]);
@@ -635,29 +580,23 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   // Removido: função de faturamento consolidado de todos os hospitais
 
   // Load Data
-  const loadExecutiveData = async (dateRange?: DateRange) => {
+  const loadExecutiveData = async () => {
     if (!hasExecutiveAccess) return;
     
     setIsLoading(true);
     try {
-      const baseRange = dateRange || selectedDateRange;
-      const currentDateRange: DateRange = useOnlyEndDate
-        ? { startDate: baseRange.endDate, endDate: baseRange.endDate }
-        : baseRange;
-      console.log('📊 Carregando dados executivos reais...', {
-        periodo: `${currentDateRange.startDate.toLocaleDateString('pt-BR')} - ${currentDateRange.endDate.toLocaleDateString('pt-BR')}`
-      });
+      console.log('📊 Carregando dados executivos reais...');
       
       // ✅ PRIMEIRO: Tentar carregar das views, se falhar usar dados reais das tabelas
       let billingStatsData = null;
       try {
         // Filtros executivos aplicam somente à aba Médicos.
         // Para billing/KPIs e demais abas, não aplicar filtros globais aqui.
-        billingStatsData = await AIHBillingService.getCompleteBillingStats(currentDateRange);
+        billingStatsData = await AIHBillingService.getCompleteBillingStats();
         console.log('✅ Dados carregados das views de billing');
       } catch (error) {
         console.warn('⚠️ Views de billing não disponíveis, buscando dados reais das tabelas:', error);
-        billingStatsData = await getRealAIHData(currentDateRange);
+        billingStatsData = await getRealAIHData();
       }
 
       // Carregar dados das views de médicos/hospitais em paralelo
@@ -745,9 +684,6 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       const activeDoctors = doctorsResult.doctors.filter(d => d.activity_status === 'ATIVO').length;
       
       // ✅ CABEÇALHO: usar RPC get_hospital_kpis (fonte única e agregada no banco)
-      const startDateISO = currentDateRange.startDate.toISOString();
-      const endDateISO = currentDateRange.endDate.toISOString();
-
       // Garantir hospital ativo (fallback para aba atual)
       const activeHospitalId = (selectedHospitals.length > 0 && !selectedHospitals.includes('all'))
         ? selectedHospitals[0]
@@ -880,16 +816,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   // Effects
   useEffect(() => {
     if (hasExecutiveAccess) {
-      // Expor estado de filtro por alta ao restante da árvore (solução simples, não invasiva)
-      try {
-        (window as any).__SIGTAP_USE_ONLY_END_DATE__ = useOnlyEndDate;
-        (window as any).__SIGTAP_SELECTED_END_DATE__ = selectedDateRange?.endDate;
-      } catch {}
-      loadExecutiveData(selectedDateRange);
+      loadExecutiveData();
     }
-  }, [selectedTimeRange, selectedHospitals, selectedDateRange, selectedCompetency, hasExecutiveAccess, useOnlyEndDate]);
+  }, [selectedHospitals, selectedCompetency, hasExecutiveAccess]);
 
-  // Carregar TODAS as competências disponíveis (mês da alta) conforme hospitais selecionados
+  // ✅ Carregar competências disponíveis do campo `competencia` da tabela `aihs`
   useEffect(() => {
     if (!showCompetencyTabs) {
       setAvailableCompetencies([]);
@@ -899,7 +830,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       try {
         let q = supabase
           .from('aihs')
-          .select('discharge_date,hospital_id');
+          .select('competencia,hospital_id')
+          .not('competencia', 'is', null);
         if (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) {
           q = q.in('hospital_id', selectedHospitals);
         }
@@ -911,11 +843,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         }
         const setYM = new Set<string>();
         (data || []).forEach((row: any) => {
-          const ref = row.discharge_date;
-          if (!ref) return;
-          const d = new Date(ref);
-          const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-          setYM.add(ym);
+          const comp = row.competencia;
+          if (comp) setYM.add(comp);
         });
         const arr = Array.from(setYM).sort((a, b) => (a < b ? 1 : -1));
         const formatted = arr.map((ym) => {
@@ -1072,50 +1001,36 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              {/* CARÁTER DE ATENDIMENTO */}
-              <div className="w-full md:w-[200px]">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Caráter de Atendimento</label>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={selectedCareCharacter}
-                    onChange={(e) => setSelectedCareCharacter(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-9"
-                  >
-                    <option value="all">Todos</option>
-                    <option value="1">Eletivo</option>
-                    <option value="2">Urgência/Emergência</option>
-                  </select>
-                  {selectedCareCharacter !== 'all' && (
-                    <button
-                      onClick={() => setSelectedCareCharacter('all')}
-                      className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                      title="Limpar filtro de caráter de atendimento"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </div>
+              {/* ✅ REMOVIDO: Filtros de especialidade médica e especialidade de atendimento */}
 
-              {/* ESPECIALIDADE DO MÉDICO */}
-              <div className="w-full md:w-[220px]">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Especialidade Médica</label>
+              {/* 🏥 FILTRO DE HOSPITAL */}
+              <div className="w-full md:w-[280px]">
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Hospital</label>
                 <div className="flex items-center gap-2">
                   <select
-                    value={selectedSpecialty}
-                    onChange={(e) => setSelectedSpecialty(e.target.value)}
+                    value={selectedHospitals[0] || 'all'}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSelectedHospitals(value === 'all' ? ['all'] : [value]);
+                      setActiveHospitalTab(value === 'all' ? null : value);
+                    }}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-9"
                   >
-                    <option value="all">Todas</option>
-                    {availableSpecialties.map(spec => (
-                      <option key={spec} value={spec}>{spec}</option>
+                    <option value="all">Todos os Hospitais</option>
+                    {hospitalStats.map(hospital => (
+                      <option key={hospital.id} value={hospital.id}>
+                        {hospital.name}
+                      </option>
                     ))}
                   </select>
-                  {selectedSpecialty !== 'all' && (
+                  {selectedHospitals[0] !== 'all' && !selectedHospitals.includes('all') && (
                     <button
-                      onClick={() => setSelectedSpecialty('all')}
+                      onClick={() => {
+                        setSelectedHospitals(['all']);
+                        setActiveHospitalTab(null);
+                      }}
                       className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                      title="Limpar filtro de especialidade"
+                      title="Limpar filtro de hospital"
                     >
                       ✕
                     </button>
@@ -1123,26 +1038,27 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              {/* ESPECIALIDADE DE ATENDIMENTO */}
-              <div className="w-full md:w-[240px]">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Especialidade de Atendimento</label>
+              {/* 🗓️ FILTRO DE COMPETÊNCIA */}
+              <div className="w-full md:w-[220px]">
+                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Competência</label>
                 <div className="flex items-center gap-2">
                   <select
-                    value={selectedCareSpecialty}
-                    onChange={(e) => setSelectedCareSpecialty(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-9"
+                    value={selectedCompetency}
+                    onChange={(e) => setSelectedCompetency(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors h-9"
                   >
                     <option value="all">Todas</option>
-                    <option value="01 - Cirúrgico">01 - Cirúrgico</option>
-                    <option value="02 - Obstétricos">02 - Obstétricos</option>
-                    <option value="03 - Clínico">03 - Clínico</option>
-                    <option value="07 - Pediátricos">07 - Pediátricos</option>
+                    {availableCompetencies.map(comp => (
+                      <option key={comp.value} value={comp.value}>
+                        {comp.label}
+                      </option>
+                    ))}
                   </select>
-                  {selectedCareSpecialty !== 'all' && (
+                  {selectedCompetency !== 'all' && (
                     <button
-                      onClick={() => setSelectedCareSpecialty('all')}
-                      className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                      title="Limpar filtro de especialidade de atendimento"
+                      onClick={() => setSelectedCompetency('all')}
+                      className="px-2 py-1 text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
+                      title="Limpar filtro de competência"
                     >
                       ✕
                     </button>
@@ -1150,71 +1066,23 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              {/* DATA DE ADMISSÃO */}
-              <div className="w-full md:w-[180px]">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data de Admissão</label>
-                <Input
-                  type="date"
-                  value={formatDateForInput(selectedDateRange.startDate)}
-                  onChange={(e) => {
-                    const newStart = parseDateInputLocal(e.target.value);
-                    // Garantir consistência: se start > end, alinhar end = start
-                    const endAligned = (selectedDateRange.endDate && newStart > selectedDateRange.endDate)
-                      ? newStart
-                      : selectedDateRange.endDate;
-                    const updated = { startDate: newStart, endDate: endAligned };
-                    setSelectedDateRange(updated);
-                    handleDateRangeChange(updated);
+              {/* ✅ SIMPLIFICADO: Botão de limpar filtros apenas */}
+              <div className="w-full flex justify-end pt-1">
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setPatientSearchTerm('');
+                    setSelectedHospitals(['all']);
+                    setSelectedCompetency('all');
+                    setActiveHospitalTab(null);
                   }}
-                  disabled={useOnlyEndDate}
-                  className="h-9"
-                />
-              </div>
-
-              {/* DATA DE ALTA */}
-              <div className="w-full md:w-[180px]">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Data de Alta</label>
-                <Input
-                  type="date"
-                  value={formatDateForInput(selectedDateRange.endDate)}
-                  max={formatDateForInput(new Date())}
-                  onChange={(e) => {
-                    const newEnd = parseDateInputLocal(e.target.value);
-                    // Garantir consistência: se end < start, alinhar start = end
-                    const startAligned = (selectedDateRange.startDate && newEnd < selectedDateRange.startDate)
-                      ? newEnd
-                      : selectedDateRange.startDate;
-                    const updated = { startDate: startAligned, endDate: newEnd };
-                    setSelectedDateRange(updated);
-                    handleDateRangeChange(updated);
-                  }}
-                  className="h-9"
-                />
-              </div>
-
-              {/* Linha 2: Toggle e botão de limpar filtros, ocupam largura completa */}
-              <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                <div className="flex items-center gap-2">
-                  <Switch checked={useOnlyEndDate} onCheckedChange={(v) => { setUseOnlyEndDate(!!v); setIsLoading(true); loadExecutiveData(); }} />
-                  <span className="text-xs text-gray-700">Filtrar apenas pela data de alta</span>
-                </div>
-                <div className="flex md:justify-end">
-                  <button
-                    onClick={() => {
-                      setSearchTerm('');
-                      setSelectedCareCharacter('all');
-                      setSelectedHospitals(['all']);
-                      setSelectedSpecialty('all');
-                      setSelectedCareSpecialty('all');
-                    }}
-                    className="inline-flex items-center gap-2 px-3 h-9 rounded-lg border border-gray-200 text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                    title="Limpar todos os filtros"
-                    aria-label="Limpar filtros"
-                  >
-                    <X className="h-4 w-4" />
-                    <span className="text-sm">Limpar filtros</span>
-                  </button>
-                </div>
+                  className="inline-flex items-center gap-2 px-3 h-9 rounded-lg border border-gray-200 text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                  title="Limpar todos os filtros"
+                  aria-label="Limpar filtros"
+                >
+                  <X className="h-4 w-4" />
+                  <span className="text-sm">Limpar filtros</span>
+                </button>
               </div>
 
               
@@ -1247,38 +1115,12 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               </div>
             )}
 
-            {/* Abas por Hospital (sempre separar médicos por hospital) */}
-            {hospitalStats && hospitalStats.length > 0 && (
-              <div className="pt-4 border-t border-gray-100">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-2 flex items-center gap-2">
-                  <span>Hospitais</span>
-                  <span className="text-[10px] font-normal text-gray-500 normal-case">(Selecione o hospital)</span>
-                </label>
-                <Tabs value={activeHospitalTab || sortedHospitalStats[0]?.id} onValueChange={handleHospitalTabChange}>
-                  <TabsList
-                    className="w-full h-auto grid gap-0 bg-muted rounded-md p-1 border border-gray-200"
-                    style={{ gridTemplateColumns: `repeat(${sortedHospitalStats.length || 1}, minmax(0, 1fr))` }}
-                  >
-                    {sortedHospitalStats.map((h) => (
-                      <TabsTrigger
-                        key={h.id}
-                        value={h.id}
-                        title={h.name}
-                        className="justify-center text-center whitespace-nowrap text-[11px] leading-tight px-1.5 py-1 rounded-none first:rounded-l-md last:rounded-r-md transition-colors min-h-[1.5rem] w-full border border-transparent hover:bg-blue-50/40 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200/80 data-[state=active]:bg-gradient-to-br data-[state=active]:from-blue-50/80 data-[state=active]:to-blue-100/40 data-[state=active]:text-blue-800 data-[state=active]:border-blue-200/60 data-[state=active]:shadow-sm data-[state=active]:backdrop-blur-sm"
-                        aria-label={`Selecionar ${h.name}`}
-                      >
-                        {getHospitalTabLabel(h.name)}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
-              </div>
-            )}
-
+            {/* ✅ BARRA DE ABAS DE HOSPITAIS REMOVIDA - Agora usa dropdown acima */}
+            
             {/* Abas de Competência duplicadas removidas */}
 
             {/* INDICADORES DE FILTROS ATIVOS */}
-            {(searchTerm || patientSearchTerm || selectedCareCharacter !== 'all' || selectedSpecialty !== 'all' || selectedCareSpecialty !== 'all' || !selectedHospitals.includes('all')) && (
+            {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all')) && (
               <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                 <div className="flex items-center gap-2">
                   {searchTerm && (
@@ -1293,20 +1135,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   )}
                   {!selectedHospitals.includes('all') && (
                     <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                      🏥 {selectedHospitals.length} Hospital(is)
+                      🏥 {hospitalStats.find(h => h.id === selectedHospitals[0])?.name || 'Hospital selecionado'}
                     </Badge>
                   )}
-                  {selectedCareCharacter !== 'all' && (
-                    <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700 border-orange-200">
-                      🎯 Caráter: {selectedCareCharacter === '1' ? 'Eletivo' : 'Urgência/Emergência'}
-                    </Badge>
-                  )}
-                  {selectedSpecialty !== 'all' && (
-                    <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                      🩺 Especialidade Médica: {selectedSpecialty}
-                    </Badge>
-                  )}
-                  {selectedCareSpecialty !== 'all' && (
+                  {false && (
                     <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
                       🏥 Especialidade de Atendimento: {selectedCareSpecialty}
                     </Badge>
@@ -1330,14 +1162,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         <TabsContent value="doctors" className="space-y-6">
           <MedicalProductionDashboard 
             onStatsUpdate={updateMedicalProductionStats}
-            dateRange={productionEffectiveDateRange}
-            onDateRangeChange={handleDateRangeChange}
             selectedHospitals={selectedHospitals}
             searchTerm={searchTerm}
-            patientSearchTerm={patientSearchTerm} // 🆕 NOVO: Busca por nome do paciente
-            selectedCareCharacter={selectedCareCharacter}
-            selectedSpecialty={selectedSpecialty}
-            selectedCareSpecialty={selectedCareSpecialty}
+            patientSearchTerm={patientSearchTerm}
+            selectedCompetencia={selectedCompetency}
           />
           {/* ⚠️ NOTA: onStatsUpdate agora apenas atualiza activeDoctors, não afeta faturamento/AIHs */}
         </TabsContent>
@@ -1351,7 +1179,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
         {/* TAB: PROCEDIMENTOS */}
         <TabsContent value="procedures" className="space-y-6">
-          <ProcedureHierarchyDashboard dateRange={selectedDateRange} selectedHospitals={selectedHospitals} selectedCareCharacter={selectedCareCharacter} selectedSpecialty={selectedSpecialty} searchTerm={searchTerm} />
+          <ProcedureHierarchyDashboard selectedHospitals={selectedHospitals} searchTerm={searchTerm} />
         </TabsContent>
 
         {/* Aba Relatórios removida */}

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity, CreditCard, Stethoscope, FileSpreadsheet } from 'lucide-react';
+import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity, CreditCard, Stethoscope, FileSpreadsheet, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
 import { supabase } from '../lib/supabase';
@@ -88,6 +88,7 @@ interface AIH {
   care_modality?: string;
   requesting_physician?: string;
   professional_cbo?: string;
+  cns_responsavel?: string; // ✅ CNS do médico responsável
   competencia?: string; // ✅ Competência SUS (YYYY-MM-DD)
   hospitals?: { name: string };
   processed_at?: string;
@@ -148,11 +149,22 @@ const PatientManagement = () => {
   // Estados de expansão unificados
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   
-  // Filtros simplificados
+  // ✅ NOVO: Mapa de médicos (CNS -> Nome)
+  const [doctorsCache, setDoctorsCache] = useState<Map<string, string>>(new Map());
+  
+  // Filtros simplificados - APENAS COMPETÊNCIA
   const [globalSearch, setGlobalSearch] = useState('');
-  const [selectedCareCharacter, setSelectedCareCharacter] = useState<string>('all');
   const [selectedCompetencia, setSelectedCompetencia] = useState<string>('all');
   const [availableCompetencias, setAvailableCompetencias] = useState<string[]>([]);
+  
+  // ✅ NOVO: Filtro de hospital (apenas para administradores)
+  const [selectedHospitalFilter, setSelectedHospitalFilter] = useState<string>('all');
+  const [availableHospitals, setAvailableHospitals] = useState<Array<{id: string, name: string}>>([]);
+  
+  // ✅ NOVO: Filtro de médicos (apenas para administradores)
+  const [selectedDoctorFilter, setSelectedDoctorFilter] = useState<string>('all');
+  const [availableDoctors, setAvailableDoctors] = useState<Array<{cns: string, name: string}>>([]);
+  const [doctorSearchTerm, setDoctorSearchTerm] = useState<string>('');
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(0);
@@ -326,9 +338,7 @@ const PatientManagement = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResults, setSyncResults] = useState<any>(null);
 
-  // NOVOS ESTADOS: Filtros por data
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  // ✅ REMOVIDO: Filtros de data de admissão e alta (agora usa apenas competência)
 
   // Removido: Range mensal e lista de competências não são mais necessários
 
@@ -361,18 +371,55 @@ const PatientManagement = () => {
     }
   }, [currentHospitalId]);
 
-  // ✅ OTIMIZADO: Recarregar dados quando filtros de backend mudarem
+  // ✅ CARREGAR HOSPITAIS E MÉDICOS (apenas para administradores)
   useEffect(() => {
-    if (currentHospitalId) {
-      loadAIHs(); // Recarregar AIHs com filtros aplicados no SQL
+    const loadHospitalsAndDoctors = async () => {
+      if (isDirector) {
+        try {
+          // Carregar hospitais
+          const { data: hospitals } = await supabase
+            .from('hospitals')
+            .select('id, name')
+            .eq('is_active', true)
+            .order('name');
+          
+          if (hospitals) {
+            setAvailableHospitals(hospitals);
+            console.log('🏥 Hospitais carregados:', hospitals.length);
+          }
+          
+          // Carregar médicos
+          const { data: doctors } = await supabase
+            .from('doctors')
+            .select('cns, name')
+            .eq('is_active', true)
+            .order('name');
+          
+          if (doctors) {
+            setAvailableDoctors(doctors);
+            console.log('👨‍⚕️ Médicos carregados:', doctors.length);
+          }
+        } catch (error) {
+          console.error('❌ Erro ao carregar hospitais/médicos:', error);
+        }
+      }
+    };
+    
+    loadHospitalsAndDoctors();
+  }, [isDirector]);
+
+  // ✅ SIMPLIFICADO: Recarregar dados quando hospital mudar
+  useEffect(() => {
+    if (currentHospitalId || isDirector) {
+      loadAIHs(); // Recarregar AIHs
     }
-  }, [currentHospitalId, startDate, endDate, selectedCareCharacter]);
+  }, [currentHospitalId, selectedHospitalFilter]);
 
   // Resetar página quando filtros mudarem + atualizar contagem
   useEffect(() => {
     setCurrentPage(0);
     loadAIHsCount();
-  }, [globalSearch, startDate, endDate, selectedCompetencia]);
+  }, [globalSearch, selectedCompetencia, selectedHospitalFilter, selectedDoctorFilter]);
 
   // Carregar competências disponíveis quando AIHs mudarem
   useEffect(() => {
@@ -423,36 +470,33 @@ const PatientManagement = () => {
 
   const loadAIHs = async () => {
     try {
-      console.log('🔍 Carregando AIHs (com paginação e filtros) para hospital:', currentHospitalId);
+      // ✅ ADMINISTRADOR: Usar filtro de hospital selecionado
+      const hospitalIdToLoad = isDirector && selectedHospitalFilter !== 'all' 
+        ? selectedHospitalFilter 
+        : (currentHospitalId || 'ALL');
+      
+      console.log('🔍 Carregando AIHs (com paginação, filtros e médicos) para hospital:', hospitalIdToLoad);
+      console.log('👨‍⚕️ Filtro de médico:', selectedDoctorFilter !== 'all' ? selectedDoctorFilter : 'Todos');
       const pageSize = 1000; // Supabase limita a 1000 por request
       let offset = 0;
       const all: any[] = [];
 
-      // ✅ OTIMIZADO: Aplicar filtros de data no backend (SQL)
-      let dateFromISO: string | undefined;
-      let dateToISO: string | undefined;
-
-      // Aplicar filtros de data se existirem
-      // startDate → filtra admission_date (Admissão)
-      if (startDate) {
-        dateFromISO = `${startDate}T00:00:00`;
-      }
-      // endDate → filtra discharge_date (Alta)
-      if (endDate) {
-        dateToISO = `${endDate}T23:59:59.999`;
-      }
-
-      // Preparar filtro de caráter de atendimento
-      const careCharacterFilter = selectedCareCharacter !== 'all' ? selectedCareCharacter : undefined;
+      // ✅ SIMPLIFICADO: Sem filtros de data - usa apenas competência no frontend
 
       while (true) {
-        const batch = await persistenceService.getAIHs(currentHospitalId || 'ALL', {
+        // ✅ BUSCAR AIHs usando persistenceService (sem join complexo)
+        const batch = await persistenceService.getAIHs(hospitalIdToLoad, {
           limit: pageSize,
-          offset,
-          dateFrom: dateFromISO, // ✅ Filtra admission_date >= dateFrom
-          dateTo: dateToISO,     // ✅ Filtra discharge_date <= dateTo
-          careCharacter: careCharacterFilter,
-        } as any);
+          offset
+        });
+
+        const error = null;
+        
+        if (error) {
+          console.error('❌ Erro ao carregar batch de AIHs:', error);
+          break;
+        }
+
         const batchLen = batch?.length || 0;
         if (batchLen === 0) break;
         all.push(...batch);
@@ -464,15 +508,29 @@ const PatientManagement = () => {
 
       setAIHs(all);
       
-      // Log detalhado dos filtros aplicados
-      const filterLog = [];
-      if (dateFromISO) filterLog.push(`Admissão >= ${startDate}`);
-      if (dateToISO) filterLog.push(`Alta <= ${endDate}`);
-      if (careCharacterFilter) filterLog.push(`Caráter: ${careCharacterFilter === '1' ? 'Eletivo' : 'Urgência/Emergência'}`);
+      // ✅ CARREGAR MÉDICOS EM BATCH
+      const uniqueCNS = [...new Set(all.map(aih => aih.cns_responsavel).filter(Boolean))];
+      if (uniqueCNS.length > 0) {
+        try {
+          const { data: doctors } = await supabase
+            .from('doctors')
+            .select('cns, name')
+            .in('cns', uniqueCNS);
+          
+          if (doctors) {
+            const newDoctorsMap = new Map(doctorsCache);
+            doctors.forEach(doc => {
+              newDoctorsMap.set(doc.cns, doc.name);
+            });
+            setDoctorsCache(newDoctorsMap);
+            console.log('👨‍⚕️ Médicos carregados:', doctors.length);
+          }
+        } catch (err) {
+          console.warn('⚠️ Erro ao carregar médicos:', err);
+        }
+      }
       
-      console.log('📊 AIHs carregadas:', all.length, 
-        filterLog.length > 0 ? `(Filtros: ${filterLog.join(', ')})` : '(sem filtros)',
-        '| Ordenação: updated_at DESC (mais recentes primeiro)');
+      console.log('📊 AIHs carregadas:', all.length, '| Filtro de competência aplicado no frontend');
     } catch (error) {
       console.error('❌ Erro ao carregar AIHs:', error);
       toast({
@@ -486,15 +544,12 @@ const PatientManagement = () => {
   // Contagem exata de AIHs (sem limite de 1000)
   const loadAIHsCount = async () => {
     try {
-      let dateFromISO: string | undefined = undefined;
-      let dateToISO: string | undefined = undefined;
-      if (startDate) dateFromISO = `${startDate}T00:00:00`;
-      if (endDate) dateToISO = `${endDate}T23:59:59.999`;
-
-      const count = await persistenceService.countAIHs(currentHospitalId || 'ALL', {
-        dateFrom: dateFromISO,
-        dateTo: dateToISO
-      });
+      // ✅ ADMINISTRADOR: Usar filtro de hospital selecionado
+      const hospitalIdToCount = isDirector && selectedHospitalFilter !== 'all' 
+        ? selectedHospitalFilter 
+        : (currentHospitalId || 'ALL');
+      
+      const count = await persistenceService.countAIHs(hospitalIdToCount, {});
       setTotalAIHsCount(count);
       console.log('🧮 Contagem exata de AIHs (back-end):', count);
     } catch (error) {
@@ -757,6 +812,13 @@ const PatientManagement = () => {
       }
     }
     
+    // ✅ NOVO: Filtro de médico (frontend - apenas para administradores)
+    if (isDirector && selectedDoctorFilter !== 'all') {
+      if (!item.cns_responsavel || item.cns_responsavel !== selectedDoctorFilter) {
+        return false;
+      }
+    }
+    
     // Apenas filtro de busca textual (frontend) - os demais já foram aplicados no SQL
     if (!globalSearch) return true;
     
@@ -889,22 +951,46 @@ const PatientManagement = () => {
         return updatedB!.getTime() - updatedA!.getTime();
       });
 
-      // Cabeçalho do Excel (removidas colunas Procedimentos e Nome do Médico)
+      // Cabeçalho do Excel
       const header = [
         'Nome Paciente',
         'Nº AIH', 
+        'Médico Responsável',
         'Caráter de Atendimento',
         'Hospital',
         'Admissão',
         'Alta'
       ];
 
+      // ✅ BUSCAR MÉDICOS POR CNS (batch para performance)
+      const uniqueCNS = [...new Set(dataToExport.map(item => item.cns_responsavel).filter(Boolean))];
+      const doctorsMap = new Map<string, string>();
+      
+      if (uniqueCNS.length > 0) {
+        try {
+          const { data: doctors } = await supabase
+            .from('doctors')
+            .select('cns, name')
+            .in('cns', uniqueCNS);
+          
+          if (doctors) {
+            doctors.forEach(doc => {
+              doctorsMap.set(doc.cns, doc.name);
+            });
+          }
+        } catch (err) {
+          console.warn('⚠️ Erro ao buscar médicos:', err);
+        }
+      }
+
       // Preparar dados para o Excel
       const rows: Array<Array<string | number>> = [];
       
       for (const item of dataToExport) {
         const patientName = (item.patient || item.patients)?.name || 'N/A';
-        const aihNumber = item.aih_number || 'N/A';
+        const aihNumber = item.aih_number ? item.aih_number.toString().replace(/[.\-]/g, '') : 'N/A';
+        // ✅ BUSCAR MÉDICO: 1º do Map (via CNS), 2º de requesting_physician
+        const doctorName = doctorsMap.get(item.cns_responsavel || '') || item.requesting_physician || 'N/A';
         const careCharacter = CareCharacterUtils.getDescription(item.care_character) || item.care_character || 'N/A';
         const hospitalName = item.hospitals?.name || 'N/A';
         const admissionDate = item.admission_date ? formatDate(item.admission_date) : 'N/A';
@@ -913,6 +999,7 @@ const PatientManagement = () => {
         rows.push([
           patientName,
           aihNumber,
+          doctorName,
           careCharacter,
           hospitalName,
           admissionDate,
@@ -924,10 +1011,11 @@ const PatientManagement = () => {
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
 
-      // Configurar largura das colunas (ajustadas para as novas colunas)
+      // Configurar largura das colunas
       (ws as any)['!cols'] = [
         { wch: 30 }, // Nome Paciente
         { wch: 15 }, // Nº AIH
+        { wch: 30 }, // Médico Responsável
         { wch: 20 }, // Caráter de Atendimento
         { wch: 25 }, // Hospital
         { wch: 12 }, // Admissão
@@ -1106,69 +1194,7 @@ const PatientManagement = () => {
               {/* espaço vazio para manter espaçamento vertical uniforme no mobile */}
             </div>
 
-            {/* Admissão */}
-            <div className="space-y-3 w-full md:w-[170px]">
-              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                <div className="p-1 bg-green-100 rounded">
-                  <Calendar className="w-3 h-3 text-green-600" />
-                </div>
-                <span>Admissão</span>
-              </label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full border-gray-300 focus:border-green-500 focus:ring-green-500 bg-white/80 hover:bg-white transition-colors"
-              />
-            </div>
-
-            {/* Alta */}
-            <div className="space-y-3 w-full md:w-[170px]">
-              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                <div className="p-1 bg-purple-100 rounded">
-                  <Calendar className="w-3 h-3 text-purple-600" />
-                </div>
-                <span>Alta</span>
-              </label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-full border-gray-300 focus:border-purple-500 focus:ring-purple-500 bg-white/80 hover:bg-white transition-colors"
-              />
-            </div>
-
-            {/* Filtro de Caráter de Atendimento */}
-            <div className="space-y-3 w-full md:w-[180px]">
-              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                <div className="p-1 bg-orange-100 rounded">
-                  <Activity className="w-3 h-3 text-orange-600" />
-                </div>
-                <span>Caráter</span>
-              </label>
-              <Select value={selectedCareCharacter} onValueChange={setSelectedCareCharacter}>
-                <SelectTrigger className="w-full border-gray-300 focus:border-orange-500 focus:ring-orange-500 bg-white/80 hover:bg-white transition-colors">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="1">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                      Eletivo
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                      Urgência/Emerg.
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Filtro de Competência */}
+            {/* ✅ SIMPLIFICADO: Apenas filtro de Competência */}
             <div className="space-y-3 w-full md:w-[180px]">
               <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
                 <div className="p-1 bg-indigo-100 rounded">
@@ -1198,6 +1224,119 @@ const PatientManagement = () => {
               </Select>
             </div>
 
+            {/* ✅ NOVO: Filtro de Hospital (apenas para administradores) */}
+            {isDirector && (
+              <div className="space-y-3 w-full md:w-[220px]">
+                <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+                  <div className="p-1 bg-blue-100 rounded">
+                    <Activity className="w-3 h-3 text-blue-600" />
+                  </div>
+                  <span>Hospital</span>
+                </label>
+                <Select value={selectedHospitalFilter} onValueChange={setSelectedHospitalFilter}>
+                  <SelectTrigger className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white/80 hover:bg-white transition-colors">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      <div className="flex items-center gap-2">
+                        Todos os Hospitais
+                      </div>
+                    </SelectItem>
+                    {availableHospitals.map(hospital => (
+                      <SelectItem key={hospital.id} value={hospital.id}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                          {hospital.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* ✅ NOVO: Filtro de Médicos com Busca (apenas para administradores) */}
+            {isDirector && (
+              <div className="space-y-3 w-full md:w-[250px]">
+                <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+                  <div className="p-1 bg-green-100 rounded">
+                    <Stethoscope className="w-3 h-3 text-green-600" />
+                  </div>
+                  <span>Médico</span>
+                </label>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    placeholder="Digite para buscar médico..."
+                    value={doctorSearchTerm}
+                    onChange={(e) => setDoctorSearchTerm(e.target.value)}
+                    className="w-full border-gray-300 focus:border-green-500 focus:ring-green-500 bg-white/80 hover:bg-white transition-colors pr-8"
+                  />
+                  {doctorSearchTerm && (
+                    <button
+                      onClick={() => {
+                        setDoctorSearchTerm('');
+                        setSelectedDoctorFilter('all');
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                {doctorSearchTerm && (
+                  <div className="absolute z-50 w-full md:w-[250px] max-h-[200px] overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg mt-1">
+                    <div className="p-1">
+                      <button
+                        onClick={() => {
+                          setSelectedDoctorFilter('all');
+                          setDoctorSearchTerm('');
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                          Todos os Médicos
+                        </div>
+                      </button>
+                      {availableDoctors
+                        .filter(doc => 
+                          doc.name.toLowerCase().includes(doctorSearchTerm.toLowerCase()) ||
+                          doc.cns.includes(doctorSearchTerm)
+                        )
+                        .slice(0, 20)
+                        .map(doctor => (
+                          <button
+                            key={doctor.cns}
+                            onClick={() => {
+                              setSelectedDoctorFilter(doctor.cns);
+                              setDoctorSearchTerm(doctor.name);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 rounded transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                              <span className="truncate">{doctor.name}</span>
+                            </div>
+                            <div className="text-xs text-gray-500 ml-4">CNS: {doctor.cns}</div>
+                          </button>
+                        ))
+                      }
+                      {availableDoctors.filter(doc => 
+                        doc.name.toLowerCase().includes(doctorSearchTerm.toLowerCase()) ||
+                        doc.cns.includes(doctorSearchTerm)
+                      ).length === 0 && (
+                        <div className="px-3 py-2 text-sm text-gray-500">
+                          Nenhum médico encontrado
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Botão Limpar */}
             <div className="w-full md:w-[150px] flex items-end">
               <Button
@@ -1205,10 +1344,10 @@ const PatientManagement = () => {
                 size="sm"
                 onClick={() => {
                   setGlobalSearch('');
-                  setStartDate('');
-                  setEndDate('');
-                  setSelectedCareCharacter('all');
                   setSelectedCompetencia('all');
+                  setSelectedHospitalFilter('all');
+                  setSelectedDoctorFilter('all');
+                  setDoctorSearchTerm('');
                 }}
                 className="h-9 text-gray-600 hover:text-gray-800 hover:bg-gray-50 border-gray-300 transition-colors w-full md:w-auto"
                 title="Limpar filtros"
@@ -1236,6 +1375,16 @@ const PatientManagement = () => {
                 {selectedCompetencia !== 'all' && (
                   <span className="ml-2 text-sm font-normal text-indigo-600">
                     • Competência: {formatCompetencia(selectedCompetencia)}
+                  </span>
+                )}
+                {isDirector && selectedHospitalFilter !== 'all' && (
+                  <span className="ml-2 text-sm font-normal text-blue-600">
+                    • {availableHospitals.find(h => h.id === selectedHospitalFilter)?.name || 'Hospital'}
+                  </span>
+                )}
+                {isDirector && selectedDoctorFilter !== 'all' && (
+                  <span className="ml-2 text-sm font-normal text-green-600">
+                    • Dr(a). {availableDoctors.find(d => d.cns === selectedDoctorFilter)?.name || 'Médico'}
                   </span>
                 )}
               </span>
@@ -1599,10 +1748,10 @@ const PatientManagement = () => {
                               <p className="font-medium text-gray-900">{item.hospitals?.name}</p>
                             </div>
                           )}
-                          {(item.requesting_physician || proceduresData[item.id]?.[0]?.professional_name) && (
+                          {(doctorsCache.get(item.cns_responsavel || '') || item.requesting_physician || proceduresData[item.id]?.[0]?.professional_name) && (
                             <div className="col-span-12 md:col-span-8">
                               <span className="text-[11px] text-gray-500">Médico</span>
-                              <p className="font-medium text-gray-900">{item.requesting_physician || proceduresData[item.id]?.[0]?.professional_name}</p>
+                              <p className="font-medium text-gray-900">{doctorsCache.get(item.cns_responsavel || '') || item.requesting_physician || proceduresData[item.id]?.[0]?.professional_name}</p>
                             </div>
                           )}
                           {item.professional_cbo && (
