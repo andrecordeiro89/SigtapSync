@@ -953,10 +953,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {/* Abas de competência removidas conforme solicitação */}
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* FILTROS EM LINHA (Busca maior) */}
-            <div className="flex flex-col md:flex-row md:flex-wrap md:items-end gap-3">
+            {/* FILTROS EM LINHA - DISTRIBUÍDOS SIMETRICAMENTE */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               {/* BUSCA RÁPIDA MÉDICOS */}
-              <div className="flex-1 min-w-[240px]">
+              <div className="w-full">
                 <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Buscar Médico</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -979,7 +979,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               </div>
 
               {/* 🆕 NOVO: BUSCA POR NOME DO PACIENTE */}
-              <div className="flex-1 min-w-[240px]">
+              <div className="w-full">
                 <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Buscar Paciente</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-green-400" />
@@ -1001,10 +1001,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              {/* ✅ REMOVIDO: Filtros de especialidade médica e especialidade de atendimento */}
-
               {/* 🏥 FILTRO DE HOSPITAL */}
-              <div className="w-full md:w-[280px]">
+              <div className="w-full">
                 <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Hospital</label>
                 <div className="flex items-center gap-2">
                   <select
@@ -1029,7 +1027,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                         setSelectedHospitals(['all']);
                         setActiveHospitalTab(null);
                       }}
-                      className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                      className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors flex-shrink-0"
                       title="Limpar filtro de hospital"
                     >
                       ✕
@@ -1039,7 +1037,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               </div>
 
               {/* 🗓️ FILTRO DE COMPETÊNCIA */}
-              <div className="w-full md:w-[220px]">
+              <div className="w-full">
                 <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Competência</label>
                 <div className="flex items-center gap-2">
                   <select
@@ -1057,7 +1055,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   {selectedCompetency !== 'all' && (
                     <button
                       onClick={() => setSelectedCompetency('all')}
-                      className="px-2 py-1 text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors"
+                      className="px-2 py-1 text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors flex-shrink-0"
                       title="Limpar filtro de competência"
                     >
                       ✕
@@ -1065,59 +1063,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   )}
                 </div>
               </div>
-
-              {/* ✅ SIMPLIFICADO: Botão de limpar filtros apenas */}
-              <div className="w-full flex justify-end pt-1">
-                <button
-                  onClick={() => {
-                    setSearchTerm('');
-                    setPatientSearchTerm('');
-                    setSelectedHospitals(['all']);
-                    setSelectedCompetency('all');
-                    setActiveHospitalTab(null);
-                  }}
-                  className="inline-flex items-center gap-2 px-3 h-9 rounded-lg border border-gray-200 text-gray-700 hover:text-gray-900 hover:bg-gray-100"
-                  title="Limpar todos os filtros"
-                  aria-label="Limpar filtros"
-                >
-                  <X className="h-4 w-4" />
-                  <span className="text-sm">Limpar filtros</span>
-                </button>
-              </div>
-
-              
             </div>
 
-            {/* Abas de Competência (mês da alta) — logo abaixo dos filtros */}
-            {showCompetencyTabs && availableCompetencies.length > 0 && (
-              <div className="pt-3">
-                <Tabs value={selectedCompetency} onValueChange={setSelectedCompetency}>
-                  <TabsList className="w-full h-auto flex flex-wrap gap-1 bg-muted rounded-md p-1">
-                    <TabsTrigger
-                      value="all"
-                      className="text-xs px-2 py-1 rounded data-[state=active]:bg-background data-[state=active]:text-foreground"
-                      title="Todas as competências"
-                    >
-                      Todas
-                    </TabsTrigger>
-                    {availableCompetencies.map((c) => (
-                      <TabsTrigger
-                        key={c.value}
-                        value={c.value}
-                        className="text-xs px-2 py-1 rounded data-[state=active]:bg-background data-[state=active]:text-foreground"
-                        title={`Competência ${c.label}`}
-                      >
-                        {c.label}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                </Tabs>
-              </div>
-            )}
-
+            {/* ✅ ABAS DE COMPETÊNCIA REMOVIDAS - Agora usa apenas dropdown */}
             {/* ✅ BARRA DE ABAS DE HOSPITAIS REMOVIDA - Agora usa dropdown acima */}
-            
-            {/* Abas de Competência duplicadas removidas */}
 
             {/* INDICADORES DE FILTROS ATIVOS */}
             {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all')) && (
