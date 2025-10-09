@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Home, Upload, Search, FileUp, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe } from 'lucide-react';
+import { Home, Upload, Search, FileUp, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe, RefreshCw } from 'lucide-react';
 import ProfileEditModal from './ProfileEditModal';
 import {
   Sidebar,
@@ -114,7 +114,17 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       order: 6,
       color: 'from-pink-500 to-purple-600'
     },
-
+    {
+      id: 'sync',
+      label: 'Sync',
+      icon: RefreshCw,
+      description: 'Reconciliação Tabwin vs Sistema - Apenas Administrador',
+      requiresAdmin: true,
+      requiresExecutive: false,  // ✅ Remover acesso executivo
+      requiresStrictAdmin: true, // ✅ NOVO: Apenas admin/diretoria
+      order: 7,
+      color: 'from-violet-500 to-indigo-600'
+    },
     {
       id: 'audit-dashboard',
       label: 'Auditoria AIH',
@@ -152,6 +162,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
     const isDeveloper = user?.role === 'developer' || user?.role === 'ti';
     const hasExecutiveAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('generate_reports');
     const hasAuditAccess = isAuditor() || isAdmin() || isDirector() || isTI() || hasPermission('audit_access');
+    const isStrictAdmin = isAdmin() || isDirector(); // ✅ NOVO: Apenas admin/diretoria (sem coordenador/TI)
     
     return allTabs
       .filter(tab => {
@@ -165,6 +176,11 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
         
         if (tab.requiresAuditor) {
           return hasAuditAccess;
+        }
+        
+        // ✅ NOVO: Se requer admin estrito (só admin/diretoria)
+        if ((tab as any).requiresStrictAdmin) {
+          return isStrictAdmin;
         }
         
         if (tab.requiresExecutive) {

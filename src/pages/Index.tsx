@@ -8,6 +8,7 @@ import PatientManagement from '../components/PatientManagement';
 import AIHUpload from '../components/AIHUpload';
 import ExecutiveDashboard from '../components/ExecutiveDashboard';
 import MedicalStaffDashboard from '../components/MedicalStaffDashboard';
+import SyncDashboard from '../components/SyncDashboard';
 import AuditDashboard from './AuditDashboard';
 import ProcedureDebugger from '../components/ProcedureDebugger';
 import { SidebarProvider, SidebarInset } from '../components/ui/sidebar';
@@ -35,6 +36,8 @@ const Index = () => {
         return <ExecutiveDashboard />;
       case 'medical-staff':
         return <MedicalStaffDashboard />;
+      case 'sync':
+        return <SyncDashboard />;
       case 'audit-dashboard':
         return <AuditDashboard />;
       case 'procedure-debugger':
