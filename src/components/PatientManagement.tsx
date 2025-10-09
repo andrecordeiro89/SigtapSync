@@ -286,8 +286,11 @@ const PatientManagement = () => {
   };
 
   const handleSaveCompetencia = async (aihId: string) => {
+    // Guardar valor original para rollback se necessário
+    const originalCompetencia = aihs.find(a => a.id === aihId)?.competencia;
+    const newCompetencia = competenciaValue[aihId];
+    
     try {
-      const newCompetencia = competenciaValue[aihId];
       if (!newCompetencia) {
         toast({
           title: 'Competência inválida',
@@ -321,7 +324,22 @@ const PatientManagement = () => {
         formatoEsperado: 'YYYY-MM-DD'
       });
 
-      // Atualizar no banco usando Supabase direto
+      // ⚡ OPTIMISTIC UPDATE: Atualizar UI IMEDIATAMENTE (antes do banco confirmar)
+      setAIHs(prev => prev.map(aih => 
+        aih.id === aihId 
+          ? { 
+              ...aih, 
+              competencia: competenciaDate, 
+              updated_at: new Date().toISOString() 
+            }
+          : aih
+      ));
+
+      // Fechar modal imediatamente para parecer instantâneo
+      setEditingCompetencia(prev => ({ ...prev, [aihId]: false }));
+      setCompetenciaValue(prev => { const copy = { ...prev }; delete copy[aihId]; return copy; });
+
+      // Atualizar no banco usando Supabase direto (em background)
       const { data: updatedData, error } = await supabase
         .from('aihs')
         .update({ 
@@ -329,33 +347,44 @@ const PatientManagement = () => {
           updated_at: new Date().toISOString()
         })
         .eq('id', aihId)
-        .select('id, competencia'); // 🆕 Retornar dados atualizados para confirmar
+        .select('id, competencia, updated_at'); // 🆕 Retornar dados atualizados para confirmar
 
       if (error) {
         console.error('❌ Erro do Supabase:', error);
+        
+        // ⚠️ ROLLBACK: Reverter mudança otimista se deu erro
+        await loadAIHs(); // Recarregar do banco para ter certeza dos dados corretos
+        
         throw error;
       }
 
       // 🔧 DEBUG: Verificar o que foi salvo no banco
       console.log('✅ BANCO ATUALIZADO:', updatedData);
 
-      // ✅ RECARREGAR A LISTA COMPLETA DO BANCO (mais seguro que atualizar só o estado local)
-      await loadAIHs();
+      // ✅ Atualizar lista de competências disponíveis se necessário
+      if (!availableCompetencias.includes(competenciaDate)) {
+        setAvailableCompetencias(prev => {
+          const newList = [...prev, competenciaDate];
+          return newList.sort((a, b) => b.localeCompare(a)); // Mais recente primeiro
+        });
+      }
 
-      // Limpar estados de edição
-      setEditingCompetencia(prev => ({ ...prev, [aihId]: false }));
-      setCompetenciaValue(prev => { const copy = { ...prev }; delete copy[aihId]; return copy; });
-
+      // ✅ Toast de confirmação
       toast({ 
-        title: '✅ Competência atualizada com sucesso!', 
-        description: `Nova competência salva: ${formatCompetencia(competenciaDate)}`,
-        duration: 3000
+        title: '✅ Salvo!', 
+        description: `Competência: ${formatCompetencia(competenciaDate)}`,
+        duration: 2000
       });
     } catch (e: any) {
       console.error('❌ ERRO AO ATUALIZAR COMPETÊNCIA:', e);
+      
+      // Reabrir modal de edição para tentar novamente
+      setEditingCompetencia(prev => ({ ...prev, [aihId]: true }));
+      setCompetenciaValue(prev => ({ ...prev, [aihId]: newCompetencia }));
+      
       toast({ 
-        title: 'Erro ao salvar competência', 
-        description: e?.message || 'Falha ao atualizar no banco de dados', 
+        title: 'Erro ao salvar', 
+        description: e?.message || 'Falha na conexão. Tente novamente.', 
         variant: 'destructive',
         duration: 5000
       });
