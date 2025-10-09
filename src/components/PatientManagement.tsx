@@ -247,17 +247,35 @@ const PatientManagement = () => {
 
   // Funções para edição de competência
   const handleStartEditCompetencia = (aihId: string, currentCompetencia: string | undefined) => {
+    // 🔧 DEBUG: Verificar valor recebido
+    console.log('📝 INICIANDO EDIÇÃO DE COMPETÊNCIA:', {
+      aihId,
+      competenciaRecebida: currentCompetencia,
+      tipo: typeof currentCompetencia
+    });
+
     setEditingCompetencia(prev => ({ ...prev, [aihId]: true }));
+    
     // Converter YYYY-MM-DD para YYYY-MM (formato do input type="month")
-    if (currentCompetencia) {
-      const match = currentCompetencia.match(/^(\d{4})-(\d{2})/);
+    if (currentCompetencia && currentCompetencia.trim() !== '') {
+      // Limpar e normalizar o valor
+      const cleanValue = currentCompetencia.trim();
+      const match = cleanValue.match(/^(\d{4})-(\d{2})/);
+      
       if (match) {
-        setCompetenciaValue(prev => ({ ...prev, [aihId]: `${match[1]}-${match[2]}` }));
+        const yearMonth = `${match[1]}-${match[2]}`;
+        console.log('✅ Competência convertida:', yearMonth);
+        setCompetenciaValue(prev => ({ ...prev, [aihId]: yearMonth }));
+      } else {
+        console.warn('⚠️ Formato de competência não reconhecido:', cleanValue);
+        // Tentar usar valor atual mesmo assim
+        setCompetenciaValue(prev => ({ ...prev, [aihId]: cleanValue }));
       }
     } else {
       // Se não houver competência, usar mês atual
       const now = new Date();
       const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      console.log('ℹ️ Sem competência existente. Usando mês atual:', yearMonth);
       setCompetenciaValue(prev => ({ ...prev, [aihId]: yearMonth }));
     }
   };
@@ -295,38 +313,51 @@ const PatientManagement = () => {
       // Converter YYYY-MM para YYYY-MM-01 (primeiro dia do mês)
       const competenciaDate = `${newCompetencia}-01`;
 
+      // 🔧 DEBUG: Verificar valores antes de salvar
+      console.log('💾 SALVANDO COMPETÊNCIA:', {
+        aihId,
+        competenciaInput: newCompetencia,
+        competenciaFinal: competenciaDate,
+        formatoEsperado: 'YYYY-MM-DD'
+      });
+
       // Atualizar no banco usando Supabase direto
-      const { error } = await supabase
+      const { data: updatedData, error } = await supabase
         .from('aihs')
         .update({ 
           competencia: competenciaDate,
           updated_at: new Date().toISOString()
         })
-        .eq('id', aihId);
+        .eq('id', aihId)
+        .select('id, competencia'); // 🆕 Retornar dados atualizados para confirmar
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erro do Supabase:', error);
+        throw error;
+      }
 
-      // Atualizar estado local
-      setAIHs(prev => prev.map(aih => 
-        aih.id === aihId 
-          ? { ...aih, competencia: competenciaDate, updated_at: new Date().toISOString() }
-          : aih
-      ));
+      // 🔧 DEBUG: Verificar o que foi salvo no banco
+      console.log('✅ BANCO ATUALIZADO:', updatedData);
+
+      // ✅ RECARREGAR A LISTA COMPLETA DO BANCO (mais seguro que atualizar só o estado local)
+      await loadAIHs();
 
       // Limpar estados de edição
       setEditingCompetencia(prev => ({ ...prev, [aihId]: false }));
       setCompetenciaValue(prev => { const copy = { ...prev }; delete copy[aihId]; return copy; });
 
       toast({ 
-        title: '✅ Competência atualizada', 
-        description: `Nova competência: ${formatCompetencia(competenciaDate)}` 
+        title: '✅ Competência atualizada com sucesso!', 
+        description: `Nova competência salva: ${formatCompetencia(competenciaDate)}`,
+        duration: 3000
       });
     } catch (e: any) {
-      console.error('Erro ao atualizar competência:', e);
+      console.error('❌ ERRO AO ATUALIZAR COMPETÊNCIA:', e);
       toast({ 
-        title: 'Erro ao salvar', 
-        description: e?.message || 'Falha ao atualizar a competência', 
-        variant: 'destructive' 
+        title: 'Erro ao salvar competência', 
+        description: e?.message || 'Falha ao atualizar no banco de dados', 
+        variant: 'destructive',
+        duration: 5000
       });
     } finally {
       setSavingCompetencia(prev => ({ ...prev, [aihId]: false }));
@@ -807,8 +838,16 @@ const PatientManagement = () => {
   const filteredData = unifiedData.filter(item => {
     // Filtro de competência (frontend)
     if (selectedCompetencia !== 'all') {
-      if (!item.competencia || item.competencia !== selectedCompetencia) {
-        return false;
+      // 🆕 OPÇÃO ESPECIAL: Mostrar apenas AIHs SEM competência
+      if (selectedCompetencia === 'sem_competencia') {
+        if (item.competencia && item.competencia.trim() !== '') {
+          return false; // Se TEM competência, não mostrar
+        }
+      } else {
+        // Filtro normal: mostrar apenas a competência selecionada
+        if (!item.competencia || item.competencia !== selectedCompetencia) {
+          return false;
+        }
       }
     }
     
@@ -1212,6 +1251,13 @@ const PatientManagement = () => {
                       Todas
                     </div>
                   </SelectItem>
+                  {/* 🆕 OPÇÃO ESPECIAL: Sem Competência */}
+                  <SelectItem value="sem_competencia">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                      <span className="text-orange-700 font-medium">⚠️ Sem Competência</span>
+                    </div>
+                  </SelectItem>
                   {availableCompetencias.map(comp => (
                     <SelectItem key={comp} value={comp}>
                       <div className="flex items-center gap-2">
@@ -1374,7 +1420,7 @@ const PatientManagement = () => {
                 AIHs Processadas ({filteredData.length})
                 {selectedCompetencia !== 'all' && (
                   <span className="ml-2 text-sm font-normal text-indigo-600">
-                    • Competência: {formatCompetencia(selectedCompetencia)}
+                    • Competência: {selectedCompetencia === 'sem_competencia' ? '⚠️ Sem Competência' : formatCompetencia(selectedCompetencia)}
                   </span>
                 )}
                 {isDirector && selectedHospitalFilter !== 'all' && (
