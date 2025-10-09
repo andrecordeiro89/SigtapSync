@@ -1686,7 +1686,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           const procedures = p.procedures || [];
                           if (procedures.length > 0) {
                             procedures.forEach((proc: any) => {
-                              const procCode = proc.procedure_code || '';
+                              // 🔧 PADRONIZAÇÃO: Remover "." e "-" do código de procedimento
+                              const procCodeRaw = proc.procedure_code || '';
+                              const procCode = procCodeRaw.replace(/[.\-]/g, '');
+                              
                               const procDesc = proc.procedure_description || proc.sigtap_description || '';
                               const procDate = proc.procedure_date || '';
                               const procDateLabel = procDate 
@@ -1702,7 +1705,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 idx++, 
                                 name, 
                                 aih, // Usar aih que pode ser "Aguardando geração"
-                                procCode,
+                                procCode, // ✅ Código padronizado sem "." e "-"
                                 procDesc,
                                 procDateLabel,
                                 disLabel, 

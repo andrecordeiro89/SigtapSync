@@ -428,8 +428,10 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
       // Tabela Top procedimentos
       push([quote('Procedimento (código)'), quote('Descrição'), quote('Qtde'), quote('Valor total (BRL)')]);
       top.forEach((p: any) => {
+        // 🔧 PADRONIZAÇÃO: Remover "." e "-" do código de procedimento
+        const procedureCode = (p.code || '—').replace(/[.\-]/g, '');
         push([
-          quote(p.code || '—'),
+          quote(procedureCode),
           quote(p.desc || 'Sem descrição'),
           toInt(p.count),
           toDec(p.total)
@@ -483,8 +485,10 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
       // Tabela Top procedimentos
       push([quote('Procedimento (código)'), quote('Descrição'), quote('Qtde'), quote('Valor total (BRL)')]);
       top.forEach((p: any) => {
+        // 🔧 PADRONIZAÇÃO: Remover "." e "-" do código de procedimento
+        const procedureCode = (p.code || '—').replace(/[.\-]/g, '');
         push([
-          quote(p.code || '—'),
+          quote(procedureCode),
           quote(p.desc || 'Sem descrição'),
           toInt(p.count),
           toDec(p.total)
@@ -537,7 +541,9 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
       push([quote('Top procedimentos por faturamento')]);
       push([quote('Procedimento (código)'), quote('Descrição'), quote('Qtde'), quote('Valor total (BRL)')]);
       (ha.topProcedures || []).forEach((p: any) => {
-        push([quote(p.code || '—'), quote(p.desc || 'Sem descrição'), toInt(p.count), toDec(p.total)]);
+        // 🔧 PADRONIZAÇÃO: Remover "." e "-" do código de procedimento
+        const procedureCode = (p.code || '—').replace(/[.\-]/g, '');
+        push([quote(procedureCode), quote(p.desc || 'Sem descrição'), toInt(p.count), toDec(p.total)]);
       });
       lines.push('');
 
