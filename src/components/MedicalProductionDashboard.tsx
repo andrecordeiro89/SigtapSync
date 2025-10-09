@@ -1618,6 +1618,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       let excludedByDateFilter = 0;
                       let patientsWithoutAIH = 0;
                       
+                      // 🔧 FIX: Usar Set para deduplicate por AIH number (evitar pacientes recorrentes duplicados)
+                      const uniqueAIHs = new Set<string>();
+                      
                       console.log('🔍 [RELATÓRIO GERAL] Iniciando coleta de dados...');
                       console.log('🔍 [RELATÓRIO GERAL] Médicos filtrados:', filteredDoctors.length);
                       console.log('🔍 [RELATÓRIO GERAL] Sem filtro de data');
@@ -1657,6 +1660,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                           const aih = aihRaw || 'Aguardando geração';
                           
+                          // 🔧 FIX DUPLICATAS: Verificar se AIH já foi processada
+                          if (aihRaw && uniqueAIHs.has(aihRaw)) {
+                            console.log(`⏭️ [RELATÓRIO GERAL] AIH ${aihRaw} já processada - pulando duplicata`);
+                            return; // Pular duplicatas
+                          }
+                          if (aihRaw) {
+                            uniqueAIHs.add(aihRaw); // Marcar AIH como processada
+                          }
+                          
                           if (!aihRaw) {
                             patientsWithoutAIH++;
                             console.log(`⚠️ [RELATÓRIO GERAL] Paciente sem AIH incluído: ${name}`);
@@ -1682,7 +1694,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0;
                           const aihWithIncrements = baseAih + increment;
                           
-                          // Se o paciente tem procedimentos, criar uma linha para cada procedimento
+                          // ✅ FIX: Mostrar todos os procedimentos, mas garantir que a AIH pertence à competência correta
+                          // A competência já foi filtrada no backend, então esta AIH pertence à competência selecionada
                           const procedures = p.procedures || [];
                           if (procedures.length > 0) {
                             procedures.forEach((proc: any) => {
@@ -1849,6 +1862,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       console.log('🔍 [RELATÓRIO SIMPLIFICADO] Médicos filtrados:', filteredDoctors.length);
                       console.log('🔍 [RELATÓRIO SIMPLIFICADO] Sem filtro de data');
                       
+                      // 🔧 FIX: Usar Set para deduplicate por AIH number (evitar pacientes recorrentes duplicados)
+                      const uniqueAIHs = new Set<string>();
+                      
                       filteredDoctors.forEach((card: any) => {
                         const doctorName = card.doctor_info?.name || 'Médico não identificado';
                         const doctorPatients = card.patients || [];
@@ -1882,6 +1898,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           // 🔧 CORREÇÃO: Pacientes podem não ter AIH gerada ainda - INCLUIR TODOS
                           const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                           const aihDisplay = aih || 'Aguardando geração';
+                          
+                          // 🔧 FIX DUPLICATAS: Verificar se AIH já foi processada
+                          if (aih && uniqueAIHs.has(aih)) {
+                            console.log(`⏭️ [RELATÓRIO SIMPLIFICADO] AIH ${aih} já processada - pulando duplicata`);
+                            return; // Pular duplicatas
+                          }
+                          if (aih) {
+                            uniqueAIHs.add(aih); // Marcar AIH como processada
+                          }
                           
                           // 🤱 LOG ESPECÍFICO PARA PARTOS CESAREANOS
                           const procedures = p.procedures || [];
@@ -2220,6 +2245,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         const hospitalName = doctor.hospitals?.[0]?.hospital_name || '';
                                         const hospitalId = doctor.hospitals?.[0]?.hospital_id;
                                         
+                                        // 🔧 FIX: Usar Set para deduplicate por AIH number (evitar pacientes recorrentes duplicados)
+                                        const uniqueAIHs = new Set<string>();
+                                        
                                         console.log(`📊 [RELATÓRIO MÉDICO] Gerando relatório para ${doctorName}`);
                                         console.log(`📊 [RELATÓRIO MÉDICO] Sem filtro de data`);
                                         
@@ -2243,6 +2271,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           const name = p.patient_info?.name || 'Paciente';
                                           const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                                           const aih = aihRaw || 'Aguardando geração';
+                                          
+                                          // 🔧 FIX DUPLICATAS: Verificar se AIH já foi processada
+                                          if (aihRaw && uniqueAIHs.has(aihRaw)) {
+                                            console.log(`⏭️ [RELATÓRIO MÉDICO] AIH ${aihRaw} já processada - pulando duplicata`);
+                                            return; // Pular duplicatas
+                                          }
+                                          if (aihRaw) {
+                                            uniqueAIHs.add(aihRaw); // Marcar AIH como processada
+                                          }
+                                          
                                           const careSpec = (p?.aih_info?.specialty || '').toString();
                                           const careCharacter = (() => {
                                             const raw = (p?.aih_info?.care_character ?? '').toString();
@@ -2259,7 +2297,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, hospitalId) : 0;
                                           const aihWithIncrements = baseAih + increment;
                                           
-                                          // ✅ DETALHAMENTO POR PROCEDIMENTO (mesma lógica do relatório geral)
+                                          // ✅ FIX: Mostrar todos os procedimentos da AIH (que já foi filtrada por competência)
                                           const procedures = p.procedures || [];
                                           if (procedures.length > 0) {
                                             procedures.forEach((proc: any) => {
