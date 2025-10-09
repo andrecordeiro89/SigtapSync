@@ -5,12 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Filter, Download, Eye, FileText, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Filter, Download, Eye, FileText, AlertCircle, ChevronDown, ChevronUp, FileSpreadsheet } from 'lucide-react';
 import { formatCurrency } from '../utils/validation';
 import { SigtapProcedure } from '../types';
 import { useSigtapContext } from '../contexts/SigtapContext';
 import SigtapCrossSearch from './SigtapCrossSearch';
 import { useAuth } from '../contexts/AuthContext';
+import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 // Função para corrigir problemas de encoding
 const fixEncoding = (text: string): string => {
@@ -205,6 +207,104 @@ const SigtapViewer = () => {
     link.href = URL.createObjectURL(blob);
     link.download = `sigtap_procedures_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
+  };
+
+  // 📊 EXPORTAÇÃO EXCEL PROFISSIONAL COM FORMATAÇÃO
+  const handleExportExcel = () => {
+    if (!filteredProcedures.length) {
+      toast.error('Nenhum procedimento para exportar');
+      return;
+    }
+
+    try {
+      toast.info(`Preparando exportação de ${filteredProcedures.length} procedimentos...`);
+
+      // 📋 Preparar dados para Excel
+      const excelData = filteredProcedures.map((p, index) => ({
+        '#': index + 1,
+        'Código': cleanText(p.code || ''),
+        'Procedimento': cleanText(p.description || ''),
+        'Origem': cleanText(p.origem || ''),
+        'Complexidade': cleanText(p.complexity || ''),
+        'Modalidade': cleanText(p.modality || ''),
+        'Instrumento de Registro': cleanText(p.registrationInstrument || ''),
+        'Tipo de Financiamento': cleanText(p.financing || ''),
+        'Valor SA (Ambulatorial)': p.valueAmb || 0,
+        'Valor SH (Hospitalar)': p.valueHosp || 0,
+        'Valor SP (Profissional)': p.valueProf || 0,
+        'VALOR TOTAL': (p.valueAmb || 0) + (p.valueHosp || 0) + (p.valueProf || 0),
+        'Atributo Complementar': cleanText(p.complementaryAttribute || ''),
+        'Sexo': cleanText(p.gender || ''),
+        'Idade Mínima': p.minAge || '',
+        'Unid. Idade Min': cleanText(p.minAgeUnit || ''),
+        'Idade Máxima': p.maxAge || '',
+        'Unid. Idade Max': cleanText(p.maxAgeUnit || ''),
+        'Quantidade Máxima': p.maxQuantity || '',
+        'Média Permanência': p.averageStay || '',
+        'Pontos': p.points || '',
+        'CBO': Array.isArray(p.cbo) ? p.cbo.join('; ') : (p.cbo || ''),
+        'CID': Array.isArray(p.cid) ? p.cid.join('; ') : (p.cid || ''),
+        'Habilitação': cleanText(p.habilitation || ''),
+        'Grupos de Habilitação': Array.isArray(p.habilitationGroup) ? p.habilitationGroup.join('; ') : '',
+        'Serviço/Classificação': cleanText(p.serviceClassification || ''),
+        'Especialidade Leito': cleanText(p.especialidadeLeito || '')
+      }));
+
+      // 📊 Criar workbook e worksheet
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Procedimentos SIGTAP');
+
+      // 🎨 Configurar larguras de colunas (otimizado para leitura)
+      const colWidths = [
+        { wch: 5 },  // #
+        { wch: 12 }, // Código
+        { wch: 60 }, // Procedimento
+        { wch: 15 }, // Origem
+        { wch: 18 }, // Complexidade
+        { wch: 20 }, // Modalidade
+        { wch: 25 }, // Instrumento
+        { wch: 25 }, // Financiamento
+        { wch: 18 }, // Valor SA
+        { wch: 18 }, // Valor SH
+        { wch: 18 }, // Valor SP
+        { wch: 15 }, // Valor Total
+        { wch: 25 }, // Atributo Complementar
+        { wch: 10 }, // Sexo
+        { wch: 12 }, // Idade Min
+        { wch: 15 }, // Unid Idade Min
+        { wch: 12 }, // Idade Max
+        { wch: 15 }, // Unid Idade Max
+        { wch: 15 }, // Qtd Máxima
+        { wch: 15 }, // Média Permanência
+        { wch: 10 }, // Pontos
+        { wch: 30 }, // CBO
+        { wch: 30 }, // CID
+        { wch: 25 }, // Habilitação
+        { wch: 40 }, // Grupos Habilitação
+        { wch: 30 }, // Serviço/Classificação
+        { wch: 25 }  // Especialidade Leito
+      ];
+      ws['!cols'] = colWidths;
+
+      // 🔍 Habilitar filtros automáticos
+      if (excelData.length > 0) {
+        ws['!autofilter'] = { ref: `A1:AA${excelData.length + 1}` };
+      }
+
+      // 💾 Gerar e baixar arquivo
+      const fileName = `SIGTAP_Procedimentos_${new Date().toISOString().split('T')[0]}_${filteredProcedures.length}_registros.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      toast.success(`✅ ${filteredProcedures.length} procedimentos exportados com sucesso!`, {
+        description: `Arquivo: ${fileName}`
+      });
+    } catch (error) {
+      console.error('Erro ao exportar Excel:', error);
+      toast.error('Erro ao gerar arquivo Excel', {
+        description: error instanceof Error ? error.message : 'Erro desconhecido'
+      });
+    }
   };
 
   const handleClearCache = async () => {
@@ -426,16 +526,30 @@ const SigtapViewer = () => {
         {/* Botões Administrativos - Apenas para Diretoria */}
         {isAdminUser && (
           <div className="flex space-x-2">
+            {/* 📊 BOTÃO EXCEL - DESTAQUE (RECOMENDADO) */}
+            <Button 
+              onClick={handleExportExcel} 
+              variant="default" 
+              className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white shadow-md"
+              disabled={!filteredProcedures.length}
+              title="Exportar para Excel (XLSX) - Formato profissional com filtros e formatação"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Exportar Excel</span>
+            </Button>
+            
+            {/* CSV - Opção alternativa */}
             <Button 
               onClick={handleExportCSV} 
               variant="outline" 
               className="flex items-center space-x-2"
               disabled={!filteredProcedures.length}
-              title="Exportar dados para CSV - Apenas Diretoria"
+              title="Exportar dados para CSV (formato simples) - Apenas Diretoria"
             >
               <Download className="w-4 h-4" />
-              <span>Exportar</span>
+              <span>CSV</span>
             </Button>
+            
             <Button 
               onClick={() => {
                 if (confirm('Limpar todos os dados? Você precisará importar novamente.')) {
