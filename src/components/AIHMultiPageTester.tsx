@@ -78,6 +78,39 @@ declare module 'jspdf' {
   }
 }
 
+// ✅ FUNÇÕES UTILITÁRIAS PARA MANIPULAÇÃO DE DATAS SEM TIMEZONE
+/**
+ * Formata data ISO (YYYY-MM-DD) para formato brasileiro (DD/MM/YYYY)
+ * Sem usar new Date() para evitar problemas de timezone
+ */
+const formatDateBR = (isoDate: string | undefined | null): string => {
+  if (!isoDate) return 'N/A';
+  
+  const match = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [, year, month, day] = match;
+    return `${day}/${month}/${year}`;
+  }
+  
+  return String(isoDate);
+};
+
+/**
+ * Extrai ano e mês (YYYY-MM) de data ISO sem timezone
+ * Usado para cálculo de competência SUS
+ */
+const extractYearMonth = (isoDate: string | undefined | null): string => {
+  if (!isoDate) return '';
+  
+  const match = String(isoDate).match(/^(\d{4})-(\d{2})-\d{2}/);
+  if (match) {
+    const [, year, month] = match;
+    return `${year}-${month}`;
+  }
+  
+  return '';
+};
+
 // Componente para exibir participação profissional
 const ParticipationDisplay = ({ code }: { code: string }) => {
   if (!code) {
@@ -141,15 +174,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
   const [competenciaMode, setCompetenciaMode] = useState<'alta' | 'manual'>(() => {
     try {
       const ref = (aihCompleta as any)?.dataFim || (aihCompleta as any)?.dataInicio;
-      let altaYM = '';
-      if (ref) {
-        const d = new Date(ref);
-        if (!isNaN(d.getTime())) {
-          const y = d.getUTCFullYear();
-          const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-          altaYM = `${y}-${m}`;
-        }
-      }
+      // ✅ CORREÇÃO: Usar extractYearMonth sem timezone
+      const altaYM = extractYearMonth(ref);
       const comp = (aihCompleta as any)?.competencia as string | undefined;
       const compYM = comp ? comp.slice(0, 7) : '';
       return (!!altaYM && (!compYM || compYM === altaYM)) ? 'alta' : 'manual';
@@ -159,15 +185,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
   useEffect(() => {
     try {
       const ref = (aihCompleta as any)?.dataFim || (aihCompleta as any)?.dataInicio;
-      let altaYM = '';
-      if (ref) {
-        const d = new Date(ref);
-        if (!isNaN(d.getTime())) {
-          const y = d.getUTCFullYear();
-          const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-          altaYM = `${y}-${m}`;
-        }
-      }
+      // ✅ CORREÇÃO: Usar extractYearMonth sem timezone
+      const altaYM = extractYearMonth(ref);
       const comp = (aihCompleta as any)?.competencia as string | undefined;
       const compYM = comp ? comp.slice(0, 7) : '';
       const shouldAlta = (!!altaYM && (!compYM || compYM === altaYM));
@@ -956,19 +975,19 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600">Data Autorização</label>
-                  <p className="text-gray-900 text-sm font-mono">{aihCompleta.dataAutorizacao}</p>
+                  <p className="text-gray-900 text-sm font-mono">{formatDateBR(aihCompleta.dataAutorizacao)}</p>
                 </div>
               </div>
               
               {/* Linha 2: Datas de Internação */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
                 <div>
-                  <label className="text-xs font-medium text-gray-600">Data Início</label>
-                  <p className="text-gray-900 text-sm font-mono">{aihCompleta.dataInicio}</p>
+                  <label className="text-xs font-medium text-gray-600">Data Início (Admissão)</label>
+                  <p className="text-gray-900 text-sm font-mono">{formatDateBR(aihCompleta.dataInicio)}</p>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-600">Data Fim</label>
-                  <p className="text-gray-900 text-sm font-mono">{aihCompleta.dataFim}</p>
+                  <label className="text-xs font-medium text-gray-600">Data Fim (Alta)</label>
+                  <p className="text-gray-900 text-sm font-mono">{formatDateBR(aihCompleta.dataFim)}</p>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600">Motivo Encerramento</label>
@@ -1044,7 +1063,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
               <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mt-3">
                 <div>
                   <label className="text-xs font-medium text-gray-600">Nascimento</label>
-                  <p className="text-gray-900 text-sm">{aihCompleta.nascimento}</p>
+                  <p className="text-gray-900 text-sm">{formatDateBR(aihCompleta.nascimento)}</p>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-600">Sexo</label>
@@ -1418,15 +1437,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
               {(() => {
                 const altaYM = (() => {
                   const ref = (aihCompleta as any)?.dataFim || (aihCompleta as any)?.dataInicio;
-                  try {
-                    const d = ref ? new Date(ref) : null;
-                    if (d && !isNaN(d.getTime())) {
-                      const y = d.getUTCFullYear();
-                      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-                      return `${y}-${m}`;
-                    }
-                  } catch {}
-                  return '';
+                  // ✅ CORREÇÃO: Usar extractYearMonth sem timezone
+                  return extractYearMonth(ref);
                 })();
                 const compYM = (() => {
                   const comp = (aihCompleta as any)?.competencia as string | undefined;
@@ -2704,12 +2716,8 @@ const AIHMultiPageTester = () => {
       // Permitir salvar quando modo for 'alta' e houver data de alta/admissão
       if (!((aihCompleta as any)?.competencia)) {
         const ref = (aihCompleta as any)?.dataFim || (aihCompleta as any)?.dataInicio;
-        const canDerive = (() => {
-          try {
-            const d = ref ? new Date(ref) : null;
-            return d && !isNaN(d.getTime());
-          } catch { return false; }
-        })();
+        // ✅ CORREÇÃO: Usar extractYearMonth sem timezone
+        const canDerive = !!extractYearMonth(ref);
         if (!canDerive) {
           toast({
             title: 'Selecione a competência',
@@ -2721,10 +2729,11 @@ const AIHMultiPageTester = () => {
         }
         // Derivar competência de alta/admissão e anexar ao payload
         try {
-          const d = new Date(ref);
-          const y = d.getUTCFullYear();
-          const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-          (aihForService as any).competencia = `${y}-${m}-01`;
+          // ✅ CORREÇÃO: Usar extractYearMonth sem timezone
+          const altaYM = extractYearMonth(ref);
+          if (altaYM) {
+            (aihForService as any).competencia = `${altaYM}-01`;
+          }
         } catch {}
       }
 
@@ -2797,12 +2806,8 @@ const AIHMultiPageTester = () => {
       // Se competência não estiver setada, derivar pela alta/admissão no ato do salvar completo
       if (!((aihCompleta as any)?.competencia)) {
         const ref = (aihCompleta as any)?.dataFim || (aihCompleta as any)?.dataInicio;
-        const canDerive = (() => {
-          try {
-            const d = ref ? new Date(ref) : null;
-            return d && !isNaN(d.getTime());
-          } catch { return false; }
-        })();
+        // ✅ CORREÇÃO: Usar extractYearMonth sem timezone
+        const canDerive = !!extractYearMonth(ref);
         if (!canDerive) {
           toast({
             title: 'Selecione a competência',

@@ -1543,6 +1543,7 @@ export class AIHPersistenceService {
     limit?: number;
     offset?: number;
     careCharacter?: string; // ✅ Filtro de caráter de atendimento (1=Eletivo, 2=Urgência/Emergência)
+    competencia?: string; // ✅ NOVO: Filtro de competência SUS (YYYY-MM-DD)
   }) {
     try {
       let query = supabase
@@ -1606,6 +1607,17 @@ export class AIHPersistenceService {
       // ✅ OTIMIZADO: Filtro de caráter de atendimento
       if (filters?.careCharacter) {
         query = query.eq('care_character', filters.careCharacter);
+      }
+
+      // ✅ NOVO: Filtro de competência SUS (formato: YYYY-MM-DD)
+      if (filters?.competencia && filters.competencia !== 'all') {
+        // 🆕 OPÇÃO ESPECIAL: Mostrar apenas AIHs SEM competência
+        if (filters.competencia === 'sem_competencia') {
+          query = query.is('competencia', null);
+        } else {
+          // Filtro normal: mostrar apenas a competência selecionada
+          query = query.eq('competencia', filters.competencia);
+        }
       }
 
       // Aplicar paginação

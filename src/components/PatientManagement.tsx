@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, RotateCcw, Info, Activity, CreditCard, Stethoscope, FileSpreadsheet, X } from 'lucide-react';
+import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, AlertCircle, RotateCcw, Info, Activity, CreditCard, Stethoscope, FileSpreadsheet, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
 import { supabase } from '../lib/supabase';
@@ -468,12 +468,12 @@ const PatientManagement = () => {
     loadHospitalsAndDoctors();
   }, [isDirector]);
 
-  // ✅ SIMPLIFICADO: Recarregar dados quando hospital mudar
+  // ✅ SIMPLIFICADO: Recarregar dados quando hospital ou competência mudarem
   useEffect(() => {
     if (currentHospitalId || isDirector) {
       loadAIHs(); // Recarregar AIHs
     }
-  }, [currentHospitalId, selectedHospitalFilter]);
+  }, [currentHospitalId, selectedHospitalFilter, selectedCompetencia]);
 
   // Resetar página quando filtros mudarem + atualizar contagem
   useEffect(() => {
@@ -536,18 +536,23 @@ const PatientManagement = () => {
         : (currentHospitalId || 'ALL');
       
       console.log('🔍 Carregando AIHs (com paginação, filtros e médicos) para hospital:', hospitalIdToLoad);
+      console.log('🗓️ Filtro de competência:', selectedCompetencia !== 'all' ? selectedCompetencia : 'Todas');
       console.log('👨‍⚕️ Filtro de médico:', selectedDoctorFilter !== 'all' ? selectedDoctorFilter : 'Todos');
       const pageSize = 1000; // Supabase limita a 1000 por request
       let offset = 0;
       const all: any[] = [];
 
-      // ✅ SIMPLIFICADO: Sem filtros de data - usa apenas competência no frontend
+      // ✅ NOVO: Filtro de competência aplicado no SQL (backend)
+      const competenciaFilter = (selectedCompetencia && selectedCompetencia !== 'all') 
+        ? selectedCompetencia 
+        : undefined;
 
       while (true) {
-        // ✅ BUSCAR AIHs usando persistenceService (sem join complexo)
+        // ✅ BUSCAR AIHs usando persistenceService COM FILTRO DE COMPETÊNCIA
         const batch = await persistenceService.getAIHs(hospitalIdToLoad, {
           limit: pageSize,
-          offset
+          offset,
+          competencia: competenciaFilter // ✅ NOVO: Filtrar no SQL
         });
 
         const error = null;
@@ -590,7 +595,7 @@ const PatientManagement = () => {
         }
       }
       
-      console.log('📊 AIHs carregadas:', all.length, '| Filtro de competência aplicado no frontend');
+      console.log('📊 AIHs carregadas:', all.length, '| Filtro de competência aplicado no BACKEND (SQL)');
     } catch (error) {
       console.error('❌ Erro ao carregar AIHs:', error);
       toast({
@@ -863,22 +868,9 @@ const PatientManagement = () => {
     };
   });
 
-  // ✅ OTIMIZADO: Filtros aplicados (backend já filtrou data e caráter)
+  // ✅ OTIMIZADO: Filtros aplicados (backend já filtrou competência, data e caráter)
   const filteredData = unifiedData.filter(item => {
-    // Filtro de competência (frontend)
-    if (selectedCompetencia !== 'all') {
-      // 🆕 OPÇÃO ESPECIAL: Mostrar apenas AIHs SEM competência
-      if (selectedCompetencia === 'sem_competencia') {
-        if (item.competencia && item.competencia.trim() !== '') {
-          return false; // Se TEM competência, não mostrar
-        }
-      } else {
-        // Filtro normal: mostrar apenas a competência selecionada
-        if (!item.competencia || item.competencia !== selectedCompetencia) {
-          return false;
-        }
-      }
-    }
+    // ✅ COMPETÊNCIA JÁ FILTRADA NO BACKEND (SQL) - não precisa filtrar aqui
     
     // ✅ NOVO: Filtro de médico (frontend - apenas para administradores)
     if (isDirector && selectedDoctorFilter !== 'all') {
@@ -921,6 +913,38 @@ const PatientManagement = () => {
     currentPage * itemsPerPage,
     (currentPage + 1) * itemsPerPage
   );
+
+  // ✅ NOVO: Calcular número de PACIENTES ÚNICOS (não AIHs) e detectar múltiplas AIHs
+  const { uniquePatients, aihsWithPatients, patientsWithMultipleAIHs } = React.useMemo(() => {
+    const patientIds = new Set<string>();
+    const patientAIHCount = new Map<string, number>(); // Contador de AIHs por paciente
+    let validAIHs = 0;
+    
+    filteredData.forEach(item => {
+      if (item.patient_id) {
+        patientIds.add(item.patient_id);
+        validAIHs++;
+        
+        // Contar AIHs por paciente
+        const currentCount = patientAIHCount.get(item.patient_id) || 0;
+        patientAIHCount.set(item.patient_id, currentCount + 1);
+      }
+    });
+    
+    // Identificar pacientes com múltiplas AIHs
+    const multipleAIHs = new Map<string, number>();
+    patientAIHCount.forEach((count, patientId) => {
+      if (count > 1) {
+        multipleAIHs.set(patientId, count);
+      }
+    });
+    
+    return {
+      uniquePatients: patientIds.size,
+      aihsWithPatients: validAIHs,
+      patientsWithMultipleAIHs: multipleAIHs
+    };
+  }, [filteredData]);
 
   // ✅ OTIMIZADO: Prefetch automático de procedimentos ao trocar página
   useEffect(() => {
@@ -1443,26 +1467,46 @@ const PatientManagement = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-xl">
-            <div className="flex items-center space-x-2">
-              <FileText className="w-5 h-5" />
-              <span>
-                AIHs Processadas ({filteredData.length})
-                {selectedCompetencia !== 'all' && (
-                  <span className="ml-2 text-sm font-normal text-indigo-600">
-                    • Competência: {selectedCompetencia === 'sem_competencia' ? '⚠️ Sem Competência' : formatCompetencia(selectedCompetencia)}
-                  </span>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center space-x-2">
+                <FileText className="w-5 h-5" />
+                <span>
+                  AIHs Processadas ({uniquePatients} pacientes)
+                  {selectedCompetencia !== 'all' && (
+                    <span className="ml-2 text-sm font-normal text-indigo-600">
+                      • Competência: {selectedCompetencia === 'sem_competencia' ? '⚠️ Sem Competência' : formatCompetencia(selectedCompetencia)}
+                    </span>
+                  )}
+                  {isDirector && selectedHospitalFilter !== 'all' && (
+                    <span className="ml-2 text-sm font-normal text-blue-600">
+                      • {availableHospitals.find(h => h.id === selectedHospitalFilter)?.name || 'Hospital'}
+                    </span>
+                  )}
+                  {isDirector && selectedDoctorFilter !== 'all' && (
+                    <span className="ml-2 text-sm font-normal text-green-600">
+                      • Dr(a). {availableDoctors.find(d => d.cns === selectedDoctorFilter)?.name || 'Médico'}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 flex-wrap">
+                {(filteredData.length - aihsWithPatients) > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-orange-600 font-normal">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>
+                      ⚠️ {filteredData.length - aihsWithPatients} AIH(s) órfã(s) sem paciente associado
+                    </span>
+                  </div>
                 )}
-                {isDirector && selectedHospitalFilter !== 'all' && (
-                  <span className="ml-2 text-sm font-normal text-blue-600">
-                    • {availableHospitals.find(h => h.id === selectedHospitalFilter)?.name || 'Hospital'}
-                  </span>
+                {patientsWithMultipleAIHs.size > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-blue-600 font-normal">
+                    <Info className="w-3 h-3" />
+                    <span>
+                      ℹ️ {patientsWithMultipleAIHs.size} paciente(s) com múltiplas AIHs (total: {Array.from(patientsWithMultipleAIHs.values()).reduce((sum, count) => sum + count, 0)} AIHs)
+                    </span>
+                  </div>
                 )}
-                {isDirector && selectedDoctorFilter !== 'all' && (
-                  <span className="ml-2 text-sm font-normal text-green-600">
-                    • Dr(a). {availableDoctors.find(d => d.cns === selectedDoctorFilter)?.name || 'Médico'}
-                  </span>
-                )}
-              </span>
+              </div>
             </div>
             <Button
               onClick={handleGeneratePatientsExcelReport}
@@ -1519,6 +1563,21 @@ const PatientManagement = () => {
                               <h3 className="font-semibold text-gray-900 truncate text-lg">
                                 {item.patient?.name || item.patients?.name || 'Paciente não identificado'}
                               </h3>
+                              {/* Badge: Múltiplas AIHs */}
+                              {(() => {
+                                const patientId = item.patient_id;
+                                const aihCount = patientId ? patientsWithMultipleAIHs.get(patientId) : null;
+                                if (!aihCount || aihCount <= 1) return null;
+                                return (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="bg-blue-50 border-blue-200 text-blue-700 text-[10px] h-5 px-1.5 font-semibold"
+                                    title={`Este paciente possui ${aihCount} AIHs (internações múltiplas)`}
+                                  >
+                                    🔄 {aihCount}× AIHs
+                                  </Badge>
+                                );
+                              })()}
                               {(() => {
                                 const patientId = (item.patient as any)?.id || (item.patients as any)?.id;
                                 const shownName = (item.patient as any)?.name || (item.patients as any)?.name || '';

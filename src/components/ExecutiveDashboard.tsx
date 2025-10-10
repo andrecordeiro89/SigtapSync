@@ -844,14 +844,15 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         const setYM = new Set<string>();
         (data || []).forEach((row: any) => {
           const comp = row.competencia;
-          if (comp) setYM.add(comp);
+          if (comp) setYM.add(comp); // Mantém formato YYYY-MM-DD do banco
         });
         const arr = Array.from(setYM).sort((a, b) => (a < b ? 1 : -1));
-        const formatted = arr.map((ym) => {
-          const [y, m] = ym.split('-');
+        const formatted = arr.map((competenciaFull) => {
+          // ✅ CORREÇÃO: Usar formato completo YYYY-MM-DD (não apenas YYYY-MM)
+          const [y, m] = competenciaFull.split('-'); // pega ano e mês para label
           const d = new Date(Number(y), Number(m) - 1, 1);
           const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
-          return { value: ym, label };
+          return { value: competenciaFull, label }; // ✅ value mantém YYYY-MM-DD completo
         });
         setAvailableCompetencies(formatted);
       } catch (e) {

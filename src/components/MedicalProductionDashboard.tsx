@@ -84,6 +84,37 @@ const formatNumber = (value: number | null | undefined): string => {
   return Math.round(value).toLocaleString('pt-BR');
 };
 
+// ✅ FUNÇÃO SEGURA: Parse de data ISO sem problemas de timezone
+const parseISODateToLocal = (isoString: string | undefined | null): string => {
+  if (!isoString) return '';
+  
+  const s = String(isoString).trim();
+  if (!s) return '';
+  
+  // Tentar extrair YYYY-MM-DD (ignora hora se houver)
+  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [, year, month, day] = match;
+    return `${day}/${month}/${year}`;
+  }
+  
+  // Se não encontrou padrão esperado, tentar split manual
+  try {
+    const parts = s.split(/[-T]/);
+    if (parts.length >= 3) {
+      const [year, month, day] = parts;
+      if (year && month && day) {
+        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ Erro ao parsear data:', s, err);
+  }
+  
+  // Último recurso: retornar indicador de erro
+  return '⚠️ Data inválida';
+};
+
 // Função para formatar competência (YYYY-MM-DD para MM/YYYY)
 const formatCompetencia = (competencia: string | undefined): string => {
   if (!competencia) return '—';
@@ -1245,7 +1276,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   // ✅ CALCULAR ESTATÍSTICAS GLOBAIS AVANÇADAS
   const globalStats = React.useMemo(() => {
     const totalDoctors = doctors.length;
-    const totalPatients = doctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
+    
+    // ✅ CORREÇÃO: Contar PACIENTES ÚNICOS globalmente (não somar pacientes por médico)
+    const uniquePatientIds = new Set<string>();
+    doctors.forEach(doctor => {
+      doctor.patients.forEach(patient => {
+        if (patient.patient_id) {
+          uniquePatientIds.add(patient.patient_id);
+        }
+      });
+    });
+    const totalPatients = uniquePatientIds.size;
     
     // Coletar todos os procedimentos (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
     const allProcedures = doctors.flatMap(doctor => 
@@ -1305,7 +1346,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   // ✅ CALCULAR ESTATÍSTICAS DOS MÉDICOS FILTRADOS
   const filteredStats = React.useMemo(() => {
     const totalDoctors = filteredDoctors.length;
-    const totalPatients = filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
+    
+    // ✅ CORREÇÃO: Contar PACIENTES ÚNICOS globalmente (não somar pacientes por médico)
+    const uniquePatientIds = new Set<string>();
+    filteredDoctors.forEach(doctor => {
+      doctor.patients.forEach(patient => {
+        if (patient.patient_id) {
+          uniquePatientIds.add(patient.patient_id);
+        }
+      });
+    });
+    const totalPatients = uniquePatientIds.size;
     
     // Coletar todos os procedimentos dos médicos filtrados (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
     const allProcedures = filteredDoctors.flatMap(doctor => 
@@ -1684,9 +1735,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             }
                           })();
                           const disISO = p?.aih_info?.discharge_date || '';
-                          const disLabel = disISO
-                            ? (() => { const s = String(disISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
-                            : '';
+                          const disLabel = parseISODateToLocal(disISO);
                           
                           // Calcular valor da AIH com incrementos Opera Paraná
                           const baseAih = Number(p.total_value_reais || 0);
@@ -1705,13 +1754,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                               
                               const procDesc = proc.procedure_description || proc.sigtap_description || '';
                               const procDate = proc.procedure_date || '';
-                              const procDateLabel = procDate 
-                                ? (() => { 
-                                    const s = String(procDate); 
-                                    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); 
-                                    return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); 
-                                  })()
-                                : '';
+                              const procDateLabel = parseISODateToLocal(procDate);
                               const procValue = Number(proc.value_reais || 0);
                               
                               rows.push([
@@ -1925,13 +1968,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           
                           const name = p.patient_info?.name || 'Paciente';
                           const admissionISO = p?.aih_info?.admission_date || '';
-                          const admissionLabel = admissionISO
-                            ? (() => { const s = String(admissionISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
-                            : '';
+                          const admissionLabel = parseISODateToLocal(admissionISO);
                           const dischargeISO = p?.aih_info?.discharge_date || '';
-                          const dischargeLabel = dischargeISO
-                            ? (() => { const s = String(dischargeISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
-                            : '';
+                          const dischargeLabel = parseISODateToLocal(dischargeISO);
                           
                           allPatients.push({
                             name,
@@ -2288,7 +2327,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           })();
                                           const disISO = p?.aih_info?.discharge_date || '';
                                           const disLabel = disISO
-                                            ? (() => { const s = String(disISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
+                                            ? parseISODateToLocal(disISO)
                                             : '';
                                           
                                           // ✅ CÁLCULOS FINANCEIROS (mesma lógica do relatório geral)
@@ -2308,7 +2347,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 ? (() => { 
                                                     const s = String(procDate); 
                                                     const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); 
-                                                    return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); 
+                                                    return m ? `${m[3]}/${m[2]}/${m[1]}` : parseISODateToLocal(s); 
                                                   })()
                                                 : '';
                                               const procValue = Number(proc.value_reais || 0);
@@ -2462,13 +2501,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                            const aihDisplay = aih || 'Aguardando geração';
                                            
                                            const admissionISO = p?.aih_info?.admission_date || '';
-                                           const admissionLabel = admissionISO
-                                             ? (() => { const s = String(admissionISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
-                                             : '';
+                                           const admissionLabel = parseISODateToLocal(admissionISO);
                                            const dischargeISO = p?.aih_info?.discharge_date || '';
-                                           const dischargeLabel = dischargeISO
-                                             ? (() => { const s = String(dischargeISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
-                                             : '';
+                                           const dischargeLabel = parseISODateToLocal(dischargeISO);
                                            
                                            rows.push([
                                              idx++,
@@ -2588,7 +2623,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           const aih = aihRaw || 'Aguardando geração';
                                           const disISO = p?.aih_info?.discharge_date || '';
                                           const disLabel = disISO
-                                            ? (() => { const s = String(disISO); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); })()
+                                            ? parseISODateToLocal(disISO)
                                             : '';
                                           
                                           // ✅ FILTRAR APENAS PROCEDIMENTOS ANESTÉSICOS
@@ -2620,7 +2655,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 ? (() => { 
                                                     const s = String(procDate); 
                                                     const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); 
-                                                    return m ? `${m[3]}/${m[2]}/${m[1]}` : formatDateFns(new Date(s), 'dd/MM/yyyy'); 
+                                                    return m ? `${m[3]}/${m[2]}/${m[1]}` : parseISODateToLocal(s); 
                                                   })()
                                                 : '';
                                               const anesthetistName = proc.professional_name || 'Anestesista não identificado';
