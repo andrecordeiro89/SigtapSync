@@ -1669,8 +1669,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       let excludedByDateFilter = 0;
                       let patientsWithoutAIH = 0;
                       
-                      // 🔧 FIX: Usar Set para deduplicate por AIH number (evitar pacientes recorrentes duplicados)
-                      const uniqueAIHs = new Set<string>();
+                      // 🔧 FIX: Usar Set para deduplicate por PATIENT ID (mesma lógica do badge)
+                      const uniquePatientIds = new Set<string>();
                       
                       console.log('🔍 [RELATÓRIO GERAL] Iniciando coleta de dados...');
                       console.log('🔍 [RELATÓRIO GERAL] Médicos filtrados:', filteredDoctors.length);
@@ -1706,18 +1706,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             }
                           }
                           
+                          const patientId = p.patient_id;
                           const name = p.patient_info?.name || 'Paciente';
                           // 🔧 CORREÇÃO: Incluir pacientes sem AIH com aviso
                           const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                           const aih = aihRaw || 'Aguardando geração';
                           
-                          // 🔧 FIX DUPLICATAS: Verificar se AIH já foi processada
-                          if (aihRaw && uniqueAIHs.has(aihRaw)) {
-                            console.log(`⏭️ [RELATÓRIO GERAL] AIH ${aihRaw} já processada - pulando duplicata`);
+                          // 🔧 FIX DUPLICATAS: Verificar se PACIENTE já foi processado (mesma lógica do badge)
+                          if (patientId && uniquePatientIds.has(patientId)) {
+                            console.log(`⏭️ [RELATÓRIO GERAL] Paciente ${patientId} (${name}) já processado - pulando duplicata`);
                             return; // Pular duplicatas
                           }
-                          if (aihRaw) {
-                            uniqueAIHs.add(aihRaw); // Marcar AIH como processada
+                          if (patientId) {
+                            uniquePatientIds.add(patientId); // Marcar paciente como processado
                           }
                           
                           if (!aihRaw) {
@@ -1905,8 +1906,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       console.log('🔍 [RELATÓRIO SIMPLIFICADO] Médicos filtrados:', filteredDoctors.length);
                       console.log('🔍 [RELATÓRIO SIMPLIFICADO] Sem filtro de data');
                       
-                      // 🔧 FIX: Usar Set para deduplicate por AIH number (evitar pacientes recorrentes duplicados)
-                      const uniqueAIHs = new Set<string>();
+                      // 🔧 FIX: Usar Set para deduplicate por PATIENT ID (mesma lógica do badge)
+                      const uniquePatientIds = new Set<string>();
                       
                       filteredDoctors.forEach((card: any) => {
                         const doctorName = card.doctor_info?.name || 'Médico não identificado';
@@ -1938,18 +1939,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             }
                           }
                           
+                          const patientId = p.patient_id;
+                          
+                          // 🔧 FIX DUPLICATAS: Verificar se PACIENTE já foi processado (mesma lógica do badge)
+                          if (patientId && uniquePatientIds.has(patientId)) {
+                            console.log(`⏭️ [RELATÓRIO SIMPLIFICADO] Paciente ${patientId} já processado - pulando duplicata`);
+                            return; // Pular duplicatas
+                          }
+                          if (patientId) {
+                            uniquePatientIds.add(patientId); // Marcar paciente como processado
+                          }
+                          
                           // 🔧 CORREÇÃO: Pacientes podem não ter AIH gerada ainda - INCLUIR TODOS
                           const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                           const aihDisplay = aih || 'Aguardando geração';
-                          
-                          // 🔧 FIX DUPLICATAS: Verificar se AIH já foi processada
-                          if (aih && uniqueAIHs.has(aih)) {
-                            console.log(`⏭️ [RELATÓRIO SIMPLIFICADO] AIH ${aih} já processada - pulando duplicata`);
-                            return; // Pular duplicatas
-                          }
-                          if (aih) {
-                            uniqueAIHs.add(aih); // Marcar AIH como processada
-                          }
                           
                           // 🤱 LOG ESPECÍFICO PARA PARTOS CESAREANOS
                           const procedures = p.procedures || [];
