@@ -1878,6 +1878,161 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   Relatório Pacientes Geral
                 </Button>
                 
+                {/* 🆕 NOVO: Relatório Pacientes Conferência */}
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const rows: Array<Array<string | number>> = [];
+                      const header = [
+                        '#', 
+                        'Nome do Paciente', 
+                        'Nº AIH', 
+                        'Data Alta (SUS)', 
+                        'Médico', 
+                        'Hospital',
+                        'AIH Seca',
+                        'Incremento',
+                        'AIH c/ Incremento'
+                      ];
+                      let idx = 1;
+                      let totalPatientsFound = 0;
+                      let excludedByDateFilter = 0;
+                      let patientsWithoutAIH = 0;
+                      
+                      // 🔧 FIX: Usar Set para deduplicate por PATIENT ID (mesma lógica do badge)
+                      const uniquePatientIds = new Set<string>();
+                      
+                      console.log('🔍 [RELATÓRIO CONFERÊNCIA] Iniciando coleta de dados...');
+                      console.log('🔍 [RELATÓRIO CONFERÊNCIA] Médicos filtrados:', filteredDoctors.length);
+                      console.log('🔍 [RELATÓRIO CONFERÊNCIA] Uma linha por paciente');
+                      
+                      filteredDoctors.forEach((card: any) => {
+                        const doctorName = card.doctor_info?.name || '';
+                        const hospitalName = card.hospitals?.[0]?.hospital_name || '';
+                        console.log(`👨‍⚕️ [RELATÓRIO CONFERÊNCIA] Médico: ${doctorName} - Pacientes: ${(card.patients || []).length}`);
+                        
+                        (card.patients || []).forEach((p: any) => {
+                          totalPatientsFound++;
+                          
+                          const patientId = p.patient_id;
+                          const name = p.patient_info?.name || 'Paciente';
+                          // 🔧 CORREÇÃO: Incluir pacientes sem AIH com aviso
+                          const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
+                          const aih = aihRaw || 'Aguardando geração';
+                          
+                          // 🔧 FIX DUPLICATAS: Verificar se PACIENTE já foi processado (mesma lógica do badge)
+                          if (patientId && uniquePatientIds.has(patientId)) {
+                            console.log(`⏭️ [RELATÓRIO CONFERÊNCIA] Paciente ${patientId} (${name}) já processado - pulando duplicata`);
+                            return; // Pular duplicatas
+                          }
+                          if (patientId) {
+                            uniquePatientIds.add(patientId); // Marcar paciente como processado
+                          }
+                          
+                          if (!aihRaw) {
+                            patientsWithoutAIH++;
+                            console.log(`⚠️ [RELATÓRIO CONFERÊNCIA] Paciente sem AIH incluído: ${name}`);
+                          }
+                          
+                          const disISO = p?.aih_info?.discharge_date || '';
+                          const disLabel = parseISODateToLocal(disISO);
+                          
+                          // Calcular valor da AIH com incrementos Opera Paraná
+                          const baseAih = Number(p.total_value_reais || 0);
+                          const doctorCovered = isDoctorCoveredForOperaParana(doctorName, card.hospitals?.[0]?.hospital_id);
+                          const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0;
+                          const aihWithIncrements = baseAih + increment;
+                          
+                          // ✅ UMA LINHA POR PACIENTE: Não iterar pelos procedimentos
+                          rows.push([
+                            idx++, 
+                            name, 
+                            aih, // Usar aih que pode ser "Aguardando geração"
+                            disLabel, 
+                            doctorName, 
+                            hospitalName,
+                            formatCurrency(baseAih),
+                            formatCurrency(increment),
+                            formatCurrency(aihWithIncrements)
+                          ]);
+                        });
+                      });
+                      
+                      // Ordenar por Data Alta (SUS) - mais recente primeiro
+                      rows.sort((a, b) => {
+                        const dateA = a[3] as string; // Data Alta (SUS) está na posição 3 (0-indexed)
+                        const dateB = b[3] as string;
+                        
+                        // Se não há data, colocar no final
+                        if (!dateA && !dateB) return 0;
+                        if (!dateA) return 1;
+                        if (!dateB) return -1;
+                        
+                        // Converter DD/MM/YYYY para Date para comparação
+                        const parseDate = (dateStr: string) => {
+                          const parts = dateStr.split('/');
+                          if (parts.length === 3) {
+                            return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                          }
+                          return new Date(0);
+                        };
+                        
+                        const parsedDateA = parseDate(dateA);
+                        const parsedDateB = parseDate(dateB);
+                        
+                        // Ordenar do mais recente para o mais antigo
+                        return parsedDateB.getTime() - parsedDateA.getTime();
+                      });
+                      
+                      // 🔧 AVISO: Exibir estatísticas sobre registros incluídos
+                      console.log('📊 [RELATÓRIO CONFERÊNCIA] Estatísticas finais:');
+                      console.log(`📊 [RELATÓRIO CONFERÊNCIA] Total de pacientes encontrados: ${totalPatientsFound}`);
+                      console.log(`📊 [RELATÓRIO CONFERÊNCIA] Excluídos por filtro de data: ${excludedByDateFilter}`);
+                      console.log(`📊 [RELATÓRIO CONFERÊNCIA] Pacientes sem AIH incluídos: ${patientsWithoutAIH}`);
+                      console.log(`📊 [RELATÓRIO CONFERÊNCIA] Total de linhas no relatório: ${rows.length}`);
+                      
+                      // Renumerar após ordenação
+                      rows.forEach((row, index) => {
+                        row[0] = index + 1; // Atualizar numeração sequencial
+                      });
+                      
+                      const wb = XLSX.utils.book_new();
+                      const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+                      (ws as any)['!cols'] = [
+                        { wch: 5 },   // #
+                        { wch: 35 },  // Nome do Paciente
+                        { wch: 18 },  // Nº AIH
+                        { wch: 16 },  // Data Alta (SUS)
+                        { wch: 30 },  // Médico
+                        { wch: 35 },  // Hospital
+                        { wch: 18 },  // AIH Seca
+                        { wch: 18 },  // Incremento
+                        { wch: 20 },  // AIH c/ Incremento
+                      ];
+                      XLSX.utils.book_append_sheet(wb, ws, 'Pacientes');
+                      const fileName = `Relatorio_Pacientes_Conferencia_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+                      XLSX.writeFile(wb, fileName);
+                      
+                      // ✅ Notificação única e clara
+                      if (patientsWithoutAIH > 0) {
+                        toast.success(`Relatório de conferência gerado! ${patientsWithoutAIH} registro(s) sem AIH incluído(s).`);
+                      } else {
+                        toast.success('Relatório de conferência gerado com sucesso!');
+                      }
+                    } catch (e) {
+                      console.error('Erro ao exportar Relatório Conferência:', e);
+                      toast.error('Erro ao gerar relatório de conferência');
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white"
+                  title="Gerar relatório de conferência de pacientes (uma linha por paciente com valores consolidados)"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Relatório Pacientes Conferência
+                </Button>
+                
                 {/* 🆕 NOVO: Relatório Pacientes Geral Simplificado */}
                 <Button
                   variant="default"
@@ -1891,7 +2046,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         'Nome do Paciente', 
                         'Nº AIH', 
                         'Data de Admissão',
-                        'Data de Alta'
+                        'Data de Alta',
+                        'Médico',
+                        'AIH Seca',
+                        'Incremento',
+                        'AIH c/ Incremento'
                       ];
                       let idx = 1;
                       
@@ -1911,6 +2070,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       
                       filteredDoctors.forEach((card: any) => {
                         const doctorName = card.doctor_info?.name || 'Médico não identificado';
+                        const hospitalName = card.hospitals?.[0]?.hospital_name || 'Hospital não identificado';
                         const doctorPatients = card.patients || [];
                         console.log(`👨‍⚕️ [RELATÓRIO SIMPLIFICADO] Médico: ${doctorName} - Pacientes: ${doctorPatients.length}`);
                         
@@ -1975,11 +2135,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           const dischargeISO = p?.aih_info?.discharge_date || '';
                           const dischargeLabel = parseISODateToLocal(dischargeISO);
                           
+                          // Calcular valores da AIH com incrementos Opera Paraná
+                          const baseAih = Math.round((Number(p.total_value_reais || 0)) * 100) / 100;
+                          const doctorCovered = isDoctorCoveredForOperaParana(doctorName, card.hospitals?.[0]?.hospital_id);
+                          const incrementRaw = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0;
+                          const increment = Math.round(incrementRaw * 100) / 100;
+                          const aihWithIncrements = Math.round((baseAih + increment) * 100) / 100;
+                          
                           allPatients.push({
                             name,
                             aih: aihDisplay, // Usar aihDisplay que inclui "Aguardando geração" se vazio
                             admissionLabel,
-                            dischargeLabel
+                            dischargeLabel,
+                            doctorName,
+                            baseAih,
+                            increment,
+                            aihWithIncrements
                           });
                         });
                       });
@@ -2042,7 +2213,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           patient.name,
                           patient.aih,
                           patient.admissionLabel,
-                          patient.dischargeLabel
+                          patient.dischargeLabel,
+                          patient.doctorName,
+                          formatCurrency(patient.baseAih),
+                          formatCurrency(patient.increment),
+                          formatCurrency(patient.aihWithIncrements)
                         ]);
                       });
                       
@@ -2054,6 +2229,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         { wch: 18 },  // Nº AIH
                         { wch: 18 },  // Data de Admissão
                         { wch: 18 },  // Data de Alta
+                        { wch: 30 },  // Médico
+                        { wch: 18 },  // AIH Seca
+                        { wch: 18 },  // Incremento
+                        { wch: 20 },  // AIH c/ Incremento
                       ];
                       XLSX.utils.book_append_sheet(wb, ws, 'Pacientes Simplificado');
                       const fileName = `Relatorio_Pacientes_Simplificado_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
