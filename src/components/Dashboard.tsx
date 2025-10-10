@@ -198,7 +198,10 @@ const Dashboard = () => {
           created_at: aih.created_at,
           operation_type: 'CREATE',
           patient_name: aih.patients?.name || 'Paciente',
-          doctor_name: aih.requesting_physician || doctorByAihId.get(aih.id) || undefined
+          doctor_name: aih.requesting_physician || doctorByAihId.get(aih.id) || null,
+          competencia: aih.competencia, // ✅ Campo de competência
+          admission_date: aih.admission_date, // ✅ Data de admissão
+          discharge_date: aih.discharge_date, // ✅ Data de alta
         }));
 
         setRecentActivity(processedActivity);
@@ -317,6 +320,56 @@ const Dashboard = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  // ✅ Função para formatar competência (YYYY-MM-DD -> MM/YYYY)
+  const formatCompetencia = (competencia: string | undefined): string => {
+    if (!competencia) return '—';
+    
+    try {
+      // Formato esperado: YYYY-MM-DD (ex: 2024-03-01)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(competencia)) {
+        const [year, month] = competencia.split('-');
+        return `${month}/${year}`;
+      }
+      
+      // Formato alternativo: YYYY-MM (ex: 2024-03)
+      if (/^\d{4}-\d{2}$/.test(competencia)) {
+        const [year, month] = competencia.split('-');
+        return `${month}/${year}`;
+      }
+      
+      // Fallback: tentar parsear como data ISO
+      const date = new Date(competencia);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+      }
+      
+      return competencia; // Retorna valor original se não conseguir formatar
+    } catch {
+      return competencia || '—';
+    }
+  };
+
+  // ✅ Função para formatar datas de admissão e alta (YYYY-MM-DD -> DD/MM/YYYY)
+  const formatDate = (dateString: string | undefined): string => {
+    if (!dateString) return '—';
+    
+    try {
+      // Formato esperado: YYYY-MM-DD ou YYYY-MM-DDTHH:mm:ss
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric'
+        });
+      }
+      
+      return dateString; // Retorna valor original se não conseguir formatar
+    } catch {
+      return dateString || '—';
+    }
   };
 
   // ✅ Card explicativo para usuários comuns - Versão compacta
@@ -624,7 +677,7 @@ const Dashboard = () => {
                         </div>
 
                         {/* Conteúdo: Linha única com todas as informações */}
-                        <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-6 gap-3 items-center">
                           
                           {/* Coluna 1: AIH e Nomes */}
                           <div className="space-y-1">
@@ -648,7 +701,52 @@ const Dashboard = () => {
                             )}
                           </div>
 
-                          {/* Coluna 2: Hospital */}
+                          {/* Coluna 2: Datas de Admissão e Alta (Agrupadas) */}
+                          <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-2">
+                            {/* Data de Admissão */}
+                            <div className="flex items-center gap-1.5">
+                              <CalendarDays className="h-3 w-3 text-blue-500 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium text-blue-700">
+                                  {formatDate(log.admission_date)}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Admissão
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Separador visual */}
+                            <div className="w-px h-8 bg-gray-300"></div>
+
+                            {/* Data de Alta */}
+                            <div className="flex items-center gap-1.5">
+                              <CalendarDays className="h-3 w-3 text-green-500 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium text-green-700">
+                                  {formatDate(log.discharge_date)}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  Alta
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Coluna 3: Competência */}
+                          <div className="flex items-center gap-2">
+                            <CalendarDays className="h-3.5 w-3.5 text-purple-500 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium text-purple-700">
+                                {formatCompetencia(log.competencia)}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Competência
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Coluna 4: Hospital */}
                           <div className="flex items-center gap-2">
                             <Building2 className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
                             <span className="text-sm font-medium text-gray-900 truncate">
@@ -656,7 +754,7 @@ const Dashboard = () => {
                             </span>
                           </div>
 
-                          {/* Coluna 3: Operador */}
+                          {/* Coluna 5: Operador */}
                           <div className="flex items-center gap-2">
                             <Users className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
                             <div className="min-w-0">
@@ -671,7 +769,7 @@ const Dashboard = () => {
                             </div>
                           </div>
 
-                          {/* Coluna 4: Data/Hora */}
+                          {/* Coluna 6: Data/Hora */}
                           <div className="flex items-center gap-1.5 md:justify-end">
                             <Clock className="h-3.5 w-3.5 text-gray-400" />
                             <span className="text-xs text-gray-600 whitespace-nowrap">
