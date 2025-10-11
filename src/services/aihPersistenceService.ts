@@ -1816,20 +1816,22 @@ export class AIHPersistenceService {
       const completedCountQuery = baseAIHFilter(
         supabase.from('aihs').select('id', { count: 'exact', head: true }).eq('processing_status', 'completed')
       );
-      const patientsCountQuery = baseAIHFilter(
-        supabase.from('patients').select('id', { count: 'exact', head: true }).eq('is_active', true)
+      // ✅ CORREÇÃO: Contar AIHs em vez de pacientes únicos
+      // total_patients agora representa total de AIHs/internações
+      const aihsCountQuery = baseAIHFilter(
+        supabase.from('aihs').select('id', { count: 'exact', head: true })
       );
 
       const [
         { count: totalAIHs },
         { count: pendingAIHs },
         { count: completedAIHs },
-        { count: patientsCount }
+        { count: aihsCount }
       ] = await Promise.all([
         totalCountQuery,
         pendingCountQuery,
         completedCountQuery,
-        patientsCountQuery
+        aihsCountQuery
       ]);
 
       // Calcular número de hospitais com AIHs processadas (modo admin)
@@ -1880,12 +1882,13 @@ export class AIHPersistenceService {
         }
       }
 
-      // Nota: total_value/average_value não são usados no Dashboard. Mantemos 0 por enquanto.
+      // ✅ total_patients agora representa total de AIHs (não pacientes únicos)
+      // Isso permite contar corretamente pacientes com múltiplas AIHs
       const stats = {
         total_aihs: totalAIHs || 0,
         pending_aihs: pendingAIHs || 0,
         completed_aihs: completedAIHs || 0,
-        total_patients: patientsCount || 0,
+        total_patients: aihsCount || 0, // Representa total de AIHs/internações
         total_value: 0,
         average_value: 0,
         hospitals_count: isAdminMode ? (processedHospitalsCount ?? 0) : 1,

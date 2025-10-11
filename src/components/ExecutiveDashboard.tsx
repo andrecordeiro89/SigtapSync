@@ -1012,7 +1012,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               </div>
               <div className="flex items-center gap-3">
                 <Badge variant="secondary" className="bg-blue-100 text-blue-800 px-3 py-2 font-medium">
-                  {medicalProductionStats ? `${medicalProductionStats.totalPatients} pacientes` : 'Carregando...'}
+                  {medicalProductionStats ? `${medicalProductionStats.totalPatients} AIHs` : 'Carregando...'}
                 </Badge>
               </div>
             </div>

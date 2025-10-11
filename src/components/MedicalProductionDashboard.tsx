@@ -1280,16 +1280,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const globalStats = React.useMemo(() => {
     const totalDoctors = doctors.length;
     
-    // ✅ CORREÇÃO: Contar PACIENTES ÚNICOS globalmente (não somar pacientes por médico)
-    const uniquePatientIds = new Set<string>();
-    doctors.forEach(doctor => {
-      doctor.patients.forEach(patient => {
-        if (patient.patient_id) {
-          uniquePatientIds.add(patient.patient_id);
-        }
-      });
-    });
-    const totalPatients = uniquePatientIds.size;
+    // ✅ CORREÇÃO: Contar TOTAL DE AIHs (internações), não pacientes únicos
+    // Um paciente com múltiplas AIHs deve ser contado múltiplas vezes
+    const totalAIHs = doctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
+    const totalPatients = totalAIHs; // Badge mostrará "Total de AIHs/Internações"
     
     // Coletar todos os procedimentos (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
     const allProcedures = doctors.flatMap(doctor => 
@@ -1350,16 +1344,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const filteredStats = React.useMemo(() => {
     const totalDoctors = filteredDoctors.length;
     
-    // ✅ CORREÇÃO: Contar PACIENTES ÚNICOS globalmente (não somar pacientes por médico)
-    const uniquePatientIds = new Set<string>();
-    filteredDoctors.forEach(doctor => {
-      doctor.patients.forEach(patient => {
-        if (patient.patient_id) {
-          uniquePatientIds.add(patient.patient_id);
-        }
-      });
-    });
-    const totalPatients = uniquePatientIds.size;
+    // ✅ CORREÇÃO: Contar TOTAL DE AIHs (internações), não pacientes únicos
+    // Um paciente com múltiplas AIHs deve ser contado múltiplas vezes
+    const totalAIHs = filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
+    const totalPatients = totalAIHs; // Representa total de AIHs/internações
     
     // Coletar todos os procedimentos dos médicos filtrados (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
     const allProcedures = filteredDoctors.flatMap(doctor => 
@@ -1740,12 +1728,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                          'AIH c/ Incremento'
                        ];
                       let idx = 1;
-                      let totalPatientsFound = 0;
+                      let totalAIHsFound = 0;
                       let excludedByDateFilter = 0;
-                      let patientsWithoutAIH = 0;
+                      let aihsWithoutNumber = 0;
                       
-                      // 🔧 FIX: Usar Set para deduplicate por PATIENT ID (mesma lógica do badge)
-                      const uniquePatientIds = new Set<string>();
+                      // ✅ CORREÇÃO: NÃO deduplicate por paciente - cada AIH é um registro único
+                      // Um paciente com múltiplas AIHs deve gerar múltiplas linhas no relatório
                       
                       console.log('🔍 [RELATÓRIO GERAL] Iniciando coleta de dados...');
                       console.log('🔍 [RELATÓRIO GERAL] Médicos filtrados:', filteredDoctors.length);
@@ -1757,7 +1745,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         console.log(`👨‍⚕️ [RELATÓRIO GERAL] Médico: ${doctorName} - Pacientes: ${(card.patients || []).length}`);
                         
                         (card.patients || []).forEach((p: any) => {
-                          totalPatientsFound++;
+                          totalAIHsFound++; // ✅ Contar AIHs, não pacientes únicos
                           
                           // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo filtro do relatório simplificado)
                           if (false) {
@@ -1783,22 +1771,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           
                           const patientId = p.patient_id;
                           const name = p.patient_info?.name || 'Paciente';
-                          // 🔧 CORREÇÃO: Incluir pacientes sem AIH com aviso
+                          // 🔧 CORREÇÃO: Incluir AIHs sem número com aviso
                           const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                           const aih = aihRaw || 'Aguardando geração';
                           
-                          // 🔧 FIX DUPLICATAS: Verificar se PACIENTE já foi processado (mesma lógica do badge)
-                          if (patientId && uniquePatientIds.has(patientId)) {
-                            console.log(`⏭️ [RELATÓRIO GERAL] Paciente ${patientId} (${name}) já processado - pulando duplicata`);
-                            return; // Pular duplicatas
-                          }
-                          if (patientId) {
-                            uniquePatientIds.add(patientId); // Marcar paciente como processado
-                          }
+                          // ✅ CORREÇÃO: NÃO pular duplicatas de paciente - cada AIH é única
+                          // Mesmo paciente com múltiplas AIHs deve gerar múltiplas linhas
                           
                           if (!aihRaw) {
-                            patientsWithoutAIH++;
-                            console.log(`⚠️ [RELATÓRIO GERAL] Paciente sem AIH incluído: ${name}`);
+                            aihsWithoutNumber++;
+                            console.log(`⚠️ [RELATÓRIO GERAL] AIH sem número incluída: ${name}`);
                           }
                           
                           const careSpec = (p?.aih_info?.specialty || '').toString();
@@ -1900,11 +1882,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         return parsedDateB.getTime() - parsedDateA.getTime();
                       });
                       
-                      // 🔧 AVISO: Exibir estatísticas sobre registros incluídos
+                      // 📊 Estatísticas finais do relatório
                       console.log('📊 [RELATÓRIO GERAL] Estatísticas finais:');
-                      console.log(`📊 [RELATÓRIO GERAL] Total de pacientes encontrados: ${totalPatientsFound}`);
-                      console.log(`📊 [RELATÓRIO GERAL] Excluídos por filtro de data: ${excludedByDateFilter}`);
-                      console.log(`📊 [RELATÓRIO GERAL] Pacientes sem AIH incluídos: ${patientsWithoutAIH}`);
+                      console.log(`📊 [RELATÓRIO GERAL] Total de AIHs encontradas: ${totalAIHsFound}`);
+                      console.log(`📊 [RELATÓRIO GERAL] Excluídas por filtro de data: ${excludedByDateFilter}`);
+                      console.log(`📊 [RELATÓRIO GERAL] AIHs sem número incluídas: ${aihsWithoutNumber}`);
                       console.log(`📊 [RELATÓRIO GERAL] Total de linhas no relatório: ${rows.length}`);
                       
                       // Renumerar após ordenação
@@ -1972,16 +1954,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         'AIH c/ Incremento'
                       ];
                       let idx = 1;
-                      let totalPatientsFound = 0;
+                      let totalAIHsFound = 0;
                       let excludedByDateFilter = 0;
-                      let patientsWithoutAIH = 0;
+                      let aihsWithoutNumber = 0;
                       
-                      // 🔧 FIX: Usar Set para deduplicate por PATIENT ID (mesma lógica do badge)
-                      const uniquePatientIds = new Set<string>();
+                      // ✅ CORREÇÃO: NÃO deduplicate por paciente - cada AIH é um registro único
+                      // Um paciente com múltiplas AIHs deve gerar múltiplas linhas no relatório
                       
                       console.log('🔍 [RELATÓRIO CONFERÊNCIA] Iniciando coleta de dados...');
                       console.log('🔍 [RELATÓRIO CONFERÊNCIA] Médicos filtrados:', filteredDoctors.length);
-                      console.log('🔍 [RELATÓRIO CONFERÊNCIA] Uma linha por paciente');
+                      console.log('🔍 [RELATÓRIO CONFERÊNCIA] Uma linha por AIH (internação)');
                       
                       filteredDoctors.forEach((card: any) => {
                         const doctorName = card.doctor_info?.name || '';
@@ -1989,26 +1971,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         console.log(`👨‍⚕️ [RELATÓRIO CONFERÊNCIA] Médico: ${doctorName} - Pacientes: ${(card.patients || []).length}`);
                         
                         (card.patients || []).forEach((p: any) => {
-                          totalPatientsFound++;
+                          totalAIHsFound++; // ✅ Contar AIHs, não pacientes únicos
                           
                           const patientId = p.patient_id;
                           const name = p.patient_info?.name || 'Paciente';
-                          // 🔧 CORREÇÃO: Incluir pacientes sem AIH com aviso
+                          // 🔧 CORREÇÃO: Incluir AIHs sem número com aviso
                           const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                           const aih = aihRaw || 'Aguardando geração';
                           
-                          // 🔧 FIX DUPLICATAS: Verificar se PACIENTE já foi processado (mesma lógica do badge)
-                          if (patientId && uniquePatientIds.has(patientId)) {
-                            console.log(`⏭️ [RELATÓRIO CONFERÊNCIA] Paciente ${patientId} (${name}) já processado - pulando duplicata`);
-                            return; // Pular duplicatas
-                          }
-                          if (patientId) {
-                            uniquePatientIds.add(patientId); // Marcar paciente como processado
-                          }
+                          // ✅ CORREÇÃO: NÃO pular duplicatas de paciente - cada AIH é única
+                          // Mesmo paciente com múltiplas AIHs deve gerar múltiplas linhas
                           
                           if (!aihRaw) {
-                            patientsWithoutAIH++;
-                            console.log(`⚠️ [RELATÓRIO CONFERÊNCIA] Paciente sem AIH incluído: ${name}`);
+                            aihsWithoutNumber++;
+                            console.log(`⚠️ [RELATÓRIO CONFERÊNCIA] AIH sem número incluída: ${name}`);
                           }
                           
                           const disISO = p?.aih_info?.discharge_date || '';
@@ -2020,7 +1996,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0;
                           const aihWithIncrements = baseAih + increment;
                           
-                          // ✅ UMA LINHA POR PACIENTE: Não iterar pelos procedimentos
+                          // ✅ UMA LINHA POR AIH: Cada internação/atendimento é uma linha
                           rows.push([
                             idx++, 
                             name, 
@@ -2061,11 +2037,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         return parsedDateB.getTime() - parsedDateA.getTime();
                       });
                       
-                      // 🔧 AVISO: Exibir estatísticas sobre registros incluídos
+                      // 📊 Estatísticas finais do relatório
                       console.log('📊 [RELATÓRIO CONFERÊNCIA] Estatísticas finais:');
-                      console.log(`📊 [RELATÓRIO CONFERÊNCIA] Total de pacientes encontrados: ${totalPatientsFound}`);
-                      console.log(`📊 [RELATÓRIO CONFERÊNCIA] Excluídos por filtro de data: ${excludedByDateFilter}`);
-                      console.log(`📊 [RELATÓRIO CONFERÊNCIA] Pacientes sem AIH incluídos: ${patientsWithoutAIH}`);
+                      console.log(`📊 [RELATÓRIO CONFERÊNCIA] Total de AIHs encontradas: ${totalAIHsFound}`);
+                      console.log(`📊 [RELATÓRIO CONFERÊNCIA] Excluídas por filtro de data: ${excludedByDateFilter}`);
+                      console.log(`📊 [RELATÓRIO CONFERÊNCIA] AIHs sem número incluídas: ${aihsWithoutNumber}`);
                       console.log(`📊 [RELATÓRIO CONFERÊNCIA] Total de linhas no relatório: ${rows.length}`);
                       
                       // Renumerar após ordenação
@@ -2086,13 +2062,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         { wch: 18 },  // Incremento
                         { wch: 20 },  // AIH c/ Incremento
                       ];
-                      XLSX.utils.book_append_sheet(wb, ws, 'Pacientes');
-                      const fileName = `Relatorio_Pacientes_Conferencia_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
+                      XLSX.utils.book_append_sheet(wb, ws, 'AIHs');
+                      const fileName = `Relatorio_AIHs_Conferencia_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
                       XLSX.writeFile(wb, fileName);
                       
                       // ✅ Notificação única e clara
-                      if (patientsWithoutAIH > 0) {
-                        toast.success(`Relatório de conferência gerado! ${patientsWithoutAIH} registro(s) sem AIH incluído(s).`);
+                      if (aihsWithoutNumber > 0) {
+                        toast.success(`Relatório de conferência gerado! ${aihsWithoutNumber} AIH(s) sem número incluída(s).`);
                       } else {
                         toast.success('Relatório de conferência gerado com sucesso!');
                       }
@@ -2140,8 +2116,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       console.log('🔍 [RELATÓRIO SIMPLIFICADO] Médicos filtrados:', filteredDoctors.length);
                       console.log('🔍 [RELATÓRIO SIMPLIFICADO] Sem filtro de data');
                       
-                      // 🔧 FIX: Usar Set para deduplicate por PATIENT ID (mesma lógica do badge)
-                      const uniquePatientIds = new Set<string>();
+                      // ✅ CORREÇÃO: NÃO deduplicate por paciente - cada AIH é um registro único
+                      // Um paciente com múltiplas AIHs deve gerar múltiplas linhas no relatório
                       
                       filteredDoctors.forEach((card: any) => {
                         const doctorName = card.doctor_info?.name || 'Médico não identificado';
@@ -2176,16 +2152,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           
                           const patientId = p.patient_id;
                           
-                          // 🔧 FIX DUPLICATAS: Verificar se PACIENTE já foi processado (mesma lógica do badge)
-                          if (patientId && uniquePatientIds.has(patientId)) {
-                            console.log(`⏭️ [RELATÓRIO SIMPLIFICADO] Paciente ${patientId} já processado - pulando duplicata`);
-                            return; // Pular duplicatas
-                          }
-                          if (patientId) {
-                            uniquePatientIds.add(patientId); // Marcar paciente como processado
-                          }
+                          // ✅ CORREÇÃO: NÃO pular duplicatas de paciente - cada AIH é única
+                          // Mesmo paciente com múltiplas AIHs deve gerar múltiplas linhas
                           
-                          // 🔧 CORREÇÃO: Pacientes podem não ter AIH gerada ainda - INCLUIR TODOS
+                          // 🔧 CORREÇÃO: AIHs podem não ter número gerado ainda - INCLUIR TODAS
                           const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                           const aihDisplay = aih || 'Aguardando geração';
                           
@@ -2201,7 +2171,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           }
                           
                           if (!aih) {
-                            console.log(`⚠️ [RELATÓRIO SIMPLIFICADO] Paciente sem AIH incluído: ${p.patient_info?.name || 'Sem nome'}`);
+                            console.log(`⚠️ [RELATÓRIO SIMPLIFICADO] AIH sem número incluída: ${p.patient_info?.name || 'Sem nome'}`);
                           }
                           
                           const name = p.patient_info?.name || 'Paciente';
@@ -2244,12 +2214,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       });
                       
                       console.log('📊 [RELATÓRIO SIMPLIFICADO] ESTATÍSTICAS:');
-                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Total encontrado: ${totalPatientsFound}`);
-                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Excluídos por data: ${excludedByDateFilter}`);
-                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Pacientes sem AIH incluídos: ${allPatients.filter(p => p.aih === 'Aguardando geração').length}`);
+                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Total de AIHs encontradas: ${totalPatientsFound}`);
+                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Excluídas por data: ${excludedByDateFilter}`);
+                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] AIHs sem número incluídas: ${allPatients.filter(p => p.aih === 'Aguardando geração').length}`);
                       console.log(`🤱 [RELATÓRIO SIMPLIFICADO] Partos cesareanos identificados: ${cesareanCount}`);
-                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Incluídos no relatório: ${allPatients.length}`);
-                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Diferença esperada vs real: ${323 - allPatients.length}`);
+                      console.log(`📊 [RELATÓRIO SIMPLIFICADO] Incluídas no relatório: ${allPatients.length}`);
                       
                       // 🔄 CORREÇÃO: Ordenar por data de alta (do mais antigo para o mais recente)
                       const patientsArray = allPatients;
