@@ -530,8 +530,8 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                             </>
                           )}
 
-                          {/* PROCEDIMENTOS MÉDICOS (04) - INFORMAÇÃO ADICIONAL */}
-                          {medicalCount > 0 && (
+                          {/* PROCEDIMENTOS MÉDICOS (04) - OCULTO CONFORME SOLICITAÇÃO */}
+                          {/* {medicalCount > 0 && (
                             <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-2 border border-orange-200">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
@@ -543,7 +543,7 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                                 <span className="text-sm font-bold text-orange-700">{formatValue(medicalValue)}</span>
                               </div>
                             </div>
-                          )}
+                          )} */}
                         </div>
                       );
                     })()}
@@ -557,63 +557,121 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
                         const careCharacter = (patient.aih_info as any)?.care_character;
                         const aihHasExcluded = hasAnyExcludedCodeInProcedures(patient.procedures as any);
                         const incMeta = getProcedureIncrementMeta(procedure.procedure_code, careCharacter, doctorName, undefined, aihHasExcluded);
+                        const isMedical04 = isMedicalProcedure(procedure.procedure_code);
+                        const isPrincipal = procedure.sequence === 1;
                         return (
                           <div 
                             key={`${procedure.procedure_id}-${procIndex}`}
-                            className={`p-3 hover:bg-gray-50 border-b last:border-b-0 ${
-                               isMedicalProcedure(procedure.procedure_code) ? 'bg-orange-50/40 border-l-4 border-l-orange-300' : ''
-                             } ${incMeta ? 'ring-1 ring-emerald-200 bg-emerald-50/40' : ''}`}
+                            className={`bg-white border rounded-lg overflow-hidden mb-2 ${
+                              isMedical04 && isPrincipal ? 'border-emerald-300 shadow-sm' : 'border-slate-200'
+                            } ${incMeta ? 'ring-2 ring-emerald-200' : ''}`}
                           >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {procedure.procedure_description}
-                                  </div>
-                                  {isMedicalProcedure(procedure.procedure_code) && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
-                                      Médico 04
-                                    </span>
-                                  )}
-                                  {incMeta && (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                      {incMeta.label}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-xs text-gray-500 space-y-1 mt-1">
-                                  <div>Código: {procedure.procedure_code}</div>
-                                  <div>Data: {formatDate(procedure.procedure_date)}</div>
-                                  {procedure.sequence && (
-                                    <div>Sequência: {procedure.sequence}</div>
-                                  )}
-                                  {procedure.aih_id && (
-                                    <div>AIH: {procedure.aih_id.substring(0, 8)}...</div>
-                                  )}
+                            {/* CABEÇALHO DO PROCEDIMENTO */}
+                            <div className={`px-4 py-2.5 border-b flex items-center justify-between ${
+                              isMedical04 && isPrincipal ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200' : 'bg-slate-50 border-slate-200'
+                            }`}>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-xs font-bold uppercase tracking-wide px-2 py-1 rounded ${
+                                  isMedical04 && isPrincipal ? 'bg-emerald-600 text-white' : 'bg-slate-600 text-white'
+                                }`}>
+                                  {procedure.procedure_code}
+                                </span>
+                                {isMedical04 && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`${isPrincipal ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-slate-100 text-slate-700 border-slate-300'} text-[10px]`}
+                                  >
+                                    🩺 Médico 04
+                                  </Badge>
+                                )}
+                                {isMedical04 && isPrincipal && (
+                                  <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                                    Principal
+                                  </Badge>
+                                )}
+                                {incMeta && (
+                                  <Badge variant="outline" className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                                    {incMeta.label}
+                                  </Badge>
+                                )}
+                                {procedure.sequence && procedure.sequence > 1 && (
+                                  <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 text-[10px]">
+                                    Seq. {procedure.sequence}
+                                  </Badge>
+                                )}
+                                <div className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${statusDisplay.color}`}>
+                                  {statusDisplay.icon}
+                                  {statusDisplay.text}
                                 </div>
                               </div>
-                              <div className="text-right space-y-1 ml-3">
+                              
+                              {/* VALOR NO CABEÇALHO */}
+                              <div className="text-right">
                                 {(() => {
                                   const base = procedure.value_reais || 0;
                                   if (incMeta) {
                                     const incremented = base * incMeta.factor;
                                     return (
                                       <div className="text-right">
-                                        <div className="text-[11px] text-gray-500 line-through">{formatValue(base)}</div>
-                                        <div className="text-sm font-extrabold text-emerald-700">{formatValue(incremented)}</div>
+                                        <div className="text-[10px] text-slate-500 line-through">{formatValue(base)}</div>
+                                        <div className="text-base font-black text-emerald-700">{formatValue(incremented)}</div>
                                       </div>
                                     );
                                   }
                                   return (
-                                    <div className={`text-sm font-bold ${isMedicalProcedure(procedure.procedure_code) ? 'text-orange-600' : 'text-green-600'}`}>
+                                    <div className={`text-base font-bold ${isMedical04 && isPrincipal ? 'text-emerald-700' : 'text-slate-900'}`}>
                                       {formatValue(base)}
                                     </div>
                                   );
                                 })()}
-                                <div className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${statusDisplay.color}`}>
-                                  {statusDisplay.icon}
-                                  {statusDisplay.text}
+                              </div>
+                            </div>
+                            
+                            {/* CORPO DO PROCEDIMENTO */}
+                            <div className="px-4 py-3">
+                              {/* DESCRIÇÃO */}
+                              <div className="mb-3">
+                                <p className="text-sm text-slate-700 leading-relaxed">
+                                  {procedure.procedure_description || 'Descrição não disponível'}
+                                </p>
+                              </div>
+                              
+                              {/* GRID DE INFORMAÇÕES (2 COLUNAS) */}
+                              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                                {/* DATA */}
+                                <div>
+                                  <span className="text-slate-500 font-medium uppercase tracking-wide">Data:</span>
+                                  <span className="ml-2 text-slate-900 font-medium">{formatDate(procedure.procedure_date)}</span>
                                 </div>
+                                
+                                {/* CBO */}
+                                {procedure.cbo && (
+                                  <div>
+                                    <span className="text-slate-500 font-medium uppercase tracking-wide">CBO:</span>
+                                    <Badge
+                                      variant="outline"
+                                      className={`ml-2 text-[10px] ${procedure.cbo === '225151' ? 'bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white border-0' : 'bg-slate-100 text-slate-700 border-slate-300'}`}
+                                    >
+                                      {procedure.cbo}
+                                    </Badge>
+                                  </div>
+                                )}
+                                
+                                {/* AIH ID */}
+                                {procedure.aih_id && (
+                                  <div className="col-span-2">
+                                    <span className="text-slate-500 font-medium uppercase tracking-wide">AIH ID:</span>
+                                    <span className="ml-2 text-slate-900 font-mono text-[10px]">{procedure.aih_id.substring(0, 8)}...</span>
+                                  </div>
+                                )}
+                                
+                                {/* PROFISSIONAL */}
+                                {procedure.professional_name && (
+                                  <div className="col-span-2">
+                                    <span className="text-slate-500 font-medium uppercase tracking-wide">Profissional:</span>
+                                    <span className="ml-2 text-slate-900">{procedure.professional_name}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>

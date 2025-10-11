@@ -1382,15 +1382,38 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   // ✅ NOVO: Calcular pacientes com múltiplas AIHs (igual PatientManagement)
   const multipleAIHsStats = React.useMemo(() => {
     const patientAIHCount = new Map<string, number>();
+    const patientDetails = new Map<string, any>(); // 🆕 Armazenar detalhes do paciente
+    const patientAIHsList = new Map<string, any[]>(); // 🆕 Armazenar lista de AIHs por paciente
     let totalAIHs = 0;
     
-    // Contar AIHs por paciente
+    // Contar AIHs por paciente e coletar detalhes
     filteredDoctors.forEach(doctor => {
       doctor.patients.forEach(patient => {
         if (patient.patient_id) {
           totalAIHs++;
           const currentCount = patientAIHCount.get(patient.patient_id) || 0;
           patientAIHCount.set(patient.patient_id, currentCount + 1);
+          
+          // 🆕 Armazenar lista de AIHs por paciente
+          if (!patientAIHsList.has(patient.patient_id)) {
+            patientAIHsList.set(patient.patient_id, []);
+          }
+          patientAIHsList.get(patient.patient_id)!.push({
+            aih_number: patient.aih_info?.aih_number || 'Não informado',
+            admission_date: patient.aih_info?.admission_date,
+            discharge_date: patient.aih_info?.discharge_date,
+            competencia: patient.aih_info?.competencia
+          });
+          
+          // 🆕 Armazenar detalhes do paciente (✅ CORREÇÃO: usar patient_info)
+          if (!patientDetails.has(patient.patient_id)) {
+            patientDetails.set(patient.patient_id, {
+              patient_id: patient.patient_id,
+              patient_name: patient.patient_info?.name || 'Nome não informado',
+              patient_cns: patient.patient_info?.cns || 'Não informado',
+              hospital_name: doctor.hospitals?.[0]?.hospital_name || 'Hospital não informado'
+            });
+          }
         }
       });
     });
@@ -1406,11 +1429,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     // Calcular total de AIHs de pacientes com múltiplas internações
     const totalMultipleAIHs = Array.from(patientsWithMultiple.values()).reduce((sum, count) => sum + count, 0);
     
+    // 🆕 Criar array com detalhes dos pacientes com múltiplas AIHs
+    const multipleAIHsDetails = Array.from(patientsWithMultiple.entries())
+      .map(([patientId, count]) => ({
+        ...patientDetails.get(patientId),
+        aih_count: count,
+        aihs: patientAIHsList.get(patientId) || [] // 🆕 Incluir lista de AIHs
+      }))
+      .sort((a, b) => b.aih_count - a.aih_count); // Ordenar por quantidade de AIHs (maior primeiro)
+    
     return {
       totalAIHs,
       patientsWithMultipleAIHs: patientsWithMultiple.size,
       totalMultipleAIHs,
-      aihsWithoutPatients: 0 // Não temos AIHs órfãs nesta view
+      aihsWithoutPatients: 0, // Não temos AIHs órfãs nesta view
+      multipleAIHsDetails // 🆕 Array com detalhes dos pacientes
     };
   }, [filteredDoctors]);
   
@@ -1477,7 +1510,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         totalProcedures: filteredStats.totalProcedures,
         patientsWithMultipleAIHs: multipleAIHsStats.patientsWithMultipleAIHs,
         totalMultipleAIHs: multipleAIHsStats.totalMultipleAIHs,
-        totalAIHs: multipleAIHsStats.totalAIHs
+        totalAIHs: multipleAIHsStats.totalAIHs,
+        multipleAIHsDetails: multipleAIHsStats.multipleAIHsDetails // 🆕 Passar detalhes dos pacientes
       });
     }
   }, [filteredStats, multipleAIHsStats, onStatsUpdate, isLoading]);
@@ -3369,8 +3403,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   </>
                                                 )}
 
-                                                {/* PROCEDIMENTOS MÉDICOS (04) - INFORMAÇÃO ADICIONAL */}
-                                                {medicalCount > 0 && (
+                                                {/* PROCEDIMENTOS MÉDICOS (04) - OCULTO CONFORME SOLICITAÇÃO */}
+                                                {/* {medicalCount > 0 && (
                                                   <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-2 border border-orange-200">
                                                     <div className="flex items-center justify-between">
                                                       <div className="flex items-center gap-2">
@@ -3382,7 +3416,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                       <span className="text-sm font-bold text-orange-700">{formatCurrency(medicalValue)}</span>
                                                     </div>
                                                   </div>
-                                                )}
+                                                )} */}
                                               </div>
                                             );
                                           })()}
@@ -3449,19 +3483,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     return '';
                                                   })();
                                                   return (
-                                                <div key={procedure.procedure_id || procIndex} className={`bg-white/80 p-4 rounded-xl border-l-4 ${
-                                                  isMedical04 && isPrincipal ? 'border-l-emerald-400 bg-emerald-50/20' : 'border-l-slate-300'
-                                                } ${operaEligible && isPrincipal ? 'ring-1 ring-emerald-200' : ''}`}>
-                                                  <div className="flex items-start justify-between">
-                                                    <div className="flex-1">
-                                                      <div className="flex items-center gap-2 mb-2">
-                                                        <div className={`font-medium px-3 py-1 rounded-lg text-xs ${
-                                                          (isMedical04 && isPrincipal)
-                                                            ? 'text-emerald-800 bg-emerald-100 border border-emerald-200'
-                                                            : 'text-slate-800 bg-slate-100 border border-slate-200'
+                                                <div key={procedure.procedure_id || procIndex} className={`bg-white border rounded-lg overflow-hidden ${
+                                                  isMedical04 && isPrincipal ? 'border-emerald-300 shadow-sm' : 'border-slate-200'
+                                                } ${operaEligible && isPrincipal ? 'ring-2 ring-emerald-200' : ''}`}>
+                                                  {/* CABEÇALHO DO PROCEDIMENTO */}
+                                                  <div className={`px-4 py-2.5 border-b flex items-center justify-between ${
+                                                    isMedical04 && isPrincipal ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200' : 'bg-slate-50 border-slate-200'
+                                                  }`}>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                      <span className={`text-xs font-bold uppercase tracking-wide px-2 py-1 rounded ${
+                                                        isMedical04 && isPrincipal ? 'bg-emerald-600 text-white' : 'bg-slate-600 text-white'
                                                         }`}>
                                                           {procedure.procedure_code}
-                                                        </div>
+                                                      </span>
                                                         {isMedical04 && (
                                                           <Badge 
                                                             variant="outline" 
@@ -3491,7 +3525,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                             return (
                                                               <Badge 
                                                                 variant={anesthetistInfo.badgeVariant} 
-                                                                className={`${anesthetistInfo.badgeClass} text-xs ${anesthetistInfo.shouldCalculate ? '' : 'animate-pulse'}`}
+                                                              className={`${anesthetistInfo.badgeClass} text-[10px] ${anesthetistInfo.shouldCalculate ? '' : 'animate-pulse'}`}
                                                               >
                                                                 {anesthetistInfo.badge}
                                                               </Badge>
@@ -3500,38 +3534,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           return null;
                                                         })()}
                                                         {procedure.sequence && procedure.sequence > 1 && (
-                                                          <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 text-xs">
+                                                        <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 text-[10px]">
                                                             Seq. {procedure.sequence}
                                                           </Badge>
                                                         )}
                                                       </div>
                                                       
-                                                      <div className="text-xs text-slate-700 mb-3 leading-relaxed">
-                                                        {procedure.procedure_description || 'Descrição não disponível'}
-                                                      </div>
-                                                      
-                                                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm text-slate-600">
-                                                        <div className="flex items-center h-6 md:h-7 whitespace-nowrap">
-                                                          {procedure.cbo ? (
-                                                            <Badge
-                                                              variant="outline"
-                                                              className={`w-28 justify-center text-[10px] ${procedure.cbo === '225151' ? 'bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white border-0 shadow-sm' : 'bg-slate-100 text-slate-700 border-slate-300'}`}
-                                                            >
-                                                              CBO: {procedure.cbo}
-                                                            </Badge>
-                                                          ) : (
-                                                            <span className="w-28" />
-                                                          )}
-                                                        </div>
-
-                                                        {/* Campo Confiança removido a pedido */}
-                                                        <div className="h-6 md:h-7" />
-
-                                                        <div className="h-6 md:h-7" />
-                                                      </div>
-                                                    </div>
-                                                    
-                                                    <div className="text-right ml-4">
+                                                    {/* VALOR NO CABEÇALHO */}
+                                                    <div className="text-right">
                                                       {(() => {
                                                         const anesthetistInfo = getAnesthetistProcedureType(procedure.cbo, procedure.procedure_code);
                                                         if (operaEligible && (!anesthetistInfo.isAnesthetist || anesthetistInfo.shouldCalculate)) {
@@ -3539,27 +3549,26 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           const increment = base * 1.5; // +150%
                                                           return (
                                                             <div className="text-right">
-                                                              <div className="text-[11px] text-slate-500 line-through">{formatCurrency(base)}</div>
-                                                              <div className="text-lg font-extrabold text-emerald-700">{formatCurrency(increment)}</div>
+                                                              <div className="text-[10px] text-slate-500 line-through">{formatCurrency(base)}</div>
+                                                              <div className="text-base font-black text-emerald-700">{formatCurrency(increment)}</div>
                                                             </div>
                                                           );
                                                         }
                                                         if (anesthetistInfo.isAnesthetist && !anesthetistInfo.shouldCalculate) {
-                                                          // 🚫 ANESTESISTA 04.xxx: Mostrar "Controle por Quantidade"
                                                           return (
-                                                            <div className="text-center py-2">
-                                                              <div className="text-sm font-medium text-red-600 mb-1">
-                                                                🚫 Sem valor monetário
+                                                            <div className="text-right">
+                                                              <div className="text-xs font-bold text-red-600">
+                                                                🚫 Sem valor
                                                               </div>
-                                                              <div className="text-xs text-red-500">
-                                                                {anesthetistInfo.message}
+                                                              <div className="text-[9px] text-red-500">
+                                                                {anesthetistInfo.message.split(':')[0]}
                                                               </div>
                                                             </div>
                                                           );
                                                         } else {
                                                           // ✅ PROCEDIMENTO NORMAL OU ANESTESISTA 03.xxx: Mostrar valor
                                                           return (
-                                                            <div className={`text-lg font-bold ${
+                                                            <div className={`text-base font-bold ${
                                                               isMedical04 && isPrincipal ? 'text-emerald-700' : 'text-slate-900'
                                                             }`}>
                                                               {formatCurrency(procedure.value_reais)}
@@ -3567,6 +3576,64 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           );
                                                         }
                                                       })()}
+                                                    </div>
+                                                  </div>
+                                                  
+                                                  {/* CORPO DO PROCEDIMENTO */}
+                                                  <div className="px-4 py-3">
+                                                    {/* DESCRIÇÃO */}
+                                                    <div className="mb-3">
+                                                      <p className="text-sm text-slate-700 leading-relaxed">
+                                                        {procedure.procedure_description || 'Descrição não disponível'}
+                                                      </p>
+                                                    </div>
+                                                    
+                                                    {/* GRID DE INFORMAÇÕES (2 COLUNAS) */}
+                                                    <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                                                      {/* CBO */}
+                                                      {procedure.cbo && (
+                                                        <div>
+                                                          <span className="text-slate-500 font-medium uppercase tracking-wide">CBO:</span>
+                                                          <Badge
+                                                            variant="outline"
+                                                            className={`ml-2 text-[10px] ${procedure.cbo === '225151' ? 'bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white border-0' : 'bg-slate-100 text-slate-700 border-slate-300'}`}
+                                                          >
+                                                            {procedure.cbo}
+                                                          </Badge>
+                                                        </div>
+                                                      )}
+                                                      
+                                                      {/* DATA */}
+                                                      {procedure.procedure_date && (
+                                                        <div>
+                                                          <span className="text-slate-500 font-medium uppercase tracking-wide">Data:</span>
+                                                          <span className="ml-2 text-slate-900 font-medium">{parseISODateToLocal(procedure.procedure_date)}</span>
+                                                        </div>
+                                                      )}
+                                                      
+                                                      {/* PROFISSIONAL */}
+                                                      {procedure.professional_name && (
+                                                        <div className="col-span-2">
+                                                          <span className="text-slate-500 font-medium uppercase tracking-wide">Profissional:</span>
+                                                          <span className="ml-2 text-slate-900">{procedure.professional_name}</span>
+                                                        </div>
+                                                      )}
+                                                      
+                                                      {/* PARTICIPAÇÃO */}
+                                                      {procedure.participation && (
+                                                        <div>
+                                                          <span className="text-slate-500 font-medium uppercase tracking-wide">Participação:</span>
+                                                          <span className="ml-2 text-slate-900">{procedure.participation}</span>
+                                                        </div>
+                                                      )}
+                                                      
+                                                      {/* COMPLEXIDADE */}
+                                                      {procedure.complexity && (
+                                                        <div>
+                                                          <span className="text-slate-500 font-medium uppercase tracking-wide">Complexidade:</span>
+                                                          <span className="ml-2 text-slate-900">{procedure.complexity}</span>
+                                                        </div>
+                                                      )}
                                                     </div>
                                                   </div>
                                                 </div>

@@ -6,12 +6,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Switch } from './ui/switch';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 import {
   BarChart4,
   TrendingUp,
   Users,
+  User,
   Hospital,
   DollarSign,
   FileText,
@@ -24,6 +26,7 @@ import {
   Award,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Filter,
   Search,
   X
@@ -81,6 +84,63 @@ const safeValue = (value: number | null | undefined): number => {
 const calculatePercentage = (part: number, total: number): number => {
   if (total === 0 || isNaN(part) || isNaN(total)) return 0;
   return Math.round((part / total) * 100);
+};
+
+// ✅ FUNÇÃO SEGURA: Parse de data ISO sem problemas de timezone
+const parseISODateToLocal = (isoString: string | undefined | null): string => {
+  if (!isoString) return '';
+  
+  const s = String(isoString).trim();
+  if (!s) return '';
+  
+  // Tentar extrair YYYY-MM-DD (ignora hora se houver)
+  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [, year, month, day] = match;
+    return `${day}/${month}/${year}`;
+  }
+  
+  // Se não encontrou padrão esperado, tentar split manual
+  try {
+    const parts = s.split(/[-T]/);
+    if (parts.length >= 3) {
+      const [year, month, day] = parts;
+      if (year && month && day) {
+        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ Erro ao parsear data:', s, err);
+  }
+  
+  // Último recurso: retornar indicador de erro
+  return '⚠️ Data inválida';
+};
+
+// Função para formatar competência (YYYY-MM-DD para MM/YYYY)
+const formatCompetencia = (competencia: string | undefined): string => {
+  if (!competencia) return '—';
+  
+  try {
+    // Formato esperado: YYYY-MM-DD ou YYYY-MM
+    const match = competencia.match(/^(\d{4})-(\d{2})/);
+    if (match) {
+      const [, year, month] = match;
+      return `${month}/${year}`;
+    }
+    
+    // Tentar parsear como data
+    const date = new Date(competencia);
+    if (!isNaN(date.getTime())) {
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${month}/${year}`;
+    }
+    
+    return competencia;
+  } catch {
+    return competencia;
+  }
 };
 
 // ✅ FUNÇÃO PARA BUSCAR DADOS REAIS DAS AIHS (FALLBACK PARA VIEWS)
@@ -959,13 +1019,103 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             
             {/* ✅ NOVO: Alertas de múltiplas AIHs (igual PatientManagement) */}
             {medicalProductionStats && medicalProductionStats.patientsWithMultipleAIHs && medicalProductionStats.patientsWithMultipleAIHs > 0 && (
-              <div className="flex items-center gap-4 flex-wrap mt-3">
-                <div className="flex items-center gap-2 text-xs text-blue-600 font-normal">
-                  <AlertCircle className="w-3 h-3" />
-                  <span>
-                    ℹ️ {medicalProductionStats.patientsWithMultipleAIHs} paciente(s) com múltiplas AIHs (total: {medicalProductionStats.totalMultipleAIHs} AIHs)
-                  </span>
-                </div>
+              <div className="mt-3">
+                <Collapsible>
+                  <CollapsibleTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-2 h-auto font-normal"
+                    >
+                      <AlertCircle className="w-3 h-3" />
+                      <span>
+                        ℹ️ {medicalProductionStats.patientsWithMultipleAIHs} paciente(s) com múltiplas AIHs (total: {medicalProductionStats.totalMultipleAIHs} AIHs)
+                      </span>
+                      <ChevronDown className="w-3 h-3 ml-1" />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="mt-2 bg-blue-50/50 rounded-lg p-3 border border-blue-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="w-4 h-4 text-blue-600" />
+                        <h4 className="text-xs font-semibold text-blue-900">Pacientes com Múltiplas AIHs</h4>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[400px] overflow-y-auto">
+                        {medicalProductionStats.multipleAIHsDetails && medicalProductionStats.multipleAIHsDetails.length > 0 ? (
+                          medicalProductionStats.multipleAIHsDetails.map((patient: any, index: number) => (
+                            <div 
+                              key={index}
+                              className="bg-white rounded-md p-2.5 border border-blue-100 hover:border-blue-300 transition-colors h-fit"
+                            >
+                              {/* Cabeçalho do Paciente */}
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-center gap-2 flex-1">
+                                  <User className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold text-gray-900 text-xs">{patient.patient_name}</span>
+                                    <span className="text-gray-500 text-[10px]">CNS: {patient.patient_cns}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5">
+                                    {patient.aih_count}× AIHs
+                                  </Badge>
+                                </div>
+                              </div>
+                              
+                              {/* Lista de AIHs */}
+                              {patient.aihs && patient.aihs.length > 0 && (
+                                <div className="space-y-1 pl-5 border-l-2 border-blue-200 ml-1">
+                                  {patient.aihs.map((aih: any, aihIndex: number) => (
+                                    <div 
+                                      key={aihIndex}
+                                      className="text-[10px] text-gray-600 bg-gray-50 rounded px-2 py-1"
+                                    >
+                                      <div className="flex items-center justify-between flex-wrap gap-1">
+                                        <span className="font-medium text-gray-700">
+                                          AIH: {aih.aih_number}
+                                        </span>
+                                        {aih.competencia && (
+                                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-purple-50 text-purple-700 border-purple-200">
+                                            {formatCompetencia(aih.competencia)}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-2 mt-0.5 text-[9px]">
+                                        {aih.admission_date && (
+                                          <span className="text-green-600">
+                                            📅 Admissão: {parseISODateToLocal(aih.admission_date)}
+                                          </span>
+                                        )}
+                                        {aih.discharge_date && (
+                                          <span className="text-blue-600">
+                                            📤 Alta: {parseISODateToLocal(aih.discharge_date)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              {/* Hospital */}
+                              {patient.hospital_name && (
+                                <div className="mt-1.5 text-[10px] text-gray-500 flex items-center gap-1">
+                                  <Hospital className="w-3 h-3" />
+                                  <span>{patient.hospital_name}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center text-gray-500 text-xs py-2">
+                            Nenhum detalhe disponível
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
             )}
             
