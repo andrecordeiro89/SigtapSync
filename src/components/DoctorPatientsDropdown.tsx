@@ -397,70 +397,156 @@ export const DoctorPatientsDropdown: React.FC<DoctorPatientsDropdownProps> = ({
               {doctorData.patients.map((patient, patientIndex) => (
                 <div key={`${patient.patient_info?.cns}-${patientIndex}`} className="border-b last:border-b-0">
                   
-                  {/* 👤 CABEÇALHO DO PACIENTE */}
-                  <div className="p-3 bg-gray-50 border-b">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-900">
-                          {patient.patient_info?.name || 'Nome não disponível'}
+                  {/* 👤 CABEÇALHO DO PACIENTE - DESIGN LIMPO E OBJETIVO */}
+                  <div className="p-4 bg-white border-b border-gray-200">
+                    {/* NOME DO PACIENTE - DESTAQUE */}
+                    <div className="mb-3 pb-3 border-b border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full">
+                            <User className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <div className="text-base font-bold text-gray-900">
+                            {patient.patient_info?.name || 'Nome não disponível'}
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500">
-                          CNS: {patient.patient_info?.cns || 'CNS não disponível'}
-                        </div>
-                        <div className="text-xs text-blue-600 mt-1 flex items-center gap-2 flex-wrap">
-                          <span>{patient.procedures.length} procedimento(s)</span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-semibold">
+                            {patient.procedures.length} PROC
+                          </Badge>
                           {(patient.aih_info as any)?.care_character && (
-                            <Badge variant="outline" className={`border ${((patient.aih_info as any).care_character === '1') ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
-                              Caráter: {((patient.aih_info as any).care_character === '1') ? 'Eletivo' : 'Urgência/Emergência'}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-gray-600 mt-1 flex items-center gap-2 flex-wrap">
-                          <Calendar className="h-3 w-3 text-gray-400" />
-                          <span>Admissão: {patient.aih_info?.admission_date ? formatDate(patient.aih_info.admission_date) : '-'}</span>
-                          {patient.aih_info?.discharge_date && (
-                            <span>· Alta: {formatDate(patient.aih_info.discharge_date)}</span>
-                          )}
-                          {patient.aih_info && (patient.aih_info as any).competencia && (
-                            <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700">
-                              Competência: {formatCompetencia((patient.aih_info as any).competencia as any)}
+                            <Badge variant="outline" className={`text-[10px] font-semibold ${((patient.aih_info as any).care_character === '1') ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                              {((patient.aih_info as any).care_character === '1') ? '01 - ELETIVO' : '02 - URGÊNCIA'}
                             </Badge>
                           )}
                         </div>
                       </div>
-                      <div className="text-right space-y-1">
-                        {(() => {
-                          const doctorCovered = isDoctorCoveredForOperaParana(doctorName);
-                          const baseAih = typeof (patient as any).total_value_reais === 'number'
-                            ? (patient as any).total_value_reais
-                            : sumProceduresBaseReais(patient.procedures as any);
-                          const careCharacter = (patient.aih_info as any)?.care_character;
-                          const increment = doctorCovered ? computeIncrementForProcedures(patient.procedures as any, careCharacter, doctorName) : 0;
-                          const hasIncrement = increment > 0;
-                          const withIncrement = baseAih + increment;
-                          return (
-                            <>
-                              <div className="text-xs text-gray-500">
-                                AIH Seca: <span className="font-bold text-emerald-600">{formatValue(baseAih)}</span>
-                              </div>
-                              {hasIncrement && (
-                                <div className="text-xs text-emerald-700">
-                                  AIH c/ Incremento: <span className="font-bold">{formatValue(withIncrement)}</span>
-                                </div>
-                              )}
-                            </>
-                          );
-                        })()}
-                        <div className="text-xs text-orange-600">
-                          Proc. 04: <span className="font-bold">
-                            {formatValue(patient.procedures
-                              .filter(proc => isMedicalProcedure(proc.procedure_code))
-                              .reduce((sum, proc) => sum + proc.value_reais, 0))}
-                            ({patient.procedures.filter(proc => isMedicalProcedure(proc.procedure_code)).length})
+                    </div>
+
+                    {/* GRID DE INFORMAÇÕES - 2 COLUNAS */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-3">
+                      {/* Coluna 1 */}
+                      <div className="space-y-2">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Prontuário:</span>
+                          <span className="text-xs font-medium text-gray-900">{patient.patient_info?.medical_record || '-'}</span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">CNS:</span>
+                          <span className="text-xs font-mono font-medium text-gray-900">{patient.patient_info?.cns || 'CNS não disponível'}</span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Nº AIH:</span>
+                          <span className="text-xs font-mono font-medium text-gray-900">{patient.aih_info?.aih_number || '-'}</span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Competência:</span>
+                          <span className="text-xs font-semibold text-blue-700">
+                            {patient.aih_info && (patient.aih_info as any).competencia ? formatCompetencia((patient.aih_info as any).competencia as any) : '-'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Coluna 2 */}
+                      <div className="space-y-2">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Admissão:</span>
+                          <span className="text-xs font-medium text-gray-900">
+                            {patient.aih_info?.admission_date ? formatDate(patient.aih_info.admission_date) : '-'}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Alta:</span>
+                          <span className="text-xs font-medium text-gray-900">
+                            {patient.aih_info?.discharge_date ? formatDate(patient.aih_info.discharge_date) : '-'}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Gênero:</span>
+                          <span className="text-xs font-medium text-gray-900">
+                            {patient.patient_info?.gender === 'M' ? 'Masculino' : patient.patient_info?.gender === 'F' ? 'Feminino' : '-'}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Nascimento:</span>
+                          <span className="text-xs font-medium text-gray-900">
+                            {patient.patient_info?.birth_date ? formatDate(patient.patient_info.birth_date) : '-'}
                           </span>
                         </div>
                       </div>
                     </div>
+
+                    {/* SEÇÃO DE VALORES - DESTAQUE ESPECIAL (AIH SECA, INCREMENTO, AIH C/ INCREMENTO) */}
+                    {(() => {
+                      const doctorCovered = isDoctorCoveredForOperaParana(doctorName);
+                      const baseAih = typeof (patient as any).total_value_reais === 'number'
+                        ? (patient as any).total_value_reais
+                        : sumProceduresBaseReais(patient.procedures as any);
+                      const careCharacter = (patient.aih_info as any)?.care_character;
+                      const increment = doctorCovered ? computeIncrementForProcedures(patient.procedures as any, careCharacter, doctorName) : 0;
+                      const hasIncrement = increment > 0;
+                      const withIncrement = baseAih + increment;
+                      const medicalValue = patient.procedures
+                        .filter(proc => isMedicalProcedure(proc.procedure_code))
+                        .reduce((sum, proc) => sum + proc.value_reais, 0);
+                      const medicalCount = patient.procedures.filter(proc => isMedicalProcedure(proc.procedure_code)).length;
+                      
+                      return (
+                        <div className="mt-3 pt-3 border-t-2 border-gray-200 space-y-2">
+                          {/* AIH SECA - CAMPO MAIS IMPORTANTE */}
+                          <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-3 border-2 border-emerald-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <DollarSign className="h-4 w-4 text-emerald-600" />
+                                <span className="text-xs font-bold text-emerald-900 uppercase tracking-wide">AIH Seca</span>
+                              </div>
+                              <span className="text-lg font-black text-emerald-700">{formatValue(baseAih)}</span>
+                            </div>
+                          </div>
+
+                          {/* INCREMENTO - SE HOUVER */}
+                          {hasIncrement && (
+                            <>
+                              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border-2 border-blue-200">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">📈</span>
+                                    <span className="text-xs font-bold text-blue-900 uppercase tracking-wide">Incremento</span>
+                                  </div>
+                                  <span className="text-lg font-black text-blue-700">{formatValue(increment)}</span>
+                                </div>
+                              </div>
+
+                              {/* AIH C/ INCREMENTO - TOTAL FINAL */}
+                              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border-2 border-purple-300">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <CheckCircle className="h-4 w-4 text-purple-600" />
+                                    <span className="text-xs font-bold text-purple-900 uppercase tracking-wide">AIH c/ Incremento</span>
+                                  </div>
+                                  <span className="text-lg font-black text-purple-700">{formatValue(withIncrement)}</span>
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          {/* PROCEDIMENTOS MÉDICOS (04) - INFORMAÇÃO ADICIONAL */}
+                          {medicalCount > 0 && (
+                            <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-2 border border-orange-200">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center justify-center w-5 h-5 bg-orange-100 rounded-full">
+                                    <span className="text-[10px] font-bold text-orange-700">04</span>
+                                  </div>
+                                  <span className="text-[10px] font-semibold text-orange-800 uppercase">Proc. Médicos ({medicalCount})</span>
+                                </div>
+                                <span className="text-sm font-bold text-orange-700">{formatValue(medicalValue)}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* 🩺 PROCEDIMENTOS DO PACIENTE */}

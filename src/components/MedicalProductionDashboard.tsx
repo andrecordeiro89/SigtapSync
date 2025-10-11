@@ -3173,142 +3173,219 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   <div key={patientKey} className="p-3 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
                                     <Collapsible>
                                       <CollapsibleTrigger asChild>
+                                        {/* 👤 CARD DO PACIENTE - DESIGN LIMPO E OBJETIVO */}
                                         <div 
-                                          className="w-full cursor-pointer p-3 rounded-lg hover:bg-slate-50 border border-slate-200 transition-colors"
+                                          className="w-full cursor-pointer p-4 rounded-lg hover:bg-slate-50 border border-slate-200 transition-colors bg-white"
                                           onClick={() => togglePatientExpansion(patientKey)}
                                         >
-                                          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_360px_auto] items-center">
-                                            <div className="flex items-center gap-4 min-w-0">
-                                            <div className="flex items-center gap-3">
-                                                {isPatientExpanded ? (
-                                                  <ChevronDown className="h-4 w-4 text-slate-500 transition-transform duration-200" />
-                                                ) : (
-                                                  <ChevronRight className="h-4 w-4 text-slate-500 transition-transform duration-200" />
-                                                )}
-                                                <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center">
-                                                  <User className="h-5 w-5 text-slate-600" />
+                                          {/* Ícone de expansão */}
+                                          <div className="flex items-center gap-2 mb-2">
+                                            {isPatientExpanded ? (
+                                              <ChevronDown className="h-4 w-4 text-slate-500 transition-transform duration-200" />
+                                            ) : (
+                                              <ChevronRight className="h-4 w-4 text-slate-500 transition-transform duration-200" />
+                                            )}
+                                            <span className="text-xs text-slate-500 font-medium">
+                                              {isPatientExpanded ? 'Clique para recolher' : 'Clique para expandir procedimentos'}
+                                            </span>
+                                          </div>
+
+                                          {/* NOME DO PACIENTE - DESTAQUE */}
+                                          <div className="mb-3 pb-3 border-b border-gray-100">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center gap-2">
+                                                <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full">
+                                                  <User className="h-4 w-4 text-blue-600" />
+                                                </div>
+                                                <div className="text-base font-bold text-gray-900">
+                                                  {(/procedimento/i.test(patient.patient_info.name) || /\b\d{2}\.\d{2}\.\d{2}\.\d{3}-\d\b/.test(patient.patient_info.name)) ? 'Nome não disponível' : patient.patient_info.name}
                                                 </div>
                                               </div>
-                                              <div className="space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                  <div className="font-medium text-slate-800 truncate">
-                                                    {(/procedimento/i.test(patient.patient_info.name) || /\b\d{2}\.\d{2}\.\d{2}\.\d{3}-\d\b/.test(patient.patient_info.name)) ? 'Nome não disponível' : patient.patient_info.name}
-                                                  </div>
-                                                  {/* Badge de caráter (Eletivo etc.) ao lado do nome */}
-                                                  {patient.aih_info.care_character && (() => {
-                                                    const raw = String(patient.aih_info.care_character || '').toLowerCase().trim();
-                                                    const isElective = raw === '1' || raw.includes('eletivo');
-                                                    const isUrgent = raw === '2' || raw.includes('urg') || raw.includes('emerg');
-                                                    const color = isElective ? 'text-blue-600' : (isUrgent ? 'text-red-600' : 'text-slate-700');
-                                                    return (
-                                                      <Badge
-                                                        variant="outline"
-                                                        className={`inline-flex items-center gap-1 rounded-md border-0 bg-transparent px-0 py-0 h-auto ${color} text-[11px]`}
-                                                      >
-                                                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                                                        {CareCharacterUtils.formatForDisplay(
-                                                          typeof patient.aih_info.care_character === 'string'
-                                                            ? patient.aih_info.care_character.trim()
-                                                            : String(patient.aih_info.care_character),
-                                                          false
-                                                        )}
-                                                      </Badge>
-                                                    );
-                                                  })()}
-                                                  {(() => {
-                                                    const doctorKeyLocal = doctor.doctor_info.cns;
-                                                    const procTermRawLocal = (procedureSearchTerm.get(doctorKeyLocal) || '').toLowerCase().trim();
-                                                    if (!procTermRawLocal) return null;
-                                                    const procTermLocal = procTermRawLocal.replace(/[\.\s]/g, '');
-                                                    const matchCount = (patient.procedures || []).filter(p => {
-                                                      const codeNorm = (p.procedure_code || '').toLowerCase().replace(/[\.\s]/g, '');
-                                                      const desc = (p.procedure_description || '').toLowerCase();
-                                                      return codeNorm.includes(procTermLocal) || desc.includes(procTermRawLocal);
-                                                    }).length;
-                                                    if (matchCount > 0) {
-                                                      return (
-                                                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-xs inline-flex items-center gap-1">
-                                                          <FileText className="h-3 w-3" />
-                                                          Procedimento
-                                                          <span className="ml-0.5">({matchCount})</span>
-                                                        </Badge>
-                                                      );
-                                                    }
-                                                    return null;
-                                                  })()}
-                                                </div>
-                                                <div className="text-sm text-slate-600 font-medium flex items-center gap-2">
-                                                  <span>CNS: {patient.patient_info.cns}</span>
-                                                  {patient.common_name && (
-                                                    <Badge 
-                                                      variant="outline" 
-                                                      className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] px-2 py-0.5"
-                                                    >
-                                                      {patient.common_name}
+                                              <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-semibold">
+                                                  {patient.procedures.length} PROC
+                                                </Badge>
+                                                {patient.aih_info.care_character && (() => {
+                                                  const raw = String(patient.aih_info.care_character || '').toLowerCase().trim();
+                                                  return (
+                                                    <Badge variant="outline" className={`text-[10px] font-semibold ${
+                                                      raw === '1' || raw.includes('eletivo')
+                                                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                                        : 'bg-amber-50 border-amber-200 text-amber-700'
+                                                    }`}>
+                                                      {CareCharacterUtils.formatForDisplay(
+                                                        typeof patient.aih_info.care_character === 'string'
+                                                          ? patient.aih_info.care_character.trim()
+                                                          : String(patient.aih_info.care_character),
+                                                        false
+                                                      )}
                                                     </Badge>
-                                                  )}
-                                                </div>
-                                                <AihDatesBadges
-                                                  admissionDate={patient.aih_info.admission_date}
-                                                  dischargeDate={patient.aih_info.discharge_date}
-                                                  competencia={(patient as any)?.aih_info?.competencia}
-                                                  className="text-sm"
-                                                />
-                                                {/* Bloco de AIH/CID/Especialidade/Modalidade - visível no mobile dentro do bloco esquerdo */}
-                                                <div className="md:hidden">
-                                                  <PatientAihInfoBadges
-                                                    aihNumber={patient.aih_info.aih_number}
-                                                    mainCid={(patient.aih_info as any).main_cid}
-                                                    specialty={(patient.aih_info as any).specialty}
-                                                    requestingPhysician={(patient.aih_info as any).requesting_physician}
-                                                    careModality={(patient.aih_info as any).care_modality}
-                                                    professionalCbo={(patient.aih_info as any).professional_cbo}
-                                                  />
-                                                </div>
+                                                  );
+                                                })()}
+                                                {patient.common_name && (
+                                                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] px-2 py-0.5">
+                                                    {patient.common_name}
+                                                  </Badge>
+                                                )}
                                               </div>
-                                            </div>
-                                            {/* Bloco central (desktop): AIH, CID, Especialidade, Modalidade (largura fixa) */}
-                                            <div className="hidden md:block w-[360px] self-center">
-                                              <PatientAihInfoBadges
-                                                aihNumber={patient.aih_info.aih_number}
-                                                mainCid={(patient.aih_info as any).main_cid}
-                                                specialty={(patient.aih_info as any).specialty}
-                                                requestingPhysician={(patient.aih_info as any).requesting_physician}
-                                                careModality={(patient.aih_info as any).care_modality}
-                                                professionalCbo={(patient.aih_info as any).professional_cbo}
-                                              />
-                                            </div>
-                                            <div className="text-right">
-                                              {(() => {
-                                                const baseAih = typeof (patient as any).total_value_reais === 'number'
-                                                  ? (patient as any).total_value_reais
-                                                  : sumProceduresBaseReais(patient.procedures as any);
-                                                const careCharacter = (patient as any)?.aih_info?.care_character;
-                                                const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
-                                                const increment = doctorCovered ? computeIncrementForProcedures(patient.procedures as any, careCharacter, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id) : 0;
-                                                const hasIncrement = increment > 0;
-                                                const withIncrement = baseAih + increment;
-                                                return (
-                                                  <div className="text-right">
-                                                    <div className="text-xs text-slate-600">AIH Seca</div>
-                                                    <div className="font-bold text-slate-900">{formatCurrency(baseAih)}</div>
-                                                    {hasIncrement && (
-                                                      <>
-                                                        <div className="mt-1 text-xs text-emerald-700">Incremento</div>
-                                                        <div className="font-bold text-emerald-700">{formatCurrency(increment)}</div>
-                                                        <div className="mt-1 text-xs text-emerald-700">AIH c/ Incremento</div>
-                                                        <div className="font-bold text-emerald-700">{formatCurrency(withIncrement)}</div>
-                                                      </>
-                                                    )}
-                                                  </div>
-                                                );
-                                              })()}
-                                              <div className="text-sm text-slate-600 mb-2">
-                                                {patient.procedures.length} procedimento(s)
-                                              </div>
-                                              {/* Quick stats removidos a pedido: sem badge verde com check */}
                                             </div>
                                           </div>
+
+                                          {/* GRID DE INFORMAÇÕES - 2 COLUNAS */}
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mb-3">
+                                            {/* Coluna 1 */}
+                                            <div className="space-y-2">
+                                              <div className="flex items-baseline gap-2">
+                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Prontuário:</span>
+                                                <span className="text-xs font-medium text-gray-900">{patient.patient_info.medical_record || '-'}</span>
+                                              </div>
+                                              <div className="flex items-baseline gap-2">
+                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">CNS:</span>
+                                                <span className="text-xs font-mono font-medium text-gray-900">{patient.patient_info.cns}</span>
+                                              </div>
+                                              <div className="flex items-baseline gap-2">
+                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Nº AIH:</span>
+                                                <span className="text-xs font-mono font-medium text-gray-900">{patient.aih_info.aih_number || '-'}</span>
+                                              </div>
+                                              <div className="flex items-baseline gap-2">
+                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Competência:</span>
+                                                <span className="text-xs font-semibold text-blue-700">
+                                                  {(() => {
+                                                    const comp = (patient as any)?.aih_info?.competencia;
+                                                    if (!comp) return '-';
+                                                    const m = String(comp).match(/^(\d{4})-(\d{2})/);
+                                                    if (m) return `${m[2]}/${m[1]}`;
+                                                    return comp;
+                                                  })()}
+                                                </span>
+                                              </div>
+                                              {(patient.aih_info as any).main_cid && (
+                                                <div className="flex items-baseline gap-2">
+                                                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">CID Principal:</span>
+                                                  <span className="text-xs font-medium text-gray-900">{(patient.aih_info as any).main_cid}</span>
+                                                </div>
+                                              )}
+                                            </div>
+
+                                            {/* Coluna 2 */}
+                                            <div className="space-y-2">
+                                              <div className="flex items-baseline gap-2">
+                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Admissão:</span>
+                                                <span className="text-xs font-medium text-gray-900">
+                                                  {patient.aih_info.admission_date ? (() => {
+                                                    const d = String(patient.aih_info.admission_date);
+                                                    const match = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                                                    return match ? `${match[3]}/${match[2]}/${match[1]}` : d;
+                                                  })() : '-'}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-baseline gap-2">
+                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Alta:</span>
+                                                <span className="text-xs font-medium text-gray-900">
+                                                  {patient.aih_info.discharge_date ? (() => {
+                                                    const d = String(patient.aih_info.discharge_date);
+                                                    const match = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                                                    return match ? `${match[3]}/${match[2]}/${match[1]}` : d;
+                                                  })() : '-'}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-baseline gap-2">
+                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Gênero:</span>
+                                                <span className="text-xs font-medium text-gray-900">
+                                                  {patient.patient_info.gender === 'M' ? 'Masculino' : patient.patient_info.gender === 'F' ? 'Feminino' : '-'}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-baseline gap-2">
+                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Nascimento:</span>
+                                                <span className="text-xs font-medium text-gray-900">
+                                                  {patient.patient_info.birth_date ? (() => {
+                                                    const d = String(patient.patient_info.birth_date);
+                                                    const match = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                                                    return match ? `${match[3]}/${match[2]}/${match[1]}` : d;
+                                                  })() : '-'}
+                                                </span>
+                                              </div>
+                                              {(patient.aih_info as any).specialty && (
+                                                <div className="flex items-baseline gap-2">
+                                                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Especialidade:</span>
+                                                  <span className="text-xs font-medium text-gray-900">{(patient.aih_info as any).specialty}</span>
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          {/* SEÇÃO DE VALORES - DESTAQUE ESPECIAL */}
+                                          {(() => {
+                                            const baseAih = typeof (patient as any).total_value_reais === 'number'
+                                              ? (patient as any).total_value_reais
+                                              : sumProceduresBaseReais(patient.procedures as any);
+                                            const careCharacter = (patient as any)?.aih_info?.care_character;
+                                            const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
+                                            const increment = doctorCovered ? computeIncrementForProcedures(patient.procedures as any, careCharacter, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id) : 0;
+                                            const hasIncrement = increment > 0;
+                                            const withIncrement = baseAih + increment;
+                                            const medicalValue = (patient.procedures || [])
+                                              .filter((proc: any) => (proc.procedure_code || '').toString().trim().startsWith('04'))
+                                              .reduce((sum: number, proc: any) => sum + (proc.value_reais || 0), 0);
+                                            const medicalCount = (patient.procedures || [])
+                                              .filter((proc: any) => (proc.procedure_code || '').toString().trim().startsWith('04')).length;
+                                            
+                                            return (
+                                              <div className="mt-3 pt-3 border-t-2 border-gray-200 space-y-2">
+                                                {/* AIH SECA - CAMPO MAIS IMPORTANTE */}
+                                                <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-3 border-2 border-emerald-200">
+                                                  <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                      <DollarSign className="h-4 w-4 text-emerald-600" />
+                                                      <span className="text-xs font-bold text-emerald-900 uppercase tracking-wide">AIH Seca</span>
+                                                    </div>
+                                                    <span className="text-lg font-black text-emerald-700">{formatCurrency(baseAih)}</span>
+                                                  </div>
+                                                </div>
+
+                                                {/* INCREMENTO - SE HOUVER */}
+                                                {hasIncrement && (
+                                                  <>
+                                                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border-2 border-blue-200">
+                                                      <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                          <span className="text-lg">📈</span>
+                                                          <span className="text-xs font-bold text-blue-900 uppercase tracking-wide">Incremento</span>
+                                                        </div>
+                                                        <span className="text-lg font-black text-blue-700">{formatCurrency(increment)}</span>
+                                                      </div>
+                                                    </div>
+
+                                                    {/* AIH C/ INCREMENTO - TOTAL FINAL */}
+                                                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border-2 border-purple-300">
+                                                      <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                          <CheckCircle className="h-4 w-4 text-purple-600" />
+                                                          <span className="text-xs font-bold text-purple-900 uppercase tracking-wide">AIH c/ Incremento</span>
+                                                        </div>
+                                                        <span className="text-lg font-black text-purple-700">{formatCurrency(withIncrement)}</span>
+                                                      </div>
+                                                    </div>
+                                                  </>
+                                                )}
+
+                                                {/* PROCEDIMENTOS MÉDICOS (04) - INFORMAÇÃO ADICIONAL */}
+                                                {medicalCount > 0 && (
+                                                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg p-2 border border-orange-200">
+                                                    <div className="flex items-center justify-between">
+                                                      <div className="flex items-center gap-2">
+                                                        <div className="flex items-center justify-center w-5 h-5 bg-orange-100 rounded-full">
+                                                          <span className="text-[10px] font-bold text-orange-700">04</span>
+                                                        </div>
+                                                        <span className="text-[10px] font-semibold text-orange-800 uppercase">Proc. Médicos ({medicalCount})</span>
+                                                      </div>
+                                                      <span className="text-sm font-bold text-orange-700">{formatCurrency(medicalValue)}</span>
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })()}
                                         </div>
                                       </CollapsibleTrigger>
 
