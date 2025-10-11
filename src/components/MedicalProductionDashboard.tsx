@@ -508,6 +508,9 @@ interface MedicalProductionDashboardProps {
     totalDoctors: number;
     totalPatients: number;
     totalProcedures: number;
+    patientsWithMultipleAIHs?: number;
+    totalMultipleAIHs?: number;
+    totalAIHs?: number;
   }) => void;
   selectedHospitals?: string[]; // Filtro de hospital
   searchTerm?: string; // Busca de médicos
@@ -1376,6 +1379,41 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     };
   }, [filteredDoctors]);
   
+  // ✅ NOVO: Calcular pacientes com múltiplas AIHs (igual PatientManagement)
+  const multipleAIHsStats = React.useMemo(() => {
+    const patientAIHCount = new Map<string, number>();
+    let totalAIHs = 0;
+    
+    // Contar AIHs por paciente
+    filteredDoctors.forEach(doctor => {
+      doctor.patients.forEach(patient => {
+        if (patient.patient_id) {
+          totalAIHs++;
+          const currentCount = patientAIHCount.get(patient.patient_id) || 0;
+          patientAIHCount.set(patient.patient_id, currentCount + 1);
+        }
+      });
+    });
+    
+    // Identificar pacientes com múltiplas AIHs (> 1)
+    const patientsWithMultiple = new Map<string, number>();
+    patientAIHCount.forEach((count, patientId) => {
+      if (count > 1) {
+        patientsWithMultiple.set(patientId, count);
+      }
+    });
+    
+    // Calcular total de AIHs de pacientes com múltiplas internações
+    const totalMultipleAIHs = Array.from(patientsWithMultiple.values()).reduce((sum, count) => sum + count, 0);
+    
+    return {
+      totalAIHs,
+      patientsWithMultipleAIHs: patientsWithMultiple.size,
+      totalMultipleAIHs,
+      aihsWithoutPatients: 0 // Não temos AIHs órfãs nesta view
+    };
+  }, [filteredDoctors]);
+  
   // 🧮 TOTAIS AGREGADOS PARA O CABEÇALHO (SIGTAP, Incrementos, Total)
   const aggregatedOperaParanaTotals = React.useMemo(() => {
     try {
@@ -1436,10 +1474,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         totalRevenue: filteredStats.totalRevenue,
         totalDoctors: filteredStats.totalDoctors,
         totalPatients: filteredStats.totalPatients,
-        totalProcedures: filteredStats.totalProcedures
+        totalProcedures: filteredStats.totalProcedures,
+        patientsWithMultipleAIHs: multipleAIHsStats.patientsWithMultipleAIHs,
+        totalMultipleAIHs: multipleAIHsStats.totalMultipleAIHs,
+        totalAIHs: multipleAIHsStats.totalAIHs
       });
     }
-  }, [filteredStats, onStatsUpdate, isLoading]);
+  }, [filteredStats, multipleAIHsStats, onStatsUpdate, isLoading]);
 
   // 🏥 Nome do hospital selecionado para exibir como badge no título (incluindo CNES)
   const selectedHospitalName = React.useMemo(() => {

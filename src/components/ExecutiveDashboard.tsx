@@ -16,6 +16,7 @@ import {
   DollarSign,
   FileText,
   AlertTriangle,
+  AlertCircle,
   CheckCircle,
   Clock,
   Activity,
@@ -24,8 +25,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Filter,
-    Search,
-    X
+  Search,
+  X
 } from 'lucide-react';
 
 // Services
@@ -295,6 +296,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     totalDoctors: number;
     totalPatients: number;
     totalProcedures: number;
+    patientsWithMultipleAIHs?: number;
+    totalMultipleAIHs?: number;
+    totalAIHs?: number;
   } | null>(null);
   
   const [hospitalStats, setHospitalStats] = useState<HospitalStats[]>([]);
@@ -402,6 +406,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     totalDoctors: number;
     totalPatients: number;
     totalProcedures: number;
+    patientsWithMultipleAIHs?: number;
+    totalMultipleAIHs?: number;
+    totalAIHs?: number;
   }) => {
     setMedicalProductionStats(stats);
     
@@ -949,6 +956,19 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </Badge>
               </div>
             </div>
+            
+            {/* ✅ NOVO: Alertas de múltiplas AIHs (igual PatientManagement) */}
+            {medicalProductionStats && medicalProductionStats.patientsWithMultipleAIHs && medicalProductionStats.patientsWithMultipleAIHs > 0 && (
+              <div className="flex items-center gap-4 flex-wrap mt-3">
+                <div className="flex items-center gap-2 text-xs text-blue-600 font-normal">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>
+                    ℹ️ {medicalProductionStats.patientsWithMultipleAIHs} paciente(s) com múltiplas AIHs (total: {medicalProductionStats.totalMultipleAIHs} AIHs)
+                  </span>
+                </div>
+              </div>
+            )}
+            
             {/* Indicador de consolidado oculto */}
 
             {/* Abas de competência removidas conforme solicitação */}
