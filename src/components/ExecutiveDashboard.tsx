@@ -1014,6 +1014,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 <Badge variant="secondary" className="bg-blue-100 text-blue-800 px-3 py-2 font-medium">
                   {medicalProductionStats ? `${medicalProductionStats.totalPatients} AIHs` : 'Carregando...'}
                 </Badge>
+                <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 px-3 py-2 font-medium">
+                  {medicalProductionStats ? `${medicalProductionStats.uniquePatients || 0} Pacientes` : 'Carregando...'}
+                </Badge>
               </div>
             </div>
             

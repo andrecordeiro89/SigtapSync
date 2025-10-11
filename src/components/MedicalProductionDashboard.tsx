@@ -511,6 +511,7 @@ interface MedicalProductionDashboardProps {
     patientsWithMultipleAIHs?: number;
     totalMultipleAIHs?: number;
     totalAIHs?: number;
+    uniquePatients?: number; // Pacientes únicos
   }) => void;
   selectedHospitals?: string[]; // Filtro de hospital
   searchTerm?: string; // Busca de médicos
@@ -1280,10 +1281,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const globalStats = React.useMemo(() => {
     const totalDoctors = doctors.length;
     
-    // ✅ CORREÇÃO: Contar TOTAL DE AIHs (internações), não pacientes únicos
-    // Um paciente com múltiplas AIHs deve ser contado múltiplas vezes
+    // ✅ CONTAGEM DUPLA: Total de AIHs E Pacientes Únicos
     const totalAIHs = doctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
-    const totalPatients = totalAIHs; // Badge mostrará "Total de AIHs/Internações"
+    
+    // Contar pacientes únicos (pessoas diferentes)
+    const uniquePatientIds = new Set<string>();
+    doctors.forEach(doctor => {
+      doctor.patients.forEach(patient => {
+        if (patient.patient_id) {
+          uniquePatientIds.add(patient.patient_id);
+        }
+      });
+    });
+    const uniquePatients = uniquePatientIds.size;
+    
+    const totalPatients = totalAIHs; // Mantém compatibilidade (totalPatients = total de AIHs)
     
     // Coletar todos os procedimentos (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
     const allProcedures = doctors.flatMap(doctor => 
@@ -1326,7 +1338,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
     return {
       totalDoctors,
-      totalPatients,
+      totalPatients, // Total de AIHs (para compatibilidade)
+      totalAIHs, // Total de AIHs/internações
+      uniquePatients, // Pacientes únicos
       totalProcedures,
       totalRevenue,
       avgTicket,
@@ -1344,10 +1358,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const filteredStats = React.useMemo(() => {
     const totalDoctors = filteredDoctors.length;
     
-    // ✅ CORREÇÃO: Contar TOTAL DE AIHs (internações), não pacientes únicos
-    // Um paciente com múltiplas AIHs deve ser contado múltiplas vezes
+    // ✅ CONTAGEM DUPLA: Total de AIHs E Pacientes Únicos
     const totalAIHs = filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
-    const totalPatients = totalAIHs; // Representa total de AIHs/internações
+    
+    // Contar pacientes únicos (pessoas diferentes)
+    const uniquePatientIds = new Set<string>();
+    filteredDoctors.forEach(doctor => {
+      doctor.patients.forEach(patient => {
+        if (patient.patient_id) {
+          uniquePatientIds.add(patient.patient_id);
+        }
+      });
+    });
+    const uniquePatients = uniquePatientIds.size;
+    
+    const totalPatients = totalAIHs; // Mantém compatibilidade (totalPatients = total de AIHs)
     
     // Coletar todos os procedimentos dos médicos filtrados (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
     const allProcedures = filteredDoctors.flatMap(doctor => 
@@ -1361,7 +1386,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     return {
       totalDoctors,
-      totalPatients,
+      totalPatients, // Total de AIHs (para compatibilidade)
+      totalAIHs, // Total de AIHs/internações
+      uniquePatients, // Pacientes únicos
       totalProcedures,
       totalRevenue
     };
@@ -1499,6 +1526,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         patientsWithMultipleAIHs: multipleAIHsStats.patientsWithMultipleAIHs,
         totalMultipleAIHs: multipleAIHsStats.totalMultipleAIHs,
         totalAIHs: multipleAIHsStats.totalAIHs,
+        uniquePatients: filteredStats.uniquePatients, // 🆕 Pacientes únicos
         multipleAIHsDetails: multipleAIHsStats.multipleAIHsDetails // 🆕 Passar detalhes dos pacientes
       });
     }
