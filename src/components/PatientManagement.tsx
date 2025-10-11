@@ -1532,190 +1532,210 @@ const PatientManagement = () => {
           ) : (
             <div className="space-y-4">
               {paginatedData.map((item) => (
-                <div key={item.id} className="border border-gray-200 rounded-xl bg-white hover:shadow-lg transition-all duration-300 hover:border-blue-300 overflow-hidden min-h-[120px]">
-                  {/* Header Compacto */}
-                  <div className="bg-white p-5">
-                    <div className="flex items-end justify-between min-h-[64px]">
-                      {/* Lado Esquerdo: Info Principal */}
-                      <div className="flex items-center space-x-4 flex-1">
+                <div key={item.id} className="border border-gray-200 rounded-lg bg-white hover:shadow-md transition-all duration-200 overflow-hidden">
+                  {/* Header com Nome e Ações */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleExpandAIH(item.id)}
-                          className="text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors p-2"
+                          className="text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-md transition-colors p-1.5 flex-shrink-0"
                         >
                           {expandedItems.has(item.id) ? 
                             <ChevronUp className="w-4 h-4" /> : 
                             <ChevronDown className="w-4 h-4" />
                           }
                         </Button>
-
-                        <div className="flex-1 min-w-0">
-                          {/* Nome do Paciente (esquerda) + Controles (direita, largura 1/2) */}
-                          <div className="flex items-center mb-2">
-                            {/* Esquerda: Nome e Hospital */}
-                            <div className="flex items-center space-x-2 flex-1 min-w-0">
-                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                              <User className="w-4 h-4 text-blue-600" />
-                            </div>
-                              <div className="flex flex-col min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-gray-900 truncate text-lg">
-                                {item.patient?.name || item.patients?.name || 'Paciente não identificado'}
-                              </h3>
-                              {/* Badge: Múltiplas AIHs */}
-                              {(() => {
-                                const patientId = item.patient_id;
-                                const aihCount = patientId ? patientsWithMultipleAIHs.get(patientId) : null;
-                                if (!aihCount || aihCount <= 1) return null;
-                                return (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="bg-blue-50 border-blue-200 text-blue-700 text-[10px] h-5 px-1.5 font-semibold"
-                                    title={`Este paciente possui ${aihCount} AIHs (internações múltiplas)`}
-                                  >
-                                    🔄 {aihCount}× AIHs
-                                  </Badge>
-                                );
-                              })()}
-                              {(() => {
-                                const patientId = (item.patient as any)?.id || (item.patients as any)?.id;
-                                const shownName = (item.patient as any)?.name || (item.patients as any)?.name || '';
-                                const looksWrong = !shownName || isLikelyProcedureString(shownName) || /^nome não informado$/i.test(shownName);
-                                if (!patientId || !looksWrong) return null;
-                                const value = inlineNameEdit[patientId] ?? '';
-                                const saving = !!savingName[patientId];
-                                return (
-                                  <div className="mt-2 flex items-center gap-2">
-                                    <input
-                                      className="border rounded px-2 py-1 text-sm"
-                                      placeholder="Digite o nome correto do paciente"
-                                      value={value}
-                                      onChange={(e) => handleChangeEditName(patientId, e.target.value)}
-                                      onFocus={() => handleStartEditName(patientId, '')}
-                                      disabled={saving}
-                                    />
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleSaveEditName(patientId, (item as any).hospital_id || currentHospitalId || '')}
-                                      disabled={saving || !(inlineNameEdit[patientId] ?? '').trim()}
-                                    >
-                                      {saving ? 'Salvando...' : 'Salvar nome'}
-                                    </Button>
-                                  </div>
-                                );
-                              })()}
-                              {item.care_character && (
-                                <Badge
-                                  variant="outline"
-                                  className={`text-[11px] ${CareCharacterUtils.getStyleClasses(item.care_character)}`}
-                                >
-                                  {CareCharacterUtils.formatForDisplay(item.care_character, false)}
-                                </Badge>
-                              )}
-                              {/* Controles imediatamente após o badge de Caráter */}
-                              <div className="hidden sm:flex items-center gap-2 ml-2">
-                                {(() => {
-                                  const birth = (item.patient || item.patients)?.birth_date as any;
-                                  if (!birth) return null;
-                                  const d = new Date(String(birth));
-                                  if (isNaN(d.getTime())) return null;
-                                  const today = new Date();
-                                  let age = today.getFullYear() - d.getFullYear();
-                                  const m = today.getMonth() - d.getMonth();
-                                  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
-                                  if (age < 0 || age > 130) return null;
-                                  return (
-                                    <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-700 text-[11px] h-7 inline-flex items-center">
-                                      Idade: {age}
-                                    </Badge>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                            {/* Removido: nome do hospital abaixo do nome do paciente */}
-                              </div>
-                            </div>
-
-                            {/* Controles posicionados após o badge */}
-                          </div>
-
+                        
+                        <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center flex-shrink-0">
+                          <User className="w-4 h-4 text-white" />
+                        </div>
+                        
+                        <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 text-base truncate">
+                            {item.patient?.name || item.patients?.name || 'Paciente não identificado'}
+                          </h3>
                           
-
-                          {/* Datas padronizadas + info compacta (3 colunas: Admissão/Alta, Competência e Hospital) */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 sm:gap-2 ml-0">
-                            <div className="grid grid-cols-2 gap-1 sm:gap-2">
-                              <div className="text-[11px]"><span className="text-gray-500">Admissão:</span> {formatDate(item.admission_date)}</div>
-                              <div className="text-[11px]"><span className="text-gray-500">Alta:</span> {item.discharge_date ? formatDate(item.discharge_date) : 'N/A'}</div>
-                            </div>
-                            <div className="grid grid-cols-1 gap-1 sm:gap-2">
-                              <div className="text-[11px]">
-                                <span className="text-gray-500">Competência:</span>{' '}
-                                <span className="font-semibold text-blue-600">{formatCompetencia(item.competencia)}</span>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-1 gap-1 sm:gap-2">
-                              <div className="text-[11px] truncate"><span className="text-gray-500">Hospital:</span> <span className="truncate inline-block align-bottom max-w-[260px] sm:max-w-[360px] font-semibold">{item.hospitals?.name || 'N/A'}</span></div>
-                            </div>
-                          </div>
-
-                          {/* Campos técnicos (AIH, CID, Especialidade, Modalidade) em 2 colunas fixas */}
-                          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2 ml-0">
-                            <div className="grid grid-cols-2 gap-1 sm:gap-2">
-                              <div className="text-[11px] whitespace-nowrap"><span className="text-gray-500">AIH:</span> {item.aih_number || '-'}</div>
-                              <div className="text-[11px] whitespace-nowrap"><span className="text-gray-500">CID:</span> {item.main_cid || '-'}</div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-1 sm:gap-2">
-                              <div className="text-[11px] whitespace-nowrap"><span className="text-gray-500">01 -</span> {item.specialty || 'Cirúrgico'}</div>
-                              <div className="text-[11px] whitespace-nowrap"><span className="text-gray-500">Modalidade:</span> {item.care_modality || 'Hospitalar'}</div>
-                            </div>
-                          </div>
+                          {/* Badges */}
+                          {(() => {
+                            const patientId = item.patient_id;
+                            const aihCount = patientId ? patientsWithMultipleAIHs.get(patientId) : null;
+                            if (!aihCount || aihCount <= 1) return null;
+                            return (
+                              <Badge 
+                                variant="outline" 
+                                className="bg-blue-100 border-blue-300 text-blue-700 text-[10px] h-5 px-1.5 font-semibold flex-shrink-0"
+                                title={`Este paciente possui ${aihCount} AIHs (internações múltiplas)`}
+                              >
+                                🔄 {aihCount}× AIHs
+                              </Badge>
+                            );
+                          })()}
+                          
+                          {item.care_character && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] h-5 flex-shrink-0 ${CareCharacterUtils.getStyleClasses(item.care_character)}`}
+                            >
+                              {CareCharacterUtils.formatForDisplay(item.care_character, false)}
+                            </Badge>
+                          )}
+                          
+                          {(() => {
+                            const birth = (item.patient || item.patients)?.birth_date as any;
+                            if (!birth) return null;
+                            const d = new Date(String(birth));
+                            if (isNaN(d.getTime())) return null;
+                            const today = new Date();
+                            let age = today.getFullYear() - d.getFullYear();
+                            const m = today.getMonth() - d.getMonth();
+                            if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+                            if (age < 0 || age > 130) return null;
+                            return (
+                              <Badge variant="outline" className="bg-purple-50 border-purple-200 text-purple-700 text-[10px] h-5 flex-shrink-0">
+                                {age} anos
+                              </Badge>
+                            );
+                          })()}
                         </div>
                       </div>
-
-                      {/* Lado Direito: Ações */}
-                      <div className="flex flex-col items-end space-y-2">
-                        {/* Botão de Exclusão */}
+                      
+                      {/* Botões de Ação */}
+                      <div className="flex items-center gap-2 ml-4 flex-shrink-0">
                         {(() => {
                           const userRole = user?.role as string;
                           const hasPermission = (['user', 'operator', 'coordinator', 'director', 'admin'] as const).includes(userRole as any);
                           
                           return hasPermission && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDeleteRequest('aih', item.id, item.aih_number)}
-                              className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors h-7 px-3 py-0 flex items-center"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          );
-                        })()}
-                        
-                        {/* Botão de Editar Competência */}
-                        {(() => {
-                          const userRole = user?.role as string;
-                          const hasPermission = (['user', 'operator', 'coordinator', 'director', 'admin'] as const).includes(userRole as any);
-                          
-                          return hasPermission && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleStartEditCompetencia(item.id, item.competencia)}
-                              disabled={savingCompetencia[item.id]}
-                              className="text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300 hover:bg-blue-50 transition-colors h-7 px-3 py-0 flex items-center"
-                              title="Editar competência"
-                            >
-                              {savingCompetencia[item.id] ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                              ) : (
-                                <Calendar className="w-4 h-4" />
-                              )}
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleStartEditCompetencia(item.id, item.competencia)}
+                                disabled={savingCompetencia[item.id]}
+                                className="text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300 hover:bg-blue-50 transition-colors h-8 px-3 flex items-center gap-1.5"
+                                title="Editar competência"
+                              >
+                                {savingCompetencia[item.id] ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                                ) : (
+                                  <Calendar className="w-4 h-4" />
+                                )}
+                                <span className="hidden md:inline text-xs">Editar</span>
+                              </Button>
+                              
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteRequest('aih', item.id, item.aih_number)}
+                                className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors h-8 px-3 flex items-center gap-1.5"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <span className="hidden md:inline text-xs">Excluir</span>
+                              </Button>
+                            </>
                           );
                         })()}
                       </div>
                     </div>
+                    
+                    {/* Edição inline de nome se necessário */}
+                    {(() => {
+                      const patientId = (item.patient as any)?.id || (item.patients as any)?.id;
+                      const shownName = (item.patient as any)?.name || (item.patients as any)?.name || '';
+                      const looksWrong = !shownName || isLikelyProcedureString(shownName) || /^nome não informado$/i.test(shownName);
+                      if (!patientId || !looksWrong) return null;
+                      const value = inlineNameEdit[patientId] ?? '';
+                      const saving = !!savingName[patientId];
+                      return (
+                        <div className="mt-3 flex items-center gap-2">
+                          <input
+                            className="border rounded px-2 py-1.5 text-sm flex-1"
+                            placeholder="Digite o nome correto do paciente"
+                            value={value}
+                            onChange={(e) => handleChangeEditName(patientId, e.target.value)}
+                            onFocus={() => handleStartEditName(patientId, '')}
+                            disabled={saving}
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => handleSaveEditName(patientId, (item as any).hospital_id || currentHospitalId || '')}
+                            disabled={saving || !(inlineNameEdit[patientId] ?? '').trim()}
+                          >
+                            {saving ? 'Salvando...' : 'Salvar nome'}
+                          </Button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  
+                  {/* Tabela de Informações */}
+                  <div className="bg-white">
+                    <table className="w-full text-sm">
+                      <tbody className="divide-y divide-gray-100">
+                        {/* Linha 1: Dados do Paciente */}
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 w-1/2">
+                            <span className="text-gray-500 font-medium">Prontuário: </span>
+                            <span className="text-gray-900 ml-1">{(item.patient || item.patients)?.medical_record || '-'}</span>
+                          </td>
+                          <td className="px-4 py-2.5 w-1/2">
+                            <span className="text-gray-500 font-medium">CNS: </span>
+                            <span className="text-gray-900 ml-1">{(item.patient || item.patients)?.cns || '-'}</span>
+                          </td>
+                        </tr>
+                        
+                        {/* Linha 2: Datas */}
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">Admissão: </span>
+                            <span className="text-gray-900 ml-1">{formatDate(item.admission_date)}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">Alta: </span>
+                            <span className="text-gray-900 ml-1">{item.discharge_date ? formatDate(item.discharge_date) : '-'}</span>
+                          </td>
+                        </tr>
+                        
+                        {/* Linha 3: AIH e CID */}
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">Nº AIH: </span>
+                            <span className="text-gray-900 font-mono text-xs ml-1">{item.aih_number || '-'}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">CID Principal: </span>
+                            <span className="text-gray-900 ml-1">{item.main_cid || '-'}</span>
+                          </td>
+                        </tr>
+                        
+                        {/* Linha 4: Competência e Hospital */}
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">Competência: </span>
+                            <span className="font-semibold text-blue-600 ml-1">{formatCompetencia(item.competencia)}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">Hospital: </span>
+                            <span className="text-gray-900 font-medium ml-1">{item.hospitals?.name || '-'}</span>
+                          </td>
+                        </tr>
+                        
+                        {/* Linha 5: Especialidade e Modalidade */}
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">Especialidade: </span>
+                            <span className="text-gray-900 ml-1">{item.specialty || 'Cirúrgico'}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">Modalidade: </span>
+                            <span className="text-gray-900 ml-1">{item.care_modality || 'Hospitalar'}</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
 
                   {/* Modal de Edição de Competência */}
