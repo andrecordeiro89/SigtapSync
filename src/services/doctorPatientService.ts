@@ -2014,37 +2014,56 @@ export class DoctorPatientService {
     if (!procedures || procedures.length === 0) return procedures;
 
     try {
-      // Encontrar códigos sem descrição
-      const codesNeedingDescription = procedures
-        .filter(p => p.procedure_code && (!p.procedure_description || p.procedure_description === 'Descrição não disponível'))
+      // ✅ BUSCAR INSTRUMENTO DE REGISTRO PARA TODOS OS PROCEDIMENTOS
+      const allProcedureCodes = procedures
+        .filter(p => p.procedure_code)
         .map(p => p.procedure_code);
 
-      if (codesNeedingDescription.length === 0) return procedures;
+      if (allProcedureCodes.length === 0) return procedures;
 
-      console.log(`🔍 Buscando descrições SIGTAP para ${codesNeedingDescription.length} procedimentos...`);
+      console.log(`🔍 Buscando dados SIGTAP (descrição + instrumento) para ${allProcedureCodes.length} procedimentos...`);
 
-      // Buscar no SIGTAP oficial
-      const { data: sigtapData } = await supabase
-        .from('sigtap_procedimentos_oficial')
-        .select('codigo, nome')
-        .in('codigo', codesNeedingDescription);
+      // ✅ BUSCAR NA TABELA CORRETA: sigtap_procedures
+      const { data: sigtapData, error: sigtapError } = await supabase
+        .from('sigtap_procedures')
+        .select('code, description, registration_instrument')
+        .in('code', allProcedureCodes);
 
-      if (sigtapData && sigtapData.length > 0) {
-        const descriptionMap = new Map(sigtapData.map(item => [item.codigo, item.nome]));
-        
-        console.log(`✅ Encontradas ${sigtapData.length} descrições no SIGTAP oficial`);
-
-        return procedures.map(proc => ({
-          ...proc,
-          procedure_description: proc.procedure_description && proc.procedure_description !== 'Descrição não disponível'
-            ? proc.procedure_description
-            : descriptionMap.get(proc.procedure_code) || `Procedimento ${proc.procedure_code}`
-        }));
+      if (sigtapError) {
+        console.error('❌ Erro ao buscar dados do SIGTAP:', sigtapError.message);
+        return procedures;
       }
 
+      if (sigtapData && sigtapData.length > 0) {
+        const dataMap = new Map(sigtapData.map(item => [
+          item.code, 
+          { 
+            description: item.description, 
+            registration_instrument: item.registration_instrument 
+          }
+        ]));
+        
+        console.log(`✅ Encontrados ${sigtapData.length} procedimentos no SIGTAP`);
+        console.log(`📋 Exemplo de instrumento: ${sigtapData[0]?.registration_instrument || 'N/A'}`);
+
+        return procedures.map(proc => {
+          const sigtapInfo = dataMap.get(proc.procedure_code);
+          return {
+            ...proc,
+            // Só sobrescreve descrição se estiver vazia
+            procedure_description: proc.procedure_description && proc.procedure_description !== 'Descrição não disponível'
+              ? proc.procedure_description
+              : sigtapInfo?.description || `Procedimento ${proc.procedure_code}`,
+            // ✅ SEMPRE busca instrumento de registro do SIGTAP
+            registration_instrument: sigtapInfo?.registration_instrument || '-'
+          };
+        });
+      }
+
+      console.warn('⚠️ Nenhum procedimento encontrado no SIGTAP');
       return procedures;
     } catch (error) {
-      console.warn('⚠️ Erro ao enriquecer procedimentos com SIGTAP:', error);
+      console.error('❌ Erro ao enriquecer procedimentos com SIGTAP:', error);
       return procedures;
     }
   }

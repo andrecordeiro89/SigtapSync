@@ -2519,13 +2519,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                       e.stopPropagation();
                                       try {
                                         const rows: Array<Array<string | number>> = [];
-                                        // ✅ MESMAS 15 COLUNAS DO RELATÓRIO GERAL
+                                        // ✅ AGORA COM 16 COLUNAS (adicionado Instrumento de Registro)
                                         const header = [
                                           '#', 
                                           'Nome do Paciente', 
                                           'Nº AIH', 
                                           'Código Procedimento',
-                                          'Descrição Procedimento', 
+                                          'Descrição Procedimento',
+                                          'Instrumento de Registro',
                                           'Data Procedimento',
                                           'Data Alta (SUS)', 
                                           'Especialidade de Atendimento', 
@@ -2600,6 +2601,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             procedures.forEach((proc: any) => {
                                               const procCode = proc.procedure_code || '';
                                               const procDesc = proc.procedure_description || proc.sigtap_description || '';
+                                              const registrationInstrument = proc.registration_instrument || '-';
                                               const procDate = proc.procedure_date || '';
                                               const procDateLabel = procDate 
                                                 ? (() => { 
@@ -2616,6 +2618,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 aih,
                                                 procCode,
                                                 procDesc,
+                                                registrationInstrument,
                                                 procDateLabel,
                                                 disLabel, 
                                                 careSpec, 
@@ -2636,6 +2639,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               aih,
                                               '',
                                               'Nenhum procedimento encontrado',
+                                              '-',
                                               '',
                                               disLabel, 
                                               careSpec, 
@@ -2652,8 +2656,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         
                                         // ✅ ORDENAÇÃO: Por Data de Alta (mais recente primeiro)
                                         rows.sort((a, b) => {
-                                          const dateA = a[6] as string; // Data Alta (SUS) está na posição 6
-                                          const dateB = b[6] as string;
+                                          const dateA = a[7] as string; // Data Alta (SUS) está na posição 7 (após adicionar Instrumento)
+                                          const dateB = b[7] as string;
                                           
                                           // Sem data → final
                                           if (!dateA && !dateB) return 0;
@@ -2685,13 +2689,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         
                                         const wb = XLSX.utils.book_new();
                                         const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-                                        // ✅ LARGURAS DAS COLUNAS (mesmas do relatório geral)
+                                        // ✅ LARGURAS DAS COLUNAS (atualizado com Instrumento de Registro)
                                         (ws as any)['!cols'] = [
                                           { wch: 5 },   // #
                                           { wch: 35 },  // Nome do Paciente
                                           { wch: 18 },  // Nº AIH
                                           { wch: 20 },  // Código Procedimento
                                           { wch: 45 },  // Descrição Procedimento
+                                          { wch: 25 },  // Instrumento de Registro
                                           { wch: 16 },  // Data Procedimento
                                           { wch: 16 },  // Data Alta (SUS)
                                           { wch: 25 },  // Especialidade
@@ -3635,6 +3640,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           <span className="ml-2 text-slate-900">{procedure.complexity}</span>
                                                         </div>
                                                       )}
+                                                      
+                                                      {/* INSTRUMENTO DE REGISTRO 🆕 */}
+                                                      <div>
+                                                        <span className="text-slate-500 font-medium uppercase tracking-wide">Instrumento:</span>
+                                                        <Badge
+                                                          variant="outline"
+                                                          className="ml-2 text-[10px] bg-blue-50 text-blue-700 border-blue-200"
+                                                        >
+                                                          {procedure.registration_instrument || '-'}
+                                                        </Badge>
+                                                      </div>
                                                     </div>
                                                   </div>
                                                 </div>
