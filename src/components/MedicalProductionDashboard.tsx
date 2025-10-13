@@ -1971,7 +1971,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                     try {
                       const rows: Array<Array<string | number>> = [];
                       const header = [
-                        '#', 
+                        '#',
+                        'Prontuário',
                         'Nome do Paciente', 
                         'Nº AIH', 
                         'Data Alta (SUS)', 
@@ -2003,6 +2004,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           
                           const patientId = p.patient_id;
                           const name = p.patient_info?.name || 'Paciente';
+                          const medicalRecord = p.patient_info?.medical_record || '-';
                           // 🔧 CORREÇÃO: Incluir AIHs sem número com aviso
                           const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                           const aih = aihRaw || 'Aguardando geração';
@@ -2026,7 +2028,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           
                           // ✅ UMA LINHA POR AIH: Cada internação/atendimento é uma linha
                           rows.push([
-                            idx++, 
+                            idx++,
+                            medicalRecord,
                             name, 
                             aih, // Usar aih que pode ser "Aguardando geração"
                             disLabel, 
@@ -2041,8 +2044,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       
                       // Ordenar por Data Alta (SUS) - mais recente primeiro
                       rows.sort((a, b) => {
-                        const dateA = a[3] as string; // Data Alta (SUS) está na posição 3 (0-indexed)
-                        const dateB = b[3] as string;
+                        const dateA = a[4] as string; // Data Alta (SUS) está na posição 4 (0-indexed)
+                        const dateB = b[4] as string;
                         
                         // Se não há data, colocar no final
                         if (!dateA && !dateB) return 0;
@@ -2081,6 +2084,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
                       (ws as any)['!cols'] = [
                         { wch: 5 },   // #
+                        { wch: 15 },  // Prontuário
                         { wch: 35 },  // Nome do Paciente
                         { wch: 18 },  // Nº AIH
                         { wch: 16 },  // Data Alta (SUS)
