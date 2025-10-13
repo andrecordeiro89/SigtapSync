@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { format as formatDateFns } from 'date-fns';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
@@ -2833,6 +2835,205 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                    >
                                     <FileSpreadsheet className="h-4 w-4" />
                                     Relatório Pacientes Simplificado
+                                   </Button>
+                                   
+                                   {/* 🆕 NOVO: Relatório Pacientes Simplificado PDF */}
+                                   <Button
+                                     type="button"
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       try {
+                                         const doctorName = doctor.doctor_info?.name || 'Médico';
+                                         const hospitalName = doctor.hospitals?.[0]?.hospital_name || 'Hospital';
+                                         
+                                         console.log(`📄 [PDF] Gerando relatório simplificado para ${doctorName}`);
+                                         
+                                         // Coletar dados dos pacientes
+                                         const patientsData: any[] = [];
+                                         let idx = 1;
+                                         
+                                         (doctor.patients || []).forEach((p: any) => {
+                                           const name = p.patient_info?.name || 'Paciente';
+                                           const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
+                                           const aihDisplay = aih || 'Aguardando geração';
+                                           
+                                           const admissionISO = p?.aih_info?.admission_date || '';
+                                           const admissionLabel = parseISODateToLocal(admissionISO);
+                                           const dischargeISO = p?.aih_info?.discharge_date || '';
+                                           const dischargeLabel = parseISODateToLocal(dischargeISO);
+                                           
+                                           patientsData.push([
+                                             idx++,
+                                             name,
+                                             aihDisplay,
+                                             admissionLabel,
+                                             dischargeLabel
+                                           ]);
+                                         });
+                                         
+                                         // Ordenar por data de alta (mais recente primeiro)
+                                         patientsData.sort((a, b) => {
+                                           const dateA = a[4] as string;
+                                           const dateB = b[4] as string;
+                                           
+                                           if (!dateA && !dateB) return 0;
+                                           if (!dateA) return 1;
+                                           if (!dateB) return -1;
+                                           
+                                           const parseDate = (dateStr: string) => {
+                                             const parts = dateStr.split('/');
+                                             if (parts.length === 3) {
+                                               return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                                             }
+                                             return new Date(0);
+                                           };
+                                           
+                                           const parsedDateA = parseDate(dateA);
+                                           const parsedDateB = parseDate(dateB);
+                                           
+                                           return parsedDateB.getTime() - parsedDateA.getTime();
+                                         });
+                                         
+                                         // Renumerar após ordenação
+                                         patientsData.forEach((row, index) => {
+                                           row[0] = index + 1;
+                                         });
+                                         
+                                         // Criar PDF
+                                         const doc = new jsPDF();
+                                         const pageWidth = doc.internal.pageSize.getWidth();
+                                         
+                                         // ========================================
+                                         // CABEÇALHO COM ESTILO DO SIDEBAR
+                                         // ========================================
+                                         
+                                         // Logo/Título - Estilo do Sidebar
+                                         // "SIGTAP" em tamanho maior e mais escuro
+                                         doc.setFontSize(20);
+                                         doc.setFont('helvetica', 'bold');
+                                         doc.setTextColor(15, 23, 42); // slate-900
+                                         const sigtapWidth = doc.getTextWidth('SIGTAP');
+                                         const totalTitleWidth = sigtapWidth + doc.getTextWidth(' Sync');
+                                         const startX = (pageWidth - totalTitleWidth) / 2;
+                                         doc.text('SIGTAP', startX, 15);
+                                         
+                                         // "Sync" em tamanho menor e azul
+                                         doc.setFontSize(14);
+                                         doc.setFont('helvetica', 'bold');
+                                         doc.setTextColor(37, 99, 235); // blue-600
+                                         doc.text(' Sync', startX + sigtapWidth, 15);
+                                         
+                                         // Título do relatório
+                                         doc.setFontSize(12);
+                                         doc.setFont('helvetica', 'normal');
+                                         doc.setTextColor(100, 116, 139); // slate-500
+                                         doc.text('Relatório de Pacientes - Simplificado', pageWidth / 2, 23, { align: 'center' });
+                                         
+                                         // Linha divisória elegante
+                                         doc.setDrawColor(226, 232, 240); // slate-200
+                                         doc.setLineWidth(0.5);
+                                         doc.line(15, 28, pageWidth - 15, 28);
+                                         
+                                         // Informações do médico e hospital
+                                         doc.setFontSize(9);
+                                         doc.setFont('helvetica', 'bold');
+                                         doc.setTextColor(51, 65, 85); // slate-700
+                                         doc.text('Médico:', 15, 36);
+                                         doc.setFont('helvetica', 'normal');
+                                         doc.setTextColor(71, 85, 105); // slate-600
+                                         doc.text(doctorName, 35, 36);
+                                         
+                                         doc.setFont('helvetica', 'bold');
+                                         doc.setTextColor(51, 65, 85);
+                                         doc.text('Hospital:', 15, 42);
+                                         doc.setFont('helvetica', 'normal');
+                                         doc.setTextColor(71, 85, 105);
+                                         doc.text(hospitalName, 35, 42);
+                                         
+                                         doc.setFont('helvetica', 'bold');
+                                         doc.setTextColor(51, 65, 85);
+                                         doc.text('Data:', 15, 48);
+                                         doc.setFont('helvetica', 'normal');
+                                         doc.setTextColor(71, 85, 105);
+                                         doc.text(formatDateFns(new Date(), 'dd/MM/yyyy HH:mm'), 35, 48);
+                                         
+                                         // ✅ Total de Pacientes - Espaçamento corrigido
+                                         doc.setFont('helvetica', 'bold');
+                                         doc.setTextColor(51, 65, 85);
+                                         doc.text('Total de Pacientes:', 15, 54);
+                                         doc.setFont('helvetica', 'bold');
+                                         doc.setTextColor(37, 99, 235); // blue-600 (destaque)
+                                         doc.text(patientsData.length.toString(), 56, 54);
+                                         
+                                         // ========================================
+                                         // TABELA DE DADOS
+                                         // ========================================
+                                         
+                                         autoTable(doc, {
+                                           startY: 60,
+                                           head: [[
+                                             '#',
+                                             'Nome do Paciente',
+                                             'Nº AIH',
+                                             'Data de Admissão',
+                                             'Data de Alta'
+                                           ]],
+                                           body: patientsData,
+                                           styles: {
+                                             fontSize: 8,
+                                             cellPadding: 3,
+                                           },
+                                           headStyles: {
+                                             fillColor: [41, 128, 185],
+                                             textColor: 255,
+                                             fontStyle: 'bold',
+                                             halign: 'center'
+                                           },
+                                           columnStyles: {
+                                             0: { cellWidth: 10, halign: 'center' },      // #
+                                             1: { cellWidth: 70, halign: 'left' },        // Nome
+                                             2: { cellWidth: 35, halign: 'center' },      // AIH
+                                             3: { cellWidth: 30, halign: 'center' },      // Admissão
+                                             4: { cellWidth: 30, halign: 'center' }       // Alta
+                                           },
+                                           alternateRowStyles: {
+                                             fillColor: [245, 245, 245]
+                                           },
+                                           margin: { left: 15, right: 15 }
+                                         });
+                                         
+                                         // ========================================
+                                         // RODAPÉ
+                                         // ========================================
+                                         
+                                         const pageCount = (doc as any).internal.getNumberOfPages();
+                                         for (let i = 1; i <= pageCount; i++) {
+                                           doc.setPage(i);
+                                           doc.setFontSize(8);
+                                           doc.setTextColor(150, 150, 150);
+                                           doc.text(
+                                             `Página ${i} de ${pageCount}`,
+                                             pageWidth / 2,
+                                             doc.internal.pageSize.getHeight() - 10,
+                                             { align: 'center' }
+                                           );
+                                         }
+                                         
+                                         // Salvar PDF
+                                         const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`;
+                                         doc.save(fileName);
+                                         
+                                         console.log(`✅ [PDF] Relatório gerado: ${fileName}`);
+                                         toast.success('Relatório PDF gerado com sucesso!');
+                                       } catch (err) {
+                                         console.error('❌ [PDF] Erro ao gerar relatório:', err);
+                                         toast.error('Erro ao gerar relatório PDF');
+                                       }
+                                     }}
+                                     className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
+                                   >
+                                    <FileText className="h-4 w-4" />
+                                    PDF Simplificado
                                    </Button>
                                   
                                   <Button
