@@ -91,6 +91,7 @@ export interface ProcedureDetail {
   professional_name?: string;
   cbo?: string;
   participation?: string;
+  registration_instrument?: string; // ✅ SIGTAP: Instrumento de Registro
 }
 
 export interface DoctorSearchFilters {
@@ -317,6 +318,7 @@ export class DoctorPatientService {
             professional_name: p.professional_name,
             cbo,
             participation: isAnesthetist04 ? 'Anestesia (qtd)' : 'Responsável',
+            registration_instrument: p.sigtap_procedures?.registration_instrument || '-', // ✅ SIGTAP JOIN
             is_anesthetist_04: isAnesthetist04 // 🚀 Flag pré-calculada
           };
         });

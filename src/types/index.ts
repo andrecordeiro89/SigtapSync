@@ -367,6 +367,9 @@ export interface ProcedureAIH {
   quantity?: number; // Quantidade do procedimento (padrão: 1)
   valorUnitario?: number; // Valor unitário para referência
   
+  // ✅ SIGTAP: Instrumento de Registro
+  registration_instrument?: string;
+  
   // Lógica de porcentagem SUS
   porcentagemSUS?: number; // Porcentagem a ser aplicada no valor (padrão: 100% para principal, 70% para secundários)
   

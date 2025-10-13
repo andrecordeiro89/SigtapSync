@@ -47,6 +47,7 @@ export interface ProcedureRecord {
   care_character?: string;
   complexity?: string;
   authorization_type?: string;
+  registration_instrument?: string; // ✅ SIGTAP: Instrumento de Registro
   
   // Metadata
   created_at: string;
@@ -117,7 +118,10 @@ export class ProcedureRecordsService {
           created_at,
           sequencia,
           authorization_number,
-          notes
+          notes,
+          sigtap_procedures!procedure_records_procedure_id_fkey (
+            registration_instrument
+          )
         `)
         .eq('patient_id', patientId)
         .order('procedure_date', { ascending: false });
@@ -183,43 +187,46 @@ export class ProcedureRecordsService {
       const chunks = this.chunkArray(patientIds, CHUNK_SIZE);
 
       const results = await Promise.all(chunks.map(async (chunk, idx) => {
-        let query = supabase
-          .from('procedure_records')
-          .select(`
-            id,
-            hospital_id,
-            patient_id,
-            procedure_id,
-            aih_id,
-            procedure_date,
-            procedure_code,
-            procedure_name,
-            procedure_description,
-            procedure_code_original,
-            value_charged,
-            valor_original,
-            total_value,
-            unit_value,
-            professional,
-            professional_cbo,
-            professional_cns,
-            professional_name,
-            billing_status,
-            billing_date,
-            match_status,
-            match_confidence,
-            quantity,
-            care_modality,
-            care_character,
-            complexity,
-            authorization_type,
-            created_at,
-            sequencia,
-            authorization_number,
-            notes
-          `)
-          .in('patient_id', chunk)
-          .order('procedure_date', { ascending: false });
+      let query = supabase
+        .from('procedure_records')
+        .select(`
+          id,
+          hospital_id,
+          patient_id,
+          procedure_id,
+          aih_id,
+          procedure_date,
+          procedure_code,
+          procedure_name,
+          procedure_description,
+          procedure_code_original,
+          value_charged,
+          valor_original,
+          total_value,
+          unit_value,
+          professional,
+          professional_cbo,
+          professional_cns,
+          professional_name,
+          billing_status,
+          billing_date,
+          match_status,
+          match_confidence,
+          quantity,
+          care_modality,
+          care_character,
+          complexity,
+          authorization_type,
+          created_at,
+          sequencia,
+          authorization_number,
+          notes,
+          sigtap_procedures!procedure_records_procedure_id_fkey (
+            registration_instrument
+          )
+        `)
+        .in('patient_id', chunk)
+        .order('procedure_date', { ascending: false });
 
         if (options?.excludeAnesthetist) {
           query = query.or(
@@ -307,7 +314,10 @@ export class ProcedureRecordsService {
             match_confidence,
             sequencia,
             professional_name,
-            professional_cbo
+            professional_cbo,
+            sigtap_procedures!procedure_records_procedure_id_fkey (
+              registration_instrument
+            )
           `)
           .in('aih_id', chunk)
           .order('procedure_date', { ascending: false });

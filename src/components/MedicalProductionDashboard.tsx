@@ -2132,9 +2132,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       // ✅ SIMPLIFICADO: Sem filtros de data (apenas competência)
                       const rows: Array<Array<string | number>> = [];
                       const header = [
-                        '#', 
-                        'Nome do Paciente', 
-                        'Nº AIH', 
+                        '#',
+                        'Nome do Paciente',
+                        'Prontuário',
+                        'Nº AIH',
                         'Data de Admissão',
                         'Data de Alta',
                         'Médico',
@@ -2214,6 +2215,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           }
                           
                           const name = p.patient_info?.name || 'Paciente';
+                          const medicalRecord = p.patient_info?.medical_record || '-';
                           const admissionISO = p?.aih_info?.admission_date || '';
                           const admissionLabel = parseISODateToLocal(admissionISO);
                           const dischargeISO = p?.aih_info?.discharge_date || '';
@@ -2228,6 +2230,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           
                           allPatients.push({
                             name,
+                            medicalRecord,
                             aih: aihDisplay, // Usar aihDisplay que inclui "Aguardando geração" se vazio
                             admissionLabel,
                             dischargeLabel,
@@ -2294,6 +2297,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         rows.push([
                           idx++,
                           patient.name,
+                          patient.medicalRecord,
                           patient.aih,
                           patient.admissionLabel,
                           patient.dischargeLabel,
@@ -2309,6 +2313,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       (ws as any)['!cols'] = [
                         { wch: 5 },   // #
                         { wch: 40 },  // Nome do Paciente
+                        { wch: 16 },  // Prontuário
                         { wch: 18 },  // Nº AIH
                         { wch: 18 },  // Data de Admissão
                         { wch: 18 },  // Data de Alta
@@ -2734,15 +2739,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                      onClick={(e) => {
                                        e.stopPropagation();
                                        try {
-                                         const rows: Array<Array<string | number>> = [];
-                                         // ✅ MESMAS 5 COLUNAS DO RELATÓRIO GERAL SIMPLIFICADO
-                                         const header = [
-                                           '#', 
-                                           'Nome do Paciente', 
-                                           'Nº AIH', 
-                                           'Data de Admissão',
-                                           'Data de Alta'
-                                         ];
+                                        const rows: Array<Array<string | number>> = [];
+                                        // ✅ MESMAS COLUNAS DO RELATÓRIO GERAL SIMPLIFICADO
+                                        const header = [
+                                          '#', 
+                                          'Nome do Paciente',
+                                          'Prontuário',
+                                          'Nº AIH', 
+                                          'Data de Admissão',
+                                          'Data de Alta'
+                                        ];
                                          let idx = 1;
                                          const doctorName = doctor.doctor_info?.name || '';
                                          
@@ -2766,28 +2772,30 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                              }
                                            }
                                            
-                                           const name = p.patient_info?.name || 'Paciente';
-                                           const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
-                                           const aihDisplay = aih || 'Aguardando geração';
-                                           
-                                           const admissionISO = p?.aih_info?.admission_date || '';
-                                           const admissionLabel = parseISODateToLocal(admissionISO);
-                                           const dischargeISO = p?.aih_info?.discharge_date || '';
-                                           const dischargeLabel = parseISODateToLocal(dischargeISO);
-                                           
-                                           rows.push([
-                                             idx++,
-                                             name,
-                                             aihDisplay,
-                                             admissionLabel,
-                                             dischargeLabel
-                                           ]);
+                                          const name = p.patient_info?.name || 'Paciente';
+                                          const medicalRecord = p.patient_info?.medical_record || '-';
+                                          const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
+                                          const aihDisplay = aih || 'Aguardando geração';
+                                          
+                                          const admissionISO = p?.aih_info?.admission_date || '';
+                                          const admissionLabel = parseISODateToLocal(admissionISO);
+                                          const dischargeISO = p?.aih_info?.discharge_date || '';
+                                          const dischargeLabel = parseISODateToLocal(dischargeISO);
+                                          
+                                          rows.push([
+                                            idx++,
+                                            name,
+                                            medicalRecord,
+                                            aihDisplay,
+                                            admissionLabel,
+                                            dischargeLabel
+                                          ]);
                                          });
                                          
-                                         // ✅ ORDENAÇÃO: Por Data de Alta (mais recente primeiro)
-                                         rows.sort((a, b) => {
-                                           const dateA = a[4] as string; // Data de Alta está na posição 4
-                                           const dateB = b[4] as string;
+                                        // ✅ ORDENAÇÃO: Por Data de Alta (mais recente primeiro)
+                                        rows.sort((a, b) => {
+                                          const dateA = a[5] as string; // Data de Alta está na posição 5
+                                          const dateB = b[5] as string;
                                            
                                            // Sem data → final
                                            if (!dateA && !dateB) return 0;
@@ -2817,17 +2825,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                          
                                          console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO] Total de linhas: ${rows.length} (ordenadas por data de alta DESC)`);
                                          
-                                         const wb = XLSX.utils.book_new();
-                                         const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-                                         // ✅ LARGURAS DAS COLUNAS (mesmas do relatório geral simplificado)
-                                         (ws as any)['!cols'] = [
-                                           { wch: 5 },   // #
-                                           { wch: 40 },  // Nome do Paciente
-                                           { wch: 18 },  // Nº AIH
-                                           { wch: 18 },  // Data de Admissão
-                                           { wch: 18 },  // Data de Alta
-                                         ];
-                                         XLSX.utils.book_append_sheet(wb, ws, 'Pacientes Simplificado');
+                                        const wb = XLSX.utils.book_new();
+                                        const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+                                        // ✅ LARGURAS DAS COLUNAS (mesmas do relatório geral simplificado)
+                                        (ws as any)['!cols'] = [
+                                          { wch: 5 },   // #
+                                          { wch: 40 },  // Nome do Paciente
+                                          { wch: 16 },  // Prontuário
+                                          { wch: 18 },  // Nº AIH
+                                          { wch: 18 },  // Data de Admissão
+                                          { wch: 18 },  // Data de Alta
+                                        ];
+                                        XLSX.utils.book_append_sheet(wb, ws, 'Pacientes Simplificado');
                                          const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
                                          XLSX.writeFile(wb, fileName);
                                          toast.success('Relatório simplificado do médico gerado com sucesso!');
@@ -2842,204 +2851,289 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     Relatório Pacientes Simplificado
                                    </Button>
                                    
-                                   {/* 🆕 NOVO: Relatório Pacientes Simplificado PDF */}
-                                   <Button
-                                     type="button"
-                                     onClick={(e) => {
-                                       e.stopPropagation();
-                                       try {
-                                         const doctorName = doctor.doctor_info?.name || 'Médico';
-                                         const hospitalName = doctor.hospitals?.[0]?.hospital_name || 'Hospital';
-                                         
-                                         console.log(`📄 [PDF] Gerando relatório simplificado para ${doctorName}`);
-                                         
-                                         // Coletar dados dos pacientes
-                                         const patientsData: any[] = [];
-                                         let idx = 1;
-                                         
-                                         (doctor.patients || []).forEach((p: any) => {
-                                           const name = p.patient_info?.name || 'Paciente';
-                                           const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
-                                           const aihDisplay = aih || 'Aguardando geração';
-                                           
-                                           const admissionISO = p?.aih_info?.admission_date || '';
-                                           const admissionLabel = parseISODateToLocal(admissionISO);
-                                           const dischargeISO = p?.aih_info?.discharge_date || '';
-                                           const dischargeLabel = parseISODateToLocal(dischargeISO);
-                                           
-                                           patientsData.push([
-                                             idx++,
-                                             name,
-                                             aihDisplay,
-                                             admissionLabel,
-                                             dischargeLabel
-                                           ]);
-                                         });
-                                         
-                                         // Ordenar por data de alta (mais recente primeiro)
-                                         patientsData.sort((a, b) => {
-                                           const dateA = a[4] as string;
-                                           const dateB = b[4] as string;
-                                           
-                                           if (!dateA && !dateB) return 0;
-                                           if (!dateA) return 1;
-                                           if (!dateB) return -1;
-                                           
-                                           const parseDate = (dateStr: string) => {
-                                             const parts = dateStr.split('/');
-                                             if (parts.length === 3) {
-                                               return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-                                             }
-                                             return new Date(0);
-                                           };
-                                           
-                                           const parsedDateA = parseDate(dateA);
-                                           const parsedDateB = parseDate(dateB);
-                                           
-                                           return parsedDateB.getTime() - parsedDateA.getTime();
-                                         });
-                                         
-                                         // Renumerar após ordenação
-                                         patientsData.forEach((row, index) => {
-                                           row[0] = index + 1;
-                                         });
-                                         
-                                         // Criar PDF
-                                         const doc = new jsPDF();
-                                         const pageWidth = doc.internal.pageSize.getWidth();
-                                         
-                                         // ========================================
-                                         // CABEÇALHO COM ESTILO DO SIDEBAR
-                                         // ========================================
-                                         
-                                         // Logo/Título - Estilo do Sidebar
-                                         // "SIGTAP" em tamanho maior e mais escuro
-                                         doc.setFontSize(20);
-                                         doc.setFont('helvetica', 'bold');
-                                         doc.setTextColor(15, 23, 42); // slate-900
-                                         const sigtapWidth = doc.getTextWidth('SIGTAP');
-                                         const totalTitleWidth = sigtapWidth + doc.getTextWidth(' Sync');
-                                         const startX = (pageWidth - totalTitleWidth) / 2;
-                                         doc.text('SIGTAP', startX, 15);
-                                         
-                                         // "Sync" em tamanho menor e azul
-                                         doc.setFontSize(14);
-                                         doc.setFont('helvetica', 'bold');
-                                         doc.setTextColor(37, 99, 235); // blue-600
-                                         doc.text(' Sync', startX + sigtapWidth, 15);
-                                         
-                                         // Título do relatório
-                                         doc.setFontSize(12);
-                                         doc.setFont('helvetica', 'normal');
-                                         doc.setTextColor(100, 116, 139); // slate-500
-                                         doc.text('Relatório de Pacientes - Simplificado', pageWidth / 2, 23, { align: 'center' });
-                                         
-                                         // Linha divisória elegante
-                                         doc.setDrawColor(226, 232, 240); // slate-200
-                                         doc.setLineWidth(0.5);
-                                         doc.line(15, 28, pageWidth - 15, 28);
-                                         
-                                         // Informações do médico e hospital
-                                         doc.setFontSize(9);
-                                         doc.setFont('helvetica', 'bold');
-                                         doc.setTextColor(51, 65, 85); // slate-700
-                                         doc.text('Médico:', 15, 36);
-                                         doc.setFont('helvetica', 'normal');
-                                         doc.setTextColor(71, 85, 105); // slate-600
-                                         doc.text(doctorName, 35, 36);
-                                         
-                                         doc.setFont('helvetica', 'bold');
-                                         doc.setTextColor(51, 65, 85);
-                                         doc.text('Hospital:', 15, 42);
-                                         doc.setFont('helvetica', 'normal');
-                                         doc.setTextColor(71, 85, 105);
-                                         doc.text(hospitalName, 35, 42);
-                                         
-                                         doc.setFont('helvetica', 'bold');
-                                         doc.setTextColor(51, 65, 85);
-                                         doc.text('Data:', 15, 48);
-                                         doc.setFont('helvetica', 'normal');
-                                         doc.setTextColor(71, 85, 105);
-                                         doc.text(formatDateFns(new Date(), 'dd/MM/yyyy HH:mm'), 35, 48);
-                                         
-                                         // ✅ Total de Pacientes - Espaçamento corrigido
-                                         doc.setFont('helvetica', 'bold');
-                                         doc.setTextColor(51, 65, 85);
-                                         doc.text('Total de Pacientes:', 15, 54);
-                                         doc.setFont('helvetica', 'bold');
-                                         doc.setTextColor(37, 99, 235); // blue-600 (destaque)
-                                         doc.text(patientsData.length.toString(), 56, 54);
-                                         
-                                         // ========================================
-                                         // TABELA DE DADOS
-                                         // ========================================
-                                         
-                                         autoTable(doc, {
-                                           startY: 60,
-                                           head: [[
-                                             '#',
-                                             'Nome do Paciente',
-                                             'Nº AIH',
-                                             'Data de Admissão',
-                                             'Data de Alta'
-                                           ]],
-                                           body: patientsData,
-                                           styles: {
-                                             fontSize: 8,
-                                             cellPadding: 3,
-                                           },
-                                           headStyles: {
-                                             fillColor: [41, 128, 185],
-                                             textColor: 255,
-                                             fontStyle: 'bold',
-                                             halign: 'center'
-                                           },
-                                           columnStyles: {
-                                             0: { cellWidth: 10, halign: 'center' },      // #
-                                             1: { cellWidth: 70, halign: 'left' },        // Nome
-                                             2: { cellWidth: 35, halign: 'center' },      // AIH
-                                             3: { cellWidth: 30, halign: 'center' },      // Admissão
-                                             4: { cellWidth: 30, halign: 'center' }       // Alta
-                                           },
-                                           alternateRowStyles: {
-                                             fillColor: [245, 245, 245]
-                                           },
-                                           margin: { left: 15, right: 15 }
-                                         });
-                                         
-                                         // ========================================
-                                         // RODAPÉ
-                                         // ========================================
-                                         
-                                         const pageCount = (doc as any).internal.getNumberOfPages();
-                                         for (let i = 1; i <= pageCount; i++) {
-                                           doc.setPage(i);
-                                           doc.setFontSize(8);
-                                           doc.setTextColor(150, 150, 150);
-                                           doc.text(
-                                             `Página ${i} de ${pageCount}`,
-                                             pageWidth / 2,
-                                             doc.internal.pageSize.getHeight() - 10,
-                                             { align: 'center' }
-                                           );
-                                         }
-                                         
-                                         // Salvar PDF
-                                         const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`;
-                                         doc.save(fileName);
-                                         
-                                         console.log(`✅ [PDF] Relatório gerado: ${fileName}`);
-                                         toast.success('Relatório PDF gerado com sucesso!');
-                                       } catch (err) {
-                                         console.error('❌ [PDF] Erro ao gerar relatório:', err);
-                                         toast.error('Erro ao gerar relatório PDF');
-                                       }
-                                     }}
-                                     className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
-                                   >
-                                    <FileText className="h-4 w-4" />
-                                    PDF Simplificado
-                                   </Button>
+                                   {/* 📋 PROTOCOLO DE ATENDIMENTO APROVADO */}
+                                  <Button
+                                    type="button"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      try {
+                                        // 🖼️ Carregar logo do CIS
+                                        let logoBase64 = null;
+                                        try {
+                                          const response = await fetch('/CIS Sem fundo.jpg');
+                                          const blob = await response.blob();
+                                          logoBase64 = await new Promise<string>((resolve) => {
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => resolve(reader.result as string);
+                                            reader.readAsDataURL(blob);
+                                          });
+                                        } catch (error) {
+                                          console.error('⚠️ [PROTOCOLO] Erro ao carregar logo:', error);
+                                        }
+                                        
+                                        const doctorName = doctor.doctor_info?.name || 'Médico';
+                                        const hospitalName = doctor.hospitals?.[0]?.hospital_name || 'Hospital';
+                                        
+                                        console.log(`📋 [PROTOCOLO] Gerando protocolo de atendimento aprovado para ${doctorName}`);
+                                        console.log(`📋 [PROTOCOLO] Usando MESMA lógica do Relatório Pacientes Geral`);
+                                        
+                                        // ✅ Usar a mesma fonte de dados e filtros do Relatório Pacientes Geral
+                                        const protocolData: any[] = [];
+                                        let idx = 1;
+                                        let totalProcsFound = 0;
+                                        let totalProcsFiltered = 0;
+                                        
+                                        (doctor.patients || []).forEach((p: any) => {
+                                          const patientName = p.patient_info?.name || 'Paciente';
+                                          const medicalRecord = p.patient_info?.medical_record || '-';
+                                          const dischargeISO = p?.aih_info?.discharge_date || '';
+                                          const dischargeLabel = parseISODateToLocal(dischargeISO);
+                                          
+                                          // ✅ MESMA LÓGICA DO RELATÓRIO GERAL: Processar todos os procedimentos
+                                          const procedures = p.procedures || [];
+                                          totalProcsFound += procedures.length;
+                                          
+                                          // 🎯 NOVO: Flag para pegar apenas o PRIMEIRO procedimento não-anestesista por paciente
+                                          let firstProcedureAdded = false;
+                                          
+                                          if (procedures.length > 0) {
+                                            procedures.forEach((proc: any) => {
+                                              // ⏭️ Pular se já adicionamos um procedimento para este paciente
+                                              if (firstProcedureAdded) return;
+                                              
+                                              // ✅ FILTRO ADICIONAL: Apenas registration_instrument 03 E CBO ≠ 225151
+                                              const regInstrument = (proc.registration_instrument || '').toString().trim();
+                                              const cbo = (proc.cbo || proc.professional_cbo || '').toString().trim();
+                                              
+                                              // Verificar se é procedimento principal (03)
+                                              const isMainProcedure = regInstrument === '03 - AIH (Proc. Principal)' || 
+                                                                     regInstrument === '03' ||
+                                                                     regInstrument.startsWith('03 -');
+                                              
+                                              // Verificar se NÃO é anestesista
+                                              const isNotAnesthetist = cbo !== '225151';
+                                              
+                                              // 🔍 DEBUG detalhado
+                                              if (isMainProcedure) {
+                                                const procCode = proc.procedure_code || '';
+                                                console.log(`📋 [FILTRO] ${procCode} | Reg: "${regInstrument}" | CBO: "${cbo}" | PassaFiltro: ${isNotAnesthetist} | JáAdicionado: ${firstProcedureAdded}`);
+                                              }
+                                              
+                                              // ✅ Aplicar filtro: APENAS procedimentos principais (03) que NÃO são de anestesista
+                                              // 🎯 E apenas o PRIMEIRO que passar no filtro
+                                              if (isMainProcedure && isNotAnesthetist && !firstProcedureAdded) {
+                                                totalProcsFiltered++;
+                                                
+                                                // 🔧 PADRONIZAÇÃO: Remover "." e "-" do código (igual ao relatório geral)
+                                                const procCodeRaw = proc.procedure_code || '';
+                                                const procCode = procCodeRaw.replace(/[.\-]/g, '');
+                                                
+                                                const procDesc = (proc.procedure_description || proc.sigtap_description || '-').toString();
+                                                
+                                                protocolData.push([
+                                                  idx++,
+                                                  medicalRecord,
+                                                  patientName,
+                                                  procCode, // ✅ Código padronizado sem "." e "-"
+                                                  procDesc.substring(0, 60),
+                                                  dischargeLabel // ✅ Apenas Data Alta
+                                                ]);
+                                                
+                                                // 🎯 Marcar que já adicionamos o primeiro procedimento
+                                                firstProcedureAdded = true;
+                                                console.log(`✅ [PROTOCOLO] Primeiro procedimento adicionado: ${procCode} - ${patientName}`);
+                                              }
+                                            });
+                                          }
+                                        });
+                                        
+                                        console.log(`📋 [PROTOCOLO] Total de procedimentos encontrados: ${totalProcsFound}`);
+                                        console.log(`📋 [PROTOCOLO] Total após filtro (Reg 03 + CBO ≠ 225151): ${totalProcsFiltered}`);
+                                        
+                                        // Ordenar por data de alta (mais antiga primeiro)
+                                        protocolData.sort((a, b) => {
+                                          const dateA = a[5] as string; // Data Alta na posição 5
+                                          const dateB = b[5] as string;
+                                          
+                                          if (!dateA && !dateB) return 0;
+                                          if (!dateA) return 1;
+                                          if (!dateB) return -1;
+                                          
+                                          const parseDate = (dateStr: string) => {
+                                            const parts = dateStr.split('/');
+                                            if (parts.length === 3) {
+                                              return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                                            }
+                                            return new Date(0);
+                                          };
+                                          
+                                          const parsedDateA = parseDate(dateA);
+                                          const parsedDateB = parseDate(dateB);
+                                          
+                                          return parsedDateA.getTime() - parsedDateB.getTime(); // Mais antigo primeiro
+                                        });
+                                        
+                                        // Renumerar após ordenação
+                                        protocolData.forEach((row, index) => {
+                                          row[0] = index + 1;
+                                        });
+                                        
+                                        // Criar PDF com orientação paisagem para mais espaço
+                                        const doc = new jsPDF('landscape');
+                                        const pageWidth = doc.internal.pageSize.getWidth();
+                                        
+                                        // ========================================
+                                        // CABEÇALHO PROFISSIONAL COM LOGO
+                                        // ========================================
+                                        
+                                        // Inserir Logo CIS (se carregado)
+                                        if (logoBase64) {
+                                          // Dimensões profissionais: 40mm de largura (≈151 pixels) mantendo proporção
+                                          const logoWidth = 40;
+                                          const logoHeight = 20; // Ajuste conforme proporção da imagem
+                                          const logoX = 20; // Margem esquerda
+                                          const logoY = 8;  // Topo
+                                          
+                                          doc.addImage(logoBase64, 'JPEG', logoX, logoY, logoWidth, logoHeight);
+                                        }
+                                        
+                                        // Título do Documento (centralizado)
+                                        doc.setFontSize(16);
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.setTextColor(0, 51, 102); // Azul institucional
+                                        doc.text('PROTOCOLO DE ATENDIMENTO APROVADO', pageWidth / 2, 18, { align: 'center' });
+                                        
+                                        // Subtítulo
+                                        doc.setFontSize(10);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.setTextColor(60, 60, 60);
+                                        doc.text('CIS - Centro Integrado em Saúde', pageWidth / 2, 25, { align: 'center' });
+                                        
+                                        // Linha divisória profissional
+                                        doc.setDrawColor(0, 51, 102);
+                                        doc.setLineWidth(1);
+                                        doc.line(20, 32, pageWidth - 20, 32);
+                                        
+                                        // Informações do protocolo em layout organizado
+                                        doc.setFontSize(9);
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.setTextColor(40, 40, 40);
+                                        
+                                        // Coluna Esquerda
+                                        doc.text('Médico Responsável:', 20, 40);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.text(doctorName, 60, 40);
+                                        
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text('Instituição:', 20, 46);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.text(hospitalName, 60, 46);
+                                        
+                                        // Coluna Direita
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text('Data de Emissão:', pageWidth - 110, 40);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.text(formatDateFns(new Date(), 'dd/MM/yyyy HH:mm'), pageWidth - 60, 40);
+                                        
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text('Total de Atendimentos:', pageWidth - 110, 46);
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.setTextColor(0, 102, 51); // Verde
+                                        doc.text(protocolData.length.toString(), pageWidth - 35, 46);
+                                        
+                                        // ========================================
+                                        // TABELA DE ATENDIMENTOS
+                                        // ========================================
+                                        
+                                        autoTable(doc, {
+                                          startY: 54,
+                                          head: [[
+                                            '#',
+                                            'Prontuário',
+                                            'Nome do Paciente',
+                                            'Código',
+                                            'Descrição do Procedimento',
+                                            'Data Alta'
+                                          ]],
+                                          body: protocolData,
+                                          styles: {
+                                            fontSize: 8,
+                                            cellPadding: 2,
+                                            lineColor: [220, 220, 220],
+                                            lineWidth: 0.1,
+                                          },
+                                          headStyles: {
+                                            fillColor: [0, 51, 102], // Azul institucional
+                                            textColor: [255, 255, 255],
+                                            fontStyle: 'bold',
+                                            halign: 'center',
+                                            fontSize: 8,
+                                          },
+                                          columnStyles: {
+                                            0: { cellWidth: 10, halign: 'center' },     // #
+                                            1: { cellWidth: 22, halign: 'center' },     // Prontuário
+                                            2: { cellWidth: 65, halign: 'left' },       // Nome (aumentado +5)
+                                            3: { cellWidth: 28, halign: 'center' },     // Código
+                                            4: { cellWidth: 115, halign: 'left' },      // Descrição (aumentado +20)
+                                            5: { cellWidth: 24, halign: 'center' }      // Data Alta
+                                          },
+                                          alternateRowStyles: {
+                                            fillColor: [248, 248, 248]
+                                          },
+                                          margin: { left: 15, right: 15 }
+                                        });
+                                        
+                                        // ========================================
+                                        // RODAPÉ PROFISSIONAL
+                                        // ========================================
+                                        
+                                        const pageCount = (doc as any).internal.getNumberOfPages();
+                                        for (let i = 1; i <= pageCount; i++) {
+                                          doc.setPage(i);
+                                          
+                                          const pageHeight = doc.internal.pageSize.getHeight();
+                                          
+                                          // Linha superior do rodapé
+                                          doc.setDrawColor(200, 200, 200);
+                                          doc.setLineWidth(0.3);
+                                          doc.line(20, pageHeight - 18, pageWidth - 20, pageHeight - 18);
+                                          
+                                          // Texto do rodapé
+                                          doc.setFontSize(7);
+                                          doc.setTextColor(100, 100, 100);
+                                          doc.setFont('helvetica', 'normal');
+                                          doc.text(
+                                            'CIS - Centro Integrado em Saúde | Protocolo de Atendimento Aprovado',
+                                            20,
+                                            pageHeight - 12
+                                          );
+                                          
+                                          // Número da página
+                                          doc.setFont('helvetica', 'bold');
+                                          doc.text(
+                                            `Página ${i} de ${pageCount}`,
+                                            pageWidth - 20,
+                                            pageHeight - 12,
+                                            { align: 'right' }
+                                          );
+                                        }
+                                        
+                                        // Salvar PDF
+                                        const fileName = `Protocolo_Atendimento_Aprovado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`;
+                                        doc.save(fileName);
+                                        
+                                        console.log(`✅ [PROTOCOLO] Gerado: ${fileName} - ${protocolData.length} atendimentos`);
+                                        toast.success(`Protocolo de Atendimento Aprovado gerado! ${protocolData.length} atendimento(s) registrado(s).`);
+                                      } catch (err) {
+                                        console.error('❌ [PROTOCOLO] Erro ao gerar:', err);
+                                        toast.error('Erro ao gerar protocolo de atendimento');
+                                      }
+                                    }}
+                                    className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
+                                  >
+                                   <FileText className="h-4 w-4" />
+                                   Protocolo de Atendimento Aprovado
+                                  </Button>
                                   
                                   <Button
                                     type="button"

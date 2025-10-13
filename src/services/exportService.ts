@@ -116,7 +116,7 @@ export async function exportAllPatientsExcel(filters: AllPatientsExportFilters =
     [careLabel],
     [generatedAt],
   ];
-  const header = ['#', 'Nome do Paciente', 'Nº AIH', 'Data Alta (SUS)', 'Valor Total', 'Médico', 'Hospital'];
+  const header = ['#', 'Nome do Paciente', 'Prontuário', 'Nº AIH', 'Data Alta (SUS)', 'Valor Total', 'Médico', 'Hospital'];
 
   let index = 1;
   for (const card of hierarchy) {
@@ -124,6 +124,7 @@ export async function exportAllPatientsExcel(filters: AllPatientsExportFilters =
     const hospitalName = (card.hospitals && card.hospitals[0]?.hospital_name) || '';
     for (const p of (card.patients || [])) {
       const patientName = p.patient_info?.name || 'Paciente';
+      const medicalRecord = p.patient_info?.medical_record || '-';
       const aihNumberRaw = (p as any)?.aih_info?.aih_number || '';
       const aihNumberClean = aihNumberRaw.toString().replace(/\D/g, '');
       const dischargeISO = (p as any)?.aih_info?.discharge_date;
@@ -144,6 +145,7 @@ export async function exportAllPatientsExcel(filters: AllPatientsExportFilters =
       rows.push([
         index++,
         patientName,
+        medicalRecord,
         aihNumberClean,
         dischargeLabel,
         totalReais,
@@ -164,6 +166,7 @@ export async function exportAllPatientsExcel(filters: AllPatientsExportFilters =
   (ws as any)['!cols'] = [
     { wch: 5 },
     { wch: 40 },
+    { wch: 16 },
     { wch: 18 },
     { wch: 16 },
     { wch: 18 },
@@ -204,6 +207,7 @@ export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {
   const header = [
     '#',
     'Nome do Paciente',
+    'Prontuário',
     'CNS',
     'Nº AIH',
     'Data Alta (SUS)',
@@ -225,6 +229,7 @@ export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {
 
       // Identificadores e labels
       const patientName = p.patient_info?.name || 'Paciente';
+      const medicalRecord = p.patient_info?.medical_record || '-';
       const cns = p.patient_info?.cns || '';
       const aihNumberRaw = (p as any)?.aih_info?.aih_number || '';
       const aihNumberClean = aihNumberRaw.toString().replace(/\D/g, '');
@@ -250,6 +255,7 @@ export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {
       rows.push([
         index++,
         patientName,
+        medicalRecord,
         cns,
         aihNumberClean,
         dischargeLabel,
@@ -276,6 +282,7 @@ export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {
   (ws as any)['!cols'] = [
     { wch: 5 },   // #
     { wch: 40 },  // Paciente
+    { wch: 16 },  // Prontuário
     { wch: 20 },  // CNS
     { wch: 18 },  // AIH
     { wch: 16 },  // Data Alta
