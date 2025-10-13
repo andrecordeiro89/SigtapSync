@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>🔍 Teste Completo: Verificação de Todas as Regras SUS</title>
+  <style>
+    body { 
+      font-family: 'Segoe UI', system-ui, sans-serif; 
+      padding: 40px; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 { 
+      color: #2d3748; 
+      margin-bottom: 10px;
+      font-size: 32px;
+    }
+    h2 {
+      color: #4a5568;
+      margin-top: 40px;
+      padding-bottom: 10px;
+      border-bottom: 3px solid #667eea;
+      font-size: 24px;
+    }
+    h3 {
+      color: #667eea;
+      margin-top: 25px;
+      font-size: 18px;
+    }
+    .status { 
+      display: inline-block;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 18px;
+      margin: 20px 0;
+    }
+    .pass { background: #48bb78; color: white; }
+    .fail { background: #f56565; color: white; }
+    .warning { background: #ed8936; color: white; }
+    .test-group {
+      background: #f7fafc;
+      padding: 25px;
+      margin: 20px 0;
+      border-radius: 12px;
+      border-left: 5px solid #667eea;
+    }
+    .test-case {
+      background: white;
+      padding: 20px;
+      margin: 15px 0;
+      border-radius: 8px;
+      border: 2px solid #e2e8f0;
+    }
+    .test-case.pass {
+      border-color: #48bb78;
+      background: #f0fff4;
+    }
+    .test-case.fail {
+      border-color: #f56565;
+      background: #fff5f5;
+    }
+    .test-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    .test-details {
+      font-size: 14px;
+      line-height: 1.8;
+      color: #4a5568;
+    }
+    .code {
+      background: #2d3748;
+      color: #68d391;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+    }
+    .summary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      border-radius: 12px;
+      margin-top: 40px;
+      font-size: 18px;
+    }
+    .summary h3 {
+      color: white;
+      margin-top: 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    th {
+      background: #edf2f7;
+      font-weight: bold;
+      color: #2d3748;
+    }
+    tr:hover {
+      background: #f7fafc;
+    }
+    .emoji {
+      font-size: 24px;
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Teste Completo: Verificação de Todas as Regras SUS</h1>
+    <p style="color: #718096; font-size: 16px; margin-top: 10px;">
+      Este teste valida que a correção do procedimento ULTRASSONOGRAFIA TRANSVAGINAL não afetou nenhuma das regras críticas do sistema.
+    </p>
+
+    <div id="results"></div>
+  </div>
+
+  <script type="module">
+    // ========================================
+    // CÓPIA DAS FUNÇÕES DE susCalculationRules.ts
+    // ========================================
+    
+    const ALWAYS_FULL_PERCENT_CODES = [
+      '02.05.02.015-1', // ULTRA-SONOGRAFIA OBSTETRICA
+      '02.05.02.018-6'  // 🆕 ULTRASSONOGRAFIA TRANSVAGINAL
+    ];
+
+    const SPECIAL_CALCULATION_RULES = [
+      {
+        procedureCode: "04.15.01.001-2",
+        procedureName: "Politraumatizado (Trauma Ortopédico)",
+        rule: {
+          type: "Politraumatizado (Cirurgias Múltiplas)",
+          hospitalPercentages: [100, 75, 50, 50, 50],
+          professionalPercentage: 100,
+          maxProcedures: 5,
+        }
+      },
+      {
+        procedureCode: "04.15.03.001-3",
+        procedureName: "Politraumatizado (Trauma Múltiplo)",
+        rule: {
+          type: "Politraumatizado (Cirurgias Múltiplas)",
+          hospitalPercentages: [100, 75, 50, 50, 50],
+          professionalPercentage: 100,
+          maxProcedures: 5,
+        }
+      },
+      {
+        procedureCode: "04.15.02.003-4",
+        procedureName: "Politraumatizado (Trauma Crânio + Face)",
+        rule: {
+          type: "Politraumatizado (Cirurgias Múltiplas)",
+          hospitalPercentages: [100, 75, 50, 50, 50],
+          professionalPercentage: 100,
+          maxProcedures: 5,
+        }
+      },
+      {
+        procedureCode: "04.15.02.006-9",
+        procedureName: "Politraumatizado (Trauma Torácico + Abdome)",
+        rule: {
+          type: "Politraumatizado (Cirurgias Múltiplas)",
+          hospitalPercentages: [100, 75, 50, 50, 50],
+          professionalPercentage: 100,
+          maxProcedures: 5,
+        }
+      }
+    ];
+
+    function isInstrument04Procedure(registrationInstrument) {
+      if (!registrationInstrument) return false;
+      return registrationInstrument.toLowerCase().includes('04');
+    }
+
+    function isAlwaysFullPercentProcedure(procedureCode) {
+      const cleanCode = procedureCode.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || procedureCode;
+      if (ALWAYS_FULL_PERCENT_CODES.includes(cleanCode)) return true;
+      return isDiagnosticProcedure(cleanCode);
+    }
+
+    function isSurgicalProcedure(procedureCode) {
+      const cleanCode = procedureCode.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || procedureCode;
+      return cleanCode.startsWith('04.');
+    }
+
+    function isDiagnosticProcedure(procedureCode) {
+      const cleanCode = procedureCode.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || procedureCode;
+      return cleanCode.startsWith('02.') || cleanCode.startsWith('03.01.');
+    }
+
+    function hasSpecialRule(procedureCode) {
+      const cleanCode = procedureCode.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || procedureCode;
+      return SPECIAL_CALCULATION_RULES.some(rule => rule.procedureCode === cleanCode);
+    }
+
+    function getSpecialRule(procedureCode) {
+      const cleanCode = procedureCode.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || procedureCode;
+      return SPECIAL_CALCULATION_RULES.find(rule => rule.procedureCode === cleanCode) || null;
+    }
+
+    function applySpecialCalculation(procedures) {
+      return procedures.map((proc) => {
+        // PRIORIDADE MÁXIMA: Procedimentos sempre 100%
+        if (isAlwaysFullPercentProcedure(proc.procedureCode)) {
+          const calculatedValueHosp = proc.valueHosp;
+          const calculatedValueProf = proc.valueProf;
+          const calculatedValueAmb = proc.valueAmb;
+          const calculatedTotal = calculatedValueHosp + calculatedValueProf;
+
+          return {
+            procedureCode: proc.procedureCode,
+            calculatedValueHosp,
+            calculatedValueProf,
+            calculatedValueAmb,
+            calculatedTotal,
+            appliedHospPercentage: 100,
+            appliedProfPercentage: 100,
+            ruleApplied: 'Regra 100% permanente ou procedimento diagnóstico',
+            specialRule: true,
+            isInstrument04: false
+          };
+        }
+
+        // INSTRUMENTO 04 - SEMPRE 100%
+        if (isInstrument04Procedure(proc.registrationInstrument)) {
+          const calculatedValueHosp = proc.valueHosp;
+          const calculatedValueProf = proc.valueProf;
+          const calculatedValueAmb = proc.valueAmb;
+          const calculatedTotal = calculatedValueHosp + calculatedValueProf;
+          
+          return {
+            procedureCode: proc.procedureCode,
+            calculatedValueHosp,
+            calculatedValueProf,
+            calculatedValueAmb,
+            calculatedTotal,
+            appliedHospPercentage: 100,
+            appliedProfPercentage: 100,
+            ruleApplied: 'Instrumento 04 - AIH (Proc. Especial) - Sempre 100%',
+            specialRule: true,
+            isInstrument04: true
+          };
+        }
+        
+        // REGRAS ESPECIAIS DE CIRURGIAS MÚLTIPLAS
+        const specialRule = getSpecialRule(proc.procedureCode);
+        if (specialRule && proc.sequenceOrder <= specialRule.rule.maxProcedures) {
+          const hospPercentageIndex = proc.sequenceOrder - 1;
+          const hospPercentage = specialRule.rule.hospitalPercentages[hospPercentageIndex] || 
+                                specialRule.rule.hospitalPercentages[specialRule.rule.hospitalPercentages.length - 1];
+          
+          const calculatedValueHosp = (proc.valueHosp * hospPercentage) / 100;
+          const calculatedValueProf = proc.valueProf;
+          const calculatedValueAmb = proc.valueAmb;
+          const calculatedTotal = calculatedValueHosp + calculatedValueProf;
+          
+          return {
+            procedureCode: proc.procedureCode,
+            calculatedValueHosp,
+            calculatedValueProf,
+            calculatedValueAmb,
+            calculatedTotal,
+            appliedHospPercentage: hospPercentage,
+            appliedProfPercentage: 100,
+            ruleApplied: `${specialRule.rule.type} - ${specialRule.procedureName}`,
+            specialRule: true,
+            isInstrument04: false
+          };
+        }
+        
+        // LÓGICA PADRÃO
+        let defaultHospPercentage;
+        
+        if (isSurgicalProcedure(proc.procedureCode)) {
+          defaultHospPercentage = proc.sequenceOrder === 1 ? 100 : 70;
+        } else {
+          defaultHospPercentage = 100;
+        }
+
+        const calculatedValueHosp = (proc.valueHosp * defaultHospPercentage) / 100;
+        const calculatedValueProf = proc.valueProf;
+        const calculatedValueAmb = proc.valueAmb;
+        const calculatedTotal = calculatedValueHosp + calculatedValueProf;
+        
+        return {
+          procedureCode: proc.procedureCode,
+          calculatedValueHosp,
+          calculatedValueProf,
+          calculatedValueAmb,
+          calculatedTotal,
+          appliedHospPercentage: defaultHospPercentage,
+          appliedProfPercentage: 100,
+          ruleApplied: 'Regra padrão do sistema',
+          specialRule: false,
+          isInstrument04: false
+        };
+      });
+    }
+
+    // ========================================
+    // SUITE DE TESTES
+    // ========================================
+    
+    const testResults = [];
+    let totalTests = 0;
+    let passedTests = 0;
+    let failedTests = 0;
+
+    function runTest(testName, testFunction) {
+      totalTests++;
+      try {
+        const result = testFunction();
+        if (result.pass) {
+          passedTests++;
+          testResults.push({
+            name: testName,
+            pass: true,
+            details: result.details
+          });
+        } else {
+          failedTests++;
+          testResults.push({
+            name: testName,
+            pass: false,
+            details: result.details,
+            error: result.error
+          });
+        }
+      } catch (error) {
+        failedTests++;
+        testResults.push({
+          name: testName,
+          pass: false,
+          details: 'Exceção lançada',
+          error: error.message
+        });
+      }
+    }
+
+    // ========================================
+    // TESTES GRUPO 1: POLITRAUMATIZADO
+    // ========================================
+    
+    runTest('Politraumatizado Trauma Ortopédico - Sequência 100%, 75%, 50%', () => {
+      const procedures = [
+        {
+          procedureCode: '04.15.01.001-2',
+          valueHosp: 10000,
+          valueProf: 2000,
+          valueAmb: 0,
+          sequenceOrder: 1
+        },
+        {
+          procedureCode: '04.08.04.013-9', // Cirurgia secundária
+          valueHosp: 8000,
+          valueProf: 1500,
+          valueAmb: 0,
+          sequenceOrder: 2
+        },
+        {
+          procedureCode: '04.08.05.020-1', // Cirurgia terciária
+          valueHosp: 6000,
+          valueProf: 1000,
+          valueAmb: 0,
+          sequenceOrder: 3
+        }
+      ];
+
+      const results = applySpecialCalculation(procedures);
+      
+      const proc1 = results[0];
+      const proc2 = results[1];
+      const proc3 = results[2];
+
+      if (proc1.appliedHospPercentage === 100 && 
+          proc2.appliedHospPercentage === 75 && 
+          proc3.appliedHospPercentage === 50 &&
+          proc1.specialRule === true) {
+        return {
+          pass: true,
+          details: `
+            ✅ Procedimento 1 (04.15.01.001-2): <span class="code">${proc1.appliedHospPercentage}%</span> SH = R$ ${(proc1.calculatedValueHosp / 100).toFixed(2)}<br>
+            ✅ Procedimento 2 (secundário): <span class="code">${proc2.appliedHospPercentage}%</span> SH = R$ ${(proc2.calculatedValueHosp / 100).toFixed(2)}<br>
+            ✅ Procedimento 3 (terciário): <span class="code">${proc3.appliedHospPercentage}%</span> SH = R$ ${(proc3.calculatedValueHosp / 100).toFixed(2)}<br>
+            <strong>Regra aplicada:</strong> ${proc1.ruleApplied}
+          `
+        };
+      }
+
+      return {
+        pass: false,
+        details: 'Percentuais incorretos',
+        error: `Esperado 100%, 75%, 50%. Obtido: ${proc1.appliedHospPercentage}%, ${proc2.appliedHospPercentage}%, ${proc3.appliedHospPercentage}%`
+      };
+    });
+
+    // ========================================
+    // TESTES GRUPO 2: INSTRUMENTO 04
+    // ========================================
+    
+    runTest('Instrumento 04 - Sempre 100% independente da sequência', () => {
+      const procedures = [
+        {
+          procedureCode: '04.08.04.010-4',
+          valueHosp: 15000,
+          valueProf: 3000,
+          valueAmb: 500,
+          sequenceOrder: 2,
+          registrationInstrument: '04 - AIH (Proc. Especial)'
+        }
+      ];
+
+      const results = applySpecialCalculation(procedures);
+      const proc = results[0];
+
+      if (proc.appliedHospPercentage === 100 && 
+          proc.appliedProfPercentage === 100 &&
+          proc.isInstrument04 === true) {
+        return {
+          pass: true,
+          details: `
+            ✅ SH: <span class="code">100%</span> = R$ ${(proc.calculatedValueHosp / 100).toFixed(2)}<br>
+            ✅ SP: <span class="code">100%</span> = R$ ${(proc.calculatedValueProf / 100).toFixed(2)}<br>
+            ✅ Total: R$ ${(proc.calculatedTotal / 100).toFixed(2)}<br>
+            <strong>Instrumento 04 detectado corretamente!</strong>
+          `
+        };
+      }
+
+      return {
+        pass: false,
+        details: 'Instrumento 04 não aplicou 100%',
+        error: `SH: ${proc.appliedHospPercentage}%, SP: ${proc.appliedProfPercentage}%, Instrument04: ${proc.isInstrument04}`
+      };
+    });
+
+    // ========================================
+    // TESTES GRUPO 3: ALWAYS FULL PERCENT
+    // ========================================
+    
+    runTest('Ultra-sonografia Obstétrica (02.05.02.015-1) - Sempre 100%', () => {
+      const procedures = [
+        {
+          procedureCode: '04.08.04.010-4', // Cirurgia principal
+          valueHosp: 20000,
+          valueProf: 4000,
+          valueAmb: 0,
+          sequenceOrder: 1
+        },
+        {
+          procedureCode: '02.05.02.015-1', // USG Obstétrica
+          valueHosp: 3000,
+          valueProf: 500,
+          valueAmb: 0,
+          sequenceOrder: 2
+        }
+      ];
+
+      const results = applySpecialCalculation(procedures);
+      const proc = results[1]; // USG Obstétrica
+
+      if (proc.appliedHospPercentage === 100 && proc.specialRule === true) {
+        return {
+          pass: true,
+          details: `
+            ✅ SH: <span class="code">100%</span> = R$ ${(proc.calculatedValueHosp / 100).toFixed(2)}<br>
+            ✅ SP: <span class="code">100%</span> = R$ ${(proc.calculatedValueProf / 100).toFixed(2)}<br>
+            <strong>Código explícito em ALWAYS_FULL_PERCENT_CODES funcionando!</strong>
+          `
+        };
+      }
+
+      return {
+        pass: false,
+        details: 'USG Obstétrica não recebeu 100%',
+        error: `Esperado 100%, obtido ${proc.appliedHospPercentage}%`
+      };
+    });
+
+    runTest('🆕 Ultrassonografia Transvaginal (02.05.02.018-6) - Sempre 100%', () => {
+      const procedures = [
+        {
+          procedureCode: '04.08.04.010-4', // Cirurgia principal
+          valueHosp: 20000,
+          valueProf: 4000,
+          valueAmb: 0,
+          sequenceOrder: 1
+        },
+        {
+          procedureCode: '02.05.02.018-6', // ULTRASSONOGRAFIA TRANSVAGINAL
+          valueHosp: 3500,
+          valueProf: 600,
+          valueAmb: 0,
+          sequenceOrder: 2
+        }
+      ];
+
+      const results = applySpecialCalculation(procedures);
+      const proc = results[1]; // Ultrassonografia Transvaginal
+
+      if (proc.appliedHospPercentage === 100 && proc.specialRule === true) {
+        return {
+          pass: true,
+          details: `
+            ✅ SH: <span class="code">100%</span> = R$ ${(proc.calculatedValueHosp / 100).toFixed(2)}<br>
+            ✅ SP: <span class="code">100%</span> = R$ ${(proc.calculatedValueProf / 100).toFixed(2)}<br>
+            🎯 <strong>CORREÇÃO APLICADA COM SUCESSO!</strong>
+          `
+        };
+      }
+
+      return {
+        pass: false,
+        details: 'Ultrassonografia Transvaginal não recebeu 100%',
+        error: `Esperado 100%, obtido ${proc.appliedHospPercentage}%`
+      };
+    });
+
+    // ========================================
+    // TESTES GRUPO 4: CIRURGIAS NORMAIS MÚLTIPLAS
+    // ========================================
+    
+    runTest('Cirurgias Normais Múltiplas - Principal 100%, Secundárias 70%', () => {
+      const procedures = [
+        {
+          procedureCode: '04.08.04.010-4', // Cirurgia principal
+          valueHosp: 20000,
+          valueProf: 4000,
+          valueAmb: 0,
+          sequenceOrder: 1
+        },
+        {
+          procedureCode: '04.08.05.020-1', // Cirurgia secundária
+          valueHosp: 15000,
+          valueProf: 3000,
+          valueAmb: 0,
+          sequenceOrder: 2
+        },
+        {
+          procedureCode: '04.08.06.030-2', // Cirurgia terciária
+          valueHosp: 10000,
+          valueProf: 2000,
+          valueAmb: 0,
+          sequenceOrder: 3
+        }
+      ];
+
+      const results = applySpecialCalculation(procedures);
+      
+      const proc1 = results[0];
+      const proc2 = results[1];
+      const proc3 = results[2];
+
+      if (proc1.appliedHospPercentage === 100 && 
+          proc2.appliedHospPercentage === 70 && 
+          proc3.appliedHospPercentage === 70) {
+        return {
+          pass: true,
+          details: `
+            ✅ Principal: <span class="code">100%</span> SH = R$ ${(proc1.calculatedValueHosp / 100).toFixed(2)}<br>
+            ✅ Secundária 1: <span class="code">70%</span> SH = R$ ${(proc2.calculatedValueHosp / 100).toFixed(2)}<br>
+            ✅ Secundária 2: <span class="code">70%</span> SH = R$ ${(proc3.calculatedValueHosp / 100).toFixed(2)}<br>
+            <strong>Lógica padrão de cirurgias múltiplas mantida!</strong>
+          `
+        };
+      }
+
+      return {
+        pass: false,
+        details: 'Percentuais de cirurgias normais incorretos',
+        error: `Esperado 100%, 70%, 70%. Obtido: ${proc1.appliedHospPercentage}%, ${proc2.appliedHospPercentage}%, ${proc3.appliedHospPercentage}%`
+      };
+    });
+
+    // ========================================
+    // TESTES GRUPO 5: PROCEDIMENTOS DIAGNÓSTICOS
+    // ========================================
+    
+    runTest('Procedimentos Diagnósticos (02.x e 03.01.x) - Sempre 100%', () => {
+      const procedures = [
+        {
+          procedureCode: '04.08.04.010-4', // Cirurgia principal
+          valueHosp: 20000,
+          valueProf: 4000,
+          valueAmb: 0,
+          sequenceOrder: 1
+        },
+        {
+          procedureCode: '02.11.08.009-0', // Exame diagnóstico
+          valueHosp: 1500,
+          valueProf: 300,
+          valueAmb: 0,
+          sequenceOrder: 2
+        },
+        {
+          procedureCode: '03.01.05.010-1', // Consulta
+          valueHosp: 800,
+          valueProf: 200,
+          valueAmb: 0,
+          sequenceOrder: 3
+        }
+      ];
+
+      const results = applySpecialCalculation(procedures);
+      
+      const proc2 = results[1]; // Exame diagnóstico
+      const proc3 = results[2]; // Consulta
+
+      if (proc2.appliedHospPercentage === 100 && 
+          proc3.appliedHospPercentage === 100) {
+        return {
+          pass: true,
+          details: `
+            ✅ Exame diagnóstico (02.x): <span class="code">100%</span> SH = R$ ${(proc2.calculatedValueHosp / 100).toFixed(2)}<br>
+            ✅ Consulta (03.01.x): <span class="code">100%</span> SH = R$ ${(proc3.calculatedValueHosp / 100).toFixed(2)}<br>
+            🎯 <strong>Nova lógica de procedimentos diagnósticos funcionando!</strong>
+          `
+        };
+      }
+
+      return {
+        pass: false,
+        details: 'Procedimentos diagnósticos não receberam 100%',
+        error: `Obtido: ${proc2.appliedHospPercentage}%, ${proc3.appliedHospPercentage}%`
+      };
+    });
+
+    // ========================================
+    // TESTES GRUPO 6: MIX DE REGRAS
+    // ========================================
+    
+    runTest('Cenário Completo: Politraumatizado + Diagnóstico + Cirurgia Normal', () => {
+      const procedures = [
+        {
+          procedureCode: '04.15.01.001-2', // Politraumatizado (principal)
+          valueHosp: 25000,
+          valueProf: 5000,
+          valueAmb: 0,
+          sequenceOrder: 1
+        },
+        {
+          procedureCode: '04.08.04.013-9', // Cirurgia secundária (75% por politraumatizado)
+          valueHosp: 15000,
+          valueProf: 3000,
+          valueAmb: 0,
+          sequenceOrder: 2
+        },
+        {
+          procedureCode: '02.05.02.018-6', // Ultrassonografia Transvaginal (sempre 100%)
+          valueHosp: 3500,
+          valueProf: 600,
+          valueAmb: 0,
+          sequenceOrder: 3
+        },
+        {
+          procedureCode: '04.08.05.020-1', // Cirurgia terciária (50% por politraumatizado)
+          valueHosp: 10000,
+          valueProf: 2000,
+          valueAmb: 0,
+          sequenceOrder: 4
+        }
+      ];
+
+      const results = applySpecialCalculation(procedures);
+      
+      const politrauma = results[0];
+      const cirurgia2 = results[1];
+      const ultrassom = results[2];
+      const cirurgia3 = results[3];
+
+      if (politrauma.appliedHospPercentage === 100 && 
+          cirurgia2.appliedHospPercentage === 75 && 
+          ultrassom.appliedHospPercentage === 100 &&
+          cirurgia3.appliedHospPercentage === 50 &&
+          ultrassom.specialRule === true) {
+        return {
+          pass: true,
+          details: `
+            ✅ Politraumatizado: <span class="code">100%</span> SH (regra especial)<br>
+            ✅ Cirurgia 2: <span class="code">75%</span> SH (sequência politraumatizado)<br>
+            ✅ Ultrassom Transvaginal: <span class="code">100%</span> SH (SEMPRE 100%)<br>
+            ✅ Cirurgia 3: <span class="code">50%</span> SH (sequência politraumatizado)<br>
+            🏆 <strong>TODAS AS REGRAS COEXISTEM PERFEITAMENTE!</strong>
+          `
+        };
+      }
+
+      return {
+        pass: false,
+        details: 'Mix de regras não funcionou corretamente',
+        error: `Obtido: ${politrauma.appliedHospPercentage}%, ${cirurgia2.appliedHospPercentage}%, ${ultrassom.appliedHospPercentage}%, ${cirurgia3.appliedHospPercentage}%`
+      };
+    });
+
+    // ========================================
+    // TESTES GRUPO 7: SP SEMPRE 100%
+    // ========================================
+    
+    runTest('SP (Serviço Profissional) Sempre 100% em Todas as Regras', () => {
+      const procedures = [
+        {
+          procedureCode: '04.15.01.001-2', // Politraumatizado
+          valueHosp: 10000,
+          valueProf: 2000,
+          valueAmb: 0,
+          sequenceOrder: 1
+        },
+        {
+          procedureCode: '04.08.04.013-9', // Cirurgia normal
+          valueHosp: 8000,
+          valueProf: 1500,
+          valueAmb: 0,
+          sequenceOrder: 2
+        },
+        {
+          procedureCode: '02.05.02.018-6', // Diagnóstico
+          valueHosp: 3500,
+          valueProf: 600,
+          valueAmb: 0,
+          sequenceOrder: 3
+        }
+      ];
+
+      const results = applySpecialCalculation(procedures);
+      
+      const allSp100 = results.every(r => r.appliedProfPercentage === 100);
+
+      if (allSp100) {
+        return {
+          pass: true,
+          details: `
+            ✅ Politraumatizado SP: <span class="code">100%</span><br>
+            ✅ Cirurgia normal SP: <span class="code">100%</span><br>
+            ✅ Diagnóstico SP: <span class="code">100%</span><br>
+            <strong>Regra "SP sempre 100%" mantida em todos os cenários!</strong>
+          `
+        };
+      }
+
+      return {
+        pass: false,
+        details: 'SP não está 100% em todos os procedimentos',
+        error: `Percentuais SP: ${results.map(r => r.appliedProfPercentage).join(', ')}`
+      };
+    });
+
+    // ========================================
+    // RENDERIZAR RESULTADOS
+    // ========================================
+    
+    function renderResults() {
+      const resultsDiv = document.getElementById('results');
+      
+      let html = '';
+
+      // Status geral
+      const statusClass = failedTests === 0 ? 'pass' : 'fail';
+      const statusEmoji = failedTests === 0 ? '✅' : '⚠️';
+      html += `
+        <div class="status ${statusClass}">
+          ${statusEmoji} ${passedTests} de ${totalTests} testes passaram
+        </div>
+      `;
+
+      // Agrupar testes por categoria
+      const categories = {
+        'Politraumatizado': testResults.filter(t => t.name.includes('Politraumatizado')),
+        'Instrumento 04': testResults.filter(t => t.name.includes('Instrumento')),
+        'Always Full Percent': testResults.filter(t => t.name.includes('sonografia')),
+        'Cirurgias Normais': testResults.filter(t => t.name.includes('Cirurgias Normais')),
+        'Procedimentos Diagnósticos': testResults.filter(t => t.name.includes('Diagnósticos')),
+        'Mix de Regras': testResults.filter(t => t.name.includes('Cenário Completo')),
+        'SP Sempre 100%': testResults.filter(t => t.name.includes('SP (Serviço'))
+      };
+
+      Object.entries(categories).forEach(([category, tests]) => {
+        if (tests.length > 0) {
+          html += `<h2><span class="emoji">${failedTests === 0 ? '✅' : '🔍'}</span>${category}</h2>`;
+          html += `<div class="test-group">`;
+          
+          tests.forEach(test => {
+            html += `
+              <div class="test-case ${test.pass ? 'pass' : 'fail'}">
+                <div class="test-title">${test.pass ? '✅' : '❌'} ${test.name}</div>
+                <div class="test-details">
+                  ${test.details}
+                  ${test.error ? `<br><strong style="color: #e53e3e;">Erro:</strong> ${test.error}` : ''}
+                </div>
+              </div>
+            `;
+          });
+          
+          html += `</div>`;
+        }
+      });
+
+      // Sumário final
+      html += `
+        <div class="summary">
+          <h3><span class="emoji">📊</span>Sumário da Análise</h3>
+          <p>
+            ✅ <strong>${passedTests} testes passaram</strong><br>
+            ${failedTests > 0 ? `❌ <strong>${failedTests} testes falharam</strong><br>` : ''}
+            📝 Total de testes executados: <strong>${totalTests}</strong>
+          </p>
+          ${failedTests === 0 ? `
+            <p style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.2); border-radius: 8px;">
+              🏆 <strong>TODAS AS REGRAS CRÍTICAS ESTÃO FUNCIONANDO CORRETAMENTE!</strong><br>
+              A correção do procedimento ULTRASSONOGRAFIA TRANSVAGINAL não afetou nenhuma das regras existentes.
+            </p>
+          ` : `
+            <p style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.2); border-radius: 8px;">
+              ⚠️ <strong>ATENÇÃO:</strong> Alguns testes falharam. Revisar implementação.
+            </p>
+          `}
+        </div>
+      `;
+
+      resultsDiv.innerHTML = html;
+    }
+
+    // Executar todos os testes
+    renderResults();
+  </script>
+</body>
+</html>
+

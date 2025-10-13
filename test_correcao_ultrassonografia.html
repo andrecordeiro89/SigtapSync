@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Teste: Correção Ultrassonografia</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #764ba2;
+            margin-top: 30px;
+        }
+        .test-case {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .success {
+            border-left-color: #10b981;
+            background: #ecfdf5;
+        }
+        .error {
+            border-left-color: #ef4444;
+            background: #fef2f2;
+        }
+        .code {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 5px;
+        }
+        .badge-success {
+            background: #10b981;
+            color: white;
+        }
+        .badge-error {
+            background: #ef4444;
+            color: white;
+        }
+        .badge-info {
+            background: #3b82f6;
+            color: white;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        th {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+        tr:hover {
+            background: #f8f9fa;
+        }
+        .icon {
+            font-size: 24px;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><span class="icon">🧪</span>Teste de Validação: Correção Ultrassonografia</h1>
+        
+        <div class="test-case success">
+            <h3>✅ PROBLEMA IDENTIFICADO</h3>
+            <p><strong>Código:</strong> 02.05.02.018-6 ULTRASSONOGRAFIA TRANSVAGINAL</p>
+            <p><strong>Erro:</strong> Estava recebendo <span class="badge badge-error">70%</span> quando deveria ser <span class="badge badge-success">100%</span></p>
+        </div>
+
+        <h2><span class="icon">📊</span>Testes Automatizados</h2>
+
+        <div id="test-results"></div>
+
+        <h2><span class="icon">📋</span>Matriz de Validação</h2>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Descrição</th>
+                    <th>Tipo</th>
+                    <th>Posição</th>
+                    <th>% Esperado</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>02.05.02.018-6</strong></td>
+                    <td>Ultrassonografia Transvaginal</td>
+                    <td>Diagnóstico</td>
+                    <td>2º</td>
+                    <td><span class="badge badge-success">100%</span></td>
+                    <td>✅ CORRIGIDO</td>
+                </tr>
+                <tr>
+                    <td><strong>02.05.02.015-1</strong></td>
+                    <td>Ultrassonografia Obstétrica</td>
+                    <td>Diagnóstico</td>
+                    <td>2º</td>
+                    <td><span class="badge badge-success">100%</span></td>
+                    <td>✅ OK</td>
+                </tr>
+                <tr>
+                    <td><strong>02.02.03.005-0</strong></td>
+                    <td>Hemograma</td>
+                    <td>Exame Lab</td>
+                    <td>3º</td>
+                    <td><span class="badge badge-success">100%</span></td>
+                    <td>✅ OK</td>
+                </tr>
+                <tr>
+                    <td><strong>03.01.01.007-2</strong></td>
+                    <td>Consulta Médica</td>
+                    <td>Consulta</td>
+                    <td>1º</td>
+                    <td><span class="badge badge-success">100%</span></td>
+                    <td>✅ OK</td>
+                </tr>
+                <tr>
+                    <td><strong>04.08.01.001-0</strong></td>
+                    <td>Cirurgia de Mão</td>
+                    <td>Cirurgia</td>
+                    <td>1º</td>
+                    <td><span class="badge badge-success">100%</span></td>
+                    <td>✅ OK</td>
+                </tr>
+                <tr>
+                    <td><strong>04.08.01.002-8</strong></td>
+                    <td>Tenólise</td>
+                    <td>Cirurgia</td>
+                    <td>2º</td>
+                    <td><span class="badge badge-info">70%</span></td>
+                    <td>✅ OK (cirurgia múltipla)</td>
+                </tr>
+                <tr>
+                    <td><strong>04.08.06.021-2</strong></td>
+                    <td>Ressecção de Cisto</td>
+                    <td>Cirurgia</td>
+                    <td>3º</td>
+                    <td><span class="badge badge-info">70%</span></td>
+                    <td>✅ OK (cirurgia múltipla)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2><span class="icon">📝</span>Regras Aplicadas</h2>
+
+        <div class="code">
+// ✅ LÓGICA CORRIGIDA:
+
+if (isSurgicalProcedure(procedureCode)) {
+    // Cirurgias múltiplas: 1º=100%, demais=70%
+    percentage = sequenceOrder === 1 ? 100 : 70;
+} else {
+    // Diagnósticos, exames, consultas: sempre 100%
+    percentage = 100;
+}
+
+// IDENTIFICAÇÃO AUTOMÁTICA:
+isDiagnosticProcedure('02.05.02.018-6') → true  ✅
+isSurgicalProcedure('02.05.02.018-6')   → false ✅
+
+// RESULTADO:
+02.05.02.018-6 (2º posição) → 100% ✅ CORRETO!
+        </div>
+
+        <h2><span class="icon">🎯</span>Cenários de Teste</h2>
+
+        <div class="test-case success">
+            <h4>✅ Cenário 1: Cirurgia + Ultrassonografia</h4>
+            <p>1. <strong>04.08.01.001-0</strong> Cirurgia de Mão → <span class="badge badge-success">100%</span></p>
+            <p>2. <strong>02.05.02.018-6</strong> Ultrassonografia → <span class="badge badge-success">100%</span> (diagnóstico)</p>
+            <p>3. <strong>04.08.01.002-8</strong> Tenólise → <span class="badge badge-info">70%</span> (cirurgia secundária)</p>
+            <p><strong>Resultado:</strong> Ultrassonografia mantém 100% ✅</p>
+        </div>
+
+        <div class="test-case success">
+            <h4>✅ Cenário 2: Múltiplas Ultrassonografias</h4>
+            <p>1. <strong>02.05.02.015-1</strong> USG Obstétrica → <span class="badge badge-success">100%</span></p>
+            <p>2. <strong>02.05.02.018-6</strong> USG Transvaginal → <span class="badge badge-success">100%</span></p>
+            <p>3. <strong>02.05.01.001-8</strong> USG Abdomen → <span class="badge badge-success">100%</span></p>
+            <p><strong>Resultado:</strong> Todos mantêm 100% ✅</p>
+        </div>
+
+        <div class="test-case success">
+            <h4>✅ Cenário 3: Múltiplas Cirurgias</h4>
+            <p>1. <strong>04.08.01.001-0</strong> Cirurgia Principal → <span class="badge badge-success">100%</span></p>
+            <p>2. <strong>04.08.01.005-2</strong> Liberação Aderências → <span class="badge badge-info">70%</span></p>
+            <p>3. <strong>04.08.06.021-2</strong> Ressecção Cisto → <span class="badge badge-info">70%</span></p>
+            <p><strong>Resultado:</strong> Apenas principal com 100% ✅</p>
+        </div>
+
+    </div>
+
+    <script>
+        // Simulação das funções corrigidas
+        function isDiagnosticProcedure(code) {
+            const clean = code.match(/^[\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d]/)?.[0] || code;
+            return clean.startsWith('02.') || clean.startsWith('03.01.');
+        }
+
+        function isSurgicalProcedure(code) {
+            const clean = code.match(/^[\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d]/)?.[0] || code;
+            return clean.startsWith('04');
+        }
+
+        function calculatePercentage(code, position) {
+            if (isSurgicalProcedure(code)) {
+                return position === 1 ? 100 : 70;
+            } else {
+                return 100;
+            }
+        }
+
+        // Testes
+        const tests = [
+            {
+                code: '02.05.02.018-6',
+                name: 'Ultrassonografia Transvaginal',
+                position: 2,
+                expected: 100,
+                type: 'Diagnóstico'
+            },
+            {
+                code: '02.05.02.015-1',
+                name: 'Ultrassonografia Obstétrica',
+                position: 2,
+                expected: 100,
+                type: 'Diagnóstico'
+            },
+            {
+                code: '04.08.01.001-0',
+                name: 'Cirurgia de Mão',
+                position: 1,
+                expected: 100,
+                type: 'Cirurgia'
+            },
+            {
+                code: '04.08.01.002-8',
+                name: 'Tenólise',
+                position: 2,
+                expected: 70,
+                type: 'Cirurgia'
+            },
+            {
+                code: '02.02.03.005-0',
+                name: 'Hemograma',
+                position: 3,
+                expected: 100,
+                type: 'Exame'
+            },
+            {
+                code: '03.01.01.007-2',
+                name: 'Consulta Médica',
+                position: 1,
+                expected: 100,
+                type: 'Consulta'
+            }
+        ];
+
+        const resultsDiv = document.getElementById('test-results');
+        let allPassed = true;
+
+        tests.forEach((test, index) => {
+            const result = calculatePercentage(test.code, test.position);
+            const passed = result === test.expected;
+            
+            if (!passed) allPassed = false;
+
+            const testDiv = document.createElement('div');
+            testDiv.className = `test-case ${passed ? 'success' : 'error'}`;
+            testDiv.innerHTML = `
+                <h4>${passed ? '✅' : '❌'} Teste ${index + 1}: ${test.name}</h4>
+                <p><strong>Código:</strong> ${test.code}</p>
+                <p><strong>Tipo:</strong> ${test.type}</p>
+                <p><strong>Posição:</strong> ${test.position}º</p>
+                <p><strong>Esperado:</strong> <span class="badge ${passed ? 'badge-success' : 'badge-error'}">${test.expected}%</span></p>
+                <p><strong>Resultado:</strong> <span class="badge ${passed ? 'badge-success' : 'badge-error'}">${result}%</span></p>
+                <p><strong>Status:</strong> ${passed ? '✅ PASSOU' : '❌ FALHOU'}</p>
+            `;
+            resultsDiv.appendChild(testDiv);
+        });
+
+        // Resumo final
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = `test-case ${allPassed ? 'success' : 'error'}`;
+        summaryDiv.innerHTML = `
+            <h3>${allPassed ? '✅ TODOS OS TESTES PASSARAM!' : '❌ ALGUNS TESTES FALHARAM'}</h3>
+            <p>Total de testes: ${tests.length}</p>
+            <p>Passaram: ${tests.filter((t, i) => calculatePercentage(t.code, t.position) === t.expected).length}</p>
+            <p>Falharam: ${tests.filter((t, i) => calculatePercentage(t.code, t.position) !== t.expected).length}</p>
+        `;
+        resultsDiv.appendChild(summaryDiv);
+
+        console.log('🧪 Testes de validação executados');
+        console.log('✅ Correção: 02.05.02.018-6 agora retorna 100%');
+        console.log('📊 Resultado:', allPassed ? 'TODOS PASSARAM' : 'ALGUNS FALHARAM');
+    </script>
+</body>
+</html>
+

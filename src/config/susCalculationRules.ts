@@ -43,12 +43,43 @@ export interface ProcedureWithSigtap {
 
 // ✅ LISTA DE CÓDIGOS QUE SEMPRE DEVEM SER 100% (SH e SP), INDEPENDENTE DE POSIÇÃO/REGRAS
 const ALWAYS_FULL_PERCENT_CODES: string[] = [
-  '02.05.02.015-1'
+  '02.05.02.015-1',
+  '02.05.02.018-6'  // 🆕 ULTRASSONOGRAFIA TRANSVAGINAL - sempre 100%
 ];
+
+// ✅ NOVA FUNÇÃO: Verifica se é procedimento cirúrgico (código inicia com "04")
+export function isSurgicalProcedure(procedureCode: string): boolean {
+  if (!procedureCode) return false;
+  
+  // Extrair apenas o código se vier com descrição
+  const cleanCode = procedureCode.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || procedureCode;
+  
+  // Verificar se o código inicia com "04" (procedimentos cirúrgicos)
+  return cleanCode.startsWith('04');
+}
+
+// ✅ NOVA FUNÇÃO: Verifica se é procedimento diagnóstico/exame (códigos 02.xx, 03.01)
+export function isDiagnosticProcedure(procedureCode: string): boolean {
+  if (!procedureCode) return false;
+  
+  // Extrair apenas o código se vier com descrição
+  const cleanCode = procedureCode.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || procedureCode;
+  
+  // Procedimentos diagnósticos (imagem, patologia, radiodiagnóstico, etc.)
+  return cleanCode.startsWith('02.') || // Procedimentos diagnósticos
+         cleanCode.startsWith('03.01.'); // Consultas e atendimentos
+}
 
 export function isAlwaysFullPercentProcedure(codeOrFull: string): boolean {
   const code = codeOrFull.match(/^[\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d]/)?.[0] || codeOrFull;
-  return ALWAYS_FULL_PERCENT_CODES.includes(code);
+  
+  // 1. Verificar lista explícita
+  if (ALWAYS_FULL_PERCENT_CODES.includes(code)) return true;
+  
+  // 2. Procedimentos diagnósticos SEMPRE são 100%
+  if (isDiagnosticProcedure(code)) return true;
+  
+  return false;
 }
 
 // PROCEDIMENTOS ESPECIAIS COM REGRAS DE MÚLTIPLOS PROCEDIMENTOS
@@ -287,9 +318,18 @@ export function applySpecialCalculation(
       };
     }
     
-  // APLICAR LÓGICA PADRÃO DO SISTEMA (100% principal; secundários com 70% por padrão)
-  // TODO: Ajustar se houver orientação SUS diferente (ex.: 100/50/30) para casos sem regra específica
-  const defaultHospPercentage = proc.sequenceOrder === 1 ? 100 : 70;
+  // APLICAR LÓGICA PADRÃO DO SISTEMA
+  // ✅ CIRURGIAS MÚLTIPLAS: 100% principal; secundários com 70% 
+  // ✅ PROCEDIMENTOS NÃO-CIRÚRGICOS: Sempre 100% (diagnósticos, exames, consultas)
+  let defaultHospPercentage: number;
+  
+  if (isSurgicalProcedure(proc.procedureCode)) {
+    // Cirurgias múltiplas: aplicar redução de porcentagem por posição
+    defaultHospPercentage = proc.sequenceOrder === 1 ? 100 : 70;
+  } else {
+    // Procedimentos diagnósticos, exames, consultas: sempre 100%
+    defaultHospPercentage = 100;
+  }
     const calculatedValueHosp = (proc.valueHosp * defaultHospPercentage) / 100;
     const calculatedValueProf = proc.valueProf; // SP sempre 100%
     const calculatedValueAmb = proc.valueAmb;   // SA sempre 100%
@@ -423,13 +463,18 @@ export function logSpecialRules(): void {
   console.log('   Prioridade: MÁXIMA (aplicada antes de qualquer outra regra)');
 
   console.log('\n🏥 REGRAS 100% PERMANENTES (SH + SP), INDEPENDENTE DE SEQUÊNCIA:');
+  console.log('   Códigos específicos:');
   ALWAYS_FULL_PERCENT_CODES.forEach(code => {
     console.log(`   - ${code}: 100% SH e 100% SP`);
   });
+  console.log('   \n   Categorias automáticas:');
+  console.log('   - Procedimentos diagnósticos (02.xx): Sempre 100%');
+  console.log('   - Consultas e atendimentos (03.01.xx): Sempre 100%');
   
-  console.log('\n🏥 CIRURGIAS MÚLTIPLAS E SEQUENCIAIS:');
+  console.log('\n🏥 CIRURGIAS MÚLTIPLAS E SEQUENCIAIS (apenas códigos 04.xx):');
+  console.log('   Regra padrão: 1º=100%, 2º=70%, demais=70%');
   SPECIAL_CALCULATION_RULES.forEach(rule => {
-    console.log(`\n🏥 ${rule.procedureCode}: ${rule.procedureName}`);
+    console.log(`\n   ${rule.procedureCode}: ${rule.procedureName}`);
     console.log(`   Tipo: ${rule.rule.type}`);
     console.log(`   SH: ${rule.rule.hospitalPercentages.join('%, ')}%`);
     console.log(`   SP: ${rule.rule.professionalPercentage}% (sempre)`);
