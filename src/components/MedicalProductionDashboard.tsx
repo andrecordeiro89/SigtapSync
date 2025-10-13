@@ -1741,7 +1741,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                     try {
                       const rows: Array<Array<string | number>> = [];
                        const header = [
-                         '#', 
+                         '#',
+                         'Prontuário', 
                          'Nome do Paciente', 
                          'Nº AIH', 
                          'Código Procedimento',
@@ -1801,6 +1802,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           
                           const patientId = p.patient_id;
                           const name = p.patient_info?.name || 'Paciente';
+                          const medicalRecord = p.patient_info?.medical_record || '-';
                           // 🔧 CORREÇÃO: Incluir AIHs sem número com aviso
                           const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                           const aih = aihRaw || 'Aguardando geração';
@@ -1846,7 +1848,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                               const procValue = Number(proc.value_reais || 0);
                               
                               rows.push([
-                                idx++, 
+                                idx++,
+                                medicalRecord,
                                 name, 
                                 aih, // Usar aih que pode ser "Aguardando geração"
                                 procCode, // ✅ Código padronizado sem "." e "-"
@@ -1866,7 +1869,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           } else {
                             // Se não tem procedimentos, criar uma linha sem dados de procedimento
                             rows.push([
-                              idx++, 
+                              idx++,
+                              medicalRecord,
                               name, 
                               aih, // Usar aih que pode ser "Aguardando geração"
                               '',
@@ -1888,8 +1892,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       
                       // Ordenar por Data Alta (SUS) - mais recente primeiro
                       rows.sort((a, b) => {
-                        const dateA = a[6] as string; // Data Alta (SUS) está na posição 6 (0-indexed)
-                        const dateB = b[6] as string;
+                        const dateA = a[7] as string; // Data Alta (SUS) está na posição 7 (0-indexed)
+                        const dateB = b[7] as string;
                         
                         // Se não há data, colocar no final
                         if (!dateA && !dateB) return 0;
@@ -1928,6 +1932,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
                       (ws as any)['!cols'] = [
                         { wch: 5 },   // #
+                        { wch: 15 },  // Prontuário
                         { wch: 35 },  // Nome do Paciente
                         { wch: 18 },  // Nº AIH
                         { wch: 20 },  // Código Procedimento
@@ -1948,8 +1953,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       XLSX.writeFile(wb, fileName);
                       
                       // ✅ Notificação única e clara
-                      if (patientsWithoutAIH > 0) {
-                        toast.success(`Relatório geral gerado! ${patientsWithoutAIH} registro(s) sem AIH incluído(s).`);
+                      if (aihsWithoutNumber > 0) {
+                        toast.success(`Relatório geral gerado! ${aihsWithoutNumber} registro(s) sem AIH incluído(s).`);
                       } else {
                         toast.success('Relatório geral gerado com sucesso!');
                       }
