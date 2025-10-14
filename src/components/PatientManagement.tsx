@@ -90,6 +90,7 @@ interface AIH {
   professional_cbo?: string;
   cns_responsavel?: string; // ✅ CNS do médico responsável
   competencia?: string; // ✅ Competência SUS (YYYY-MM-DD)
+  pgt_adm?: 'sim' | 'não'; // ✅ Pagamento Administrativo (padrão: "não")
   hospitals?: { name: string };
   processed_at?: string;
   processed_by_name?: string;
@@ -194,6 +195,9 @@ const PatientManagement = () => {
   const [editingCompetencia, setEditingCompetencia] = useState<{ [aihId: string]: boolean }>({});
   const [competenciaValue, setCompetenciaValue] = useState<{ [aihId: string]: string }>({});
   const [savingCompetencia, setSavingCompetencia] = useState<{ [aihId: string]: boolean }>({});
+  
+  // ✅ NOVO: Estado para atualização de pagamento administrativo
+  const [savingPgtAdm, setSavingPgtAdm] = useState<{ [aihId: string]: boolean }>({});
 
   const handleStartEditName = (patientId: string, currentName: string) => {
     setInlineNameEdit(prev => (prev[patientId] === undefined ? ({ ...prev, [patientId]: currentName || '' }) : prev));
@@ -390,6 +394,107 @@ const PatientManagement = () => {
       });
     } finally {
       setSavingCompetencia(prev => ({ ...prev, [aihId]: false }));
+    }
+  };
+
+  // ✅ Função para atualizar Pagamento Administrativo automaticamente
+  const handleTogglePgtAdm = async (aihId: string, aihNumber: string, currentValue: 'sim' | 'não' | undefined) => {
+    try {
+      // ⚠️ Validação de segurança ANTES de qualquer operação
+      if (!aihId) {
+        throw new Error('ID da AIH não encontrado');
+      }
+
+      setSavingPgtAdm(prev => ({ ...prev, [aihId]: true }));
+      
+      // Alternar valor: sim → não, não → sim
+      const newValue: 'sim' | 'não' = currentValue === 'sim' ? 'não' : 'sim';
+
+      console.log('🔄 Atualizando pgt_adm:', {
+        aihId,
+        aihNumber,
+        de: currentValue,
+        para: newValue
+      });
+
+      // 💾 Atualizar no banco PRIMEIRO (sem optimistic update)
+      const { data, error } = await supabase
+        .from('aihs')
+        .update({ 
+          pgt_adm: newValue,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', aihId)
+        .select('id, aih_number, pgt_adm, updated_at');
+
+      if (error) {
+        console.error('Erro ao atualizar pagamento administrativo:', error);
+        throw error;
+      }
+
+      console.log('✅ Supabase confirmou atualização:', data);
+
+      // ✅ AGORA SIM: Atualizar UI com dados confirmados do banco
+      // SEM alterar updated_at para evitar reordenamento visual
+      if (data && data[0]) {
+        setAIHs(prev => {
+          let matchFound = false;
+          const newList = prev.map((aih, index) => {
+            if (aih.id === aihId) {
+              matchFound = true;
+              const patientName = (aih.patient || aih.patients)?.name;
+              console.log('🎯 ATUALIZANDO AIH NA UI:', {
+                index,
+                paciente: patientName,
+                aihNumber: aih.aih_number,
+                aihId: aih.id,
+                pgt_adm_ANTES: aih.pgt_adm,
+                pgt_adm_DEPOIS: data[0].pgt_adm,
+                idDoSupabase: data[0].id,
+                idsMatching: aih.id === data[0].id ? '✅' : '❌ PROBLEMA!'
+              });
+              return { 
+                ...aih, 
+                pgt_adm: data[0].pgt_adm,
+                // NÃO atualizar updated_at aqui para evitar reordenamento visual
+              };
+            }
+            return aih;
+          });
+          
+          if (!matchFound) {
+            console.error('❌ ERRO: ID não encontrado na lista!', {
+              aihIdProcurado: aihId,
+              totalAIHsNaLista: prev.length,
+              primeirosDezIDs: prev.slice(0, 10).map(a => ({ id: a.id, aih_number: a.aih_number }))
+            });
+          }
+          
+          console.log('📊 Lista atualizada. Total:', newList.length);
+          return newList;
+        });
+      }
+
+      // ✅ Feedback visual
+      toast({
+        title: newValue === 'sim' ? "✅ Pgt. Administrativo ativado" : "ℹ️ Pgt. Administrativo desativado",
+        description: `AIH ${aihNumber} atualizada com sucesso.`,
+        variant: "default",
+        duration: 2000
+      });
+
+    } catch (error: any) {
+      console.error('Erro ao atualizar pagamento administrativo:', error);
+      toast({
+        title: "❌ Erro ao atualizar",
+        description: error.message || "Não foi possível atualizar o pagamento administrativo.",
+        variant: "destructive",
+      });
+      
+      // Recarregar lista em caso de erro para garantir consistência
+      await loadAIHs();
+    } finally {
+      setSavingPgtAdm(prev => ({ ...prev, [aihId]: false }));
     }
   };
   const [diagnosticModalOpen, setDiagnosticModalOpen] = useState(false);
@@ -1610,6 +1715,50 @@ const PatientManagement = () => {
                           
                           return hasPermission && (
                             <>
+                              {/* ✅ NOVO: Toggle Pagamento Administrativo - REPOSICIONADO ANTES DO EDITAR */}
+                              {(() => {
+                                // 🔒 ISOLAMENTO GARANTIDO: Capturar valores imediatamente no momento da renderização
+                                const aihIdIsolated = item.id;
+                                const aihNumberIsolated = item.aih_number;
+                                const currentPgtAdm = item.pgt_adm || 'não';
+                                const patientNameIsolated = (item.patient || item.patients)?.name || 'Paciente';
+                                
+                                return (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      
+                                      // 🔍 LOG DETALHADO: Ver qual card foi clicado
+                                      console.log('👆 CLIQUE NO SWITCH:', {
+                                        paciente: patientNameIsolated,
+                                        aihNumber: aihNumberIsolated,
+                                        aihId: aihIdIsolated,
+                                        pgt_adm_atual: currentPgtAdm,
+                                        posicaoNaLista: aihs.findIndex(a => a.id === aihIdIsolated)
+                                      });
+                                      
+                                      handleTogglePgtAdm(aihIdIsolated, aihNumberIsolated, currentPgtAdm);
+                                    }}
+                                    disabled={savingPgtAdm[aihIdIsolated]}
+                                    className={`relative inline-flex items-center h-8 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200 border ${
+                                      currentPgtAdm === 'sim'
+                                        ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                                    } ${savingPgtAdm[aihIdIsolated] ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+                                    title={`${patientNameIsolated} - AIH ${aihNumberIsolated} - Pgt. Adm: ${currentPgtAdm === 'sim' ? 'Ativado' : 'Desativado'}`}
+                                  >
+                                    {savingPgtAdm[aihIdIsolated] ? (
+                                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-gray-500 mr-1.5"></div>
+                                    ) : (
+                                      <span className={`w-3.5 h-3.5 rounded-full mr-1.5 ${
+                                        currentPgtAdm === 'sim' ? 'bg-green-500' : 'bg-gray-400'
+                                      }`}></span>
+                                    )}
+                                    <span className="hidden md:inline">Pgt. Adm</span>
+                                  </button>
+                                );
+                              })()}
+                              
                               <Button
                                 size="sm"
                                 variant="outline"
