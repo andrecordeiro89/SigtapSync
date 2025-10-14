@@ -2555,11 +2555,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         const hospitalName = doctor.hospitals?.[0]?.hospital_name || '';
                                         const hospitalId = doctor.hospitals?.[0]?.hospital_id;
                                         
-                                        // 🔧 FIX: Usar Set para deduplicate por AIH number (evitar pacientes recorrentes duplicados)
-                                        const uniqueAIHs = new Set<string>();
+                                        // ✅ CORREÇÃO: NÃO deduplicate - cada entrada em doctor.patients já é uma AIH única
+                                        // O serviço doctorPatientService já garante que não há duplicatas
                                         
                                         console.log(`📊 [RELATÓRIO MÉDICO] Gerando relatório para ${doctorName}`);
-                                        console.log(`📊 [RELATÓRIO MÉDICO] Sem filtro de data`);
+                                        console.log(`📊 [RELATÓRIO MÉDICO] Total de AIHs: ${(doctor.patients || []).length}`);
                                         
                                         (doctor.patients || []).forEach((p: any) => {
                                           // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo dos relatórios gerais)
@@ -2581,15 +2581,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           const name = p.patient_info?.name || 'Paciente';
                                           const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
                                           const aih = aihRaw || 'Aguardando geração';
-                                          
-                                          // 🔧 FIX DUPLICATAS: Verificar se AIH já foi processada
-                                          if (aihRaw && uniqueAIHs.has(aihRaw)) {
-                                            console.log(`⏭️ [RELATÓRIO MÉDICO] AIH ${aihRaw} já processada - pulando duplicata`);
-                                            return; // Pular duplicatas
-                                          }
-                                          if (aihRaw) {
-                                            uniqueAIHs.add(aihRaw); // Marcar AIH como processada
-                                          }
                                           
                                           const careSpec = (p?.aih_info?.specialty || '').toString();
                                           const careCharacter = (() => {
