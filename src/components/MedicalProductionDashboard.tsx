@@ -2463,68 +2463,160 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 };
                 
                 return (
-                  <Card key={cardKey} className="mb-6 border border-slate-200/60 bg-white/80 backdrop-blur-sm hover:shadow-lg hover:border-slate-300/60 transition-all duration-500 ease-out">
+                  <Card key={cardKey} className="mb-4 border border-slate-200 bg-white hover:shadow-md transition-all duration-300">
                     <Collapsible>
                       <CollapsibleTrigger asChild>
                         <div 
-                          className="w-full cursor-pointer hover:bg-slate-50/50 transition-all duration-300 ease-out"
+                          className="w-full cursor-pointer p-4 rounded-lg hover:bg-slate-50 transition-colors"
                           onClick={() => toggleDoctorExpansion(cardKey)}
                         >
-                          <div className="p-6">
-                            <div className="flex items-center justify-between mb-6">
-                              <div className="flex items-center gap-4 flex-1">
-                                {/* ÍCONE DE EXPANSÃO E AVATAR */}
-                                <div className="flex items-center gap-3 shrink-0">
-                                  {isExpanded ? (
-                                    <ChevronDown className="h-5 w-5 text-slate-500 transition-transform duration-300" />
-                                  ) : (
-                                    <ChevronRight className="h-5 w-5 text-slate-500 transition-transform duration-300" />
-                                  )}
+                          {/* Ícone de expansão */}
+                          <div className="flex items-center gap-2 mb-2">
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4 text-slate-500 transition-transform duration-200" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-slate-500 transition-transform duration-200" />
+                            )}
+                            <span className="text-xs text-slate-500 font-medium">
+                              {isExpanded ? 'Clique para recolher' : 'Clique para expandir pacientes e detalhes'}
+                            </span>
+                          </div>
+
+                          {/* NOME DO MÉDICO - DESTAQUE */}
+                          <div className="mb-3 pb-3 border-b border-gray-100">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center justify-center w-10 h-10 bg-indigo-100 rounded-full">
+                                  <Stethoscope className="h-5 w-5 text-indigo-600" />
                                 </div>
-                                
-                                {/* INFORMAÇÕES PRINCIPAIS DO MÉDICO */}
-                                <div className="w-full">
-                                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                                    <div className="md:col-start-1 md:col-span-4 min-w-0">
-                                      <div className="text-[11px] uppercase text-slate-500">Médico</div>
-                                      <div className="text-base font-semibold text-slate-900 truncate" title={doctor.doctor_info.name}>{doctor.doctor_info.name}</div>
-                                    </div>
-                                    <div className="md:col-start-5 md:col-span-2 whitespace-nowrap hidden md:hidden">
-                                      <div className="text-[11px] uppercase text-slate-500">CNS</div>
-                                      <div className="text-sm font-mono text-slate-900 whitespace-nowrap">{doctor.doctor_info.cns || '—'}</div>
-                                    </div>
-                                    <div className="md:col-start-6 md:col-span-3 min-w-0">
-                                      <div className="text-[11px] uppercase text-slate-500">Especialidade</div>
-                                      <div className="text-sm font-medium text-slate-900 truncate" title={doctor.doctor_info.specialty || '—'}>{doctor.doctor_info.specialty || '—'}</div>
-                                    </div>
-                                    <div className="md:col-start-9 md:col-span-3 min-w-0">
-                                      <div className="text-[11px] uppercase text-slate-500">Regras do Procedimento</div>
-                                      <div className="text-sm font-medium text-slate-800" title={(() => {
-                                        const hospitalId = doctor.hospitals?.[0]?.hospital_id;
-                                        const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
-                                        if (fixedCalc.hasFixedRule) return 'Valor Fixo';
-                                        const percentageCalc = calculatePercentagePayment(doctor.doctor_info.name, doctorStats.totalValue, hospitalId);
-                                        if (percentageCalc.hasPercentageRule) return `${percentageCalc.appliedRule.match(/\d+%/)?.[0] || '65%'} do Total`;
-                                        if (doctorStats.calculatedPaymentValue > 0) return 'Regras por Procedimento';
-                                        return '—';
-                                      })()}>{(() => {
-                                        const hospitalId = doctor.hospitals?.[0]?.hospital_id;
-                                        const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
-                                        if (fixedCalc.hasFixedRule) return 'Valor Fixo';
-                                        const percentageCalc = calculatePercentagePayment(doctor.doctor_info.name, doctorStats.totalValue, hospitalId);
-                                        if (percentageCalc.hasPercentageRule) return `${percentageCalc.appliedRule.match(/\d+%/)?.[0] || '65%'} do Total`;
-                                        if (doctorStats.calculatedPaymentValue > 0) return 'Regras por Procedimento';
-                                        return '—';
-                                      })()}</div>
-                                    </div>
-                                  </div>
+                                <div>
+                                  <div className="text-lg font-bold text-gray-900">{doctor.doctor_info.name}</div>
+                                  <div className="text-xs text-gray-500 font-medium">{doctor.doctor_info.specialty || '—'}</div>
                                 </div>
                               </div>
-                              
-                              {/* ESTATÍSTICAS FINANCEIRAS */}
-                               <div className="text-right">
-                                 {/* Botões de Relatório por Médico */}
-                                 <div className="mt-3 flex flex-col gap-2">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-semibold">
+                                  {doctorStats.totalAIHs} PACIENTES
+                                </Badge>
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-semibold">
+                                  {doctorStats.totalProcedures} PROC
+                                </Badge>
+                                {getRankingMedal(index) && (
+                                  <span className="text-2xl">{getRankingMedal(index)}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* GRID DE INFORMAÇÕES - 2 COLUNAS */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 mb-3">
+                            {/* Coluna 1 */}
+                            <div className="space-y-2">
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">CNS:</span>
+                                <span className="text-xs font-mono font-medium text-gray-900">{doctor.doctor_info.cns || '—'}</span>
+                              </div>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">CRM:</span>
+                                <span className="text-xs font-medium text-gray-900">{doctor.doctor_info.crm || '—'}</span>
+                              </div>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Hospital:</span>
+                                <span className="text-xs font-medium text-gray-900">{(() => {
+                                  const hospitals = doctor.hospitals;
+                                  if (hospitals && hospitals.length > 0) {
+                                    const primaryHospital = hospitals.find((h: any) => h.is_primary_hospital);
+                                    const hospital = primaryHospital || hospitals[0];
+                                    return hospital.hospital_name;
+                                  }
+                                  return 'Não definido';
+                                })()}</span>
+                              </div>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Pacientes Atendidos:</span>
+                                <span className="text-xs font-bold text-indigo-700">{doctorStats.totalAIHs}</span>
+                              </div>
+                            </div>
+
+                            {/* Coluna 2 */}
+                            <div className="space-y-2">
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Procedimentos:</span>
+                                <span className="text-xs font-bold text-blue-700">{doctorStats.totalProcedures}</span>
+                              </div>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Ticket Médio:</span>
+                                <span className="text-xs font-medium text-gray-900">{formatCurrency(doctorStats.avgTicket)}</span>
+                              </div>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Regra Pagamento:</span>
+                                <span className="text-xs font-medium text-gray-900">{(() => {
+                                  const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                  const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
+                                  if (fixedCalc.hasFixedRule) return 'Valor Fixo';
+                                  const percentageCalc = calculatePercentagePayment(doctor.doctor_info.name, doctorStats.totalValue, hospitalId);
+                                  if (percentageCalc.hasPercentageRule) return `${percentageCalc.appliedRule.match(/\d+%/)?.[0] || '65%'} do Total`;
+                                  if (doctorStats.calculatedPaymentValue > 0) return 'Regras por Proc.';
+                                  return '—';
+                                })()}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* SEÇÃO DE VALORES - DESTAQUE ESPECIAL */}
+                          <div className="mt-3 pt-3 border-t-2 border-gray-200 space-y-2">
+                            {/* TOTAL DE AIHs - LINHA 1 */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-3 border-2 border-emerald-200">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-emerald-900 uppercase tracking-wide">Total AIHs</span>
+                                  <span className="text-base font-black text-emerald-700">{formatCurrency(doctorStats.totalValue)}</span>
+                                </div>
+                              </div>
+                              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border-2 border-blue-200">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-blue-900 uppercase tracking-wide">Incremento</span>
+                                  <span className="text-base font-black text-blue-700">{(() => {
+                                    const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
+                                    if (!doctorCovered) return '-';
+                                    const increment = (doctor.patients || []).reduce((acc, p) => (
+                                      acc + computeIncrementForProcedures(p.procedures as any, (p as any)?.aih_info?.care_character, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id)
+                                    ), 0);
+                                    return increment > 0 ? formatCurrency(increment) : '-';
+                                  })()}</span>
+                                </div>
+                              </div>
+                              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-3 border-2 border-purple-200">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-purple-900 uppercase tracking-wide">c/ Opera Paraná</span>
+                                  <span className="text-base font-black text-purple-700">{(() => {
+                                    const baseTotal = doctorStats.totalValue || 0;
+                                    const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
+                                    if (!doctorCovered) return '-';
+                                    const increment = (doctor.patients || []).reduce((acc, p) => (
+                                      acc + computeIncrementForProcedures(p.procedures as any, (p as any)?.aih_info?.care_character, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id)
+                                    ), 0);
+                                    return increment > 0 ? formatCurrency(baseTotal + increment) : '-';
+                                  })()}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* PAGAMENTO MÉDICO - DESTAQUE ESPECIAL */}
+                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border-2 border-green-300 shadow-sm">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <DollarSign className="h-5 w-5 text-green-600" />
+                                  <span className="text-sm font-bold text-green-900 uppercase tracking-wide">Pagamento Médico</span>
+                                </div>
+                                <span className="text-xl font-black text-green-700">{doctorStats.calculatedPaymentValue > 0 ? formatCurrency(doctorStats.calculatedPaymentValue) : formatCurrency(doctorStats.medicalProceduresValue)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* BOTÕES DE AÇÃO - GRID HORIZONTAL */}
+                          <div className="mt-4 pt-3 border-t border-gray-100">
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                                   <Button
                                     type="button"
                                     onClick={(e) => {
@@ -3461,90 +3553,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     <FileText className="h-4 w-4" />
                                     Protocolo Atendimento Atual
                                   </Button>
-                                 </div>
-                               </div>
-                            </div>
-                            
-                            {/* ✅ ESTATÍSTICAS DO MÉDICO - DESIGN ULTRA COMPACTO COM CORES SUAVES */}
-                            <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow className="bg-slate-50">
-                                    <TableHead>Indicador</TableHead>
-                                    <TableHead>Valor</TableHead>
-                                    <TableHead>Valor Incremento</TableHead>
-                                    <TableHead>Valor c/ Opera Paraná</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {/* 1) Hospital */}
-                                  <TableRow>
-                                    <TableCell className="font-medium">Hospital</TableCell>
-                                    <TableCell className="font-bold">{(() => {
-                                    const hospitals = doctor.hospitals;
-                                    if (hospitals && hospitals.length > 0) {
-                                      const primaryHospital = hospitals.find((h: any) => h.is_primary_hospital);
-                                      const hospital = primaryHospital || hospitals[0];
-                                      return hospital.hospital_name;
-                                    }
-                                    return 'Não definido';
-                                    })()}</TableCell>
-                                    <TableCell></TableCell>
-                                    <TableCell></TableCell>
-                                  </TableRow>
-                                  {/* 2) Pacientes Atendidos */}
-                                  <TableRow>
-                                    <TableCell className="font-medium">Pacientes Atendidos</TableCell>
-                                    <TableCell className="font-bold">{doctorStats.totalAIHs}</TableCell>
-                                    <TableCell></TableCell>
-                                    <TableCell></TableCell>
-                                  </TableRow>
-                                  {/* 3) Procedimentos */}
-                                  <TableRow>
-                                    <TableCell className="font-medium">Procedimentos</TableCell>
-                                    <TableCell className="font-bold">{doctorStats.totalProcedures}</TableCell>
-                                    <TableCell></TableCell>
-                                    <TableCell></TableCell>
-                                  </TableRow>
-                                  {/* 4) Total de AIHs */}
-                                  <TableRow>
-                                    <TableCell className="font-medium">Total de AIHs</TableCell>
-                                    <TableCell className="font-bold">{formatCurrency(doctorStats.totalValue)}</TableCell>
-                                    <TableCell className="font-bold">{(() => {
-                                       const baseTotal = doctorStats.totalValue || 0;
-                                       const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
-                                       if (!doctorCovered) return '-';
-                                       const increment = (doctor.patients || []).reduce((acc, p) => (
-                                         acc + computeIncrementForProcedures(p.procedures as any, (p as any)?.aih_info?.care_character, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id)
-                                       ), 0);
-                                       return increment > 0 ? formatCurrency(increment) : '-';
-                                     })()}</TableCell>
-                                    <TableCell className="font-bold">{(() => {
-                                       const baseTotal = doctorStats.totalValue || 0;
-                                       const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
-                                       if (!doctorCovered) return '-';
-                                       const increment = (doctor.patients || []).reduce((acc, p) => (
-                                         acc + computeIncrementForProcedures(p.procedures as any, (p as any)?.aih_info?.care_character, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id)
-                                       ), 0);
-                                       return increment > 0 ? formatCurrency(baseTotal + increment) : '-';
-                                     })()}</TableCell>
-                                  </TableRow>
-                                  {/* 5) Pagamento Médico */}
-                                  <TableRow>
-                                    <TableCell className="font-medium">Pagamento Médico</TableCell>
-                                    <TableCell className="font-bold">{doctorStats.calculatedPaymentValue > 0 ? formatCurrency(doctorStats.calculatedPaymentValue) : formatCurrency(doctorStats.medicalProceduresValue)}</TableCell>
-                                    <TableCell></TableCell>
-                                    <TableCell></TableCell>
-                                  </TableRow>
-                                  {/* 6) Ticket Médio */}
-                                  <TableRow>
-                                    <TableCell className="font-medium">Ticket Médio</TableCell>
-                                    <TableCell className="font-bold">{formatCurrency(doctorStats.avgTicket)}</TableCell>
-                                    <TableCell></TableCell>
-                                    <TableCell></TableCell>
-                                  </TableRow>
-                                </TableBody>
-                              </Table>
                             </div>
                           </div>
                         </div>
