@@ -203,11 +203,13 @@ export class DoctorsHierarchyV2Service {
       };
       (card.patients as any[]).push(patient);
 
-      // Procedimentos por paciente, se vazio usar por AIH
-      let procs = (pid && procsByPatient.get(pid)) || [];
-      if (procs.length === 0 && aih.id) {
+      // 🔧 FIX CRÍTICO: Buscar APENAS por aih_id (não por patient_id)
+      // Cada AIH tem procedimentos únicos - não misturar com outras AIHs do mesmo paciente
+      let procs: any[] = [];
+      if (aih.id) {
         procs = procsByAih.get(aih.id) || [];
       }
+      // ✅ SEM FALLBACK para patient_id! Evita mistura de procedimentos de AIHs diferentes
       if (Array.isArray(procs) && procs.length > 0) {
         const mapped: ProcedureDetail[] = procs.map((p: any) => {
           const code = p.procedure_code || '';

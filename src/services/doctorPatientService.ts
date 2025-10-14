@@ -281,17 +281,14 @@ export class DoctorPatientService {
         };
         (doctor.patients as any[]).push(patient);
 
-        // 🔧 FIX PACIENTES RECORRENTES: Usar SEMPRE procedimentos por aih_id (não por patient_id)
-        // Isso garante que pacientes com múltiplas AIHs em diferentes competências
-        // tenham apenas os procedimentos da AIH específica da competência selecionada
+        // 🔧 FIX PACIENTES RECORRENTES: Usar APENAS procedimentos por aih_id
+        // Cada AIH tem seus próprios procedimentos únicos
+        // NÃO usar fallback para patient_id (causa mistura de procedimentos de AIHs diferentes)
         let procs: any[] = [];
         if (aih.id && procsByAih.success) {
           procs = procsByAih.proceduresByAihId.get(aih.id) || [];
         }
-        // Fallback: se não encontrou por AIH, tentar por patient_id
-        if (procs.length === 0) {
-          procs = procsByPatient.get(patientId) || [];
-        }
+        // ✅ SEM FALLBACK! Se não tem por aih_id, a AIH fica sem procedimentos (correto)
         const mapped = procs.map((p: any) => {
           const code = p.procedure_code || '';
           const cbo = p.professional_cbo || '';

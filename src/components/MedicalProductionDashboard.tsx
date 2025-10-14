@@ -2864,8 +2864,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         
                                         const doctorName = doctor.doctor_info?.name || 'Médico';
                                         const hospitalName = doctor.hospitals?.[0]?.hospital_name || 'Hospital';
+                                        const competenciaLabel = selectedCompetencia && selectedCompetencia !== 'all' 
+                                          ? formatCompetencia(selectedCompetencia) 
+                                          : 'Todas as competências';
                                         
                                         console.log(`📋 [PROTOCOLO] Gerando protocolo de atendimento aprovado para ${doctorName}`);
+                                        console.log(`📋 [PROTOCOLO] Competência: ${competenciaLabel}`);
                                         console.log(`📋 [PROTOCOLO] Usando MESMA lógica do Relatório Pacientes Geral`);
                                         
                                         // ✅ Usar a mesma fonte de dados e filtros do Relatório Pacientes Geral
@@ -2873,6 +2877,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         let idx = 1;
                                         let totalProcsFound = 0;
                                         let totalProcsFiltered = 0;
+                                        let aihsWithoutMainProcedure = 0;
                                         
                                         (doctor.patients || []).forEach((p: any) => {
                                           const patientName = p.patient_info?.name || 'Paciente';
@@ -2884,22 +2889,27 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           const procedures = p.procedures || [];
                                           totalProcsFound += procedures.length;
                                           
-                                          // 🎯 NOVO: Flag para pegar apenas o PRIMEIRO procedimento não-anestesista por paciente
-                                          let firstProcedureAdded = false;
+                                          // 🎯 Buscar o PRIMEIRO procedimento principal não-anestesista
+                                          let mainProcedure = null;
                                           
                                           if (procedures.length > 0) {
-                                            procedures.forEach((proc: any) => {
-                                              // ⏭️ Pular se já adicionamos um procedimento para este paciente
-                                              if (firstProcedureAdded) return;
-                                              
-                                              // ✅ FILTRO ADICIONAL: Apenas registration_instrument 03 E CBO ≠ 225151
+                                            for (const proc of procedures) {
+                                              // ✅ FILTRO: registration_instrument 03 OU 02/03 E CBO ≠ 225151
                                               const regInstrument = (proc.registration_instrument || '').toString().trim();
                                               const cbo = (proc.cbo || proc.professional_cbo || '').toString().trim();
                                               
-                                              // Verificar se é procedimento principal (03)
-                                              const isMainProcedure = regInstrument === '03 - AIH (Proc. Principal)' || 
-                                                                     regInstrument === '03' ||
-                                                                     regInstrument.startsWith('03 -');
+                                              // 🆕 REGRA ATUALIZADA: Verificar se é procedimento principal
+                                              // Aceita: "03 - AIH (Proc. Principal)" OU "02 - BPA (Individualizado) / 03 - AIH (Proc. Principal)"
+                                              const isMainProcedureType03 = regInstrument === '03 - AIH (Proc. Principal)' || 
+                                                                           regInstrument === '03' ||
+                                                                           regInstrument.startsWith('03 -');
+                                              
+                                              const isMainProcedureType02_03 = regInstrument === '02 - BPA (Individualizado) / 03 - AIH (Proc. Principal)' ||
+                                                                               regInstrument === '02/03' ||
+                                                                               regInstrument.includes('02 - BPA') ||
+                                                                               (regInstrument.startsWith('02') && regInstrument.includes('03'));
+                                              
+                                              const isMainProcedure = isMainProcedureType03 || isMainProcedureType02_03;
                                               
                                               // Verificar se NÃO é anestesista
                                               const isNotAnesthetist = cbo !== '225151';
@@ -2907,39 +2917,48 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               // 🔍 DEBUG detalhado
                                               if (isMainProcedure) {
                                                 const procCode = proc.procedure_code || '';
-                                                console.log(`📋 [FILTRO] ${procCode} | Reg: "${regInstrument}" | CBO: "${cbo}" | PassaFiltro: ${isNotAnesthetist} | JáAdicionado: ${firstProcedureAdded}`);
+                                                console.log(`📋 [FILTRO] ${procCode} | Reg: "${regInstrument}" | CBO: "${cbo}" | PassaFiltro: ${isNotAnesthetist} | Tipo: ${isMainProcedureType03 ? '03' : '02/03'}`);
                                               }
                                               
-                                              // ✅ Aplicar filtro: APENAS procedimentos principais (03) que NÃO são de anestesista
-                                              // 🎯 E apenas o PRIMEIRO que passar no filtro
-                                              if (isMainProcedure && isNotAnesthetist && !firstProcedureAdded) {
+                                              // Se passar no filtro, pegar este procedimento e parar
+                                              if (isMainProcedure && isNotAnesthetist) {
                                                 totalProcsFiltered++;
-                                                
-                                                // 🔧 PADRONIZAÇÃO: Remover "." e "-" do código (igual ao relatório geral)
                                                 const procCodeRaw = proc.procedure_code || '';
                                                 const procCode = procCodeRaw.replace(/[.\-]/g, '');
-                                                
                                                 const procDesc = (proc.procedure_description || proc.sigtap_description || '-').toString();
                                                 
-                                                protocolData.push([
-                                                  idx++,
-                                                  medicalRecord,
-                                                  patientName,
-                                                  procCode, // ✅ Código padronizado sem "." e "-"
-                                                  procDesc.substring(0, 60),
-                                                  dischargeLabel // ✅ Apenas Data Alta
-                                                ]);
+                                                mainProcedure = {
+                                                  code: procCode,
+                                                  description: procDesc.substring(0, 60)
+                                                };
                                                 
-                                                // 🎯 Marcar que já adicionamos o primeiro procedimento
-                                                firstProcedureAdded = true;
-                                                console.log(`✅ [PROTOCOLO] Primeiro procedimento adicionado: ${procCode} - ${patientName}`);
+                                                console.log(`✅ [PROTOCOLO] Primeiro procedimento encontrado: ${procCode} - ${patientName} (${isMainProcedureType03 ? 'Reg 03' : 'Reg 02/03'})`);
+                                                break; // Pegar apenas o primeiro
                                               }
-                                            });
+                                            }
+                                          }
+                                          
+                                          // 🔧 CORREÇÃO CRÍTICA: SEMPRE adicionar AIH ao relatório
+                                          // Mesmo que não tenha procedimento principal válido
+                                          protocolData.push([
+                                            idx++,
+                                            medicalRecord,
+                                            patientName,
+                                            mainProcedure?.code || '-',                    // Se não encontrou, mostrar "-"
+                                            mainProcedure?.description || 'Sem proc. principal', // Se não encontrou, mensagem clara
+                                            dischargeLabel
+                                          ]);
+                                          
+                                          if (!mainProcedure) {
+                                            aihsWithoutMainProcedure++;
+                                            console.log(`⚠️ [PROTOCOLO] AIH sem procedimento principal: ${patientName} - incluída mesmo assim`);
                                           }
                                         });
                                         
                                         console.log(`📋 [PROTOCOLO] Total de procedimentos encontrados: ${totalProcsFound}`);
-                                        console.log(`📋 [PROTOCOLO] Total após filtro (Reg 03 + CBO ≠ 225151): ${totalProcsFiltered}`);
+                                        console.log(`📋 [PROTOCOLO] Total após filtro (Reg 03 ou 02/03 + CBO ≠ 225151): ${totalProcsFiltered}`);
+                                        console.log(`📋 [PROTOCOLO] Total de AIHs no relatório: ${protocolData.length}`);
+                                        console.log(`📋 [PROTOCOLO] AIHs sem procedimento principal: ${aihsWithoutMainProcedure}`);
                                         
                                         // Ordenar por data de alta (mais antiga primeiro)
                                         protocolData.sort((a, b) => {
@@ -3020,7 +3039,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         doc.setFont('helvetica', 'normal');
                                         doc.text(hospitalName, 60, 46);
                                         
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text('Competência:', 20, 52);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.setTextColor(0, 51, 153); // Azul
+                                        doc.text(competenciaLabel, 60, 52);
+                                        
                                         // Coluna Direita
+                                        doc.setTextColor(40, 40, 40); // Resetar cor
                                         doc.setFont('helvetica', 'bold');
                                         doc.text('Data de Emissão:', pageWidth - 110, 40);
                                         doc.setFont('helvetica', 'normal');
@@ -3037,7 +3063,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         // ========================================
                                         
                                         autoTable(doc, {
-                                          startY: 54,
+                                          startY: 60,
                                           head: [[
                                             '#',
                                             'Prontuário',
@@ -3114,7 +3140,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         doc.save(fileName);
                                         
                                         console.log(`✅ [PROTOCOLO] Gerado: ${fileName} - ${protocolData.length} atendimentos`);
-                                        toast.success(`Protocolo de Atendimento Aprovado gerado! ${protocolData.length} atendimento(s) registrado(s).`);
+                                        
+                                        // Notificação informativa
+                                        if (aihsWithoutMainProcedure > 0) {
+                                          toast.success(`Protocolo gerado! ${protocolData.length} atendimento(s). ${aihsWithoutMainProcedure} sem proc. principal (incluídos com "-").`);
+                                        } else {
+                                          toast.success(`Protocolo de Atendimento Aprovado gerado! ${protocolData.length} atendimento(s) registrado(s).`);
+                                        }
                                       } catch (err) {
                                         console.error('❌ [PROTOCOLO] Erro ao gerar:', err);
                                         toast.error('Erro ao gerar protocolo de atendimento');
