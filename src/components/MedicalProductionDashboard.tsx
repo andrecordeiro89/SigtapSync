@@ -2894,22 +2894,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           
                                           if (procedures.length > 0) {
                                             for (const proc of procedures) {
-                                              // ✅ FILTRO: registration_instrument 03 OU 02/03 E CBO ≠ 225151
                                               const regInstrument = (proc.registration_instrument || '').toString().trim();
                                               const cbo = (proc.cbo || proc.professional_cbo || '').toString().trim();
                                               
-                                              // 🆕 REGRA ATUALIZADA: Verificar se é procedimento principal
-                                              // Aceita: "03 - AIH (Proc. Principal)" OU "02 - BPA (Individualizado) / 03 - AIH (Proc. Principal)"
-                                              const isMainProcedureType03 = regInstrument === '03 - AIH (Proc. Principal)' || 
-                                                                           regInstrument === '03' ||
-                                                                           regInstrument.startsWith('03 -');
-                                              
-                                              const isMainProcedureType02_03 = regInstrument === '02 - BPA (Individualizado) / 03 - AIH (Proc. Principal)' ||
-                                                                               regInstrument === '02/03' ||
-                                                                               regInstrument.includes('02 - BPA') ||
-                                                                               (regInstrument.startsWith('02') && regInstrument.includes('03'));
-                                              
-                                              const isMainProcedure = isMainProcedureType03 || isMainProcedureType02_03;
+                                              // 🎯 REGRA SIMPLIFICADA: Procedimento principal = CONTÉM "03" no instrumento de registro
+                                              // Exemplos que passam:
+                                              // - "03 - AIH (Proc. Principal)" ✅
+                                              // - "02 - BPA (Individualizado) / 03 - AIH (Proc. Principal)" ✅
+                                              // - "03" ✅
+                                              // - Qualquer variação com "03" ✅
+                                              const isMainProcedure = regInstrument.includes('03');
                                               
                                               // Verificar se NÃO é anestesista
                                               const isNotAnesthetist = cbo !== '225151';
@@ -2917,7 +2911,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               // 🔍 DEBUG detalhado
                                               if (isMainProcedure) {
                                                 const procCode = proc.procedure_code || '';
-                                                console.log(`📋 [FILTRO] ${procCode} | Reg: "${regInstrument}" | CBO: "${cbo}" | PassaFiltro: ${isNotAnesthetist} | Tipo: ${isMainProcedureType03 ? '03' : '02/03'}`);
+                                                console.log(`📋 [FILTRO] ${procCode} | Reg: "${regInstrument}" | CBO: "${cbo}" | PassaFiltro: ${isNotAnesthetist}`);
                                               }
                                               
                                               // Se passar no filtro, pegar este procedimento e parar
@@ -2932,7 +2926,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   description: procDesc.substring(0, 60)
                                                 };
                                                 
-                                                console.log(`✅ [PROTOCOLO] Primeiro procedimento encontrado: ${procCode} - ${patientName} (${isMainProcedureType03 ? 'Reg 03' : 'Reg 02/03'})`);
+                                                console.log(`✅ [PROTOCOLO] Primeiro procedimento encontrado: ${procCode} - ${patientName} (Reg: ${regInstrument})`);
                                                 break; // Pegar apenas o primeiro
                                               }
                                             }
@@ -2956,7 +2950,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         });
                                         
                                         console.log(`📋 [PROTOCOLO] Total de procedimentos encontrados: ${totalProcsFound}`);
-                                        console.log(`📋 [PROTOCOLO] Total após filtro (Reg 03 ou 02/03 + CBO ≠ 225151): ${totalProcsFiltered}`);
+                                        console.log(`📋 [PROTOCOLO] Total após filtro (contém "03" + CBO ≠ 225151): ${totalProcsFiltered}`);
                                         console.log(`📋 [PROTOCOLO] Total de AIHs no relatório: ${protocolData.length}`);
                                         console.log(`📋 [PROTOCOLO] AIHs sem procedimento principal: ${aihsWithoutMainProcedure}`);
                                         
