@@ -3152,118 +3152,133 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                    Protocolo de Atendimento Aprovado
                                   </Button>
                                   
+                                  {/* ✅ NOVO: PROTOCOLO DE ATENDIMENTO ATUAL */}
                                   <Button
                                     type="button"
-                                    onClick={(e) => {
+                                    onClick={async (e) => {
                                       e.stopPropagation();
                                       try {
-                                        const rows: Array<Array<string | number>> = [];
-                                        // ✅ RELATÓRIO DE ANESTESISTAS: Foco em CONTAGEM de procedimentos
-                                        const header = [
-                                          '#', 
-                                          'Nome do Paciente', 
-                                          'Nº AIH',
-                                          'Código Proc. Anestésico',
-                                          'Descrição Proc. Anestésico',
-                                          'Data Procedimento',
-                                          'Data Alta (SUS)',
-                                          'Anestesista',
-                                          'CBO',
-                                          'Médico Cirurgião',
-                                          'Hospital'
-                                        ];
+                                        // 🖼️ Carregar logo do CIS
+                                        let logoBase64 = null;
+                                        try {
+                                          const response = await fetch('/CIS Sem fundo.jpg');
+                                          const blob = await response.blob();
+                                          logoBase64 = await new Promise<string>((resolve) => {
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => resolve(reader.result as string);
+                                            reader.readAsDataURL(blob);
+                                          });
+                                        } catch (error) {
+                                          console.error('⚠️ [PROTOCOLO ATUAL] Erro ao carregar logo:', error);
+                                        }
+                                        
+                                        const doctorName = doctor.doctor_info?.name || 'Médico';
+                                        const hospitalName = doctor.hospitals?.[0]?.hospital_name || 'Hospital';
+                                        const competenciaLabel = selectedCompetencia && selectedCompetencia !== 'all' 
+                                          ? formatCompetencia(selectedCompetencia) 
+                                          : 'Todas as competências';
+                                        
+                                        console.log(`📋 [PROTOCOLO ATUAL] Gerando protocolo para ${doctorName}`);
+                                        console.log(`📋 [PROTOCOLO ATUAL] Competência: ${competenciaLabel}`);
+                                        
+                                        // ✅ LÓGICA ESPECÍFICA: Filtrar apenas pacientes cujo mês de alta = mês da competência
+                                        const protocolData: any[] = [];
                                         let idx = 1;
-                                        const doctorName = doctor.doctor_info?.name || '';
-                                        const hospitalName = doctor.hospitals?.[0]?.hospital_name || '';
+                                        let totalPatientsProcessed = 0;
+                                        let patientsIncluded = 0;
+                                        let patientsExcluded = 0;
+                                        let aihsWithoutMainProcedure = 0;
                                         
-                                        console.log(`🎯 [RELATÓRIO ANESTESISTAS] Gerando para médico: ${doctorName}`);
-                                        console.log(`🎯 [RELATÓRIO ANESTESISTAS] Sem filtro de data`);
+                                        // Extrair ano e mês da competência selecionada
+                                        let competenciaYear: number | null = null;
+                                        let competenciaMonth: number | null = null;
                                         
-                                        let totalAnesthesiaProcedures = 0;
+                                        if (selectedCompetencia && selectedCompetencia !== 'all') {
+                                          const match = selectedCompetencia.match(/^(\d{4})-(\d{2})/);
+                                          if (match) {
+                                            competenciaYear = parseInt(match[1]);
+                                            competenciaMonth = parseInt(match[2]);
+                                            console.log(`📅 [PROTOCOLO ATUAL] Filtro: Ano=${competenciaYear}, Mês=${competenciaMonth}`);
+                                          }
+                                        }
                                         
                                         (doctor.patients || []).forEach((p: any) => {
-                                          // ✅ FILTRO UNIFICADO: Intervalo de datas
-                                          if (false) {
-                                            const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
-                                            
-                                            if (!discharge) return;
-                                            
-                                            const startOfPeriod = new Date();
-                                            const endOfPeriod = new Date();
-                                            
-                                            const dischargeDate = new Date(discharge);
-                                            
-                                            if (dischargeDate < startOfPeriod || dischargeDate > endOfPeriod) {
-                                              return;
+                                          totalPatientsProcessed++;
+                                          
+                                          const dischargeISO = p?.aih_info?.discharge_date || '';
+                                          
+                                          // 🔍 FILTRO CRÍTICO: Verificar se o mês de alta = mês da competência
+                                          if (competenciaYear !== null && competenciaMonth !== null && dischargeISO) {
+                                            const dischargeMatch = dischargeISO.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                                            if (dischargeMatch) {
+                                              const dischargeYear = parseInt(dischargeMatch[1]);
+                                              const dischargeMonth = parseInt(dischargeMatch[2]);
+                                              
+                                              // Se mês/ano de alta DIFERENTE da competência, EXCLUIR
+                                              if (dischargeYear !== competenciaYear || dischargeMonth !== competenciaMonth) {
+                                                console.log(`⏭️ [PROTOCOLO ATUAL] Excluindo: ${p.patient_info?.name} - Alta: ${dischargeMonth}/${dischargeYear}, Competência: ${competenciaMonth}/${competenciaYear}`);
+                                                patientsExcluded++;
+                                                return; // Pular este paciente
+                                              }
                                             }
                                           }
                                           
-                                          const name = p.patient_info?.name || 'Paciente';
-                                          const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
-                                          const aih = aihRaw || 'Aguardando geração';
-                                          const disISO = p?.aih_info?.discharge_date || '';
-                                          const disLabel = disISO
-                                            ? parseISODateToLocal(disISO)
-                                            : '';
+                                          patientsIncluded++;
                                           
-                                          // ✅ FILTRAR APENAS PROCEDIMENTOS ANESTÉSICOS
+                                          const patientName = p.patient_info?.name || 'Paciente';
+                                          const medicalRecord = p.patient_info?.medical_record || '-';
+                                          const dischargeLabel = parseISODateToLocal(dischargeISO);
+                                          
+                                          // Buscar procedimento principal (mesma lógica do Protocolo de Atendimento Aprovado)
                                           const procedures = p.procedures || [];
-                                          const anesthesiaProcedures = procedures.filter((proc: any) => {
-                                            const cbo = proc.cbo;
-                                            const procCode = proc.procedure_code || '';
-                                            
-                                            // Verificar se é anestesista (CBO 225151)
-                                            if (cbo !== '225151') return false;
-                                            
-                                            // Procedimentos 03.xxx sempre são contados
-                                            if (procCode.startsWith('03')) return true;
-                                            
-                                            // Exceções de cesarianas (04.17.01.001-0 e 04.17.01.005-2)
-                                            if (procCode === '04.17.01.001-0' || procCode === '04.17.01.005-2') return true;
-                                            
-                                            // Demais procedimentos 04.xxx de anestesistas NÃO são contados
-                                            return false;
-                                          });
+                                          let mainProcedure = null;
                                           
-                                          // ✅ GERAR UMA LINHA PARA CADA PROCEDIMENTO ANESTÉSICO
-                                          if (anesthesiaProcedures.length > 0) {
-                                            anesthesiaProcedures.forEach((proc: any) => {
-                                              const procCode = proc.procedure_code || '';
-                                              const procDesc = proc.procedure_description || proc.sigtap_description || '';
-                                              const procDate = proc.procedure_date || '';
-                                              const procDateLabel = procDate 
-                                                ? (() => { 
-                                                    const s = String(procDate); 
-                                                    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); 
-                                                    return m ? `${m[3]}/${m[2]}/${m[1]}` : parseISODateToLocal(s); 
-                                                  })()
-                                                : '';
-                                              const anesthetistName = proc.professional_name || 'Anestesista não identificado';
-                                              const cbo = proc.cbo || '225151';
+                                          if (procedures.length > 0) {
+                                            for (const proc of procedures) {
+                                              const regInstrument = (proc.registration_instrument || '').toString().trim();
+                                              const cbo = (proc.cbo || proc.professional_cbo || '').toString().trim();
                                               
-                                              rows.push([
-                                                idx++,
-                                                name,
-                                                aih,
-                                                procCode,
-                                                procDesc,
-                                                procDateLabel,
-                                                disLabel,
-                                                anesthetistName,
-                                                cbo,
-                                                doctorName,
-                                                hospitalName
-                                              ]);
+                                              const isMainProcedure = regInstrument.includes('03');
+                                              const isNotAnesthetist = cbo !== '225151';
                                               
-                                              totalAnesthesiaProcedures++;
-                                            });
+                                              if (isMainProcedure && isNotAnesthetist) {
+                                                const procCodeRaw = proc.procedure_code || '';
+                                                const procCode = procCodeRaw.replace(/[.\-]/g, '');
+                                                const procDesc = (proc.procedure_description || proc.sigtap_description || '-').toString();
+                                                
+                                                mainProcedure = {
+                                                  code: procCode,
+                                                  description: procDesc.substring(0, 60)
+                                                };
+                                                break;
+                                              }
+                                            }
+                                          }
+                                          
+                                          // Adicionar ao relatório
+                                          protocolData.push([
+                                            idx++,
+                                            medicalRecord,
+                                            patientName,
+                                            mainProcedure?.code || '-',
+                                            mainProcedure?.description || 'Sem proc. principal',
+                                            dischargeLabel
+                                          ]);
+                                          
+                                          if (!mainProcedure) {
+                                            aihsWithoutMainProcedure++;
                                           }
                                         });
                                         
-                                        // ✅ ORDENAÇÃO: Por Data de Alta (mais recente primeiro)
-                                        rows.sort((a, b) => {
-                                          const dateA = a[6] as string; // Data Alta está na posição 6
-                                          const dateB = b[6] as string;
+                                        console.log(`📋 [PROTOCOLO ATUAL] Total de pacientes processados: ${totalPatientsProcessed}`);
+                                        console.log(`📋 [PROTOCOLO ATUAL] Pacientes incluídos (alta na competência): ${patientsIncluded}`);
+                                        console.log(`📋 [PROTOCOLO ATUAL] Pacientes excluídos (alta em outro mês): ${patientsExcluded}`);
+                                        console.log(`📋 [PROTOCOLO ATUAL] AIHs sem procedimento principal: ${aihsWithoutMainProcedure}`);
+                                        
+                                        // Ordenar por data de alta (mais antiga primeiro)
+                                        protocolData.sort((a, b) => {
+                                          const dateA = a[5] as string;
+                                          const dateB = b[5] as string;
                                           
                                           if (!dateA && !dateB) return 0;
                                           if (!dateA) return 1;
@@ -3280,45 +3295,171 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           const parsedDateA = parseDate(dateA);
                                           const parsedDateB = parseDate(dateB);
                                           
-                                          return parsedDateB.getTime() - parsedDateA.getTime();
+                                          return parsedDateA.getTime() - parsedDateB.getTime();
                                         });
                                         
                                         // Renumerar após ordenação
-                                        rows.forEach((row, index) => {
+                                        protocolData.forEach((row, index) => {
                                           row[0] = index + 1;
                                         });
                                         
-                                        console.log(`🎯 [RELATÓRIO ANESTESISTAS] Total de procedimentos anestésicos: ${totalAnesthesiaProcedures}`);
-                                        console.log(`🎯 [RELATÓRIO ANESTESISTAS] Total de linhas geradas: ${rows.length} (ordenadas por data de alta DESC)`);
+                                        // Criar PDF
+                                        const doc = new jsPDF('landscape');
+                                        const pageWidth = doc.internal.pageSize.getWidth();
                                         
-                                        const wb = XLSX.utils.book_new();
-                                        const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-                                        (ws as any)['!cols'] = [
-                                          { wch: 5 },   // #
-                                          { wch: 35 },  // Nome do Paciente
-                                          { wch: 18 },  // Nº AIH
-                                          { wch: 20 },  // Código Proc. Anestésico
-                                          { wch: 45 },  // Descrição Proc. Anestésico
-                                          { wch: 16 },  // Data Procedimento
-                                          { wch: 16 },  // Data Alta (SUS)
-                                          { wch: 35 },  // Anestesista
-                                          { wch: 12 },  // CBO
-                                          { wch: 30 },  // Médico Cirurgião
-                                          { wch: 35 },  // Hospital
-                                        ];
-                                        XLSX.utils.book_append_sheet(wb, ws, 'Anestesistas');
-                                        const fileName = `Relatorio_Anestesistas_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
-                                        XLSX.writeFile(wb, fileName);
-                                        toast.success(`Relatório de anestesistas gerado! ${totalAnesthesiaProcedures} procedimento(s).`);
+                                        // Logo
+                                        if (logoBase64) {
+                                          const logoWidth = 40;
+                                          const logoHeight = 20;
+                                          const logoX = 20;
+                                          const logoY = 8;
+                                          doc.addImage(logoBase64, 'JPEG', logoX, logoY, logoWidth, logoHeight);
+                                        }
+                                        
+                                        // Título
+                                        doc.setFontSize(16);
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.setTextColor(0, 51, 102);
+                                        doc.text('PROTOCOLO DE ATENDIMENTO ATUAL', pageWidth / 2, 18, { align: 'center' });
+                                        
+                                        // Subtítulo
+                                        doc.setFontSize(10);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.setTextColor(60, 60, 60);
+                                        doc.text('CIS - Centro Integrado em Saúde', pageWidth / 2, 25, { align: 'center' });
+                                        
+                                        // Linha divisória
+                                        doc.setDrawColor(0, 51, 102);
+                                        doc.setLineWidth(1);
+                                        doc.line(20, 32, pageWidth - 20, 32);
+                                        
+                                        // Informações do protocolo
+                                        doc.setFontSize(9);
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.setTextColor(40, 40, 40);
+                                        
+                                        doc.text('Médico Responsável:', 20, 40);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.text(doctorName, 60, 40);
+                                        
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text('Instituição:', 20, 46);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.text(hospitalName, 60, 46);
+                                        
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text('Competência:', 20, 52);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.setTextColor(0, 51, 153);
+                                        doc.text(competenciaLabel, 60, 52);
+                                        
+                                        // Coluna Direita
+                                        doc.setTextColor(40, 40, 40);
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text('Data de Emissão:', pageWidth - 110, 40);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.text(formatDateFns(new Date(), 'dd/MM/yyyy HH:mm'), pageWidth - 60, 40);
+                                        
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text('Total de Atendimentos:', pageWidth - 110, 46);
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.setTextColor(0, 102, 51);
+                                        doc.text(protocolData.length.toString(), pageWidth - 35, 46);
+                                        
+                                        // ✅ NOVO: Destacar critério de filtro
+                                        doc.setTextColor(204, 0, 0); // Vermelho
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.setFontSize(8);
+                                        doc.text('* Alta na competência atual', pageWidth - 110, 52);
+                                        
+                                        // Tabela
+                                        autoTable(doc, {
+                                          startY: 60,
+                                          head: [[
+                                            '#',
+                                            'Prontuário',
+                                            'Nome do Paciente',
+                                            'Código',
+                                            'Descrição do Procedimento',
+                                            'Data Alta'
+                                          ]],
+                                          body: protocolData,
+                                          styles: {
+                                            fontSize: 8,
+                                            cellPadding: 2,
+                                            lineColor: [220, 220, 220],
+                                            lineWidth: 0.1,
+                                          },
+                                          headStyles: {
+                                            fillColor: [0, 51, 102],
+                                            textColor: [255, 255, 255],
+                                            fontStyle: 'bold',
+                                            halign: 'center',
+                                            fontSize: 8,
+                                          },
+                                          columnStyles: {
+                                            0: { cellWidth: 10, halign: 'center' },
+                                            1: { cellWidth: 22, halign: 'center' },
+                                            2: { cellWidth: 65, halign: 'left' },
+                                            3: { cellWidth: 28, halign: 'center' },
+                                            4: { cellWidth: 115, halign: 'left' },
+                                            5: { cellWidth: 24, halign: 'center' }
+                                          },
+                                          alternateRowStyles: {
+                                            fillColor: [248, 248, 248]
+                                          },
+                                          margin: { left: 15, right: 15 }
+                                        });
+                                        
+                                        // Rodapé
+                                        const pageCount = (doc as any).internal.getNumberOfPages();
+                                        for (let i = 1; i <= pageCount; i++) {
+                                          doc.setPage(i);
+                                          const pageHeight = doc.internal.pageSize.getHeight();
+                                          
+                                          doc.setDrawColor(200, 200, 200);
+                                          doc.setLineWidth(0.3);
+                                          doc.line(20, pageHeight - 18, pageWidth - 20, pageHeight - 18);
+                                          
+                                          doc.setFontSize(7);
+                                          doc.setTextColor(100, 100, 100);
+                                          doc.setFont('helvetica', 'normal');
+                                          doc.text(
+                                            'CIS - Centro Integrado em Saúde | Protocolo de Atendimento Atual',
+                                            20,
+                                            pageHeight - 12
+                                          );
+                                          
+                                          doc.setFont('helvetica', 'bold');
+                                          doc.text(
+                                            `Página ${i} de ${pageCount}`,
+                                            pageWidth - 20,
+                                            pageHeight - 12,
+                                            { align: 'right' }
+                                          );
+                                        }
+                                        
+                                        // Salvar PDF
+                                        const fileName = `Protocolo_Atendimento_Atual_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`;
+                                        doc.save(fileName);
+                                        
+                                        console.log(`✅ [PROTOCOLO ATUAL] Gerado: ${fileName}`);
+                                        
+                                        // Toast
+                                        if (patientsExcluded > 0) {
+                                          toast.success(`Protocolo Atual gerado! ${protocolData.length} atendimento(s) com alta na competência. ${patientsExcluded} excluído(s) (alta em outro mês).`);
+                                        } else {
+                                          toast.success(`Protocolo de Atendimento Atual gerado! ${protocolData.length} atendimento(s) registrado(s).`);
+                                        }
                                       } catch (err) {
-                                        console.error('Erro ao exportar Relatório Anestesistas (card):', err);
-                                        toast.error('Erro ao gerar relatório de anestesistas');
+                                        console.error('❌ [PROTOCOLO ATUAL] Erro ao gerar:', err);
+                                        toast.error('Erro ao gerar protocolo de atendimento atual');
                                       }
                                     }}
-                                    className="inline-flex items-center gap-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
+                                    className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
                                   >
-                                    <FileSpreadsheet className="h-4 w-4" />
-                                    Relatório Anestesistas
+                                    <FileText className="h-4 w-4" />
+                                    Protocolo Atendimento Atual
                                   </Button>
                                  </div>
                                </div>
