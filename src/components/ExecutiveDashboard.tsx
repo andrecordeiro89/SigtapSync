@@ -29,7 +29,9 @@ import {
   ChevronDown,
   Filter,
   Search,
-  X
+  X,
+  Building,
+  Calendar
 } from 'lucide-react';
 
 // Services
@@ -949,74 +951,101 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
   return (
     <div className="w-full px-6 space-y-6">
-      {/* CABEÇALHO (Premium) */}
-      <div className="relative">
-
-        <div className="relative flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-1.5">
-              <BarChart4 className="h-9 w-9 md:h-10 md:w-10 drop-shadow-sm" />
-              <h1 className="text-3xl md:text-4xl font-black tracking-tight text-gray-900">Análise de Dados</h1>
+      {/* ✅ CABEÇALHO - DESIGN MINIMALISTA */}
+      <Card className="shadow-sm border border-slate-200 bg-white">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md">
+                <BarChart4 className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black text-gray-900">Análise de Dados</h1>
+                <p className="text-sm text-gray-500 mt-1">Central executiva de insights e relatórios</p>
+              </div>
             </div>
-            <p className="text-gray-600 text-sm md:text-base">Central executiva de insights e relatórios</p>
+            <div className="flex flex-col items-end gap-2">
+              {currentHospitalFullName && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg px-4 py-2 border-2 border-blue-200">
+                  <div className="flex items-center gap-2">
+                    <Hospital className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-bold text-blue-900">{currentHospitalFullName}</span>
+                  </div>
+                </div>
+              )}
+              {lastUpdate && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>Atualizado: {lastUpdate.toLocaleTimeString('pt-BR')}</span>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="text-right">
-            {currentHospitalFullName && (
-              <div className="inline-flex items-center justify-end gap-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200 px-3 py-1 text-xs md:text-sm font-semibold mt-1">
-                <Hospital className="h-3 w-3" />
-                {currentHospitalFullName}
-              </div>
-            )}
-            {lastUpdate && (
-              <div className="text-xs text-gray-500 mt-2 flex items-center justify-end gap-1">
-                <Clock className="h-3 w-3" />
-                Atualizado: {lastUpdate.toLocaleTimeString('pt-BR')}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+        </CardHeader>
+      </Card>
 
-
-
+      {/* ✅ ABAS - DESIGN MINIMALISTA */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 bg-blue-100">
-          <TabsTrigger value="doctors" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            <Users className="h-4 w-4 mr-2" />
-            Profissionais
-          </TabsTrigger>
-          <TabsTrigger value="procedures" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Análise de Performance
-          </TabsTrigger>
-          <TabsTrigger value="medical-staff" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-            <Users className="h-4 w-4 mr-2" />
-            Corpo Médico
-          </TabsTrigger>
-          {/* Relatórios aba removida */}
-        </TabsList>
+        <div className="bg-white rounded-xl border-2 border-gray-200 p-1.5 shadow-sm">
+          <TabsList className="grid w-full grid-cols-3 bg-transparent gap-1">
+            <TabsTrigger 
+              value="doctors" 
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all duration-200 font-semibold text-gray-600 hover:bg-gray-50"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Profissionais
+            </TabsTrigger>
+            <TabsTrigger 
+              value="procedures" 
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all duration-200 font-semibold text-gray-600 hover:bg-gray-50"
+            >
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Análise de Performance
+            </TabsTrigger>
+            <TabsTrigger 
+              value="medical-staff" 
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all duration-200 font-semibold text-gray-600 hover:bg-gray-50"
+            >
+              <Stethoscope className="h-4 w-4 mr-2" />
+              Corpo Médico
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        {/* 🔍 FILTROS EXECUTIVOS GLOBAIS - VISÍVEIS NAS ABAS MÉDICOS E PROCEDIMENTOS */}
+        {/* 🔍 FILTROS EXECUTIVOS GLOBAIS - DESIGN MINIMALISTA */}
         {(activeTab === 'doctors' || activeTab === 'procedures') && (
-        <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-blue-50/30">
+        <Card className="shadow-sm border border-slate-200 bg-white">
           <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-                  <Filter className="h-5 w-5 text-white" />
+            {/* HEADER COM DESIGN MINIMALISTA */}
+            <div className="mb-4 pb-4 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-md">
+                    <Filter className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900">Filtros de Produção Médica</h3>
+                    <p className="text-sm text-gray-500 mt-1">Ajuste os filtros para análise da produção médica</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Filtros de Produção Médica</h3>
-                  <p className="text-sm text-gray-600 mt-1">Ajuste os filtros para análise da produção médica</p>
+                <div className="flex items-center gap-2">
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg px-4 py-2 border-2 border-blue-200">
+                    <div className="text-xs font-bold text-blue-700 uppercase tracking-wide">
+                      AIHs
+                    </div>
+                    <div className="text-lg font-black text-blue-900">
+                      {medicalProductionStats ? medicalProductionStats.totalPatients : '...'}
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg px-4 py-2 border-2 border-emerald-200">
+                    <div className="text-xs font-bold text-emerald-700 uppercase tracking-wide">
+                      Pacientes
+                    </div>
+                    <div className="text-lg font-black text-emerald-900">
+                      {medicalProductionStats ? (medicalProductionStats.uniquePatients || 0) : '...'}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Badge variant="secondary" className="bg-blue-100 text-blue-800 px-3 py-2 font-medium">
-                  {medicalProductionStats ? `${medicalProductionStats.totalPatients} AIHs` : 'Carregando...'}
-                </Badge>
-                <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 px-3 py-2 font-medium">
-                  {medicalProductionStats ? `${medicalProductionStats.uniquePatients || 0} Pacientes` : 'Carregando...'}
-                </Badge>
               </div>
             </div>
             
@@ -1126,24 +1155,27 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
             {/* Abas de competência removidas conforme solicitação */}
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* FILTROS EM LINHA - DISTRIBUÍDOS SIMETRICAMENTE */}
+          <CardContent className="space-y-4">
+            {/* FILTROS EM GRID - DESIGN MINIMALISTA */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              {/* BUSCA RÁPIDA MÉDICOS */}
+              {/* BUSCAR MÉDICO */}
               <div className="w-full">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Buscar Médico</label>
+                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
+                  <Stethoscope className="h-3.5 w-3.5 text-blue-600" />
+                  Buscar Médico
+                </label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-blue-400" />
                   <Input
                     placeholder="Nome, CNS, CRM..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 h-9 border-gray-200 focus:border-blue-500 focus:ring-blue-500/20 text-sm"
+                    className="pl-10 h-10 border-2 border-gray-200 focus:border-blue-500 focus:ring-0 text-sm rounded-lg bg-white hover:border-gray-300 transition-colors"
                   />
                   {searchTerm && (
                     <button
                       onClick={() => setSearchTerm('')}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-5 h-5 flex items-center justify-center text-xs"
                       title="Limpar busca"
                     >
                       ✕
@@ -1152,21 +1184,24 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              {/* 🆕 NOVO: BUSCA POR NOME DO PACIENTE */}
+              {/* BUSCAR PACIENTE */}
               <div className="w-full">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Buscar Paciente</label>
+                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
+                  <User className="h-3.5 w-3.5 text-green-600" />
+                  Buscar Paciente
+                </label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-green-400" />
                   <Input
                     placeholder="Nome do paciente..."
                     value={patientSearchTerm}
                     onChange={(e) => setPatientSearchTerm(e.target.value)}
-                    className="pl-10 h-9 border-gray-200 focus:border-green-500 focus:ring-green-500/20 text-sm"
+                    className="pl-10 h-10 border-2 border-gray-200 focus:border-green-500 focus:ring-0 text-sm rounded-lg bg-white hover:border-gray-300 transition-colors"
                   />
                   {patientSearchTerm && (
                     <button
                       onClick={() => setPatientSearchTerm('')}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-5 h-5 flex items-center justify-center text-xs"
                       title="Limpar busca de paciente"
                     >
                       ✕
@@ -1175,9 +1210,12 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              {/* 🏥 FILTRO DE HOSPITAL */}
+              {/* FILTRO DE HOSPITAL */}
               <div className="w-full">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Hospital</label>
+                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
+                  <Building className="h-3.5 w-3.5 text-purple-600" />
+                  Hospital
+                </label>
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedHospitals[0] || 'all'}
@@ -1186,7 +1224,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       setSelectedHospitals(value === 'all' ? ['all'] : [value]);
                       setActiveHospitalTab(value === 'all' ? null : value);
                     }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-9"
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-purple-500 hover:border-gray-300 transition-colors h-10"
                   >
                     <option value="all">Todos os Hospitais</option>
                     {hospitalStats.map(hospital => (
@@ -1201,7 +1239,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                         setSelectedHospitals(['all']);
                         setActiveHospitalTab(null);
                       }}
-                      className="px-2 py-1 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors flex-shrink-0"
+                      className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0"
                       title="Limpar filtro de hospital"
                     >
                       ✕
@@ -1210,14 +1248,17 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              {/* 🗓️ FILTRO DE COMPETÊNCIA */}
+              {/* FILTRO DE COMPETÊNCIA */}
               <div className="w-full">
-                <label className="text-xs font-medium text-gray-600 uppercase tracking-wide mb-1.5 block">Competência</label>
+                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
+                  <Calendar className="h-3.5 w-3.5 text-indigo-600" />
+                  Competência
+                </label>
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedCompetency}
                     onChange={(e) => setSelectedCompetency(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors h-9"
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-indigo-500 hover:border-gray-300 transition-colors h-10"
                   >
                     <option value="all">Todas</option>
                     {availableCompetencies.map(comp => (
@@ -1229,7 +1270,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   {selectedCompetency !== 'all' && (
                     <button
                       onClick={() => setSelectedCompetency('all')}
-                      className="px-2 py-1 text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-colors flex-shrink-0"
+                      className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0"
                       title="Limpar filtro de competência"
                     >
                       ✕
@@ -1242,35 +1283,39 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {/* ✅ ABAS DE COMPETÊNCIA REMOVIDAS - Agora usa apenas dropdown */}
             {/* ✅ BARRA DE ABAS DE HOSPITAIS REMOVIDA - Agora usa dropdown acima */}
 
-            {/* INDICADORES DE FILTROS ATIVOS */}
-            {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all')) && (
-              <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                <div className="flex items-center gap-2">
+            {/* INDICADORES DE FILTROS ATIVOS - DESIGN MINIMALISTA */}
+            {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all') || selectedCompetency !== 'all') && (
+              <div className="flex items-center justify-between pt-4 border-t-2 border-gray-100">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                    Filtros Ativos:
+                  </span>
                   {searchTerm && (
-                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                      👨‍⚕️ Médico: {searchTerm}
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border-blue-200 font-medium px-2 py-1">
+                      <Stethoscope className="h-3 w-3" />
+                      {searchTerm}
                     </Badge>
                   )}
                   {patientSearchTerm && (
-                    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                      🧑‍🦱 Paciente: {patientSearchTerm}
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-green-50 text-green-700 border-green-200 font-medium px-2 py-1">
+                      <User className="h-3 w-3" />
+                      {patientSearchTerm}
                     </Badge>
                   )}
                   {!selectedHospitals.includes('all') && (
-                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                      🏥 {hospitalStats.find(h => h.id === selectedHospitals[0])?.name || 'Hospital selecionado'}
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-purple-50 text-purple-700 border-purple-200 font-medium px-2 py-1">
+                      <Building className="h-3 w-3" />
+                      {hospitalStats.find(h => h.id === selectedHospitals[0])?.name || 'Hospital'}
                     </Badge>
                   )}
-                  {false && (
-                    <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
-                      🏥 Especialidade de Atendimento: {selectedCareSpecialty}
+                  {selectedCompetency !== 'all' && (
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 border-indigo-200 font-medium px-2 py-1">
+                      <Calendar className="h-3 w-3" />
+                      {availableCompetencies.find(c => c.value === selectedCompetency)?.label || selectedCompetency}
                     </Badge>
                   )}
-                  <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                    📅 Período Personalizado
-                  </Badge>
-                  <span className="text-xs text-gray-500">
-                    Filtros ativos aplicados globalmente
+                  <span className="text-xs text-gray-400 italic">
+                    · Aplicados globalmente
                   </span>
                 </div>
               </div>

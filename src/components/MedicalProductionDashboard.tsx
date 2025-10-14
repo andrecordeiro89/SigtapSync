@@ -1707,33 +1707,46 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
       
 
-      {/* ✅ CONTROLES E FILTROS MODERNOS */}
-      <Card className="shadow-lg border-0 bg-gradient-to-br from-white to-blue-50/30">
+      {/* ✅ CABEÇALHO MINIMALISTA */}
+      <Card className="shadow-sm border border-slate-200 bg-white">
         <CardHeader className="pb-4">
           <CardTitle>
+            {/* HEADER COM DESIGN MINIMALISTA */}
+            <div className="mb-4 pb-4 border-b border-gray-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-              <Stethoscope className="h-5 w-5 text-white" />
+                  <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md">
+                    <Stethoscope className="h-6 w-6 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-xl font-bold text-gray-900">Produção Médica - Pagamentos Médicos</h3>
+                      <h3 className="text-2xl font-bold text-gray-900">Produção Médica - Pagamentos Médicos</h3>
                 <Badge 
                   variant="outline" 
-                  className="bg-gradient-to-br from-blue-50/80 to-blue-100/50 text-blue-800 border-blue-200/70 shadow-sm backdrop-blur-sm px-2.5 py-0.5 text-xs font-semibold"
+                        className="bg-blue-50 text-blue-700 border-blue-200 px-2.5 py-0.5 text-xs font-semibold"
                 >
                   {selectedHospitalName}
                 </Badge>
               </div>
-              <p className="text-sm text-gray-600 mt-1">Visualização hierárquica completa: Médicos → Pacientes → Procedimentos</p>
+                    <p className="text-sm text-gray-500 mt-1">Visualização hierárquica completa: Médicos → Pacientes → Procedimentos</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                {/* Toggle de Atualização automática ocultado */}
-                <Button variant="outline" size="sm" onClick={() => setRefreshTick(t => t + 1)}>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setRefreshTick(t => t + 1)}
+                    className="h-9 px-3"
+                  >
                   <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
                 </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* BOTÕES DE RELATÓRIO - GRID HORIZONTAL */}
+            <div className="mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 <Button
                   variant="default"
                   size="sm"
@@ -2339,27 +2352,78 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 </Button>
               </div>
             </div>
-          </CardTitle>
 
-          {/* 🧮 Totais Agregados - SIGTAP, Incrementos, Total e Pagamento Médico Total */}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div className="rounded-lg border border-slate-200 bg-white p-3">
-              <div className="text-[11px] uppercase text-slate-500">Valor Total SIGTAP</div>
-              <div className="text-xl font-extrabold text-slate-900">{formatCurrency(aggregatedOperaParanaTotals.totalBaseSigtap)}</div>
+            {/* TOTAIS AGREGADOS - CARDS COM GRADIENTES */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              {/* Valor Total SIGTAP */}
+              <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-lg p-4 border-2 border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">
+                      Valor Total SIGTAP
             </div>
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-              <div className="text-[11px] uppercase text-emerald-700">Valor Total Incrementos</div>
-              <div className="text-xl font-extrabold text-emerald-700">{formatCurrency(aggregatedOperaParanaTotals.totalIncrement)}</div>
+                    <div className="text-2xl font-black text-slate-900">
+                      {formatCurrency(aggregatedOperaParanaTotals.totalBaseSigtap)}
             </div>
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-              <div className="text-[11px] uppercase text-blue-700">Valor Total</div>
-              <div className="text-xl font-extrabold text-blue-700">{formatCurrency(aggregatedOperaParanaTotals.totalWithIncrement)}</div>
             </div>
-            <div className="rounded-lg border-2 border-green-500 bg-green-50 p-3 shadow-sm">
-              <div className="text-[11px] uppercase text-green-700">Pagamento Médico Total</div>
-              <div className="text-xl font-extrabold text-green-700">{formatCurrency(aggregatedMedicalPayments)}</div>
+                  <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-full">
+                    <Database className="h-5 w-5 text-slate-600" />
             </div>
           </div>
+              </div>
+
+              {/* Valor Total Incrementos */}
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-4 border-2 border-emerald-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-1">
+                      Incrementos
+                    </div>
+                    <div className="text-2xl font-black text-emerald-700">
+                      {formatCurrency(aggregatedOperaParanaTotals.totalIncrement)}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-full">
+                    <TrendingUp className="h-5 w-5 text-emerald-600" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Valor Total (com Opera Paraná) */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border-2 border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">
+                      Valor Total
+                    </div>
+                    <div className="text-2xl font-black text-blue-700">
+                      {formatCurrency(aggregatedOperaParanaTotals.totalWithIncrement)}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
+                    <BarChart3 className="h-5 w-5 text-blue-600" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Pagamento Médico Total - DESTAQUE */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border-2 border-green-300 shadow-md">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">
+                      Pagamento Médico Total
+                    </div>
+                    <div className="text-2xl font-black text-green-700">
+                      {formatCurrency(aggregatedMedicalPayments)}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-full">
+                    <DollarSign className="h-5 w-5 text-green-600" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
 
@@ -2472,28 +2536,28 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         >
                           {/* Ícone de expansão */}
                           <div className="flex items-center gap-2 mb-2">
-                            {isExpanded ? (
+                                  {isExpanded ? (
                               <ChevronDown className="h-4 w-4 text-slate-500 transition-transform duration-200" />
-                            ) : (
+                                  ) : (
                               <ChevronRight className="h-4 w-4 text-slate-500 transition-transform duration-200" />
-                            )}
+                                  )}
                             <span className="text-xs text-slate-500 font-medium">
                               {isExpanded ? 'Clique para recolher' : 'Clique para expandir pacientes e detalhes'}
                             </span>
-                          </div>
-
+                                </div>
+                                
                           {/* NOME DO MÉDICO - DESTAQUE */}
                           <div className="mb-3 pb-3 border-b border-gray-100">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <div className="flex items-center justify-center w-10 h-10 bg-indigo-100 rounded-full">
                                   <Stethoscope className="h-5 w-5 text-indigo-600" />
-                                </div>
+                                    </div>
                                 <div>
                                   <div className="text-lg font-bold text-gray-900">{doctor.doctor_info.name}</div>
                                   <div className="text-xs text-gray-500 font-medium">{doctor.doctor_info.specialty || '—'}</div>
-                                </div>
-                              </div>
+                                    </div>
+                                    </div>
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-semibold">
                                   {doctorStats.totalAIHs} PACIENTES
@@ -2551,15 +2615,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                               <div className="flex items-baseline gap-2">
                                 <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Regra Pagamento:</span>
                                 <span className="text-xs font-medium text-gray-900">{(() => {
-                                  const hospitalId = doctor.hospitals?.[0]?.hospital_id;
-                                  const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
-                                  if (fixedCalc.hasFixedRule) return 'Valor Fixo';
-                                  const percentageCalc = calculatePercentagePayment(doctor.doctor_info.name, doctorStats.totalValue, hospitalId);
-                                  if (percentageCalc.hasPercentageRule) return `${percentageCalc.appliedRule.match(/\d+%/)?.[0] || '65%'} do Total`;
+                                        const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                        const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
+                                        if (fixedCalc.hasFixedRule) return 'Valor Fixo';
+                                        const percentageCalc = calculatePercentagePayment(doctor.doctor_info.name, doctorStats.totalValue, hospitalId);
+                                        if (percentageCalc.hasPercentageRule) return `${percentageCalc.appliedRule.match(/\d+%/)?.[0] || '65%'} do Total`;
                                   if (doctorStats.calculatedPaymentValue > 0) return 'Regras por Proc.';
-                                  return '—';
+                                        return '—';
                                 })()}</span>
-                              </div>
+                                    </div>
                             </div>
                           </div>
 
@@ -2598,10 +2662,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     ), 0);
                                     return increment > 0 ? formatCurrency(baseTotal + increment) : '-';
                                   })()}</span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-
+                              
                             {/* PAGAMENTO MÉDICO - DESTAQUE ESPECIAL */}
                             <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border-2 border-green-300 shadow-sm">
                               <div className="flex items-center justify-between">
@@ -3349,7 +3413,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           
                                           // Adicionar ao relatório
                                           protocolData.push([
-                                            idx++,
+                                                idx++,
                                             medicalRecord,
                                             patientName,
                                             mainProcedure?.code || '-',
