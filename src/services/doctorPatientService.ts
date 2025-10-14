@@ -40,6 +40,7 @@ export interface PatientWithProcedures {
     care_character?: string;
     hospital_id?: string;
     competencia?: string; // ✅ NOVO: Competência da AIH
+    pgt_adm?: 'sim' | 'não'; // ✅ NOVO: Pagamento Administrativo
   };
   // 🆕 Nome Comum de procedimentos (rótulo amigável): ex. "A+A"
   common_name?: string | null;
@@ -131,6 +132,7 @@ export class DoctorPatientService {
           calculated_total_value,
           cns_responsavel,
           competencia,
+          pgt_adm,
           patients (
             id,
             name,
@@ -272,7 +274,8 @@ export class DoctorPatientService {
             aih_number: aih.aih_number,
             care_character: aih.care_character,
             hospital_id: aih.hospital_id,
-            competencia: aih.competencia // ✅ NOVO: Incluir competência
+            competencia: aih.competencia, // ✅ NOVO: Incluir competência
+            pgt_adm: aih.pgt_adm || 'não' // ✅ NOVO: Pagamento Administrativo
           },
           total_value_reais: (aih.calculated_total_value || 0) / 100,
           procedures: [],

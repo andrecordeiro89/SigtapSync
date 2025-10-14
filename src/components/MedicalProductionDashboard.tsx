@@ -3616,6 +3616,24 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   })()}
                                                 </span>
                                               </div>
+                                              {/* ✅ NOVO: Pagamento Administrativo (Informativo) */}
+                                              <div className="flex items-baseline gap-2">
+                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Pgt. Administrativo:</span>
+                                                {(() => {
+                                                  const pgtAdm = (patient as any)?.aih_info?.pgt_adm || 'não';
+                                                  return pgtAdm === 'sim' ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-green-100 text-green-800 border border-green-300">
+                                                      <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                                      Sim
+                                                    </span>
+                                                  ) : (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-300">
+                                                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                                                      Não
+                                                    </span>
+                                                  );
+                                                })()}
+                                              </div>
                                               {(patient.aih_info as any).main_cid && (
                                                 <div className="flex items-baseline gap-2">
                                                   <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">CID Principal:</span>
