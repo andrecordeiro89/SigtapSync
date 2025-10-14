@@ -164,39 +164,44 @@ export class DoctorsHierarchyV2Service {
       }
 
       const card = cards[idx!];
-      // Paciente por patient_id
+      
+      // 🔧 CORREÇÃO CRÍTICA: UMA ENTRADA POR AIH (não por paciente)
+      // Cada AIH é uma internação/atendimento único, mesmo paciente pode ter múltiplas AIHs
+      // Usar aih.id como chave única em vez de patient_id
       const pid = aih.patient_id;
-      let patient = (card.patients as any[]).find(p => p.patient_id === pid);
-      if (!patient) {
-        patient = {
-          patient_id: pid,
-          patient_info: {
-            name: aih.patients?.name || 'Paciente sem nome',
-            cns: aih.patients?.cns || '',
-            birth_date: aih.patients?.birth_date || '',
-            gender: aih.patients?.gender || '',
-            medical_record: aih.patients?.medical_record || ''
-          },
-          aih_info: {
-            admission_date: aih.admission_date,
-            discharge_date: aih.discharge_date,
-            aih_number: aih.aih_number,
-            main_cid: aih.main_cid,
-            specialty: aih.specialty,
-            care_modality: aih.care_modality,
-            requesting_physician: aih.requesting_physician,
-            professional_cbo: aih.professional_cbo,
-            care_character: aih.care_character, // manter valor original para auditoria
-            hospital_id: aih.hospital_id,
-            competencia: aih.competencia
-          },
-          total_value_reais: (aih.calculated_total_value || 0) / 100,
-          procedures: [],
-          total_procedures: 0,
-          approved_procedures: 0
-        };
-        (card.patients as any[]).push(patient);
-      }
+      const aihId = aih.id; // ✅ Chave única: ID da AIH
+      
+      // ✅ SEMPRE criar nova entrada (uma por AIH)
+      // Não verificar se paciente já existe, pois podem haver múltiplas AIHs do mesmo paciente
+      const patient = {
+        patient_id: pid,
+        aih_id: aihId, // ✅ Incluir aih_id para rastreamento
+        patient_info: {
+          name: aih.patients?.name || 'Paciente sem nome',
+          cns: aih.patients?.cns || '',
+          birth_date: aih.patients?.birth_date || '',
+          gender: aih.patients?.gender || '',
+          medical_record: aih.patients?.medical_record || ''
+        },
+        aih_info: {
+          admission_date: aih.admission_date,
+          discharge_date: aih.discharge_date,
+          aih_number: aih.aih_number,
+          main_cid: aih.main_cid,
+          specialty: aih.specialty,
+          care_modality: aih.care_modality,
+          requesting_physician: aih.requesting_physician,
+          professional_cbo: aih.professional_cbo,
+          care_character: aih.care_character, // manter valor original para auditoria
+          hospital_id: aih.hospital_id,
+          competencia: aih.competencia
+        },
+        total_value_reais: (aih.calculated_total_value || 0) / 100,
+        procedures: [],
+        total_procedures: 0,
+        approved_procedures: 0
+      };
+      (card.patients as any[]).push(patient);
 
       // Procedimentos por paciente, se vazio usar por AIH
       let procs = (pid && procsByPatient.get(pid)) || [];

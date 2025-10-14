@@ -25,6 +25,7 @@ export interface DoctorHospital {
 
 export interface PatientWithProcedures {
   patient_id?: string; // 🆕 ID real do paciente (UUID da tabela patients) para associar procedimentos
+  aih_id?: string; // ✅ ID único da AIH para permitir múltiplas AIHs do mesmo paciente
   patient_info: {
     name: string;
     cns: string;
@@ -247,34 +248,38 @@ export class DoctorPatientService {
           };
         });
 
-        // Paciente
+        // 🔧 CORREÇÃO CRÍTICA: UMA ENTRADA POR AIH (não por paciente)
+        // Cada AIH é uma internação/atendimento único, mesmo paciente pode ter múltiplas AIHs
+        // Usar aih.id como chave única em vez de patient_id
         const patientId = aih.patient_id;
-        let patient = (doctor.patients as any[]).find(p => p.patient_id === patientId);
-        if (!patient) {
-          patient = {
-            patient_id: patientId,
-            patient_info: {
-              name: aih.patients?.name || 'Paciente sem nome',
-              cns: aih.patients?.cns || '',
-              birth_date: aih.patients?.birth_date || '',
-              gender: aih.patients?.gender || '',
-              medical_record: aih.patients?.medical_record || ''
-            },
-            aih_info: {
-              admission_date: aih.admission_date,
-              discharge_date: aih.discharge_date,
-              aih_number: aih.aih_number,
-              care_character: aih.care_character,
-              hospital_id: aih.hospital_id,
-              competencia: aih.competencia // ✅ NOVO: Incluir competência
-            },
-            total_value_reais: (aih.calculated_total_value || 0) / 100,
-            procedures: [],
-            total_procedures: 0,
-            approved_procedures: 0
-          };
-          (doctor.patients as any[]).push(patient);
-        }
+        const aihId = aih.id; // ✅ Chave única: ID da AIH
+        
+        // ✅ SEMPRE criar nova entrada (uma por AIH)
+        // Não verificar se paciente já existe, pois podem haver múltiplas AIHs do mesmo paciente
+        const patient = {
+          patient_id: patientId,
+          aih_id: aihId, // ✅ Incluir aih_id para rastreamento
+          patient_info: {
+            name: aih.patients?.name || 'Paciente sem nome',
+            cns: aih.patients?.cns || '',
+            birth_date: aih.patients?.birth_date || '',
+            gender: aih.patients?.gender || '',
+            medical_record: aih.patients?.medical_record || ''
+          },
+          aih_info: {
+            admission_date: aih.admission_date,
+            discharge_date: aih.discharge_date,
+            aih_number: aih.aih_number,
+            care_character: aih.care_character,
+            hospital_id: aih.hospital_id,
+            competencia: aih.competencia // ✅ NOVO: Incluir competência
+          },
+          total_value_reais: (aih.calculated_total_value || 0) / 100,
+          procedures: [],
+          total_procedures: 0,
+          approved_procedures: 0
+        };
+        (doctor.patients as any[]).push(patient);
 
         // 🔧 FIX PACIENTES RECORRENTES: Usar SEMPRE procedimentos por aih_id (não por patient_id)
         // Isso garante que pacientes com múltiplas AIHs em diferentes competências
