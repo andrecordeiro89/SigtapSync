@@ -328,6 +328,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [selectedHospitals, setSelectedHospitals] = useState<string[]>(['all']);
   const [searchTerm, setSearchTerm] = useState('');
   const [patientSearchTerm, setPatientSearchTerm] = useState(''); // Busca por nome do paciente
+  const [filterPgtAdm, setFilterPgtAdm] = useState<'all' | 'sim' | 'não'>('all'); // ✅ NOVO: Filtro Pgt. Administrativo
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
   const [selectedCareSpecialty, setSelectedCareSpecialty] = useState<string>('all'); // Mantido temporariamente
   const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
@@ -1157,7 +1158,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* FILTROS EM GRID - DESIGN MINIMALISTA */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
               {/* BUSCAR MÉDICO */}
               <div className="w-full">
                 <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
@@ -1278,13 +1279,41 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   )}
                 </div>
               </div>
+
+              {/* ✅ NOVO: FILTRO PGT. ADMINISTRATIVO */}
+              <div className="w-full">
+                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
+                  <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                  Pgt. Administrativo
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={filterPgtAdm}
+                    onChange={(e) => setFilterPgtAdm(e.target.value as 'all' | 'sim' | 'não')}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-emerald-500 hover:border-gray-300 transition-colors h-10"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="sim">Sim</option>
+                    <option value="não">Não</option>
+                  </select>
+                  {filterPgtAdm !== 'all' && (
+                    <button
+                      onClick={() => setFilterPgtAdm('all')}
+                      className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0"
+                      title="Limpar filtro pgt. administrativo"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* ✅ ABAS DE COMPETÊNCIA REMOVIDAS - Agora usa apenas dropdown */}
             {/* ✅ BARRA DE ABAS DE HOSPITAIS REMOVIDA - Agora usa dropdown acima */}
 
             {/* INDICADORES DE FILTROS ATIVOS - DESIGN MINIMALISTA */}
-            {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all') || selectedCompetency !== 'all') && (
+            {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all') || selectedCompetency !== 'all' || filterPgtAdm !== 'all') && (
               <div className="flex items-center justify-between pt-4 border-t-2 border-gray-100">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
@@ -1314,6 +1343,12 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       {availableCompetencies.find(c => c.value === selectedCompetency)?.label || selectedCompetency}
                     </Badge>
                   )}
+                  {filterPgtAdm !== 'all' && (
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 border-emerald-200 font-medium px-2 py-1">
+                      <DollarSign className="h-3 w-3" />
+                      Pgt. Adm: {filterPgtAdm === 'sim' ? 'Sim' : 'Não'}
+                    </Badge>
+                  )}
                   <span className="text-xs text-gray-400 italic">
                     · Aplicados globalmente
                   </span>
@@ -1334,6 +1369,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             searchTerm={searchTerm}
             patientSearchTerm={patientSearchTerm}
             selectedCompetencia={selectedCompetency}
+            filterPgtAdm={filterPgtAdm}
           />
           {/* ⚠️ NOTA: onStatsUpdate agora apenas atualiza activeDoctors, não afeta faturamento/AIHs */}
         </TabsContent>

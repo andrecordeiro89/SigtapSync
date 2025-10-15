@@ -519,6 +519,7 @@ interface MedicalProductionDashboardProps {
   searchTerm?: string; // Busca de médicos
   patientSearchTerm?: string; // Busca de pacientes
   selectedCompetencia?: string; // ✅ NOVO: Filtro de competência
+  filterPgtAdm?: 'all' | 'sim' | 'não'; // ✅ NOVO: Filtro Pgt. Administrativo
 }
 
 // ✅ COMPONENTE PRINCIPAL - SIMPLIFICADO
@@ -527,7 +528,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   selectedHospitals = ['all'],
   searchTerm = '',
   patientSearchTerm = '',
-  selectedCompetencia = 'all'
+  selectedCompetencia = 'all',
+  filterPgtAdm = 'all'
 }) => {
   const { user, canAccessAllHospitals, hasFullAccess } = useAuth();
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
@@ -1075,12 +1077,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           // ✅ SIMPLIFICADO: Usar APENAS competência como filtro (sem filtros de data)
           const selectedHospitalIds = (selectedHospitals && !selectedHospitals.includes('all')) ? selectedHospitals : undefined;
           const competenciaFilter = (selectedCompetencia && selectedCompetencia !== 'all') ? selectedCompetencia : undefined;
+          const pgtAdmFilter = (filterPgtAdm && filterPgtAdm !== 'all') ? filterPgtAdm : undefined;
           
           console.log('🗓️ Carregando dados com filtro de competência:', competenciaFilter || 'TODAS');
+          console.log('💵 Carregando dados com filtro pgt_adm:', pgtAdmFilter || 'TODOS');
           
           const doctorsWithPatients = await DoctorPatientService.getDoctorsWithPatientsFromProceduresView({
             hospitalIds: selectedHospitalIds,
-            competencia: competenciaFilter
+            competencia: competenciaFilter,
+            filterPgtAdm: pgtAdmFilter
           });
           // Usar diretamente a fonte das tabelas, garantindo pacientes e procedimentos
           mergedDoctors = doctorsWithPatients;
@@ -1132,7 +1137,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     };
 
     loadDoctorsData();
-  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, refreshTick, selectedCompetencia]);
+  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, refreshTick, selectedCompetencia, filterPgtAdm]);
 
   // 🆕 CARREGAR COMPETÊNCIAS DISPONÍVEIS
   useEffect(() => {
@@ -1744,6 +1749,77 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               </div>
             </div>
 
+            {/* TOTAIS AGREGADOS - CARDS COM GRADIENTES */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+              {/* Valor Total SIGTAP */}
+              <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-lg p-4 border-2 border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">
+                      Valor Total SIGTAP
+            </div>
+                    <div className="text-2xl font-black text-slate-900">
+                      {formatCurrency(aggregatedOperaParanaTotals.totalBaseSigtap)}
+            </div>
+            </div>
+                  <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-full">
+                    <Database className="h-5 w-5 text-slate-600" />
+            </div>
+          </div>
+              </div>
+
+              {/* Valor Total Incrementos */}
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-4 border-2 border-emerald-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-1">
+                      Incrementos
+                    </div>
+                    <div className="text-2xl font-black text-emerald-700">
+                      {formatCurrency(aggregatedOperaParanaTotals.totalIncrement)}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-full">
+                    <TrendingUp className="h-5 w-5 text-emerald-600" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Valor Total (com Opera Paraná) */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border-2 border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">
+                      Valor Total
+                    </div>
+                    <div className="text-2xl font-black text-blue-700">
+                      {formatCurrency(aggregatedOperaParanaTotals.totalWithIncrement)}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
+                    <BarChart3 className="h-5 w-5 text-blue-600" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Pagamento Médico Total - DESTAQUE */}
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border-2 border-green-300 shadow-md">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">
+                      Pagamento Médico Total
+                    </div>
+                    <div className="text-2xl font-black text-green-700">
+                      {formatCurrency(aggregatedMedicalPayments)}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-full">
+                    <DollarSign className="h-5 w-5 text-green-600" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* BOTÕES DE RELATÓRIO - GRID HORIZONTAL */}
             <div className="mb-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -1766,6 +1842,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                          'Caráter de Atendimento',
                          'Médico', 
                          'Hospital',
+                         'Pgt. Administrativo',
                          'Valor Procedimento',
                          'AIH Seca',
                          'Incremento',
@@ -1860,6 +1937,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                               const procDateLabel = parseISODateToLocal(procDate);
                               const procValue = Number(proc.value_reais || 0);
                               
+                              const pgtAdm = p?.aih_info?.pgt_adm || 'não';
+                              
                               rows.push([
                                 idx++,
                                 medicalRecord,
@@ -1873,6 +1952,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 careCharacter,
                                 doctorName, 
                                 hospitalName,
+                                pgtAdm,
                                 procValue,
                                 baseAih,
                                 increment,
@@ -1881,6 +1961,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             });
                           } else {
                             // Se não tem procedimentos, criar uma linha sem dados de procedimento
+                            const pgtAdm = p?.aih_info?.pgt_adm || 'não';
+                            
                             rows.push([
                               idx++,
                               medicalRecord,
@@ -1894,6 +1976,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                               careCharacter,
                               doctorName, 
                               hospitalName,
+                              pgtAdm,
                               0,
                               baseAih,
                               increment,
@@ -1956,6 +2039,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         { wch: 22 },  // Caráter de Atendimento
                         { wch: 30 },  // Médico
                         { wch: 35 },  // Hospital
+                        { wch: 20 },  // Pgt. Administrativo
                         { wch: 18 },  // Valor Procedimento
                         { wch: 18 },  // AIH Seca
                         { wch: 18 },  // Incremento
@@ -1998,6 +2082,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         'Data Alta (SUS)', 
                         'Médico', 
                         'Hospital',
+                        'Pgt. Administrativo',
                         'AIH Seca',
                         'Incremento',
                         'AIH c/ Incremento'
@@ -2046,6 +2131,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0;
                           const aihWithIncrements = baseAih + increment;
                           
+                          const pgtAdm = p?.aih_info?.pgt_adm || 'não';
+                          
                           // ✅ UMA LINHA POR AIH: Cada internação/atendimento é uma linha
                           rows.push([
                             idx++,
@@ -2055,6 +2142,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             disLabel, 
                             doctorName, 
                             hospitalName,
+                            pgtAdm,
                             formatCurrency(baseAih),
                             formatCurrency(increment),
                             formatCurrency(aihWithIncrements)
@@ -2110,6 +2198,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         { wch: 16 },  // Data Alta (SUS)
                         { wch: 30 },  // Médico
                         { wch: 35 },  // Hospital
+                        { wch: 20 },  // Pgt. Administrativo
                         { wch: 18 },  // AIH Seca
                         { wch: 18 },  // Incremento
                         { wch: 20 },  // AIH c/ Incremento
@@ -2152,6 +2241,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         'Data de Admissão',
                         'Data de Alta',
                         'Médico',
+                        'Pgt. Administrativo',
                         'AIH Seca',
                         'Incremento',
                         'AIH c/ Incremento'
@@ -2241,6 +2331,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           const increment = Math.round(incrementRaw * 100) / 100;
                           const aihWithIncrements = Math.round((baseAih + increment) * 100) / 100;
                           
+                          const pgtAdm = p?.aih_info?.pgt_adm || 'não';
+                          
                           allPatients.push({
                             name,
                             medicalRecord,
@@ -2248,6 +2340,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             admissionLabel,
                             dischargeLabel,
                             doctorName,
+                            pgtAdm,
                             baseAih,
                             increment,
                             aihWithIncrements
@@ -2315,6 +2408,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           patient.admissionLabel,
                           patient.dischargeLabel,
                           patient.doctorName,
+                          patient.pgtAdm,
                           formatCurrency(patient.baseAih),
                           formatCurrency(patient.increment),
                           formatCurrency(patient.aihWithIncrements)
@@ -2331,6 +2425,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                         { wch: 18 },  // Data de Admissão
                         { wch: 18 },  // Data de Alta
                         { wch: 30 },  // Médico
+                        { wch: 20 },  // Pgt. Administrativo
                         { wch: 18 },  // AIH Seca
                         { wch: 18 },  // Incremento
                         { wch: 20 },  // AIH c/ Incremento
@@ -2350,77 +2445,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   <FileSpreadsheet className="h-4 w-4" />
                   Relatório Pacientes Geral Simplificado
                 </Button>
-              </div>
-            </div>
-
-            {/* TOTAIS AGREGADOS - CARDS COM GRADIENTES */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              {/* Valor Total SIGTAP */}
-              <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-lg p-4 border-2 border-slate-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">
-                      Valor Total SIGTAP
-            </div>
-                    <div className="text-2xl font-black text-slate-900">
-                      {formatCurrency(aggregatedOperaParanaTotals.totalBaseSigtap)}
-            </div>
-            </div>
-                  <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-full">
-                    <Database className="h-5 w-5 text-slate-600" />
-            </div>
-          </div>
-              </div>
-
-              {/* Valor Total Incrementos */}
-              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-4 border-2 border-emerald-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-1">
-                      Incrementos
-                    </div>
-                    <div className="text-2xl font-black text-emerald-700">
-                      {formatCurrency(aggregatedOperaParanaTotals.totalIncrement)}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-full">
-                    <TrendingUp className="h-5 w-5 text-emerald-600" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Valor Total (com Opera Paraná) */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border-2 border-blue-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">
-                      Valor Total
-                    </div>
-                    <div className="text-2xl font-black text-blue-700">
-                      {formatCurrency(aggregatedOperaParanaTotals.totalWithIncrement)}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
-                    <BarChart3 className="h-5 w-5 text-blue-600" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Pagamento Médico Total - DESTAQUE */}
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-4 border-2 border-green-300 shadow-md">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">
-                      Pagamento Médico Total
-                    </div>
-                    <div className="text-2xl font-black text-green-700">
-                      {formatCurrency(aggregatedMedicalPayments)}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-full">
-                    <DollarSign className="h-5 w-5 text-green-600" />
-                  </div>
-                </div>
               </div>
             </div>
           </CardTitle>

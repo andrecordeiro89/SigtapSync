@@ -112,6 +112,7 @@ export class DoctorPatientService {
   static async getDoctorsWithPatientsFromProceduresView(options?: {
     hospitalIds?: string[];
     competencia?: string; // ✅ NOVO: Usar competência em vez de datas
+    filterPgtAdm?: 'all' | 'sim' | 'não'; // ✅ NOVO: Filtro Pgt. Administrativo
   }): Promise<DoctorWithPatients[]> {
     try {
       console.log('📥 [TABELAS - OTIMIZADO] Carregando dados em paralelo...', options);
@@ -151,6 +152,12 @@ export class DoctorPatientService {
       if (options?.competencia && options.competencia !== 'all') {
         aihsQuery = aihsQuery.eq('competencia', options.competencia);
         console.log('🗓️ Filtrando por competência:', options.competencia);
+      }
+      
+      // ✅ NOVO: Filtro Pgt. Administrativo
+      if (options?.filterPgtAdm && options.filterPgtAdm !== 'all') {
+        aihsQuery = aihsQuery.eq('pgt_adm', options.filterPgtAdm);
+        console.log('💵 Filtrando por Pgt. Administrativo:', options.filterPgtAdm);
       }
 
       // 🚀 EXECUTAR QUERY DE AIHs PRIMEIRO (necessária para obter IDs)
