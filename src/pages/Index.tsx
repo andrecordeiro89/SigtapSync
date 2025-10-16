@@ -11,6 +11,7 @@ import MedicalStaffDashboard from '../components/MedicalStaffDashboard';
 import SyncDashboard from '../components/SyncDashboard';
 import AuditDashboard from './AuditDashboard';
 import ProcedureDebugger from '../components/ProcedureDebugger';
+import HospitalDischargesManager from '../components/HospitalDischargesManager';
 import { SidebarProvider, SidebarInset } from '../components/ui/sidebar';
 import { useIsCompact } from '../hooks/use-compact';
 
@@ -30,6 +31,8 @@ const Index = () => {
         return <SigtapImport />;
       case 'sigtap-viewer':
         return <SigtapViewer />;
+      case 'hospital-discharges':
+        return <HospitalDischargesManager />;
       case 'patients':
         return <PatientManagement />;
       case 'executive-dashboard':

@@ -52,12 +52,20 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       order: 4
     },
     {
+      id: 'hospital-discharges',
+      label: 'Altas Hospitalares',
+      icon: FileText,
+      description: 'Importação de altas do sistema hospitalar',
+      requiresAdmin: false,
+      order: 5
+    },
+    {
       id: 'patients',
       label: 'Pacientes',
       icon: Users,
       description: 'Cadastro e gerenciamento',
       requiresAdmin: false,
-      order: 5
+      order: 6
     },
     {
       id: 'executive-dashboard',
@@ -66,7 +74,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       description: 'Central de inteligência e relatórios para diretoria',
       requiresAdmin: true,
       requiresExecutive: true, // Novo flag para acesso executivo
-      order: 6
+      order: 7
     },
     {
       id: 'medical-staff',
@@ -75,7 +83,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       description: 'Gestão e análise do corpo clínico médico',
       requiresAdmin: true,
       requiresExecutive: true, // Mesmo nível de acesso do dashboard executivo
-      order: 7
+      order: 8
     },
     {
       id: 'audit-dashboard',
@@ -84,7 +92,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       description: 'Auditoria e rastreamento de AIH por analista',
       requiresAdmin: false,
       requiresAuditor: true, // Novo flag para auditoria
-      order: 8
+      order: 9
     },
     {
       id: 'aih-upload',
@@ -93,7 +101,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       description: 'Teste de rastreabilidade - Apenas desenvolvimento',
       requiresAdmin: true,
       requiresDeveloper: true, // Novo flag para desenvolvimento
-      order: 9
+      order: 10
     }
   ];
 

@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Home, Upload, Search, FileUp, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe, RefreshCw } from 'lucide-react';
+import { Home, Upload, Search, FileUp, FileText, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe, RefreshCw } from 'lucide-react';
 import ProfileEditModal from './ProfileEditModal';
 import {
   Sidebar,
@@ -96,12 +96,21 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       color: 'from-orange-500 to-red-600'
     },
     {
+      id: 'hospital-discharges',
+      label: 'Altas Hospitalares',
+      icon: FileText,
+      description: 'Importação de altas do sistema hospitalar',
+      requiresAdmin: false,
+      order: 5,
+      color: 'from-teal-500 to-cyan-600'
+    },
+    {
       id: 'patients',
       label: 'Pacientes',
       icon: Users,
       description: 'Cadastro e gerenciamento',
       requiresAdmin: false,
-      order: 5,
+      order: 6,
       color: 'from-cyan-500 to-blue-600'
     },
     {
@@ -111,7 +120,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       description: 'Central de inteligência e relatórios para diretoria',
       requiresAdmin: true,
       requiresExecutive: true,
-      order: 6,
+      order: 7,
       color: 'from-pink-500 to-purple-600'
     },
     {
@@ -122,7 +131,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       requiresAdmin: true,
       requiresExecutive: false,  // ✅ Remover acesso executivo
       requiresStrictAdmin: true, // ✅ NOVO: Apenas admin/diretoria
-      order: 7,
+      order: 8,
       color: 'from-violet-500 to-indigo-600'
     },
     {
@@ -132,7 +141,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       description: 'Auditoria e rastreamento de AIH por analista',
       requiresAdmin: false,
       requiresAuditor: true,
-      order: 8,
+      order: 9,
       color: 'from-amber-500 to-orange-600'
     },
     {
@@ -142,7 +151,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       description: 'Teste de rastreabilidade - Apenas desenvolvimento',
       requiresAdmin: true,
       requiresDeveloper: true,
-      order: 9,
+      order: 10,
       color: 'from-slate-500 to-gray-600'
     },
     {
