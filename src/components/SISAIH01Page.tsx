@@ -56,6 +56,10 @@ const SISAIH01Page = () => {
   const [conteudoManual, setConteudoManual] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // 🆕 Estado para competência selecionada
+  const [competenciaSelecionada, setCompetenciaSelecionada] = useState<string>('');
+  const [competenciaCustomizada, setCompetenciaCustomizada] = useState<string>('');
+  
   // 🆕 Estados para registros salvos no banco
   const [registrosSalvos, setRegistrosSalvos] = useState<any[]>([]);
   const [isLoadingSalvos, setIsLoadingSalvos] = useState(false);
@@ -66,12 +70,103 @@ const SISAIH01Page = () => {
   const registrosPorPagina = 20;
   const registrosPorPaginaSalvos = 50;
 
+  // 🔄 Função para limpar completamente a tela e voltar ao início
+  const limparTelaCompleta = () => {
+    console.log('🧹 Limpando todos os estados...');
+    
+    // Limpar registros e estatísticas
+    setRegistros([]);
+    setRegistrosFiltrados([]);
+    setEstatisticas(null);
+    
+    // Limpar competência selecionada
+    setCompetenciaSelecionada('');
+    setCompetenciaCustomizada('');
+    
+    // Limpar conteúdo manual
+    setConteudoManual('');
+    
+    // Limpar busca
+    setBuscaTexto('');
+    
+    // Resetar paginação
+    setPaginaAtual(1);
+    
+    // Resetar flags de processamento
+    setIsProcessing(false);
+    setIsSaving(false);
+    setShowSaveConfirmation(false);
+    setSavedCount(0);
+    
+    // Limpar input de arquivo
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    
+    // Recarregar registros salvos para mostrar os novos
+    carregarRegistrosSalvos();
+    
+    // Scroll suave para o topo da página
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    console.log('✅ Tela resetada com sucesso!');
+    
+    // Mostrar toast informativo
+    setTimeout(() => {
+      toast.info('📋 Tela limpa. Você pode processar um novo arquivo.', {
+        description: 'Os registros salvos foram atualizados na aba "Registros Salvos"',
+        duration: 4000
+      });
+    }, 1000);
+  };
+
+  // 🆕 Gerar lista de competências (últimos 12 meses)
+  const gerarOpcoesCompetencia = () => {
+    const opcoes: { value: string; label: string }[] = [];
+    const hoje = new Date();
+    
+    for (let i = 0; i < 12; i++) {
+      const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      const ano = data.getFullYear();
+      const mes = String(data.getMonth() + 1).padStart(2, '0');
+      const competencia = `${ano}${mes}`;
+      const label = `${mes}/${ano}`;
+      opcoes.push({ value: competencia, label });
+    }
+    
+    return opcoes;
+  };
+
   // Processar arquivo ou conteúdo
   const processarConteudo = async (conteudo: string) => {
+    // 🔐 Validar se competência foi selecionada
+    if (!competenciaSelecionada) {
+      toast.error('Por favor, selecione a competência antes de processar', {
+        description: 'A competência é obrigatória para identificar o período de referência das AIHs'
+      });
+      return;
+    }
+    
     setIsProcessing(true);
     try {
-      // Processar com o parser
-      const registrosProcessados = processarArquivoSISAIH01(conteudo);
+      // Usar competência customizada se selecionado "custom"
+      const competenciaFinal = competenciaSelecionada === 'custom' 
+        ? competenciaCustomizada 
+        : competenciaSelecionada;
+      
+      // Validar competência customizada
+      if (competenciaSelecionada === 'custom' && (!competenciaCustomizada || !/^\d{6}$/.test(competenciaCustomizada))) {
+        toast.error('Competência customizada inválida', {
+          description: 'Use o formato AAAAMM (ex: 202501 para janeiro/2025)'
+        });
+        setIsProcessing(false);
+        return;
+      }
+      
+      console.log(`📅 Processando arquivo com competência: ${competenciaFinal}`);
+      
+      // Processar com o parser + competência manual
+      const registrosProcessados = processarArquivoSISAIH01(conteudo, competenciaFinal);
       
       if (registrosProcessados.length === 0) {
         toast.error('Nenhum registro válido encontrado no arquivo');
@@ -88,7 +183,7 @@ const SISAIH01Page = () => {
       setPaginaAtual(1);
       
       toast.success(`✅ ${registrosProcessados.length} registros processados com sucesso!`, {
-        description: `${stats.pacientes_unicos} pacientes únicos identificados`
+        description: `Competência: ${competenciaFinal.substring(4, 6)}/${competenciaFinal.substring(0, 4)} | ${stats.pacientes_unicos} pacientes únicos`
       });
     } catch (error) {
       console.error('Erro ao processar arquivo:', error);
@@ -192,6 +287,7 @@ const SISAIH01Page = () => {
     try {
       console.log(`📦 Iniciando salvamento de ${registros.length} registros em ${totalBatches} lotes`);
       console.log(`🏥 Hospital do usuário: ${hospitalIdUsuario}`);
+      console.log(`📅 Competência dos registros: ${registros[0]?.competencia || 'Não definida'}`);
 
       for (let i = 0; i < totalBatches; i++) {
         const inicio = i * BATCH_SIZE;
@@ -321,16 +417,27 @@ const SISAIH01Page = () => {
           description: `Todos os registros foram vinculados ao seu hospital`,
           duration: 5000
         });
+        
+        // 🔄 RESETAR TELA APÓS SALVAMENTO BEM-SUCEDIDO
+        console.log('🔄 Resetando tela SISAIH01...');
+        limparTelaCompleta();
+        
       } else if (sucessos > 0) {
         toast.warning(`⚠️ ${sucessos} salvos, ${erros} com erro`, {
           description: `Verifique o console para detalhes dos erros`,
           duration: 7000
         });
+        
+        // 🔄 RESETAR TELA MESMO COM ERROS PARCIAIS
+        console.log('🔄 Resetando tela SISAIH01 (com erros parciais)...');
+        limparTelaCompleta();
+        
       } else {
         toast.error(`❌ Nenhum registro salvo. ${erros} erros`, {
           description: 'Verifique o console para detalhes dos erros',
           duration: 7000
         });
+        // Não resetar se NENHUM registro foi salvo
       }
     } catch (error) {
       toast.dismiss(loadingToast);
@@ -361,7 +468,7 @@ const SISAIH01Page = () => {
     }
   };
 
-  // 🆕 Carregar registros salvos no banco de dados
+  // 🆕 Carregar registros salvos no banco de dados (com JOIN para médico)
   const carregarRegistrosSalvos = async () => {
     if (!hospitalIdUsuario) return;
     
@@ -369,28 +476,42 @@ const SISAIH01Page = () => {
     try {
       console.log('📊 Carregando registros salvos do banco...');
       
-      // Construir query base
-      let query = supabase
+      // Query com JOIN para pegar nome do médico responsável
+      // Primeiro, buscar registros com select específico
+      let baseQuery = supabase
         .from('aih_registros')
-        .select('*', { count: 'exact' });
+        .select(`
+          id,
+          numero_aih,
+          nome_paciente,
+          cns,
+          data_nascimento,
+          data_internacao,
+          data_saida,
+          cnes_hospital,
+          competencia,
+          medico_responsavel,
+          hospital_id,
+          created_at
+        `, { count: 'exact' });
       
       // 🔐 Filtrar por hospital (exceto admins)
       if (!canAccessAllHospitals()) {
-        query = query.eq('hospital_id', hospitalIdUsuario);
+        baseQuery = baseQuery.eq('hospital_id', hospitalIdUsuario);
       }
       
       // Aplicar busca se houver
       if (buscaSalvos.trim()) {
-        query = query.or(`nome_paciente.ilike.%${buscaSalvos}%,cns.ilike.%${buscaSalvos}%,numero_aih.ilike.%${buscaSalvos}%,cpf.ilike.%${buscaSalvos}%`);
+        baseQuery = baseQuery.or(`nome_paciente.ilike.%${buscaSalvos}%,cns.ilike.%${buscaSalvos}%,numero_aih.ilike.%${buscaSalvos}%`);
       }
       
       // Paginação
       const inicio = (paginaAtualSalvos - 1) * registrosPorPaginaSalvos;
-      query = query
+      baseQuery = baseQuery
         .order('created_at', { ascending: false })
         .range(inicio, inicio + registrosPorPaginaSalvos - 1);
       
-      const { data, error, count } = await query;
+      const { data: registrosData, error, count } = await baseQuery;
       
       if (error) {
         console.error('Erro ao carregar registros:', error);
@@ -398,10 +519,56 @@ const SISAIH01Page = () => {
         return;
       }
       
-      setRegistrosSalvos(data || []);
+      // Se não há registros, definir lista vazia
+      if (!registrosData || registrosData.length === 0) {
+        setRegistrosSalvos([]);
+        setTotalRegistrosSalvos(0);
+        console.log('✅ Nenhum registro encontrado');
+        return;
+      }
+      
+      // Buscar nomes dos médicos responsáveis via JOIN manual
+      // Coletar CNS únicos de médicos
+      const cnsUnicos = [...new Set(
+        registrosData
+          .map(r => r.medico_responsavel)
+          .filter(cns => cns && cns.trim() !== '')
+      )];
+      
+      console.log(`🔍 Buscando dados de ${cnsUnicos.length} médicos únicos...`);
+      
+      // Buscar médicos via doctor_hospital (com hospital_id)
+      const medicosMap = new Map<string, string>();
+      
+      if (cnsUnicos.length > 0) {
+        // Buscar na tabela doctors diretamente pelo CNS
+        const { data: medicosData, error: medicosError } = await supabase
+          .from('doctors')
+          .select('cns, name')
+          .in('cns', cnsUnicos);
+        
+        if (!medicosError && medicosData) {
+          medicosData.forEach(medico => {
+            if (medico.cns && medico.name) {
+              medicosMap.set(medico.cns, medico.name);
+            }
+          });
+          console.log(`✅ ${medicosMap.size} médicos encontrados na tabela doctors`);
+        }
+      }
+      
+      // Enriquecer registros com nome do médico
+      const registrosEnriquecidos = registrosData.map(registro => ({
+        ...registro,
+        medico_responsavel_nome: registro.medico_responsavel 
+          ? (medicosMap.get(registro.medico_responsavel) || registro.medico_responsavel)
+          : '-'
+      }));
+      
+      setRegistrosSalvos(registrosEnriquecidos);
       setTotalRegistrosSalvos(count || 0);
       
-      console.log(`✅ ${data?.length || 0} registros carregados (${count} total)`);
+      console.log(`✅ ${registrosEnriquecidos.length} registros carregados (${count} total)`);
     } catch (error) {
       console.error('Erro ao carregar registros:', error);
       toast.error('Erro ao carregar registros');
@@ -476,6 +643,81 @@ const SISAIH01Page = () => {
               Encoding: ISO-8859-1. Tipos de registro processados: 01 (Principal), 03 (Continuação), 05 (Longa Permanência).
             </AlertDescription>
           </Alert>
+
+          {/* 🆕 SELEÇÃO DE COMPETÊNCIA (OBRIGATÓRIA) */}
+          <div className="bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-300 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Calendar className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 space-y-3">
+                <div>
+                  <label className="text-sm font-semibold text-orange-900 flex items-center gap-2">
+                    Competência (Mês de Referência)
+                    <Badge variant="destructive" className="text-xs">OBRIGATÓRIO</Badge>
+                  </label>
+                  <p className="text-xs text-orange-700 mt-1">
+                    Selecione o mês de referência para as AIHs deste arquivo
+                  </p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Select de Competência */}
+                  <div className="space-y-2">
+                    <select
+                      value={competenciaSelecionada}
+                      onChange={(e) => setCompetenciaSelecionada(e.target.value)}
+                      className="w-full px-3 py-2 border border-orange-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      disabled={isProcessing}
+                    >
+                      <option value="">Selecione a competência...</option>
+                      {gerarOpcoesCompetencia().map(op => (
+                        <option key={op.value} value={op.value}>
+                          {op.label}
+                        </option>
+                      ))}
+                      <option value="custom">📝 Customizada (Digite abaixo)</option>
+                    </select>
+                  </div>
+
+                  {/* Input customizado (só aparece se "custom" selecionado) */}
+                  {competenciaSelecionada === 'custom' && (
+                    <div className="space-y-1">
+                      <Input
+                        type="text"
+                        value={competenciaCustomizada}
+                        onChange={(e) => setCompetenciaCustomizada(e.target.value)}
+                        placeholder="Ex: 202501 (jan/2025)"
+                        maxLength={6}
+                        disabled={isProcessing}
+                        className="border-orange-300 focus:ring-orange-500"
+                      />
+                      <p className="text-xs text-orange-600">
+                        Formato: AAAAMM (6 dígitos)
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Indicador visual da competência selecionada */}
+                {competenciaSelecionada && competenciaSelecionada !== 'custom' && (
+                  <div className="bg-green-100 border border-green-300 rounded-md px-3 py-2 flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-800">
+                      Competência selecionada: {competenciaSelecionada.substring(4, 6)}/{competenciaSelecionada.substring(0, 4)}
+                    </span>
+                  </div>
+                )}
+                
+                {competenciaSelecionada === 'custom' && competenciaCustomizada && /^\d{6}$/.test(competenciaCustomizada) && (
+                  <div className="bg-green-100 border border-green-300 rounded-md px-3 py-2 flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-800">
+                      Competência customizada: {competenciaCustomizada.substring(4, 6)}/{competenciaCustomizada.substring(0, 4)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
           {/* Upload de arquivo */}
           <div className="space-y-2">
@@ -622,6 +864,16 @@ const SISAIH01Page = () => {
               >
                 <Download className="h-4 w-4 mr-2" />
                 Exportar CSV
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={limparTelaCompleta}
+                disabled={registros.length === 0 || isSaving}
+                className="border-orange-300 text-orange-700 hover:bg-orange-50"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Limpar Tela
               </Button>
 
               <Button
@@ -958,50 +1210,73 @@ const SISAIH01Page = () => {
                         <TableHeader>
                           <TableRow className="bg-gray-50">
                             <TableHead className="font-semibold">Número AIH</TableHead>
-                            <TableHead className="font-semibold">Tipo</TableHead>
                             <TableHead className="font-semibold">Paciente</TableHead>
                             <TableHead className="font-semibold">CNS</TableHead>
-                            <TableHead className="font-semibold">CPF</TableHead>
-                            <TableHead className="font-semibold">Nasc.</TableHead>
-                            <TableHead className="font-semibold">Sexo</TableHead>
-                            <TableHead className="font-semibold">Mãe</TableHead>
+                            <TableHead className="font-semibold">Nascimento</TableHead>
                             <TableHead className="font-semibold">Internação</TableHead>
                             <TableHead className="font-semibold">Saída</TableHead>
-                            <TableHead className="font-semibold">Proc. Realizado</TableHead>
-                            <TableHead className="font-semibold">Diag. Principal</TableHead>
-                            <TableHead className="font-semibold">Município</TableHead>
                             <TableHead className="font-semibold">CNES</TableHead>
+                            <TableHead className="font-semibold">Competência</TableHead>
+                            <TableHead className="font-semibold">Médico Responsável</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {registrosSalvos.map((registro, index) => (
                             <TableRow key={registro.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <TableCell className="font-mono text-sm">{registro.numero_aih}</TableCell>
-                              <TableCell>
-                                <Badge variant={registro.tipo_aih === '01' ? 'default' : 'secondary'}>
-                                  {registro.tipo_aih_descricao || registro.tipo_aih}
-                                </Badge>
+                              {/* Número AIH */}
+                              <TableCell className="font-mono text-sm font-medium text-blue-700">
+                                {registro.numero_aih}
                               </TableCell>
+                              
+                              {/* Paciente */}
                               <TableCell className="font-medium max-w-[200px] truncate" title={registro.nome_paciente}>
                                 {registro.nome_paciente}
                               </TableCell>
-                              <TableCell className="font-mono text-sm">{registro.cns || '-'}</TableCell>
-                              <TableCell className="font-mono text-sm">{registro.cpf || '-'}</TableCell>
-                              <TableCell className="text-sm">{registro.data_nascimento ? new Date(registro.data_nascimento).toLocaleDateString('pt-BR') : '-'}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className={registro.sexo === 'M' ? 'border-blue-300 text-blue-700' : 'border-pink-300 text-pink-700'}>
-                                  {registro.sexo === 'M' ? '♂ M' : '♀ F'}
+                              
+                              {/* CNS */}
+                              <TableCell className="font-mono text-sm">
+                                {registro.cns || '-'}
+                              </TableCell>
+                              
+                              {/* Nascimento */}
+                              <TableCell className="text-sm">
+                                {registro.data_nascimento 
+                                  ? new Date(registro.data_nascimento).toLocaleDateString('pt-BR') 
+                                  : '-'}
+                              </TableCell>
+                              
+                              {/* Internação */}
+                              <TableCell className="text-sm">
+                                {registro.data_internacao 
+                                  ? new Date(registro.data_internacao).toLocaleDateString('pt-BR') 
+                                  : '-'}
+                              </TableCell>
+                              
+                              {/* Saída */}
+                              <TableCell className="text-sm">
+                                {registro.data_saida 
+                                  ? new Date(registro.data_saida).toLocaleDateString('pt-BR') 
+                                  : '-'}
+                              </TableCell>
+                              
+                              {/* CNES */}
+                              <TableCell className="font-mono text-sm">
+                                {registro.cnes_hospital || '-'}
+                              </TableCell>
+                              
+                              {/* Competência */}
+                              <TableCell className="text-sm">
+                                <Badge variant="outline" className="bg-blue-50 border-blue-300 text-blue-800">
+                                  {registro.competencia 
+                                    ? `${registro.competencia.substring(4, 6)}/${registro.competencia.substring(0, 4)}`
+                                    : '-'}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="max-w-[150px] truncate text-sm" title={registro.nome_mae}>
-                                {registro.nome_mae || '-'}
+                              
+                              {/* Médico Responsável */}
+                              <TableCell className="font-medium text-sm max-w-[180px] truncate" title={registro.medico_responsavel_nome}>
+                                {registro.medico_responsavel_nome || '-'}
                               </TableCell>
-                              <TableCell className="text-sm">{registro.data_internacao ? new Date(registro.data_internacao).toLocaleDateString('pt-BR') : '-'}</TableCell>
-                              <TableCell className="text-sm">{registro.data_saida ? new Date(registro.data_saida).toLocaleDateString('pt-BR') : '-'}</TableCell>
-                              <TableCell className="font-mono text-sm">{registro.procedimento_realizado || '-'}</TableCell>
-                              <TableCell className="font-mono text-sm">{registro.diagnostico_principal || '-'}</TableCell>
-                              <TableCell className="text-sm">{registro.municipio_hospital || '-'}</TableCell>
-                              <TableCell className="font-mono text-sm">{registro.cnes_hospital || '-'}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>

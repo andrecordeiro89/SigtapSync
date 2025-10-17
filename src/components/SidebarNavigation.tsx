@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Home, Upload, Search, FileUp, FileText, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe, ChevronRight } from 'lucide-react';
+import { Home, Upload, Search, FileUp, FileText, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe, ChevronRight, GitCompare } from 'lucide-react';
 import ProfileEditModal from './ProfileEditModal';
 import {
   Sidebar,
@@ -115,12 +115,21 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       color: 'from-indigo-500 to-purple-600'
     },
     {
+      id: 'aih-sync',
+      label: 'Sync',
+      icon: GitCompare,
+      description: 'Sincronização e reconciliação de AIHs',
+      requiresAdmin: false,
+      order: 7,
+      color: 'from-purple-500 to-pink-600'
+    },
+    {
       id: 'patients',
       label: 'Pacientes',
       icon: Users,
       description: 'Cadastro e gerenciamento',
       requiresAdmin: false,
-      order: 7,
+      order: 8,
       color: 'from-cyan-500 to-blue-600'
     },
     {

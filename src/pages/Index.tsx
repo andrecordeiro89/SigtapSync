@@ -13,6 +13,7 @@ import AuditDashboard from './AuditDashboard';
 import ProcedureDebugger from '../components/ProcedureDebugger';
 import HospitalDischargesManager from '../components/HospitalDischargesManager';
 import SISAIH01Page from '../components/SISAIH01Page';
+import SyncPage from '../components/SyncPage';
 import { SidebarProvider, SidebarInset } from '../components/ui/sidebar';
 import { useIsCompact } from '../hooks/use-compact';
 
@@ -36,6 +37,8 @@ const Index = () => {
         return <HospitalDischargesManager />;
       case 'sisaih01':
         return <SISAIH01Page />;
+      case 'aih-sync':
+        return <SyncPage />;
       case 'patients':
         return <PatientManagement />;
       case 'executive-dashboard':

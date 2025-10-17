@@ -226,8 +226,10 @@ function obterTipoAIH(codigo: string): string {
 
 /**
  * Parse completo de uma linha do arquivo SISAIH01
+ * @param linha - Linha do arquivo TXT
+ * @param competenciaManual - Competência selecionada manualmente pelo usuário (formato: YYYYMM, ex: "202501")
  */
-export function parseLinhaSISAIH01(linha: string): RegistroSISAIH01 | null {
+export function parseLinhaSISAIH01(linha: string, competenciaManual?: string): RegistroSISAIH01 | null {
   if (!linha || linha.length < 100) return null;
   
   const identAIH = extrairCampo(linha, 'IDENT_AIH');
@@ -237,6 +239,9 @@ export function parseLinhaSISAIH01(linha: string): RegistroSISAIH01 | null {
     return null;
   }
   
+  // Usar competência manual se fornecida, caso contrário usar do arquivo
+  const competenciaFinal = competenciaManual || extrairCampo(linha, 'APRES_LOTE');
+  
   return {
     // Identificação
     numero_aih: extrairCampo(linha, 'NU_AIH'),
@@ -244,7 +249,7 @@ export function parseLinhaSISAIH01(linha: string): RegistroSISAIH01 | null {
     tipo_aih_descricao: obterTipoAIH(identAIH),
     cnes_hospital: extrairCampo(linha, 'CNES_HOSP'),
     municipio_hospital: extrairCampo(linha, 'MUN_HOSP'),
-    competencia: extrairCampo(linha, 'APRES_LOTE'),
+    competencia: competenciaFinal,
     
     // Datas (formato ISO para o banco)
     data_emissao: dataParaISO(extrairCampo(linha, 'DT_EMISSAO')),
@@ -302,13 +307,15 @@ export function parseLinhaSISAIH01(linha: string): RegistroSISAIH01 | null {
 
 /**
  * Processa arquivo completo SISAIH01
+ * @param conteudo - Conteúdo do arquivo TXT
+ * @param competenciaManual - Competência selecionada manualmente pelo usuário (formato: YYYYMM, ex: "202501")
  */
-export function processarArquivoSISAIH01(conteudo: string): RegistroSISAIH01[] {
+export function processarArquivoSISAIH01(conteudo: string, competenciaManual?: string): RegistroSISAIH01[] {
   const linhas = conteudo.split('\n').filter(l => l.trim().length > 100);
   const registros: RegistroSISAIH01[] = [];
   
   linhas.forEach(linha => {
-    const registro = parseLinhaSISAIH01(linha);
+    const registro = parseLinhaSISAIH01(linha, competenciaManual);
     if (registro) {
       registros.push(registro);
     }
