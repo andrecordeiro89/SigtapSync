@@ -190,7 +190,7 @@ const SyncPage = () => {
       // Buscar AIHs da tabela
       const { data: aihsData, error } = await supabase
         .from('aihs')
-        .select('aih_number, patient_id, admission_date, competencia, created_at')
+        .select('aih_number, patient_id, admission_date, competencia, created_at, total_procedures, procedure_requested, calculated_total_value')
         .eq('hospital_id', hospitalAIHSelecionado);
 
       if (error) {
@@ -219,8 +219,13 @@ const SyncPage = () => {
       
       // Log de exemplos
       if (aihsFiltradas.length > 0) {
-        const exemplos = aihsFiltradas.slice(0, 5).map(a => a.aih_number);
-        console.log('📋 Exemplos de AIH numbers:', exemplos);
+        const exemplos = aihsFiltradas.slice(0, 3).map(a => ({
+          aih_number: a.aih_number,
+          total_procedures: a.total_procedures,
+          procedure_requested: a.procedure_requested,
+          calculated_total_value: a.calculated_total_value
+        }));
+        console.log('📋 Exemplos de AIHs com dados:', exemplos);
       }
 
       setAihsEncontradas(aihsFiltradas);
@@ -341,10 +346,18 @@ const SyncPage = () => {
 
       console.log(`📋 Mapa AIH Avançado: ${mapAIHAvancado.size} registros válidos`);
       
-      // Exemplos de normalização
+      // Exemplos de normalização e dados
       if (mapAIHAvancado.size > 0) {
-        const exemplos = Array.from(mapAIHAvancado.keys()).slice(0, 3);
-        console.log('   Exemplos normalizados:', exemplos);
+        const primeiraAih = Array.from(mapAIHAvancado.entries())[0];
+        console.log('   Exemplo de AIH no mapa:', {
+          numero_normalizado: primeiraAih[0],
+          dados: {
+            aih_number: primeiraAih[1]?.aih_number,
+            total_procedures: primeiraAih[1]?.total_procedures,
+            procedure_requested: primeiraAih[1]?.procedure_requested,
+            calculated_total_value: primeiraAih[1]?.calculated_total_value
+          }
+        });
       }
 
       const mapSISAIH01 = new Map<string, any>();
@@ -415,6 +428,23 @@ const SyncPage = () => {
           aih_avancado: aihAvancado,
           sisaih01: sisaih01
         });
+        
+        // Log do primeiro sincronizado para debug
+        if (status === 'sincronizado' && sincronizados === 1) {
+          console.log('🔍 Primeiro registro sincronizado (debug):', {
+            numero_aih: numeroNormalizado,
+            aih_avancado_dados: {
+              total_procedures: aihAvancado?.total_procedures,
+              procedure_requested: aihAvancado?.procedure_requested,
+              calculated_total_value_centavos: aihAvancado?.calculated_total_value,
+              calculated_total_value_reais: aihAvancado?.calculated_total_value / 100
+            },
+            sisaih01_dados: {
+              nome_paciente: sisaih01?.nome_paciente,
+              data_internacao: sisaih01?.data_internacao
+            }
+          });
+        }
       });
 
       console.log('\n📊 RESULTADO DA SINCRONIZAÇÃO:');
@@ -807,14 +837,17 @@ const SyncPage = () => {
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="rounded-lg border border-green-200 overflow-hidden">
-                  <div className="max-h-[500px] overflow-y-auto">
+                  <div className="overflow-y-auto">
                     <Table>
                       <TableHeader className="bg-green-50 sticky top-0">
                         <TableRow>
-                          <TableHead className="font-semibold text-green-900 w-20">#</TableHead>
+                          <TableHead className="font-semibold text-green-900 w-16">#</TableHead>
                           <TableHead className="font-semibold text-green-900">Número AIH</TableHead>
-                          <TableHead className="font-semibold text-green-900">Paciente (SISAIH01)</TableHead>
+                          <TableHead className="font-semibold text-green-900">Paciente</TableHead>
                           <TableHead className="font-semibold text-green-900">Data Internação</TableHead>
+                          <TableHead className="font-semibold text-green-900 text-center">Qtd. Proc.</TableHead>
+                          <TableHead className="font-semibold text-green-900">Procedimento Principal</TableHead>
+                          <TableHead className="font-semibold text-green-900 text-right">Valor Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -826,17 +859,37 @@ const SyncPage = () => {
                                 {index + 1}
                               </TableCell>
                               <TableCell>
-                                <span className="font-mono text-blue-600 font-medium">
+                                <span className="font-mono text-blue-600 font-medium text-sm">
                                   {detalhe.numero_aih}
                                 </span>
                               </TableCell>
                               <TableCell className="text-gray-700">
                                 {detalhe.sisaih01?.nome_paciente || '-'}
                               </TableCell>
-                              <TableCell className="text-gray-600">
+                              <TableCell className="text-gray-600 text-sm">
                                 {detalhe.sisaih01?.data_internacao 
                                   ? new Date(detalhe.sisaih01.data_internacao).toLocaleDateString('pt-BR')
                                   : '-'}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <span className="inline-flex items-center justify-center px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">
+                                  {detalhe.aih_avancado?.total_procedures || 0}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-gray-700">
+                                <span className="font-mono text-xs">
+                                  {detalhe.aih_avancado?.procedure_requested || '-'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className="font-semibold text-green-700">
+                                  {detalhe.aih_avancado?.calculated_total_value 
+                                    ? new Intl.NumberFormat('pt-BR', {
+                                        style: 'currency',
+                                        currency: 'BRL'
+                                      }).format(detalhe.aih_avancado.calculated_total_value / 100)
+                                    : '-'}
+                                </span>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -845,11 +898,11 @@ const SyncPage = () => {
                   </div>
                 </div>
                 
-                {resultadoSync.sincronizados > 10 && (
-                  <p className="text-sm text-gray-500 mt-3 text-center">
-                    Mostrando {resultadoSync.sincronizados} registros sincronizados
+                <div className="mt-4 text-center">
+                  <p className="text-sm text-gray-600">
+                    Total: <strong className="text-green-700">{resultadoSync.sincronizados}</strong> registros sincronizados
                   </p>
-                )}
+                </div>
               </CardContent>
             </Card>
           )}
@@ -871,8 +924,8 @@ const SyncPage = () => {
             </Alert>
           )}
 
-          {/* Botão para refazer */}
-          <div className="flex justify-center">
+          {/* Botão para refazer - Abaixo da tabela */}
+          <div className="flex justify-center pt-6 pb-4">
             <Button
               onClick={() => {
                 setResultadoSync(null);
@@ -884,6 +937,7 @@ const SyncPage = () => {
               }}
               variant="outline"
               size="lg"
+              className="shadow-lg hover:shadow-xl transition-all"
             >
               <RefreshCw className="h-5 w-5 mr-2" />
               Nova Sincronização
