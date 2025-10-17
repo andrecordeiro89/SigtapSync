@@ -95,23 +95,31 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       order: 4,
       color: 'from-orange-500 to-red-600'
     },
-    // 🔒 TEMPORARIAMENTE OCULTO - Altas Hospitalares (em desenvolvimento)
-    // {
-    //   id: 'hospital-discharges',
-    //   label: 'Altas Hospitalares',
-    //   icon: FileText,
-    //   description: 'Importação de altas do sistema hospitalar',
-    //   requiresAdmin: false,
-    //   order: 5,
-    //   color: 'from-teal-500 to-cyan-600'
-    // },
+    {
+      id: 'hospital-discharges',
+      label: 'Altas Hospitalares',
+      icon: FileText,
+      description: 'Importação de altas do sistema hospitalar',
+      requiresAdmin: false,
+      order: 5,
+      color: 'from-teal-500 to-cyan-600'
+    },
+    {
+      id: 'sisaih01',
+      label: 'SISAIH01',
+      icon: FileText,
+      description: 'Processador de arquivos SISAIH01 do DATASUS',
+      requiresAdmin: false,
+      order: 6,
+      color: 'from-indigo-500 to-purple-600'
+    },
     {
       id: 'patients',
       label: 'Pacientes',
       icon: Users,
       description: 'Cadastro e gerenciamento',
       requiresAdmin: false,
-      order: 5,  // ✅ Ajustado para 5 (era 6)
+      order: 7,
       color: 'from-cyan-500 to-blue-600'
     },
     {
@@ -121,7 +129,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       description: 'Central de inteligência e relatórios para diretoria',
       requiresAdmin: true,
       requiresExecutive: true,
-      order: 6,  // ✅ Ajustado (era 7)
+      order: 8,
       color: 'from-pink-500 to-purple-600'
     },
     {
@@ -130,9 +138,9 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       icon: RefreshCw,
       description: 'Reconciliação Tabwin vs Sistema - Apenas Administrador',
       requiresAdmin: true,
-      requiresExecutive: false,  // ✅ Remover acesso executivo
-      requiresStrictAdmin: true, // ✅ NOVO: Apenas admin/diretoria
-      order: 7,  // ✅ Ajustado (era 8)
+      requiresExecutive: false,
+      requiresStrictAdmin: true,
+      order: 9,
       color: 'from-violet-500 to-indigo-600'
     },
     {
@@ -142,7 +150,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       description: 'Auditoria e rastreamento de AIH por analista',
       requiresAdmin: false,
       requiresAuditor: true,
-      order: 8,  // ✅ Ajustado (era 9)
+      order: 10,
       color: 'from-amber-500 to-orange-600'
     },
     {
@@ -152,7 +160,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       description: 'Teste de rastreabilidade - Apenas desenvolvimento',
       requiresAdmin: true,
       requiresDeveloper: true,
-      order: 9,  // ✅ Ajustado (era 10)
+      order: 11,
       color: 'from-slate-500 to-gray-600'
     },
     {
@@ -162,7 +170,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       description: 'Debug da tabela procedure_records - Desenvolvimento',
       requiresAdmin: true,
       requiresDeveloper: true,
-      order: 10,
+      order: 12,
       color: 'from-red-500 to-pink-600'
     }
   ];

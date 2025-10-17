@@ -22,12 +22,13 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { HospitalDischargeService, HospitalDischarge } from '../services/hospitalDischargeService';
+import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const HospitalDischargesManager = () => {
-  const { user, getCurrentHospital } = useAuth();
+  const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [discharges, setDischarges] = useState<HospitalDischarge[]>([]);
@@ -35,10 +36,40 @@ const HospitalDischargesManager = () => {
   const [stats, setStats] = useState({ totalDischarges: 0, todayDischarges: 0, averageStayDuration: 'N/A' });
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [hospitalName, setHospitalName] = useState<string>('Carregando...');
   const itemsPerPage = 20;
 
   const hospitalId = user?.hospital_id;
-  const hospitalName = getCurrentHospital();
+
+  // Carregar nome do hospital
+  useEffect(() => {
+    const loadHospitalName = async () => {
+      if (!hospitalId || hospitalId === 'ALL') {
+        setHospitalName('Todos os Hospitais');
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('hospitals')
+          .select('name')
+          .eq('id', hospitalId)
+          .single();
+
+        if (error) {
+          console.error('Erro ao buscar nome do hospital:', error);
+          setHospitalName(hospitalId);
+        } else {
+          setHospitalName(data.name || hospitalId);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar hospital:', error);
+        setHospitalName(hospitalId);
+      }
+    };
+
+    loadHospitalName();
+  }, [hospitalId]);
 
   // Carregar dados ao montar componente
   useEffect(() => {
