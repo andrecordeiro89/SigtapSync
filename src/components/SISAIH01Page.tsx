@@ -1,10 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import {
   FileText,
   Upload,
@@ -21,10 +23,13 @@ import {
   MapPin,
   Calendar,
   Hospital,
-  Stethoscope
+  Stethoscope,
+  Database,
+  Eye
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
 import {
   processarArquivoSISAIH01,
   gerarEstatisticas,
@@ -34,6 +39,11 @@ import {
 } from '../utils/sisaih01Parser';
 
 const SISAIH01Page = () => {
+  // 🔐 Pegar dados do usuário logado
+  const { user, getCurrentHospital, canAccessAllHospitals } = useAuth();
+  const hospitalIdUsuario = getCurrentHospital();
+  
+  // Estados existentes
   const [registros, setRegistros] = useState<RegistroSISAIH01[]>([]);
   const [registrosFiltrados, setRegistrosFiltrados] = useState<RegistroSISAIH01[]>([]);
   const [estatisticas, setEstatisticas] = useState<EstatisticasSISAIH01 | null>(null);
@@ -46,7 +56,15 @@ const SISAIH01Page = () => {
   const [conteudoManual, setConteudoManual] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // 🆕 Estados para registros salvos no banco
+  const [registrosSalvos, setRegistrosSalvos] = useState<any[]>([]);
+  const [isLoadingSalvos, setIsLoadingSalvos] = useState(false);
+  const [paginaAtualSalvos, setPaginaAtualSalvos] = useState(1);
+  const [totalRegistrosSalvos, setTotalRegistrosSalvos] = useState(0);
+  const [buscaSalvos, setBuscaSalvos] = useState('');
+  
   const registrosPorPagina = 20;
+  const registrosPorPaginaSalvos = 50;
 
   // Processar arquivo ou conteúdo
   const processarConteudo = async (conteudo: string) => {
@@ -144,10 +162,19 @@ const SISAIH01Page = () => {
       toast.error('Nenhum registro para salvar');
       return;
     }
+    
+    // 🔐 Validar se usuário tem hospital vinculado
+    if (!hospitalIdUsuario || hospitalIdUsuario === 'ALL') {
+      toast.error('Usuário sem hospital vinculado', {
+        description: 'Entre em contato com o administrador para vincular seu usuário a um hospital específico'
+      });
+      return;
+    }
+    
     setShowSaveConfirmation(true);
   };
 
-  // Salvar no banco de dados (simplificado - sem autenticação)
+  // Salvar no banco de dados usando o hospital do usuário logado
   const handleSalvarNoBanco = async () => {
     setShowSaveConfirmation(false);
     setIsSaving(true);
@@ -164,6 +191,7 @@ const SISAIH01Page = () => {
 
     try {
       console.log(`📦 Iniciando salvamento de ${registros.length} registros em ${totalBatches} lotes`);
+      console.log(`🏥 Hospital do usuário: ${hospitalIdUsuario}`);
 
       for (let i = 0; i < totalBatches; i++) {
         const inicio = i * BATCH_SIZE;
@@ -176,13 +204,14 @@ const SISAIH01Page = () => {
           return str.length > maxLength ? str.substring(0, maxLength) : str;
         };
 
-        // Preparar dados para inserção (com validação de tamanho)
+        // 🏥 Preparar dados usando o hospital_id do usuário logado
         const dadosParaInserir = lote.map(r => ({
           numero_aih: truncate(r.numero_aih, 13)!,
           tipo_aih: truncate(r.tipo_aih, 2)!,
           tipo_aih_descricao: truncate(r.tipo_aih_descricao, 50),
           cnes_hospital: truncate(r.cnes_hospital, 7),
           municipio_hospital: truncate(r.municipio_hospital, 6),
+          hospital_id: hospitalIdUsuario, // 🔐 Usar hospital do usuário logado
           competencia: truncate(r.competencia, 6),
           data_emissao: r.data_emissao || null,
           data_internacao: r.data_internacao,
@@ -281,16 +310,20 @@ const SISAIH01Page = () => {
 
       toast.dismiss(loadingToast);
 
-      console.log(`📊 Resumo: ${sucessos} salvos, ${erros} erros de ${registros.length} total`);
+      console.log(`\n📊 RESUMO DO SALVAMENTO:`);
+      console.log(`   ✅ Registros salvos: ${sucessos}`);
+      console.log(`   ❌ Registros com erro: ${erros}`);
+      console.log(`   📦 Total processado: ${registros.length}`);
+      console.log(`   🏥 Hospital: ${hospitalIdUsuario}`);
 
       if (erros === 0) {
         toast.success(`✅ ${sucessos} registros salvos com sucesso!`, {
-          description: 'Dados gravados na tabela aih_registros',
+          description: `Todos os registros foram vinculados ao seu hospital`,
           duration: 5000
         });
       } else if (sucessos > 0) {
         toast.warning(`⚠️ ${sucessos} salvos, ${erros} com erro`, {
-          description: 'Verifique o console para detalhes dos erros',
+          description: `Verifique o console para detalhes dos erros`,
           duration: 7000
         });
       } else {
@@ -328,11 +361,68 @@ const SISAIH01Page = () => {
     }
   };
 
-  // Paginação
+  // 🆕 Carregar registros salvos no banco de dados
+  const carregarRegistrosSalvos = async () => {
+    if (!hospitalIdUsuario) return;
+    
+    setIsLoadingSalvos(true);
+    try {
+      console.log('📊 Carregando registros salvos do banco...');
+      
+      // Construir query base
+      let query = supabase
+        .from('aih_registros')
+        .select('*', { count: 'exact' });
+      
+      // 🔐 Filtrar por hospital (exceto admins)
+      if (!canAccessAllHospitals()) {
+        query = query.eq('hospital_id', hospitalIdUsuario);
+      }
+      
+      // Aplicar busca se houver
+      if (buscaSalvos.trim()) {
+        query = query.or(`nome_paciente.ilike.%${buscaSalvos}%,cns.ilike.%${buscaSalvos}%,numero_aih.ilike.%${buscaSalvos}%,cpf.ilike.%${buscaSalvos}%`);
+      }
+      
+      // Paginação
+      const inicio = (paginaAtualSalvos - 1) * registrosPorPaginaSalvos;
+      query = query
+        .order('created_at', { ascending: false })
+        .range(inicio, inicio + registrosPorPaginaSalvos - 1);
+      
+      const { data, error, count } = await query;
+      
+      if (error) {
+        console.error('Erro ao carregar registros:', error);
+        toast.error('Erro ao carregar registros salvos');
+        return;
+      }
+      
+      setRegistrosSalvos(data || []);
+      setTotalRegistrosSalvos(count || 0);
+      
+      console.log(`✅ ${data?.length || 0} registros carregados (${count} total)`);
+    } catch (error) {
+      console.error('Erro ao carregar registros:', error);
+      toast.error('Erro ao carregar registros');
+    } finally {
+      setIsLoadingSalvos(false);
+    }
+  };
+
+  // 🆕 Carregar registros ao montar o componente ou mudar página/busca
+  useEffect(() => {
+    carregarRegistrosSalvos();
+  }, [hospitalIdUsuario, paginaAtualSalvos, buscaSalvos]);
+
+  // Paginação (registros processados)
   const totalPaginas = Math.ceil(registrosFiltrados.length / registrosPorPagina);
   const indiceInicio = (paginaAtual - 1) * registrosPorPagina;
   const indiceFim = indiceInicio + registrosPorPagina;
   const registrosPagina = registrosFiltrados.slice(indiceInicio, indiceFim);
+  
+  // Paginação (registros salvos)
+  const totalPaginasSalvos = Math.ceil(totalRegistrosSalvos / registrosPorPaginaSalvos);
 
   return (
     <div className="space-y-6">
@@ -349,8 +439,25 @@ const SISAIH01Page = () => {
         </div>
       </div>
 
-      {/* Upload de Arquivo */}
-      <Card>
+      {/* 🆕 Sistema de Abas */}
+      <Tabs defaultValue="upload" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 lg:w-auto">
+          <TabsTrigger value="upload" className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Upload e Processamento
+          </TabsTrigger>
+          <TabsTrigger value="registros" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Registros Salvos ({totalRegistrosSalvos})
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ======================== */}
+        {/* ABA 1: UPLOAD */}
+        {/* ======================== */}
+        <TabsContent value="upload" className="space-y-6 mt-6">
+          {/* Upload de Arquivo */}
+          <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
@@ -791,6 +898,164 @@ const SISAIH01Page = () => {
           </CardContent>
         </Card>
       )}
+        </TabsContent>
+
+        {/* ======================== */}
+        {/* ABA 2: REGISTROS SALVOS */}
+        {/* ======================== */}
+        <TabsContent value="registros" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5" />
+                    Registros Salvos no Banco de Dados
+                  </CardTitle>
+                  <CardDescription>
+                    {totalRegistrosSalvos} registro(s) encontrado(s) no seu hospital
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={carregarRegistrosSalvos}
+                  variant="outline"
+                  size="sm"
+                  disabled={isLoadingSalvos}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingSalvos ? 'animate-spin' : ''}`} />
+                  Atualizar
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Busca */}
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    value={buscaSalvos}
+                    onChange={(e) => {
+                      setBuscaSalvos(e.target.value);
+                      setPaginaAtualSalvos(1);
+                    }}
+                    placeholder="Buscar por nome, CNS, AIH ou CPF..."
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Tabela de Registros */}
+              {isLoadingSalvos ? (
+                <div className="py-12 text-center">
+                  <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+                  <p className="text-gray-600">Carregando registros...</p>
+                </div>
+              ) : registrosSalvos.length > 0 ? (
+                <>
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gray-50">
+                            <TableHead className="font-semibold">Número AIH</TableHead>
+                            <TableHead className="font-semibold">Tipo</TableHead>
+                            <TableHead className="font-semibold">Paciente</TableHead>
+                            <TableHead className="font-semibold">CNS</TableHead>
+                            <TableHead className="font-semibold">CPF</TableHead>
+                            <TableHead className="font-semibold">Nasc.</TableHead>
+                            <TableHead className="font-semibold">Sexo</TableHead>
+                            <TableHead className="font-semibold">Mãe</TableHead>
+                            <TableHead className="font-semibold">Internação</TableHead>
+                            <TableHead className="font-semibold">Saída</TableHead>
+                            <TableHead className="font-semibold">Proc. Realizado</TableHead>
+                            <TableHead className="font-semibold">Diag. Principal</TableHead>
+                            <TableHead className="font-semibold">Município</TableHead>
+                            <TableHead className="font-semibold">CNES</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {registrosSalvos.map((registro, index) => (
+                            <TableRow key={registro.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <TableCell className="font-mono text-sm">{registro.numero_aih}</TableCell>
+                              <TableCell>
+                                <Badge variant={registro.tipo_aih === '01' ? 'default' : 'secondary'}>
+                                  {registro.tipo_aih_descricao || registro.tipo_aih}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-medium max-w-[200px] truncate" title={registro.nome_paciente}>
+                                {registro.nome_paciente}
+                              </TableCell>
+                              <TableCell className="font-mono text-sm">{registro.cns || '-'}</TableCell>
+                              <TableCell className="font-mono text-sm">{registro.cpf || '-'}</TableCell>
+                              <TableCell className="text-sm">{registro.data_nascimento ? new Date(registro.data_nascimento).toLocaleDateString('pt-BR') : '-'}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className={registro.sexo === 'M' ? 'border-blue-300 text-blue-700' : 'border-pink-300 text-pink-700'}>
+                                  {registro.sexo === 'M' ? '♂ M' : '♀ F'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="max-w-[150px] truncate text-sm" title={registro.nome_mae}>
+                                {registro.nome_mae || '-'}
+                              </TableCell>
+                              <TableCell className="text-sm">{registro.data_internacao ? new Date(registro.data_internacao).toLocaleDateString('pt-BR') : '-'}</TableCell>
+                              <TableCell className="text-sm">{registro.data_saida ? new Date(registro.data_saida).toLocaleDateString('pt-BR') : '-'}</TableCell>
+                              <TableCell className="font-mono text-sm">{registro.procedimento_realizado || '-'}</TableCell>
+                              <TableCell className="font-mono text-sm">{registro.diagnostico_principal || '-'}</TableCell>
+                              <TableCell className="text-sm">{registro.municipio_hospital || '-'}</TableCell>
+                              <TableCell className="font-mono text-sm">{registro.cnes_hospital || '-'}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+
+                  {/* Paginação */}
+                  {totalPaginasSalvos > 1 && (
+                    <div className="mt-4 flex items-center justify-between">
+                      <p className="text-sm text-gray-600">
+                        Mostrando {((paginaAtualSalvos - 1) * registrosPorPaginaSalvos) + 1} a{' '}
+                        {Math.min(paginaAtualSalvos * registrosPorPaginaSalvos, totalRegistrosSalvos)} de{' '}
+                        {totalRegistrosSalvos} registros
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPaginaAtualSalvos(p => Math.max(1, p - 1))}
+                          disabled={paginaAtualSalvos === 1}
+                        >
+                          Anterior
+                        </Button>
+                        <span className="flex items-center px-3 text-sm">
+                          Página {paginaAtualSalvos} de {totalPaginasSalvos}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPaginaAtualSalvos(p => Math.min(totalPaginasSalvos, p + 1))}
+                          disabled={paginaAtualSalvos === totalPaginasSalvos}
+                        >
+                          Próxima
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="py-12 text-center">
+                  <Database className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Nenhum registro encontrado
+                  </h3>
+                  <p className="text-gray-500">
+                    {buscaSalvos ? 'Tente ajustar os filtros de busca' : 'Faça upload e salve registros para vê-los aqui'}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Modal de Confirmação de Salvamento */}
       {showSaveConfirmation && (
