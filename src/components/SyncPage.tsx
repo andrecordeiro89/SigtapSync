@@ -491,18 +491,21 @@ const SyncPage = () => {
         </Button>
       </div>
 
-      {/* Informação sobre o fluxo */}
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          <strong>Etapa 1:</strong> Selecione hospital e competência do AIH Avançado → 
-          <strong> Etapa 2:</strong> Selecione hospital e competência do SISAIH01 → 
-          <strong> Etapa 3:</strong> Executar sincronização
-        </AlertDescription>
-      </Alert>
+      {/* Informação sobre o fluxo - Esconder se houver resultado */}
+      {!resultadoSync && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            <strong>Etapa 1:</strong> Selecione hospital e competência do AIH Avançado → 
+            <strong> Etapa 2:</strong> Selecione hospital e competência do SISAIH01 → 
+            <strong> Etapa 3:</strong> Executar sincronização
+          </AlertDescription>
+        </Alert>
+      )}
 
-      {/* ETAPA 1: AIH Avançado */}
-      <Card className={`border-2 ${etapa1Concluida ? 'border-green-300 bg-green-50/30' : 'border-blue-200'}`}>
+      {/* ETAPA 1: AIH Avançado - Esconder se houver resultado */}
+      {!resultadoSync && (
+        <Card className={`border-2 ${etapa1Concluida ? 'border-green-300 bg-green-50/30' : 'border-blue-200'}`}>
         <CardHeader className={`${etapa1Concluida ? 'bg-gradient-to-r from-green-50 to-emerald-50' : 'bg-gradient-to-r from-blue-50 to-indigo-50'}`}>
           <CardTitle className={`flex items-center gap-2 ${etapa1Concluida ? 'text-green-900' : 'text-blue-900'}`}>
             <Database className="h-5 w-5" />
@@ -604,8 +607,10 @@ const SyncPage = () => {
           </div>
         </CardContent>
       </Card>
+      )}
 
-      {/* ETAPA 2: SISAIH01 */}
+      {/* ETAPA 2: SISAIH01 - Esconder se houver resultado */}
+      {!resultadoSync && (
       <Card className={`border-2 ${!etapa1Concluida ? 'opacity-50 cursor-not-allowed' : etapa2Concluida ? 'border-green-300 bg-green-50/30' : 'border-purple-200'}`}>
         <CardHeader className={`${etapa2Concluida ? 'bg-gradient-to-r from-green-50 to-emerald-50' : 'bg-gradient-to-r from-purple-50 to-pink-50'}`}>
           <CardTitle className={`flex items-center gap-2 ${etapa2Concluida ? 'text-green-900' : 'text-purple-900'}`}>
@@ -710,8 +715,9 @@ const SyncPage = () => {
           </div>
         </CardContent>
       </Card>
+      )}
 
-      {/* ETAPA 3: Executar Sincronização */}
+      {/* ETAPA 3: Executar Sincronização - Esconder se houver resultado */}
       {etapa2Concluida && !resultadoSync && (
         <Card className="border-2 border-gradient-to-r from-purple-300 to-pink-300 bg-gradient-to-r from-purple-50 to-pink-50">
           <CardContent className="pt-6">
@@ -837,7 +843,7 @@ const SyncPage = () => {
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="rounded-lg border border-green-200 overflow-hidden">
-                  <div className="overflow-y-auto">
+                  <div className="max-h-[600px] overflow-y-auto">
                     <Table>
                       <TableHeader className="bg-green-50 sticky top-0">
                         <TableRow>
