@@ -38,6 +38,7 @@ const SyncPage = () => {
       status: 'sincronizado' | 'pendente' | 'nao_processado';
       aih_avancado?: any;
       sisaih01?: any;
+      procedure_description?: string | null;
     }>;
   } | null>(null);
   
@@ -453,6 +454,80 @@ const SyncPage = () => {
       console.log(`   ❌ Não Processados: ${naoProcessados}`);
       console.log(`   📈 Taxa de Sincronização: ${mapSISAIH01.size > 0 ? ((sincronizados / mapSISAIH01.size) * 100).toFixed(2) : 0}%`);
 
+      // Buscar descrições dos procedimentos na tabela sigtap_procedures
+      console.log('🔍 Buscando descrições dos procedimentos...');
+      const codigosProcedimentos = [...new Set(
+        detalhes
+          .filter(d => d.status === 'sincronizado' && d.aih_avancado?.procedure_requested)
+          .map(d => d.aih_avancado.procedure_requested) // Manter o formato original
+      )];
+
+      if (codigosProcedimentos.length > 0) {
+        console.log(`📋 Buscando ${codigosProcedimentos.length} procedimentos únicos...`);
+        console.log('📋 Exemplos de códigos:', codigosProcedimentos.slice(0, 3));
+        
+        // Tentar buscar com o formato original primeiro
+        const { data: procedimentos, error: errorProc } = await supabase
+          .from('sigtap_procedures')
+          .select('code, description')
+          .in('code', codigosProcedimentos);
+
+        if (errorProc) {
+          console.warn('⚠️ Erro ao buscar procedimentos do SIGTAP:', errorProc);
+        } else if (procedimentos && procedimentos.length > 0) {
+          console.log(`✅ ${procedimentos.length} procedimentos encontrados no SIGTAP`);
+          console.log('📋 Exemplo de procedimento encontrado:', procedimentos[0]);
+          
+          // Criar mapa de código → descrição (tentar múltiplos formatos)
+          const mapProcedimentos = new Map<string, string>();
+          procedimentos.forEach(proc => {
+            if (proc.code && proc.description) {
+              // Adicionar no formato original
+              mapProcedimentos.set(proc.code, proc.description);
+              // Adicionar também sem formatação (só números)
+              const codigoSemFormatacao = proc.code.replace(/\D/g, '');
+              mapProcedimentos.set(codigoSemFormatacao, proc.description);
+            }
+          });
+
+          console.log(`📊 Mapa de procedimentos criado com ${mapProcedimentos.size} entradas`);
+
+          // Enriquecer detalhes com descrição do procedimento
+          detalhes.forEach(detalhe => {
+            if (detalhe.aih_avancado?.procedure_requested) {
+              const codigoOriginal = detalhe.aih_avancado.procedure_requested;
+              
+              // Tentar encontrar com código original
+              let descricao = mapProcedimentos.get(codigoOriginal);
+              
+              // Se não encontrar, tentar sem formatação
+              if (!descricao) {
+                const codigoSemFormatacao = codigoOriginal.replace(/\D/g, '');
+                descricao = mapProcedimentos.get(codigoSemFormatacao);
+              }
+              
+              detalhe.procedure_description = descricao || null;
+            }
+          });
+
+          const comDescricao = detalhes.filter(d => d.procedure_description).length;
+          console.log(`✅ ${comDescricao} de ${detalhes.filter(d => d.status === 'sincronizado').length} registros sincronizados com descrição`);
+        } else {
+          console.warn('⚠️ Nenhum procedimento encontrado na tabela sigtap_procedures');
+          console.log('💡 Verificando formato dos códigos no banco de dados...');
+          
+          // Buscar alguns exemplos para ver o formato
+          const { data: amostra } = await supabase
+            .from('sigtap_procedures')
+            .select('code')
+            .limit(5);
+          
+          if (amostra && amostra.length > 0) {
+            console.log('📋 Exemplos de códigos na tabela sigtap_procedures:', amostra.map(p => p.code));
+          }
+        }
+      }
+
       setResultadoSync({
         sincronizados,
         pendentes,
@@ -473,7 +548,7 @@ const SyncPage = () => {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="w-full px-6 py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -847,13 +922,13 @@ const SyncPage = () => {
                     <Table>
                       <TableHeader className="bg-green-50 sticky top-0">
                         <TableRow>
-                          <TableHead className="font-semibold text-green-900 w-16">#</TableHead>
-                          <TableHead className="font-semibold text-green-900">Número AIH</TableHead>
+                          <TableHead className="font-semibold text-green-900 w-12">#</TableHead>
+                          <TableHead className="font-semibold text-green-900 w-32">Número AIH</TableHead>
                           <TableHead className="font-semibold text-green-900">Paciente</TableHead>
-                          <TableHead className="font-semibold text-green-900">Data Internação</TableHead>
-                          <TableHead className="font-semibold text-green-900 text-center">Qtd. Proc.</TableHead>
-                          <TableHead className="font-semibold text-green-900">Procedimento Principal</TableHead>
-                          <TableHead className="font-semibold text-green-900 text-right">Valor Total</TableHead>
+                          <TableHead className="font-semibold text-green-900 w-28">Data Intern.</TableHead>
+                          <TableHead className="font-semibold text-green-900 text-center w-20">Qtd.</TableHead>
+                          <TableHead className="font-semibold text-green-900 w-64">Procedimento Principal</TableHead>
+                          <TableHead className="font-semibold text-green-900 text-right w-32">Valor Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -861,34 +936,45 @@ const SyncPage = () => {
                           .filter(d => d.status === 'sincronizado')
                           .map((detalhe, index) => (
                             <TableRow key={detalhe.numero_aih} className="hover:bg-green-50/50">
-                              <TableCell className="text-gray-600 font-medium">
+                              <TableCell className="text-gray-600 font-medium text-sm">
                                 {index + 1}
                               </TableCell>
-                              <TableCell>
-                                <span className="font-mono text-blue-600 font-medium text-sm">
+                              <TableCell className="w-32">
+                                <span className="font-mono text-blue-600 font-medium text-xs">
                                   {detalhe.numero_aih}
                                 </span>
                               </TableCell>
-                              <TableCell className="text-gray-700">
+                              <TableCell className="text-gray-700 text-sm">
                                 {detalhe.sisaih01?.nome_paciente || '-'}
                               </TableCell>
-                              <TableCell className="text-gray-600 text-sm">
+                              <TableCell className="text-gray-600 text-xs w-28">
                                 {detalhe.sisaih01?.data_internacao 
                                   ? new Date(detalhe.sisaih01.data_internacao).toLocaleDateString('pt-BR')
                                   : '-'}
                               </TableCell>
-                              <TableCell className="text-center">
-                                <span className="inline-flex items-center justify-center px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">
+                              <TableCell className="text-center w-20">
+                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">
                                   {detalhe.aih_avancado?.total_procedures || 0}
                                 </span>
                               </TableCell>
-                              <TableCell className="text-gray-700">
-                                <span className="font-mono text-xs">
-                                  {detalhe.aih_avancado?.procedure_requested || '-'}
-                                </span>
+                              <TableCell className="text-gray-700 w-64">
+                                {detalhe.procedure_description ? (
+                                  <div className="space-y-0.5">
+                                    <span className="font-mono text-xs text-blue-600 block">
+                                      {detalhe.aih_avancado?.procedure_requested || '-'}
+                                    </span>
+                                    <span className="text-xs text-gray-600 line-clamp-2">
+                                      {detalhe.procedure_description}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="font-mono text-xs">
+                                    {detalhe.aih_avancado?.procedure_requested || '-'}
+                                  </span>
+                                )}
                               </TableCell>
-                              <TableCell className="text-right">
-                                <span className="font-semibold text-green-700">
+                              <TableCell className="text-right w-32">
+                                <span className="font-semibold text-green-700 text-sm">
                                   {detalhe.aih_avancado?.calculated_total_value 
                                     ? new Intl.NumberFormat('pt-BR', {
                                         style: 'currency',
@@ -904,10 +990,26 @@ const SyncPage = () => {
                   </div>
                 </div>
                 
-                <div className="mt-4 text-center">
-                  <p className="text-sm text-gray-600">
-                    Total: <strong className="text-green-700">{resultadoSync.sincronizados}</strong> registros sincronizados
-                  </p>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                  <div className="text-center md:text-left">
+                    <p className="text-sm text-gray-600">
+                      Total de Registros: <strong className="text-green-700">{resultadoSync.sincronizados}</strong>
+                    </p>
+                  </div>
+                  <div className="text-center md:text-right">
+                    <p className="text-sm text-gray-600">
+                      Valor Total: <strong className="text-green-700 text-lg">
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL'
+                        }).format(
+                          resultadoSync.detalhes
+                            .filter(d => d.status === 'sincronizado')
+                            .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0) / 100
+                        )}
+                      </strong>
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
