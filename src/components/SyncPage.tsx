@@ -67,7 +67,9 @@ const SyncPage = () => {
         if (!canAccessAllHospitals() && userHospitalId && userHospitalId !== 'ALL') {
           setHospitalAIHSelecionado(userHospitalId);
           setHospitalSISAIH01Selecionado(userHospitalId);
-          console.log(`🏥 Hospital pré-selecionado: ${userHospitalId}`);
+          console.log(`🏥 Hospital pré-selecionado (modo operador): ${userHospitalId}`);
+        } else if (canAccessAllHospitals()) {
+          console.log(`🔓 Modo administrador: selecione manualmente o hospital`);
         }
         
         // Configurar também para SISAIH01
@@ -493,16 +495,22 @@ const SyncPage = () => {
               disabled={!canAccessAllHospitals() || etapa1Concluida}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
-              <option value="">Selecione o hospital...</option>
+              <option value="">
+                {canAccessAllHospitals() ? 'Selecione o hospital...' : 'Carregando...'}
+              </option>
               {hospitaisAIHAvancado.map(h => (
                 <option key={h.id} value={h.id}>
                   {h.name}
                 </option>
               ))}
             </select>
-            {!canAccessAllHospitals() && (
+            {!canAccessAllHospitals() ? (
               <p className="text-xs text-blue-600">
-                Hospital fixo: seu hospital vinculado
+                🔒 Hospital fixo: seu hospital vinculado
+              </p>
+            ) : (
+              <p className="text-xs text-green-600">
+                🔓 Modo Administrador: você pode selecionar qualquer hospital
               </p>
             )}
           </div>
@@ -592,19 +600,25 @@ const SyncPage = () => {
             <select
               value={hospitalSISAIH01Selecionado}
               onChange={(e) => setHospitalSISAIH01Selecionado(e.target.value)}
-              disabled={!etapa1Concluida || !canAccessAllHospitals() || etapa2Concluida}
+              disabled={!etapa1Concluida || (!canAccessAllHospitals()) || etapa2Concluida}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
-              <option value="">Selecione o hospital...</option>
+              <option value="">
+                {canAccessAllHospitals() ? 'Selecione o hospital...' : 'Carregando...'}
+              </option>
               {hospitaisSISAIH01.map(h => (
                 <option key={h.id} value={h.id}>
                   {h.name}
                 </option>
               ))}
             </select>
-            {!canAccessAllHospitals() && (
+            {!canAccessAllHospitals() ? (
               <p className="text-xs text-purple-600">
-                Hospital fixo: seu hospital vinculado
+                🔒 Hospital fixo: seu hospital vinculado
+              </p>
+            ) : (
+              <p className="text-xs text-green-600">
+                🔓 Modo Administrador: você pode selecionar qualquer hospital
               </p>
             )}
           </div>
