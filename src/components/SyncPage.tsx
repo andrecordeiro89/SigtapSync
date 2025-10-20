@@ -372,7 +372,15 @@ const SyncPage = () => {
                 ? new Date(d.aih_avancado.admission_date).toLocaleDateString('pt-BR')
                 : '-');
 
-          const procedimento = d.aih_avancado?.procedure_requested || '-';
+          // Procedimento com descrição (se disponível)
+          let procedimento = '';
+          if (d.procedure_description) {
+            const codigo = d.aih_avancado?.procedure_requested || d.sisaih01?.procedimento_realizado || '';
+            procedimento = `${codigo}\n${d.procedure_description}`;
+          } else {
+            procedimento = d.aih_avancado?.procedure_requested || d.sisaih01?.procedimento_realizado || '-';
+          }
+          
           const qtdProc = d.aih_avancado?.total_procedures || 0;
           
           const valor = d.aih_avancado?.calculated_total_value
@@ -624,7 +632,14 @@ const SyncPage = () => {
             ? new Date(d.aih_avancado.admission_date).toLocaleDateString('pt-BR')
             : '-';
 
-          const procedimento = d.aih_avancado?.procedure_requested || '-';
+          // Procedimento com descrição (se disponível)
+          let procedimento = '';
+          if (d.procedure_description) {
+            const codigo = d.aih_avancado?.procedure_requested || '';
+            procedimento = `${codigo}\n${d.procedure_description}`;
+          } else {
+            procedimento = d.aih_avancado?.procedure_requested || '-';
+          }
           
           const valor = d.aih_avancado?.calculated_total_value
             ? new Intl.NumberFormat('pt-BR', {
@@ -1160,11 +1175,17 @@ const SyncPage = () => {
       console.log('🔍 Buscando descrições dos procedimentos de TODAS as AIHs...');
       
       // Pegar códigos de TODOS os registros (sincronizados, pendentes e não processados)
-      const codigosProcedimentos = [...new Set(
-        detalhes
+      // Incluir procedimentos de AIH Avançado e SISAIH01
+      const codigosProcedimentos = [...new Set([
+        // Procedimentos do AIH Avançado (sincronizados e pendentes)
+        ...detalhes
           .filter(d => d.aih_avancado?.procedure_requested)
-          .map(d => d.aih_avancado.procedure_requested)
-      )];
+          .map(d => d.aih_avancado.procedure_requested),
+        // Procedimentos do SISAIH01 (não processados)
+        ...detalhes
+          .filter(d => d.sisaih01?.procedimento_realizado)
+          .map(d => d.sisaih01.procedimento_realizado)
+      ])].filter(Boolean); // Remover valores vazios
 
       if (codigosProcedimentos.length > 0) {
         console.log(`📋 Buscando ${codigosProcedimentos.length} procedimentos únicos...`);
@@ -1206,13 +1227,20 @@ const SyncPage = () => {
               }
             });
             
-            // Enriquecer detalhes
+            // Enriquecer detalhes (busca alternativa)
             let encontrados = 0;
             detalhes.forEach(detalhe => {
+              let codigoOriginal: string | null = null;
+              
+              // Buscar código de AIH Avançado ou SISAIH01
               if (detalhe.aih_avancado?.procedure_requested) {
-                const codigoOriginal = detalhe.aih_avancado.procedure_requested;
+                codigoOriginal = detalhe.aih_avancado.procedure_requested;
+              } else if (detalhe.sisaih01?.procedimento_realizado) {
+                codigoOriginal = detalhe.sisaih01.procedimento_realizado;
+              }
+              
+              if (codigoOriginal) {
                 const codigoNorm = codigoOriginal.replace(/[.\-\s]/g, '');
-                
                 const descricao = mapProcedimentos.get(codigoOriginal) || mapProcedimentos.get(codigoNorm);
                 if (descricao) {
                   detalhe.procedure_description = descricao;
@@ -1258,9 +1286,19 @@ const SyncPage = () => {
           let naoEncontrados = 0;
           
           detalhes.forEach(detalhe => {
+            let codigoOriginal: string | null = null;
+            let fonte: string = '';
+            
+            // Determinar qual código usar (AIH Avançado ou SISAIH01)
             if (detalhe.aih_avancado?.procedure_requested) {
-              const codigoOriginal = detalhe.aih_avancado.procedure_requested;
-              
+              codigoOriginal = detalhe.aih_avancado.procedure_requested;
+              fonte = 'AIH Avançado';
+            } else if (detalhe.sisaih01?.procedimento_realizado) {
+              codigoOriginal = detalhe.sisaih01.procedimento_realizado;
+              fonte = 'SISAIH01';
+            }
+            
+            if (codigoOriginal) {
               // Tentar encontrar em TODAS as variações
               let descricao = 
                 mapProcedimentos.get(codigoOriginal) || // Original
@@ -1274,18 +1312,20 @@ const SyncPage = () => {
                 detalhe.procedure_description = descricao;
                 encontrados++;
                 if (encontrados <= 3) {
-                  console.log(`   ✅ ${codigoOriginal} → ${descricao.substring(0, 50)}...`);
+                  console.log(`   ✅ [${fonte}] ${codigoOriginal} → ${descricao.substring(0, 50)}...`);
                 }
               } else {
                 naoEncontrados++;
                 if (naoEncontrados <= 3) {
-                  console.warn(`   ⚠️ Não encontrado: ${codigoOriginal} (testadas ${mapProcedimentos.size / procedimentos.length} variações)`);
+                  console.warn(`   ⚠️ [${fonte}] Não encontrado: ${codigoOriginal}`);
                 }
               }
             }
           });
 
-          const totalComProcedimento = detalhes.filter(d => d.aih_avancado?.procedure_requested).length;
+          const totalComProcedimento = detalhes.filter(d => 
+            d.aih_avancado?.procedure_requested || d.sisaih01?.procedimento_realizado
+          ).length;
           console.log(`✅ ${encontrados} de ${totalComProcedimento} procedimentos encontrados`);
           if (naoEncontrados > 0) {
             console.warn(`⚠️ ${naoEncontrados} procedimentos não encontrados no SIGTAP`);
@@ -2124,13 +2164,30 @@ const SyncPage = () => {
                               </TableCell>
                               <TableCell className="text-center w-20">
                                 <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 text-xs font-semibold">
-                                  -
+                                  {detalhe.sisaih01?.procedimento_realizado ? '1' : '-'}
                                 </span>
                               </TableCell>
                               <TableCell className="text-gray-700 w-64">
-                                <span className="text-xs text-gray-500 italic">
-                                  Dados de procedimento não disponíveis no SISAIH01
-                                </span>
+                                {detalhe.sisaih01?.procedimento_realizado ? (
+                                  detalhe.procedure_description ? (
+                                    <div className="space-y-1">
+                                      <span className="font-mono text-xs text-blue-600 block">
+                                        {detalhe.sisaih01.procedimento_realizado}
+                                      </span>
+                                      <span className="text-xs text-gray-600 block leading-relaxed">
+                                        {detalhe.procedure_description}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="font-mono text-xs">
+                                      {detalhe.sisaih01.procedimento_realizado}
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="text-xs text-gray-500 italic">
+                                    Dados de procedimento não disponíveis
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell className="text-right w-32">
                                 <span className="font-semibold text-gray-500 text-sm">
