@@ -528,6 +528,120 @@ const SyncPage = () => {
         }
       }
 
+      // 🆕 BUSCAR NOMES DOS PACIENTES
+      console.log('🔍 Buscando nomes dos pacientes...');
+      
+      // 1. Para AIHs Pendentes (Etapa 1): buscar na tabela patients
+      const patientIds = [...new Set(
+        detalhes
+          .filter(d => (d.status === 'pendente' || d.status === 'sincronizado') && d.aih_avancado?.patient_id)
+          .map(d => d.aih_avancado.patient_id)
+      )];
+
+      if (patientIds.length > 0) {
+        console.log(`📋 Buscando ${patientIds.length} pacientes únicos na tabela patients...`);
+        console.log('📋 Exemplos de IDs:', patientIds.slice(0, 3));
+        
+        // Validar e limpar IDs
+        const validPatientIds = patientIds.filter(id => {
+          if (!id) {
+            console.warn('⚠️ ID vazio ou null encontrado');
+            return false;
+          }
+          if (typeof id !== 'string') {
+            console.warn('⚠️ ID não é string:', typeof id, id);
+            return false;
+          }
+          if (id.length < 10) {
+            console.warn('⚠️ ID muito curto (< 10 chars):', id);
+            return false;
+          }
+          return true;
+        });
+
+        console.log(`✅ ${validPatientIds.length} IDs válidos de ${patientIds.length} totais`);
+        
+        if (validPatientIds.length === 0) {
+          console.warn('⚠️ Nenhum ID válido para buscar');
+        } else {
+          // Limitar a 100 IDs por vez para evitar query muito grande
+          const batchSize = 100;
+          const allPacientes: any[] = [];
+          
+          for (let i = 0; i < validPatientIds.length; i += batchSize) {
+            const batch = validPatientIds.slice(i, i + batchSize);
+            console.log(`📋 Buscando batch ${Math.floor(i/batchSize) + 1} com ${batch.length} IDs...`);
+            
+            const { data: pacientes, error: errorPacientes } = await supabase
+              .from('patients')
+              .select('id, name')
+              .in('id', batch);
+
+            if (errorPacientes) {
+              console.error('❌ Erro ao buscar pacientes (batch):', errorPacientes);
+              console.error('   Batch com erro:', batch.slice(0, 3));
+              console.error('   Detalhes:', JSON.stringify(errorPacientes, null, 2));
+            } else if (pacientes && pacientes.length > 0) {
+              allPacientes.push(...pacientes);
+            }
+          }
+
+          const pacientes = allPacientes;
+
+          if (pacientes && pacientes.length > 0) {
+          console.log(`✅ ${pacientes.length} pacientes encontrados na tabela patients`);
+          console.log('📋 Exemplos encontrados:', pacientes.slice(0, 3).map(p => ({ id: p.id?.substring(0, 8), name: p.name })));
+          
+          // Criar mapa de patient_id → nome
+          const mapPacientes = new Map<string, string>();
+          pacientes.forEach(pac => {
+            if (pac.id && pac.name) {
+              mapPacientes.set(pac.id, pac.name);
+              console.log(`   Adicionado ao mapa: ${pac.id.substring(0, 8)}... → ${pac.name}`);
+            }
+          });
+
+          console.log(`📊 Mapa de pacientes criado com ${mapPacientes.size} entradas`);
+
+          // Enriquecer detalhes com nome do paciente
+          let enriquecidos = 0;
+          let naoEncontrados = 0;
+          detalhes.forEach(detalhe => {
+            if (detalhe.aih_avancado?.patient_id) {
+              const nome = mapPacientes.get(detalhe.aih_avancado.patient_id);
+              if (nome) {
+                detalhe.aih_avancado.patient_name = nome;
+                enriquecidos++;
+                if (enriquecidos <= 3) {
+                  console.log(`   ✅ Enriquecido: ${detalhe.aih_avancado.patient_id.substring(0, 8)}... → ${nome}`);
+                }
+              } else {
+                naoEncontrados++;
+                if (naoEncontrados <= 3) {
+                  console.warn(`   ⚠️ Não encontrado: ${detalhe.aih_avancado.patient_id.substring(0, 8)}...`);
+                }
+              }
+            }
+          });
+
+          console.log(`✅ ${enriquecidos} registros enriquecidos com nome de paciente`);
+          if (naoEncontrados > 0) {
+            console.warn(`⚠️ ${naoEncontrados} patient_ids não encontrados na tabela patients`);
+          }
+          } else {
+            console.warn('⚠️ Nenhum paciente encontrado na tabela patients');
+            console.warn('   IDs válidos buscados:', validPatientIds.length);
+            console.warn('   Resultado da query:', pacientes);
+          }
+        }
+      } else {
+        console.log('ℹ️ Nenhum patient_id para buscar');
+      }
+
+      // 2. Para AIHs Não Processadas (Etapa 2): já vem com nome_paciente do SISAIH01
+      const comNomeSISAIH01 = detalhes.filter(d => d.sisaih01?.nome_paciente).length;
+      console.log(`✅ ${comNomeSISAIH01} registros SISAIH01 já possuem nome do paciente`);
+
       setResultadoSync({
         sincronizados,
         pendentes,
@@ -945,7 +1059,7 @@ const SyncPage = () => {
                                 </span>
                               </TableCell>
                               <TableCell className="text-gray-700 text-sm">
-                                {detalhe.sisaih01?.nome_paciente || '-'}
+                                {detalhe.aih_avancado?.patient_name || detalhe.sisaih01?.nome_paciente || '-'}
                               </TableCell>
                               <TableCell className="text-gray-600 text-xs w-28">
                                 {detalhe.sisaih01?.data_internacao 
@@ -1008,6 +1122,221 @@ const SyncPage = () => {
                             .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0) / 100
                         )}
                       </strong>
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tabela de AIHs Pendentes (Etapa 1 - AIH Avançado) */}
+          {resultadoSync.pendentes > 0 && (
+            <Card className="border-2 border-orange-200">
+              <CardHeader className="bg-gradient-to-r from-orange-50 to-amber-50">
+                <CardTitle className="flex items-center gap-2 text-orange-900">
+                  ⏳ AIHs Pendentes de Confirmação SUS
+                  <span className="text-sm font-normal text-orange-600">
+                    ({resultadoSync.pendentes} registros)
+                  </span>
+                </CardTitle>
+                <CardDescription>
+                  AIHs que estão apenas no AIH Avançado (Etapa 1), aguardando confirmação pelo SUS no SISAIH01
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="rounded-lg border border-orange-200 overflow-hidden">
+                  <div className="max-h-[600px] overflow-y-auto">
+                    <Table>
+                      <TableHeader className="bg-orange-50 sticky top-0">
+                        <TableRow>
+                          <TableHead className="font-semibold text-orange-900 w-12">#</TableHead>
+                          <TableHead className="font-semibold text-orange-900 w-32">Número AIH</TableHead>
+                          <TableHead className="font-semibold text-orange-900">Paciente</TableHead>
+                          <TableHead className="font-semibold text-orange-900 w-28">Data Intern.</TableHead>
+                          <TableHead className="font-semibold text-orange-900 text-center w-20">Qtd.</TableHead>
+                          <TableHead className="font-semibold text-orange-900 w-64">Procedimento Principal</TableHead>
+                          <TableHead className="font-semibold text-orange-900 text-right w-32">Valor Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {resultadoSync.detalhes
+                          .filter(d => d.status === 'pendente')
+                          .map((detalhe, index) => (
+                            <TableRow key={detalhe.numero_aih} className="hover:bg-orange-50/50">
+                              <TableCell className="text-gray-600 font-medium text-sm">
+                                {index + 1}
+                              </TableCell>
+                              <TableCell className="w-32">
+                                <div className="space-y-1">
+                                  <span className="font-mono text-blue-600 font-medium text-xs block">
+                                    {detalhe.numero_aih}
+                                  </span>
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800">
+                                    Etapa 1
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-gray-700 text-sm">
+                                {detalhe.aih_avancado?.patient_name || (
+                                  detalhe.aih_avancado?.patient_id ? (
+                                    <span className="text-gray-500 italic text-xs">
+                                      ID: {detalhe.aih_avancado.patient_id.substring(0, 8)}...
+                                    </span>
+                                  ) : '-'
+                                )}
+                              </TableCell>
+                              <TableCell className="text-gray-600 text-xs w-28">
+                                {detalhe.aih_avancado?.admission_date 
+                                  ? new Date(detalhe.aih_avancado.admission_date).toLocaleDateString('pt-BR')
+                                  : '-'}
+                              </TableCell>
+                              <TableCell className="text-center w-20">
+                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">
+                                  {detalhe.aih_avancado?.total_procedures || 0}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-gray-700 w-64">
+                                {detalhe.procedure_description ? (
+                                  <div className="space-y-0.5">
+                                    <span className="font-mono text-xs text-blue-600 block">
+                                      {detalhe.aih_avancado?.procedure_requested || '-'}
+                                    </span>
+                                    <span className="text-xs text-gray-600 line-clamp-2">
+                                      {detalhe.procedure_description}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="font-mono text-xs">
+                                    {detalhe.aih_avancado?.procedure_requested || '-'}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right w-32">
+                                <span className="font-semibold text-orange-700 text-sm">
+                                  {detalhe.aih_avancado?.calculated_total_value 
+                                    ? new Intl.NumberFormat('pt-BR', {
+                                        style: 'currency',
+                                        currency: 'BRL'
+                                      }).format(detalhe.aih_avancado.calculated_total_value / 100)
+                                    : '-'}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+                
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                  <div className="text-center md:text-left">
+                    <p className="text-sm text-gray-600">
+                      Total de Registros: <strong className="text-orange-700">{resultadoSync.pendentes}</strong>
+                    </p>
+                  </div>
+                  <div className="text-center md:text-right">
+                    <p className="text-sm text-gray-600">
+                      Valor Total: <strong className="text-orange-700 text-lg">
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL'
+                        }).format(
+                          resultadoSync.detalhes
+                            .filter(d => d.status === 'pendente')
+                            .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0) / 100
+                        )}
+                      </strong>
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tabela de AIHs Não Processadas (Etapa 2 - SISAIH01) */}
+          {resultadoSync.naoProcessados > 0 && (
+            <Card className="border-2 border-red-200">
+              <CardHeader className="bg-gradient-to-r from-red-50 to-rose-50">
+                <CardTitle className="flex items-center gap-2 text-red-900">
+                  ❌ AIHs Não Processadas no Sistema
+                  <span className="text-sm font-normal text-red-600">
+                    ({resultadoSync.naoProcessados} registros)
+                  </span>
+                </CardTitle>
+                <CardDescription>
+                  AIHs que estão apenas no SISAIH01 (Etapa 2), confirmadas pelo SUS mas faltam no sistema interno
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="rounded-lg border border-red-200 overflow-hidden">
+                  <div className="max-h-[600px] overflow-y-auto">
+                    <Table>
+                      <TableHeader className="bg-red-50 sticky top-0">
+                        <TableRow>
+                          <TableHead className="font-semibold text-red-900 w-12">#</TableHead>
+                          <TableHead className="font-semibold text-red-900 w-32">Número AIH</TableHead>
+                          <TableHead className="font-semibold text-red-900">Paciente</TableHead>
+                          <TableHead className="font-semibold text-red-900 w-28">Data Intern.</TableHead>
+                          <TableHead className="font-semibold text-red-900 text-center w-20">Qtd.</TableHead>
+                          <TableHead className="font-semibold text-red-900 w-64">Procedimento Principal</TableHead>
+                          <TableHead className="font-semibold text-red-900 text-right w-32">Valor Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {resultadoSync.detalhes
+                          .filter(d => d.status === 'nao_processado')
+                          .map((detalhe, index) => (
+                            <TableRow key={detalhe.numero_aih} className="hover:bg-red-50/50">
+                              <TableCell className="text-gray-600 font-medium text-sm">
+                                {index + 1}
+                              </TableCell>
+                              <TableCell className="w-32">
+                                <div className="space-y-1">
+                                  <span className="font-mono text-blue-600 font-medium text-xs block">
+                                    {detalhe.numero_aih}
+                                  </span>
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800">
+                                    Etapa 2
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-gray-700 text-sm">
+                                {detalhe.sisaih01?.nome_paciente || '-'}
+                              </TableCell>
+                              <TableCell className="text-gray-600 text-xs w-28">
+                                {detalhe.sisaih01?.data_internacao 
+                                  ? new Date(detalhe.sisaih01.data_internacao).toLocaleDateString('pt-BR')
+                                  : '-'}
+                              </TableCell>
+                              <TableCell className="text-center w-20">
+                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 text-xs font-semibold">
+                                  -
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-gray-700 w-64">
+                                <span className="text-xs text-gray-500 italic">
+                                  Dados de procedimento não disponíveis no SISAIH01
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right w-32">
+                                <span className="font-semibold text-gray-500 text-sm">
+                                  -
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+                
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="text-center md:text-left">
+                    <p className="text-sm text-gray-600">
+                      Total de Registros: <strong className="text-red-700">{resultadoSync.naoProcessados}</strong>
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      ⚠️ Estas AIHs precisam ser cadastradas no sistema interno para sincronização completa
                     </p>
                   </div>
                 </div>
