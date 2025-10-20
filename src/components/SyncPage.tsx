@@ -44,6 +44,10 @@ const SyncPage = () => {
   
   const [isLoading, setIsLoading] = useState(false);
 
+  // Estados para seleção e reapresentação em lote
+  const [aihsSelecionadas, setAihsSelecionadas] = useState<Set<string>>(new Set());
+  const [processandoReapresentacao, setProcessandoReapresentacao] = useState(false);
+
   // 🆕 Carregar opções ao montar o componente
   useEffect(() => {
     carregarOpcoes();
@@ -166,6 +170,123 @@ const SyncPage = () => {
   const formatarCompetencia = (comp: string) => {
     if (!comp || comp.length !== 6) return comp;
     return `${comp.substring(4, 6)}/${comp.substring(0, 4)}`;
+  };
+
+  // Função para calcular próxima competência (AAAAMM + 1 mês)
+  const calcularProximaCompetencia = (competenciaAtual: string): string => {
+    if (!competenciaAtual || competenciaAtual.length !== 6) return '';
+    
+    const ano = parseInt(competenciaAtual.substring(0, 4));
+    const mes = parseInt(competenciaAtual.substring(4, 6));
+    
+    let novoAno = ano;
+    let novoMes = mes + 1;
+    
+    if (novoMes > 12) {
+      novoMes = 1;
+      novoAno++;
+    }
+    
+    return `${novoAno}${novoMes.toString().padStart(2, '0')}`;
+  };
+
+  // Função para toggle seleção individual
+  const toggleSelecaoAIH = (numeroAIH: string) => {
+    setAihsSelecionadas(prev => {
+      const novoSet = new Set(prev);
+      if (novoSet.has(numeroAIH)) {
+        novoSet.delete(numeroAIH);
+      } else {
+        novoSet.add(numeroAIH);
+      }
+      return novoSet;
+    });
+  };
+
+  // Função para selecionar/desselecionar todas AIHs pendentes
+  const toggleSelecionarTodas = () => {
+    if (!resultadoSync) return;
+    
+    const aihsPendentes = resultadoSync.detalhes
+      .filter(d => d.status === 'pendente')
+      .map(d => d.numero_aih);
+    
+    if (aihsSelecionadas.size === aihsPendentes.length) {
+      // Desselecionar todas
+      setAihsSelecionadas(new Set());
+    } else {
+      // Selecionar todas
+      setAihsSelecionadas(new Set(aihsPendentes));
+    }
+  };
+
+  // Função para reapresentar AIHs selecionadas na próxima competência
+  const reapresentarAIHsNaProximaCompetencia = async () => {
+    if (aihsSelecionadas.size === 0) {
+      toast.error('Nenhuma AIH selecionada');
+      return;
+    }
+
+    const proximaCompetencia = calcularProximaCompetencia(competenciaAIHSelecionada);
+    
+    if (!proximaCompetencia) {
+      toast.error('Erro ao calcular próxima competência');
+      return;
+    }
+
+    const confirmar = window.confirm(
+      `Deseja reapresentar ${aihsSelecionadas.size} AIH(s) na competência ${formatarCompetencia(proximaCompetencia)}?\n\n` +
+      `Competência atual: ${formatarCompetencia(competenciaAIHSelecionada)}\n` +
+      `Próxima competência: ${formatarCompetencia(proximaCompetencia)}\n\n` +
+      `Esta ação irá atualizar a competência dessas AIHs no sistema.`
+    );
+
+    if (!confirmar) return;
+
+    setProcessandoReapresentacao(true);
+
+    try {
+      console.log(`🔄 Reapresentando ${aihsSelecionadas.size} AIHs...`);
+      console.log(`   Competência atual: ${competenciaAIHSelecionada}`);
+      console.log(`   Próxima competência: ${proximaCompetencia}`);
+      
+      const aihsArray = Array.from(aihsSelecionadas);
+      
+      // Atualizar em lote na tabela aihs
+      const { data, error } = await supabase
+        .from('aihs')
+        .update({ competencia: proximaCompetencia })
+        .in('aih_number', aihsArray)
+        .eq('hospital_id', hospitalAIHSelecionado)
+        .select();
+
+      if (error) {
+        console.error('❌ Erro ao atualizar competências:', error);
+        toast.error('Erro ao reapresentar AIHs: ' + error.message);
+        return;
+      }
+
+      console.log(`✅ ${data?.length || 0} AIHs atualizadas com sucesso`);
+      
+      toast.success(
+        `${aihsSelecionadas.size} AIH(s) reapresentada(s) com sucesso para ${formatarCompetencia(proximaCompetencia)}!`,
+        {
+          duration: 5000,
+        }
+      );
+
+      // Limpar seleções
+      setAihsSelecionadas(new Set());
+
+      // Recarregar dados da Etapa 1 para refletir as mudanças
+      await buscarAIHs();
+
+    } catch (error: any) {
+      console.error('❌ Erro inesperado:', error);
+      toast.error('Erro inesperado ao reapresentar AIHs');
+    } finally {
+      setProcessandoReapresentacao(false);
+    }
   };
 
   // Função para normalizar número AIH (remover todos os não-dígitos)
@@ -1144,11 +1265,51 @@ const SyncPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-6">
+                {/* Barra de ações para reapresentação */}
+                <div className="mb-4 flex items-center justify-between p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm text-orange-900">
+                      <strong>{aihsSelecionadas.size}</strong> AIH(s) selecionada(s)
+                    </div>
+                    {aihsSelecionadas.size > 0 && (
+                      <div className="text-xs text-orange-700">
+                        → Próxima competência: <strong>{formatarCompetencia(calcularProximaCompetencia(competenciaAIHSelecionada))}</strong>
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    onClick={reapresentarAIHsNaProximaCompetencia}
+                    disabled={aihsSelecionadas.size === 0 || processandoReapresentacao}
+                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    {processandoReapresentacao ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Processando...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Reapresentar na Próxima Competência
+                      </>
+                    )}
+                  </Button>
+                </div>
+
                 <div className="rounded-lg border border-orange-200 overflow-hidden">
                   <div className="max-h-[600px] overflow-y-auto">
                     <Table>
                       <TableHeader className="bg-orange-50 sticky top-0">
                         <TableRow>
+                          <TableHead className="font-semibold text-orange-900 w-16 text-center">
+                            <input
+                              type="checkbox"
+                              checked={resultadoSync.detalhes.filter(d => d.status === 'pendente').length > 0 && aihsSelecionadas.size === resultadoSync.detalhes.filter(d => d.status === 'pendente').length}
+                              onChange={toggleSelecionarTodas}
+                              className="cursor-pointer w-4 h-4"
+                              title="Selecionar todas"
+                            />
+                          </TableHead>
                           <TableHead className="font-semibold text-orange-900 w-12">#</TableHead>
                           <TableHead className="font-semibold text-orange-900 w-32">Número AIH</TableHead>
                           <TableHead className="font-semibold text-orange-900">Paciente</TableHead>
@@ -1163,6 +1324,14 @@ const SyncPage = () => {
                           .filter(d => d.status === 'pendente')
                           .map((detalhe, index) => (
                             <TableRow key={detalhe.numero_aih} className="hover:bg-orange-50/50">
+                              <TableCell className="text-center w-16">
+                                <input
+                                  type="checkbox"
+                                  checked={aihsSelecionadas.has(detalhe.numero_aih)}
+                                  onChange={() => toggleSelecaoAIH(detalhe.numero_aih)}
+                                  className="cursor-pointer w-4 h-4"
+                                />
+                              </TableCell>
                               <TableCell className="text-gray-600 font-medium text-sm">
                                 {index + 1}
                               </TableCell>
