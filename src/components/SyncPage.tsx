@@ -7,6 +7,8 @@ import { GitCompare, Database, RefreshCw, Info } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const SyncPage = () => {
   const { getCurrentHospital, canAccessAllHospitals } = useAuth();
@@ -220,6 +222,566 @@ const SyncPage = () => {
     }
   };
 
+  // Função para gerar relatório PDF de AIHs Sincronizadas
+  const gerarRelatorioPDFSincronizadas = async () => {
+    if (!resultadoSync) {
+      toast.error('Nenhum resultado de sincronização disponível');
+      return;
+    }
+
+    try {
+      console.log('📄 Gerando relatório PDF de AIHs Sincronizadas...');
+
+      // 🖼️ Carregar logo do CIS
+      let logoBase64 = null;
+      try {
+        const response = await fetch('/CIS Sem fundo.jpg');
+        const blob = await response.blob();
+        logoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch (error) {
+        console.error('⚠️ Erro ao carregar logo:', error);
+      }
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
+      let yPosition = 20;
+
+      // ========== CABEÇALHO PROFISSIONAL COM LOGO ==========
+      // Inserir Logo CIS (se carregado)
+      if (logoBase64) {
+        const logoWidth = 35;
+        const logoHeight = 17.5;
+        const logoX = 15;
+        const logoY = 8;
+        doc.addImage(logoBase64, 'JPEG', logoX, logoY, logoWidth, logoHeight);
+      }
+
+      // Título do Documento (centralizado)
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 102, 204); // Azul suave institucional
+      doc.text('RELATÓRIO DE AIHs SINCRONIZADAS', pageWidth / 2, 18, { align: 'center' });
+
+      // Subtítulo
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(80, 80, 80);
+      doc.text('CIS - Centro Integrado em Saúde', pageWidth / 2, 25, { align: 'center' });
+
+      // Linha divisória profissional
+      doc.setDrawColor(0, 102, 204);
+      doc.setLineWidth(0.5);
+      doc.line(15, 30, pageWidth - 15, 30);
+
+      yPosition = 38;
+
+      // ========== INFORMAÇÕES DA SINCRONIZAÇÃO (CENTRALIZADO) ==========
+      const dataHora = new Date().toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      // Buscar nome do hospital
+      const hospitalSelecionado = hospitaisAIHAvancado.find(h => h.id === hospitalAIHSelecionado);
+      const nomeHospital = hospitalSelecionado?.name || 'Hospital não identificado';
+
+      const totalAIHsEtapa1 = aihsEncontradas.length;
+      const totalSISAIH01 = sisaih01Encontrados.length;
+      const taxaSincronizacao = totalSISAIH01 > 0 
+        ? ((resultadoSync.sincronizados / totalSISAIH01) * 100).toFixed(1) 
+        : '0.0';
+
+      doc.setFillColor(240, 248, 255);
+      doc.rect(10, yPosition, pageWidth - 20, 42, 'F');
+      doc.setDrawColor(0, 102, 204);
+      doc.setLineWidth(0.3);
+      doc.rect(10, yPosition, pageWidth - 20, 42);
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 102, 204);
+      doc.text('Informações da Sincronização', pageWidth / 2, yPosition + 8, { align: 'center' });
+
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+
+      // Organizar informações em duas colunas
+      const col1X = 25;
+      const col2X = pageWidth / 2 + 10;
+      let infoY = yPosition + 16;
+
+      doc.text(`Data/Hora: ${dataHora}`, col1X, infoY);
+      doc.text(`Competência: ${formatarCompetencia(competenciaAIHSelecionada)}`, col2X, infoY);
+      
+      infoY += 5;
+      doc.text(`Hospital: ${nomeHospital}`, col1X, infoY);
+      
+      infoY += 6;
+      doc.text(`Total Etapa 1 (AIH Avançado): ${totalAIHsEtapa1} registros`, col1X, infoY);
+      doc.text(`Total Etapa 2 (SISAIH01): ${totalSISAIH01} registros`, col2X, infoY);
+      
+      infoY += 6;
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 102, 204);
+      doc.text(`AIHs Sincronizadas: ${resultadoSync.sincronizados} (${taxaSincronizacao}%)`, pageWidth / 2, infoY, { align: 'center' });
+
+      yPosition += 48;
+      doc.setTextColor(0, 0, 0);
+
+      // ========== TABELA DE AIHs SINCRONIZADAS ==========
+      // Calcular valor total primeiro
+      const valorTotal = resultadoSync.detalhes
+        .filter(d => d.status === 'sincronizado')
+        .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0);
+
+      const valorTotalFormatado = new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(valorTotal / 100);
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 102, 204);
+      doc.text('Detalhamento das AIHs Sincronizadas', 15, yPosition);
+      
+      // Valor total no cabeçalho
+      doc.setTextColor(0, 100, 0);
+      doc.text(`Valor Total: ${valorTotalFormatado}`, pageWidth - 15, yPosition, { align: 'right' });
+      
+      yPosition += 5;
+      doc.setTextColor(0, 0, 0);
+
+      // Filtrar AIHs sincronizadas
+      const aihsSincronizadas = resultadoSync.detalhes
+        .filter(d => d.status === 'sincronizado')
+        .map((d, index) => {
+          const nomePaciente = d.aih_avancado?.patient_name || d.sisaih01?.nome_paciente || '-';
+          
+          const dataInternacao = d.sisaih01?.data_internacao
+            ? new Date(d.sisaih01.data_internacao).toLocaleDateString('pt-BR')
+            : (d.aih_avancado?.admission_date 
+                ? new Date(d.aih_avancado.admission_date).toLocaleDateString('pt-BR')
+                : '-');
+
+          const procedimento = d.aih_avancado?.procedure_requested || '-';
+          const qtdProc = d.aih_avancado?.total_procedures || 0;
+          
+          const valor = d.aih_avancado?.calculated_total_value
+            ? new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              }).format(d.aih_avancado.calculated_total_value / 100)
+            : 'R$ 0,00';
+
+          return [
+            (index + 1).toString(),
+            d.numero_aih,
+            nomePaciente,
+            dataInternacao,
+            qtdProc.toString(),
+            procedimento,
+            valor
+          ];
+        });
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['#', 'Número AIH', 'Paciente', 'Data Int.', 'Qtd', 'Procedimento', 'Valor']],
+        body: aihsSincronizadas,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [0, 102, 204], // Azul suave
+          textColor: 255,
+          fontSize: 9,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        bodyStyles: {
+          fontSize: 8,
+          textColor: 60,
+          lineColor: [200, 200, 200],
+          lineWidth: 0.1
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252] // Cinza muito suave
+        },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 28, halign: 'center' },
+          2: { cellWidth: 35 },
+          3: { cellWidth: 20, halign: 'center' },
+          4: { cellWidth: 12, halign: 'center' },
+          5: { cellWidth: 45 },
+          6: { cellWidth: 25, halign: 'right' }
+        },
+        margin: { left: 10, right: 10 }
+      });
+
+      // ========== BOX DE VALIDAÇÃO (SUAVE) ==========
+      const finalY = (doc as any).lastAutoTable.finalY || yPosition + 50;
+      let footerY = finalY + 12;
+
+      if (footerY > pageHeight - 60) {
+        doc.addPage();
+        footerY = 20;
+      }
+
+      doc.setFillColor(240, 250, 255); // Azul muito suave
+      doc.rect(10, footerY, pageWidth - 20, 22, 'F');
+      doc.setDrawColor(0, 102, 204);
+      doc.setLineWidth(0.3);
+      doc.rect(10, footerY, pageWidth - 20, 22);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 102, 204);
+      doc.text('✓ Sincronização Confirmada', 15, footerY + 6);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(8);
+      const obsText = [
+        'As AIHs listadas foram confirmadas pelo SUS (SISAIH01) e estão registradas no sistema interno.',
+        'Este relatório serve como comprovante e deve ser arquivado para auditoria.'
+      ];
+      
+      obsText.forEach((line, index) => {
+        doc.text(line, 15, footerY + 13 + (index * 4));
+      });
+
+      footerY += 30;
+
+      // Espaço para validação
+      if (footerY > pageHeight - 50) {
+        doc.addPage();
+        footerY = 20;
+      }
+
+      doc.setDrawColor(200, 200, 200);
+      doc.line(15, footerY + 20, 90, footerY + 20);
+      doc.line(110, footerY + 20, 185, footerY + 20);
+
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Responsável pela Auditoria', 52.5, footerY + 25, { align: 'center' });
+      doc.text('Data: ___/___/______', 52.5, footerY + 30, { align: 'center' });
+
+      doc.text('Diretor Técnico/Gestor', 147.5, footerY + 25, { align: 'center' });
+      doc.text('Data: ___/___/______', 147.5, footerY + 30, { align: 'center' });
+
+      // ========== RODAPÉ SUAVE ==========
+      doc.setDrawColor(0, 102, 204);
+      doc.setLineWidth(0.3);
+      doc.line(15, pageHeight - 20, pageWidth - 15, pageHeight - 20);
+
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(
+        'CIS - Centro Integrado em Saúde | Relatório de Sincronização',
+        pageWidth / 2,
+        pageHeight - 12,
+        { align: 'center' }
+      );
+      doc.text(
+        `Gerado em: ${dataHora}`,
+        pageWidth / 2,
+        pageHeight - 8,
+        { align: 'center' }
+      );
+
+      // ========== SALVAR PDF ==========
+      const nomeArquivo = `AIHs_Sincronizadas_${competenciaAIHSelecionada}_${Date.now()}.pdf`;
+      doc.save(nomeArquivo);
+
+      console.log(`✅ Relatório PDF gerado: ${nomeArquivo}`);
+      toast.success(`Relatório gerado com sucesso! ${resultadoSync.sincronizados} AIHs sincronizadas`, { duration: 3000 });
+
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao gerar PDF:', error);
+      toast.error('Erro ao gerar relatório PDF');
+      return false;
+    }
+  };
+
+  // Função para gerar relatório PDF de reapresentação
+  const gerarRelatorioPDFReapresentacao = async (
+    aihsSelecionadasArray: string[],
+    detalhesAIHs: any[],
+    competenciaAtual: string,
+    proximaCompetencia: string,
+    nomeHospital: string
+  ) => {
+    try {
+      console.log('📄 Gerando relatório PDF de reapresentação...');
+
+      // 🖼️ Carregar logo do CIS
+      let logoBase64 = null;
+      try {
+        const response = await fetch('/CIS Sem fundo.jpg');
+        const blob = await response.blob();
+        logoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch (error) {
+        console.error('⚠️ Erro ao carregar logo:', error);
+      }
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
+      let yPosition = 20;
+
+      // ========== CABEÇALHO PROFISSIONAL COM LOGO ==========
+      // Inserir Logo CIS (se carregado)
+      if (logoBase64) {
+        const logoWidth = 35;
+        const logoHeight = 17.5;
+        const logoX = 15;
+        const logoY = 8;
+        doc.addImage(logoBase64, 'JPEG', logoX, logoY, logoWidth, logoHeight);
+      }
+
+      // Título do Documento (centralizado)
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(200, 120, 0); // Laranja suave
+      doc.text('RELATÓRIO DE REAPRESENTAÇÃO DE AIHs', pageWidth / 2, 18, { align: 'center' });
+
+      // Subtítulo
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(80, 80, 80);
+      doc.text('CIS - Centro Integrado em Saúde', pageWidth / 2, 25, { align: 'center' });
+
+      // Linha divisória profissional
+      doc.setDrawColor(200, 120, 0);
+      doc.setLineWidth(0.5);
+      doc.line(15, 30, pageWidth - 15, 30);
+
+      yPosition = 38;
+
+      // ========== INFORMAÇÕES DA OPERAÇÃO ==========
+      doc.setTextColor(0, 0, 0);
+      doc.setFillColor(240, 240, 240);
+      doc.rect(10, yPosition, pageWidth - 20, 35, 'F');
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Informações da Operação', 15, yPosition + 8);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      
+      const dataHora = new Date().toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      const infoLines = [
+        `Data/Hora: ${dataHora}`,
+        `Hospital: ${nomeHospital}`,
+        `Competência Atual: ${formatarCompetencia(competenciaAtual)}`,
+        `Nova Competência: ${formatarCompetencia(proximaCompetencia)}`,
+        `Quantidade de AIHs: ${aihsSelecionadasArray.length}`
+      ];
+
+      infoLines.forEach((line, index) => {
+        doc.text(line, 15, yPosition + 15 + (index * 5));
+      });
+
+      yPosition += 45;
+
+      // ========== TABELA DE AIHs ==========
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('AIHs Selecionadas para Reapresentação', 15, yPosition);
+      yPosition += 5;
+
+      // Filtrar e preparar dados da tabela
+      const aihsParaTabela = detalhesAIHs
+        .filter(d => aihsSelecionadasArray.includes(d.numero_aih))
+        .map((d, index) => {
+          const nomePaciente = d.aih_avancado?.patient_name || 
+            (d.aih_avancado?.patient_id ? `ID: ${d.aih_avancado.patient_id.substring(0, 10)}...` : '-');
+          
+          const dataInternacao = d.aih_avancado?.admission_date
+            ? new Date(d.aih_avancado.admission_date).toLocaleDateString('pt-BR')
+            : '-';
+
+          const procedimento = d.aih_avancado?.procedure_requested || '-';
+          
+          const valor = d.aih_avancado?.calculated_total_value
+            ? new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              }).format(d.aih_avancado.calculated_total_value / 100)
+            : 'R$ 0,00';
+
+          return [
+            (index + 1).toString(),
+            d.numero_aih,
+            nomePaciente,
+            dataInternacao,
+            procedimento,
+            valor
+          ];
+        });
+
+      // Calcular valor total
+      const valorTotal = detalhesAIHs
+        .filter(d => aihsSelecionadasArray.includes(d.numero_aih))
+        .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0);
+
+      const valorTotalFormatado = new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(valorTotal / 100);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['#', 'Número AIH', 'Paciente', 'Data Intern.', 'Procedimento', 'Valor']],
+        body: aihsParaTabela,
+        foot: [['', '', '', '', 'TOTAL:', valorTotalFormatado]],
+        theme: 'striped',
+        headStyles: {
+          fillColor: [200, 120, 0], // Laranja suave
+          textColor: 255,
+          fontSize: 9,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        footStyles: {
+          fillColor: [255, 248, 230], // Laranja muito suave
+          textColor: [100, 60, 0], // Marrom
+          fontSize: 10,
+          fontStyle: 'bold',
+          halign: 'right'
+        },
+        bodyStyles: {
+          fontSize: 8,
+          textColor: 60,
+          lineColor: [200, 200, 200],
+          lineWidth: 0.1
+        },
+        alternateRowStyles: {
+          fillColor: [252, 250, 248] // Cinza muito suave com tom quente
+        },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 30, halign: 'center' },
+          2: { cellWidth: 40 },
+          3: { cellWidth: 22, halign: 'center' },
+          4: { cellWidth: 50 },
+          5: { cellWidth: 25, halign: 'right' }
+        },
+        margin: { left: 10, right: 10 }
+      });
+
+      // ========== OBSERVAÇÕES (SUAVE) ==========
+      const finalY = (doc as any).lastAutoTable.finalY || yPosition + 50;
+      let footerY = finalY + 12;
+
+      // Garantir que há espaço para observações
+      if (footerY > pageHeight - 60) {
+        doc.addPage();
+        footerY = 20;
+      }
+
+      doc.setFillColor(255, 248, 230); // Laranja muito suave
+      doc.rect(10, footerY, pageWidth - 20, 22, 'F');
+      doc.setDrawColor(200, 120, 0);
+      doc.setLineWidth(0.3);
+      doc.rect(10, footerY, pageWidth - 20, 22);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(200, 120, 0);
+      doc.text('⚠ Reapresentação Registrada', 15, footerY + 6);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(8);
+      const obsText = [
+        `AIHs reapresentadas para ${formatarCompetencia(proximaCompetencia)} conforme procedimento padrão do SUS.`,
+        'Mantenha este relatório arquivado para auditoria e controle interno.'
+      ];
+      
+      obsText.forEach((line, index) => {
+        doc.text(line, 15, footerY + 13 + (index * 4));
+      });
+
+      footerY += 30;
+
+      // Espaço para assinaturas
+      if (footerY > pageHeight - 50) {
+        doc.addPage();
+        footerY = 20;
+      }
+
+      doc.setDrawColor(200, 200, 200);
+      doc.line(15, footerY + 20, 90, footerY + 20);
+      doc.line(110, footerY + 20, 185, footerY + 20);
+
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Responsável pela Operação', 52.5, footerY + 25, { align: 'center' });
+      doc.text('Data: ___/___/______', 52.5, footerY + 30, { align: 'center' });
+
+      doc.text('Supervisor/Auditor', 147.5, footerY + 25, { align: 'center' });
+      doc.text('Data: ___/___/______', 147.5, footerY + 30, { align: 'center' });
+
+      // ========== RODAPÉ SUAVE ==========
+      doc.setDrawColor(200, 120, 0);
+      doc.setLineWidth(0.3);
+      doc.line(15, pageHeight - 20, pageWidth - 15, pageHeight - 20);
+
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(
+        'CIS - Centro Integrado em Saúde | Relatório de Reapresentação',
+        pageWidth / 2,
+        pageHeight - 12,
+        { align: 'center' }
+      );
+      doc.text(
+        `Gerado em: ${dataHora}`,
+        pageWidth / 2,
+        pageHeight - 8,
+        { align: 'center' }
+      );
+
+      // ========== SALVAR PDF ==========
+      const nomeArquivo = `Reapresentacao_AIHs_${competenciaAtual}_para_${proximaCompetencia}_${Date.now()}.pdf`;
+      doc.save(nomeArquivo);
+
+      console.log(`✅ Relatório PDF gerado: ${nomeArquivo}`);
+      toast.success('Relatório PDF gerado com sucesso!', { duration: 3000 });
+
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao gerar PDF:', error);
+      toast.error('Erro ao gerar relatório PDF');
+      return false;
+    }
+  };
+
   // Função para reapresentar AIHs selecionadas na próxima competência
   const reapresentarAIHsNaProximaCompetencia = async () => {
     if (aihsSelecionadas.size === 0) {
@@ -251,6 +813,25 @@ const SyncPage = () => {
       console.log(`   Próxima competência: ${proximaCompetencia}`);
       
       const aihsArray = Array.from(aihsSelecionadas);
+
+      // 📄 GERAR RELATÓRIO PDF ANTES DE ATUALIZAR
+      if (resultadoSync) {
+        // Buscar nome do hospital
+        const hospitalSelecionado = hospitaisAIHAvancado.find(h => h.id === hospitalAIHSelecionado);
+        const nomeHospital = hospitalSelecionado?.name || 'Hospital não identificado';
+
+        const pdfGerado = gerarRelatorioPDFReapresentacao(
+          aihsArray,
+          resultadoSync.detalhes,
+          competenciaAIHSelecionada,
+          proximaCompetencia,
+          nomeHospital
+        );
+
+        if (!pdfGerado) {
+          console.warn('⚠️ PDF não foi gerado, mas continuando com a reapresentação...');
+        }
+      }
       
       // Atualizar em lote na tabela aihs
       const { data, error } = await supabase
@@ -575,76 +1156,152 @@ const SyncPage = () => {
       console.log(`   ❌ Não Processados: ${naoProcessados}`);
       console.log(`   📈 Taxa de Sincronização: ${mapSISAIH01.size > 0 ? ((sincronizados / mapSISAIH01.size) * 100).toFixed(2) : 0}%`);
 
-      // Buscar descrições dos procedimentos na tabela sigtap_procedures
-      console.log('🔍 Buscando descrições dos procedimentos...');
+      // 🔍 BUSCAR DESCRIÇÕES DOS PROCEDIMENTOS (TODOS OS STATUS)
+      console.log('🔍 Buscando descrições dos procedimentos de TODAS as AIHs...');
+      
+      // Pegar códigos de TODOS os registros (sincronizados, pendentes e não processados)
       const codigosProcedimentos = [...new Set(
         detalhes
-          .filter(d => d.status === 'sincronizado' && d.aih_avancado?.procedure_requested)
-          .map(d => d.aih_avancado.procedure_requested) // Manter o formato original
+          .filter(d => d.aih_avancado?.procedure_requested)
+          .map(d => d.aih_avancado.procedure_requested)
       )];
 
       if (codigosProcedimentos.length > 0) {
         console.log(`📋 Buscando ${codigosProcedimentos.length} procedimentos únicos...`);
-        console.log('📋 Exemplos de códigos:', codigosProcedimentos.slice(0, 3));
+        console.log('📋 Exemplos de códigos (formato original):', codigosProcedimentos.slice(0, 5));
         
-        // Tentar buscar com o formato original primeiro
+        // Criar lista de códigos normalizados (sem formatação)
+        const codigosNormalizados = [...new Set(
+          codigosProcedimentos.map(c => c.replace(/[.\-\s]/g, '')) // Remove pontos, traços e espaços
+        )];
+        
+        console.log('📋 Exemplos de códigos normalizados:', codigosNormalizados.slice(0, 5));
+        
+        // Buscar procedimentos usando códigos normalizados
         const { data: procedimentos, error: errorProc } = await supabase
           .from('sigtap_procedures')
           .select('code, description')
-          .in('code', codigosProcedimentos);
+          .or(`code.in.(${codigosProcedimentos.map(c => `"${c}"`).join(',')}),code.in.(${codigosNormalizados.map(c => `"${c}"`).join(',')})`);
 
         if (errorProc) {
           console.warn('⚠️ Erro ao buscar procedimentos do SIGTAP:', errorProc);
+          
+          // Tentar busca alternativa usando LIKE
+          console.log('💡 Tentando busca alternativa...');
+          const { data: procAlt } = await supabase
+            .from('sigtap_procedures')
+            .select('code, description')
+            .limit(1000);
+          
+          if (procAlt && procAlt.length > 0) {
+            console.log(`📋 Buscou ${procAlt.length} procedimentos para match manual`);
+            
+            // Criar mapa normalizado
+            const mapProcedimentos = new Map<string, string>();
+            procAlt.forEach(proc => {
+              if (proc.code && proc.description) {
+                const codigoNorm = proc.code.replace(/[.\-\s]/g, '');
+                mapProcedimentos.set(codigoNorm, proc.description);
+                mapProcedimentos.set(proc.code, proc.description); // Também guardar original
+              }
+            });
+            
+            // Enriquecer detalhes
+            let encontrados = 0;
+            detalhes.forEach(detalhe => {
+              if (detalhe.aih_avancado?.procedure_requested) {
+                const codigoOriginal = detalhe.aih_avancado.procedure_requested;
+                const codigoNorm = codigoOriginal.replace(/[.\-\s]/g, '');
+                
+                const descricao = mapProcedimentos.get(codigoOriginal) || mapProcedimentos.get(codigoNorm);
+                if (descricao) {
+                  detalhe.procedure_description = descricao;
+                  encontrados++;
+                }
+              }
+            });
+            
+            console.log(`✅ ${encontrados} de ${codigosProcedimentos.length} procedimentos encontrados (busca alternativa)`);
+          }
+          
         } else if (procedimentos && procedimentos.length > 0) {
           console.log(`✅ ${procedimentos.length} procedimentos encontrados no SIGTAP`);
-          console.log('📋 Exemplo de procedimento encontrado:', procedimentos[0]);
+          console.log('📋 Exemplos encontrados:', procedimentos.slice(0, 3).map(p => ({ code: p.code, desc: p.description?.substring(0, 50) + '...' })));
           
-          // Criar mapa de código → descrição (tentar múltiplos formatos)
+          // Criar mapa COMPLETO de código → descrição (múltiplos formatos)
           const mapProcedimentos = new Map<string, string>();
           procedimentos.forEach(proc => {
             if (proc.code && proc.description) {
-              // Adicionar no formato original
+              // Formato 1: Original (ex: 03.01.06.007-9)
               mapProcedimentos.set(proc.code, proc.description);
-              // Adicionar também sem formatação (só números)
-              const codigoSemFormatacao = proc.code.replace(/\D/g, '');
-              mapProcedimentos.set(codigoSemFormatacao, proc.description);
+              mapProcedimentos.set(proc.code.toUpperCase(), proc.description);
+              mapProcedimentos.set(proc.code.toLowerCase(), proc.description);
+              
+              // Formato 2: Sem pontos (ex: 03010600079)
+              const semPontos = proc.code.replace(/\./g, '');
+              mapProcedimentos.set(semPontos, proc.description);
+              
+              // Formato 3: Sem pontos e sem traço (ex: 030106000079)
+              const normalizado = proc.code.replace(/[.\-\s]/g, '');
+              mapProcedimentos.set(normalizado, proc.description);
+              
+              // Formato 4: Apenas números
+              const apenasNumeros = proc.code.replace(/\D/g, '');
+              mapProcedimentos.set(apenasNumeros, proc.description);
             }
           });
 
-          console.log(`📊 Mapa de procedimentos criado com ${mapProcedimentos.size} entradas`);
+          console.log(`📊 Mapa de procedimentos criado com ${mapProcedimentos.size} variações de código`);
 
-          // Enriquecer detalhes com descrição do procedimento
+          // Enriquecer TODOS os detalhes com descrição do procedimento
+          let encontrados = 0;
+          let naoEncontrados = 0;
+          
           detalhes.forEach(detalhe => {
             if (detalhe.aih_avancado?.procedure_requested) {
               const codigoOriginal = detalhe.aih_avancado.procedure_requested;
               
-              // Tentar encontrar com código original
-              let descricao = mapProcedimentos.get(codigoOriginal);
+              // Tentar encontrar em TODAS as variações
+              let descricao = 
+                mapProcedimentos.get(codigoOriginal) || // Original
+                mapProcedimentos.get(codigoOriginal.toUpperCase()) || // Upper
+                mapProcedimentos.get(codigoOriginal.toLowerCase()) || // Lower
+                mapProcedimentos.get(codigoOriginal.replace(/\./g, '')) || // Sem pontos
+                mapProcedimentos.get(codigoOriginal.replace(/[.\-\s]/g, '')) || // Normalizado
+                mapProcedimentos.get(codigoOriginal.replace(/\D/g, '')); // Apenas números
               
-              // Se não encontrar, tentar sem formatação
-              if (!descricao) {
-                const codigoSemFormatacao = codigoOriginal.replace(/\D/g, '');
-                descricao = mapProcedimentos.get(codigoSemFormatacao);
+              if (descricao) {
+                detalhe.procedure_description = descricao;
+                encontrados++;
+                if (encontrados <= 3) {
+                  console.log(`   ✅ ${codigoOriginal} → ${descricao.substring(0, 50)}...`);
+                }
+              } else {
+                naoEncontrados++;
+                if (naoEncontrados <= 3) {
+                  console.warn(`   ⚠️ Não encontrado: ${codigoOriginal} (testadas ${mapProcedimentos.size / procedimentos.length} variações)`);
+                }
               }
-              
-              detalhe.procedure_description = descricao || null;
             }
           });
 
-          const comDescricao = detalhes.filter(d => d.procedure_description).length;
-          console.log(`✅ ${comDescricao} de ${detalhes.filter(d => d.status === 'sincronizado').length} registros sincronizados com descrição`);
+          const totalComProcedimento = detalhes.filter(d => d.aih_avancado?.procedure_requested).length;
+          console.log(`✅ ${encontrados} de ${totalComProcedimento} procedimentos encontrados`);
+          if (naoEncontrados > 0) {
+            console.warn(`⚠️ ${naoEncontrados} procedimentos não encontrados no SIGTAP`);
+          }
         } else {
           console.warn('⚠️ Nenhum procedimento encontrado na tabela sigtap_procedures');
           console.log('💡 Verificando formato dos códigos no banco de dados...');
           
-          // Buscar alguns exemplos para ver o formato
           const { data: amostra } = await supabase
             .from('sigtap_procedures')
-            .select('code')
-            .limit(5);
+            .select('code, description')
+            .limit(10);
           
           if (amostra && amostra.length > 0) {
-            console.log('📋 Exemplos de códigos na tabela sigtap_procedures:', amostra.map(p => p.code));
+            console.log('📋 Exemplos na tabela sigtap_procedures:');
+            amostra.forEach(p => console.log(`   - ${p.code}: ${p.description?.substring(0, 60)}...`));
           }
         }
       }
@@ -1141,15 +1798,37 @@ const SyncPage = () => {
           {resultadoSync.sincronizados > 0 && (
             <Card className="border-2 border-green-200">
               <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50">
-                <CardTitle className="flex items-center gap-2 text-green-900">
-                  ✅ AIHs Sincronizadas
-                  <span className="text-sm font-normal text-green-600">
-                    ({resultadoSync.sincronizados} registros)
-                  </span>
-                </CardTitle>
-                <CardDescription>
-                  Números das AIHs que foram encontradas em ambas as bases (AIH Avançado e SISAIH01)
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-green-900">
+                      ✅ AIHs Sincronizadas
+                      <span className="text-sm font-normal text-green-600">
+                        ({resultadoSync.sincronizados} registros)
+                      </span>
+                      <span className="text-sm font-semibold text-green-700 ml-auto">
+                        Valor Total: {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL'
+                        }).format(
+                          resultadoSync.detalhes
+                            .filter(d => d.status === 'sincronizado')
+                            .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0) / 100
+                        )}
+                      </span>
+                    </CardTitle>
+                    <CardDescription className="mt-2">
+                      Números das AIHs que foram encontradas em ambas as bases (AIH Avançado e SISAIH01)
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={gerarRelatorioPDFSincronizadas}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    size="sm"
+                  >
+                    <Database className="h-4 w-4 mr-2" />
+                    Gerar Relatório PDF
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="rounded-lg border border-green-200 overflow-hidden">
@@ -1224,28 +1903,6 @@ const SyncPage = () => {
                     </Table>
                   </div>
                 </div>
-                
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-                  <div className="text-center md:text-left">
-                    <p className="text-sm text-gray-600">
-                      Total de Registros: <strong className="text-green-700">{resultadoSync.sincronizados}</strong>
-                    </p>
-                  </div>
-                  <div className="text-center md:text-right">
-                    <p className="text-sm text-gray-600">
-                      Valor Total: <strong className="text-green-700 text-lg">
-                        {new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL'
-                        }).format(
-                          resultadoSync.detalhes
-                            .filter(d => d.status === 'sincronizado')
-                            .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0) / 100
-                        )}
-                      </strong>
-                    </p>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           )}
@@ -1258,6 +1915,16 @@ const SyncPage = () => {
                   ⏳ AIHs Pendentes de Confirmação SUS
                   <span className="text-sm font-normal text-orange-600">
                     ({resultadoSync.pendentes} registros)
+                  </span>
+                  <span className="text-sm font-semibold text-orange-700 ml-auto">
+                    Valor Total: {new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL'
+                    }).format(
+                      resultadoSync.detalhes
+                        .filter(d => d.status === 'pendente')
+                        .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0) / 100
+                    )}
                   </span>
                 </CardTitle>
                 <CardDescription>
@@ -1394,28 +2061,6 @@ const SyncPage = () => {
                           ))}
                       </TableBody>
                     </Table>
-                  </div>
-                </div>
-                
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
-                  <div className="text-center md:text-left">
-                    <p className="text-sm text-gray-600">
-                      Total de Registros: <strong className="text-orange-700">{resultadoSync.pendentes}</strong>
-                    </p>
-                  </div>
-                  <div className="text-center md:text-right">
-                    <p className="text-sm text-gray-600">
-                      Valor Total: <strong className="text-orange-700 text-lg">
-                        {new Intl.NumberFormat('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL'
-                        }).format(
-                          resultadoSync.detalhes
-                            .filter(d => d.status === 'pendente')
-                            .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0) / 100
-                        )}
-                      </strong>
-                    </p>
                   </div>
                 </div>
               </CardContent>
