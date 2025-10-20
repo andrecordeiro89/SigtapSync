@@ -3,6 +3,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Alert, AlertDescription } from './ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from './ui/alert-dialog';
 import { GitCompare, Database, RefreshCw, Info } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -49,6 +59,14 @@ const SyncPage = () => {
   // Estados para seleção e reapresentação em lote
   const [aihsSelecionadas, setAihsSelecionadas] = useState<Set<string>>(new Set());
   const [processandoReapresentacao, setProcessandoReapresentacao] = useState(false);
+  
+  // Estado para diálogo de confirmação de reapresentação
+  const [dialogReapresentacaoAberto, setDialogReapresentacaoAberto] = useState(false);
+  const [dadosReapresentacao, setDadosReapresentacao] = useState<{
+    quantidade: number;
+    competenciaAtual: string;
+    proximaCompetencia: string;
+  } | null>(null);
 
   // 🆕 Carregar opções ao montar o componente
   useEffect(() => {
@@ -280,7 +298,7 @@ const SyncPage = () => {
 
       yPosition = 38;
 
-      // ========== INFORMAÇÕES DA SINCRONIZAÇÃO (CENTRALIZADO) ==========
+      // ========== PREPARAR DADOS ==========
       const dataHora = new Date().toLocaleString('pt-BR', {
         day: '2-digit',
         month: '2-digit',
@@ -289,7 +307,6 @@ const SyncPage = () => {
         minute: '2-digit'
       });
 
-      // Buscar nome do hospital
       const hospitalSelecionado = hospitaisAIHAvancado.find(h => h.id === hospitalAIHSelecionado);
       const nomeHospital = hospitalSelecionado?.name || 'Hospital não identificado';
 
@@ -299,46 +316,6 @@ const SyncPage = () => {
         ? ((resultadoSync.sincronizados / totalSISAIH01) * 100).toFixed(1) 
         : '0.0';
 
-      doc.setFillColor(240, 248, 255);
-      doc.rect(10, yPosition, pageWidth - 20, 42, 'F');
-      doc.setDrawColor(0, 102, 204);
-      doc.setLineWidth(0.3);
-      doc.rect(10, yPosition, pageWidth - 20, 42);
-
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 102, 204);
-      doc.text('Informações da Sincronização', pageWidth / 2, yPosition + 8, { align: 'center' });
-
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(60, 60, 60);
-
-      // Organizar informações em duas colunas
-      const col1X = 25;
-      const col2X = pageWidth / 2 + 10;
-      let infoY = yPosition + 16;
-
-      doc.text(`Data/Hora: ${dataHora}`, col1X, infoY);
-      doc.text(`Competência: ${formatarCompetencia(competenciaAIHSelecionada)}`, col2X, infoY);
-      
-      infoY += 5;
-      doc.text(`Hospital: ${nomeHospital}`, col1X, infoY);
-      
-      infoY += 6;
-      doc.text(`Total Etapa 1 (AIH Avançado): ${totalAIHsEtapa1} registros`, col1X, infoY);
-      doc.text(`Total Etapa 2 (SISAIH01): ${totalSISAIH01} registros`, col2X, infoY);
-      
-      infoY += 6;
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 102, 204);
-      doc.text(`AIHs Sincronizadas: ${resultadoSync.sincronizados} (${taxaSincronizacao}%)`, pageWidth / 2, infoY, { align: 'center' });
-
-      yPosition += 48;
-      doc.setTextColor(0, 0, 0);
-
-      // ========== TABELA DE AIHs SINCRONIZADAS ==========
-      // Calcular valor total primeiro
       const valorTotal = resultadoSync.detalhes
         .filter(d => d.status === 'sincronizado')
         .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0);
@@ -348,28 +325,44 @@ const SyncPage = () => {
         currency: 'BRL'
       }).format(valorTotal / 100);
 
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 102, 204);
-      doc.text('Detalhamento das AIHs Sincronizadas', 15, yPosition);
-      
-      // Valor total no cabeçalho
-      doc.setTextColor(0, 100, 0);
-      doc.text(`Valor Total: ${valorTotalFormatado}`, pageWidth - 15, yPosition, { align: 'right' });
-      
-      yPosition += 5;
-      doc.setTextColor(0, 0, 0);
+      // ========== TABELA DE INFORMAÇÕES DA SINCRONIZAÇÃO ==========
+      autoTable(doc, {
+        startY: yPosition,
+        body: [
+          ['Data/Hora:', dataHora, 'Competência:', formatarCompetencia(competenciaAIHSelecionada)],
+          ['Hospital:', { content: nomeHospital, colSpan: 3 }],
+          ['Total Etapa 1:', `${totalAIHsEtapa1} registros`, 'Total Etapa 2:', `${totalSISAIH01} registros`],
+          ['AIHs Sincronizadas:', `${resultadoSync.sincronizados} (${taxaSincronizacao}%)`, 'Valor Total:', valorTotalFormatado]
+        ],
+        theme: 'grid',
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          lineColor: [200, 200, 200],
+          lineWidth: 0.1
+        },
+        columnStyles: {
+          0: { fontStyle: 'bold', cellWidth: 40, fillColor: [250, 250, 250] },
+          1: { cellWidth: 50 },
+          2: { fontStyle: 'bold', cellWidth: 35, fillColor: [250, 250, 250] },
+          3: { cellWidth: 55 }
+        },
+        margin: { left: 15, right: 15 }
+      });
 
+      yPosition = (doc as any).lastAutoTable.finalY + 6;
+
+      // ========== TABELA DE AIHs SINCRONIZADAS ==========
       // Filtrar AIHs sincronizadas
       const aihsSincronizadas = resultadoSync.detalhes
         .filter(d => d.status === 'sincronizado')
         .map((d, index) => {
           const nomePaciente = d.aih_avancado?.patient_name || d.sisaih01?.nome_paciente || '-';
           
-          const dataInternacao = d.sisaih01?.data_internacao
-            ? new Date(d.sisaih01.data_internacao).toLocaleDateString('pt-BR')
-            : (d.aih_avancado?.admission_date 
-                ? new Date(d.aih_avancado.admission_date).toLocaleDateString('pt-BR')
+          const dataAlta = d.sisaih01?.data_saida
+            ? new Date(d.sisaih01.data_saida).toLocaleDateString('pt-BR')
+            : (d.aih_avancado?.discharge_date 
+                ? new Date(d.aih_avancado.discharge_date).toLocaleDateString('pt-BR')
                 : '-');
 
           // Procedimento com descrição (se disponível)
@@ -394,7 +387,7 @@ const SyncPage = () => {
             (index + 1).toString(),
             d.numero_aih,
             nomePaciente,
-            dataInternacao,
+            dataAlta,
             qtdProc.toString(),
             procedimento,
             valor
@@ -403,35 +396,41 @@ const SyncPage = () => {
 
       autoTable(doc, {
         startY: yPosition,
-        head: [['#', 'Número AIH', 'Paciente', 'Data Int.', 'Qtd', 'Procedimento', 'Valor']],
+        head: [['#', 'Número AIH', 'Paciente', 'Data de Alta', 'Qtd', 'Procedimento', 'Valor']],
         body: aihsSincronizadas,
-        theme: 'striped',
+        theme: 'grid',
         headStyles: {
-          fillColor: [0, 102, 204], // Azul suave
-          textColor: 255,
+          fillColor: [30, 30, 30], // Preto elegante
+          textColor: [255, 255, 255], // Branco
           fontSize: 9,
           fontStyle: 'bold',
-          halign: 'center'
+          halign: 'center',
+          valign: 'middle',
+          lineColor: [30, 30, 30],
+          lineWidth: 0.5
         },
         bodyStyles: {
           fontSize: 8,
-          textColor: 60,
-          lineColor: [200, 200, 200],
-          lineWidth: 0.1
+          textColor: [40, 40, 40],
+          lineColor: [180, 180, 180],
+          lineWidth: 0.3
         },
         alternateRowStyles: {
           fillColor: [248, 250, 252] // Cinza muito suave
         },
         columnStyles: {
-          0: { cellWidth: 10, halign: 'center' },
-          1: { cellWidth: 28, halign: 'center' },
-          2: { cellWidth: 35 },
-          3: { cellWidth: 20, halign: 'center' },
-          4: { cellWidth: 12, halign: 'center' },
-          5: { cellWidth: 45 },
-          6: { cellWidth: 25, halign: 'right' }
+          0: { cellWidth: 8, halign: 'center', valign: 'middle' },
+          1: { cellWidth: 26, halign: 'center', valign: 'middle' },
+          2: { cellWidth: 42, valign: 'middle' },
+          3: { cellWidth: 18, halign: 'center', valign: 'middle' },
+          4: { cellWidth: 10, halign: 'center', valign: 'middle' },
+          5: { cellWidth: 52, valign: 'middle' },
+          6: { cellWidth: 24, halign: 'right', valign: 'middle' }
         },
-        margin: { left: 10, right: 10 }
+        margin: { left: 15, right: 15 },
+        didDrawPage: (data: any) => {
+          // Garantir alinhamento consistente
+        }
       });
 
       // ========== BOX DE VALIDAÇÃO (SUAVE) ==========
@@ -444,15 +443,15 @@ const SyncPage = () => {
       }
 
       doc.setFillColor(240, 250, 255); // Azul muito suave
-      doc.rect(10, footerY, pageWidth - 20, 22, 'F');
+      doc.rect(15, footerY, pageWidth - 30, 22, 'F');
       doc.setDrawColor(0, 102, 204);
       doc.setLineWidth(0.3);
-      doc.rect(10, footerY, pageWidth - 20, 22);
+      doc.rect(15, footerY, pageWidth - 30, 22);
 
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 102, 204);
-      doc.text('✓ Sincronização Confirmada', 15, footerY + 6);
+      doc.text('✓ Sincronização Confirmada', 18, footerY + 6);
 
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(80, 80, 80);
@@ -463,7 +462,7 @@ const SyncPage = () => {
       ];
       
       obsText.forEach((line, index) => {
-        doc.text(line, 15, footerY + 13 + (index * 4));
+        doc.text(line, 18, footerY + 13 + (index * 4));
       });
 
       footerY += 30;
@@ -475,16 +474,16 @@ const SyncPage = () => {
       }
 
       doc.setDrawColor(200, 200, 200);
-      doc.line(15, footerY + 20, 90, footerY + 20);
-      doc.line(110, footerY + 20, 185, footerY + 20);
+      doc.line(15, footerY + 20, 100, footerY + 20);
+      doc.line(110, footerY + 20, 195, footerY + 20);
 
       doc.setFontSize(8);
       doc.setTextColor(100, 100, 100);
-      doc.text('Responsável pela Auditoria', 52.5, footerY + 25, { align: 'center' });
-      doc.text('Data: ___/___/______', 52.5, footerY + 30, { align: 'center' });
+      doc.text('Responsável pela Auditoria', 57.5, footerY + 25, { align: 'center' });
+      doc.text('Data: ___/___/______', 57.5, footerY + 30, { align: 'center' });
 
-      doc.text('Diretor Técnico/Gestor', 147.5, footerY + 25, { align: 'center' });
-      doc.text('Data: ___/___/______', 147.5, footerY + 30, { align: 'center' });
+      doc.text('Diretor Técnico/Gestor', 152.5, footerY + 25, { align: 'center' });
+      doc.text('Data: ___/___/______', 152.5, footerY + 30, { align: 'center' });
 
       // ========== RODAPÉ SUAVE ==========
       doc.setDrawColor(0, 102, 204);
@@ -581,18 +580,7 @@ const SyncPage = () => {
 
       yPosition = 38;
 
-      // ========== INFORMAÇÕES DA OPERAÇÃO ==========
-      doc.setTextColor(0, 0, 0);
-      doc.setFillColor(240, 240, 240);
-      doc.rect(10, yPosition, pageWidth - 20, 35, 'F');
-
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Informações da Operação', 15, yPosition + 8);
-
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      
+      // ========== PREPARAR DADOS ==========
       const dataHora = new Date().toLocaleString('pt-BR', {
         day: '2-digit',
         month: '2-digit',
@@ -601,25 +589,43 @@ const SyncPage = () => {
         minute: '2-digit'
       });
 
-      const infoLines = [
-        `Data/Hora: ${dataHora}`,
-        `Hospital: ${nomeHospital}`,
-        `Competência Atual: ${formatarCompetencia(competenciaAtual)}`,
-        `Nova Competência: ${formatarCompetencia(proximaCompetencia)}`,
-        `Quantidade de AIHs: ${aihsSelecionadasArray.length}`
-      ];
+      // Calcular valor total
+      const valorTotalReap = detalhesAIHs
+        .filter(d => aihsSelecionadasArray.includes(d.numero_aih))
+        .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0);
 
-      infoLines.forEach((line, index) => {
-        doc.text(line, 15, yPosition + 15 + (index * 5));
+      const valorTotalFormatadoReap = new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(valorTotalReap / 100);
+
+      // ========== TABELA DE INFORMAÇÕES DA OPERAÇÃO ==========
+      autoTable(doc, {
+        startY: yPosition,
+        body: [
+          ['Data/Hora:', dataHora, 'Hospital:', nomeHospital],
+          ['Competência Atual:', formatarCompetencia(competenciaAtual), 'Nova Competência:', formatarCompetencia(proximaCompetencia)],
+          ['Quantidade de AIHs:', aihsSelecionadasArray.length.toString(), 'Valor Total:', valorTotalFormatadoReap]
+        ],
+        theme: 'grid',
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          lineColor: [200, 200, 200],
+          lineWidth: 0.1
+        },
+        columnStyles: {
+          0: { fontStyle: 'bold', cellWidth: 40, fillColor: [250, 250, 250] },
+          1: { cellWidth: 50 },
+          2: { fontStyle: 'bold', cellWidth: 35, fillColor: [250, 250, 250] },
+          3: { cellWidth: 55 }
+        },
+        margin: { left: 15, right: 15 }
       });
 
-      yPosition += 45;
+      yPosition = (doc as any).lastAutoTable.finalY + 6;
 
-      // ========== TABELA DE AIHs ==========
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text('AIHs Selecionadas para Reapresentação', 15, yPosition);
-      yPosition += 5;
+      // ========== TABELA DE AIHs SELECIONADAS ==========
 
       // Filtrar e preparar dados da tabela
       const aihsParaTabela = detalhesAIHs
@@ -628,8 +634,8 @@ const SyncPage = () => {
           const nomePaciente = d.aih_avancado?.patient_name || 
             (d.aih_avancado?.patient_id ? `ID: ${d.aih_avancado.patient_id.substring(0, 10)}...` : '-');
           
-          const dataInternacao = d.aih_avancado?.admission_date
-            ? new Date(d.aih_avancado.admission_date).toLocaleDateString('pt-BR')
+          const dataAlta = d.aih_avancado?.discharge_date
+            ? new Date(d.aih_avancado.discharge_date).toLocaleDateString('pt-BR')
             : '-';
 
           // Procedimento com descrição (se disponível)
@@ -652,60 +658,45 @@ const SyncPage = () => {
             (index + 1).toString(),
             d.numero_aih,
             nomePaciente,
-            dataInternacao,
+            dataAlta,
             procedimento,
             valor
           ];
         });
 
-      // Calcular valor total
-      const valorTotal = detalhesAIHs
-        .filter(d => aihsSelecionadasArray.includes(d.numero_aih))
-        .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0);
-
-      const valorTotalFormatado = new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-      }).format(valorTotal / 100);
-
       autoTable(doc, {
         startY: yPosition,
-        head: [['#', 'Número AIH', 'Paciente', 'Data Intern.', 'Procedimento', 'Valor']],
+        head: [['#', 'Número AIH', 'Paciente', 'Data de Alta', 'Procedimento', 'Valor']],
         body: aihsParaTabela,
-        foot: [['', '', '', '', 'TOTAL:', valorTotalFormatado]],
-        theme: 'striped',
+        theme: 'grid',
         headStyles: {
-          fillColor: [200, 120, 0], // Laranja suave
-          textColor: 255,
+          fillColor: [30, 30, 30], // Preto elegante
+          textColor: [255, 255, 255],
           fontSize: 9,
           fontStyle: 'bold',
-          halign: 'center'
-        },
-        footStyles: {
-          fillColor: [255, 248, 230], // Laranja muito suave
-          textColor: [100, 60, 0], // Marrom
-          fontSize: 10,
-          fontStyle: 'bold',
-          halign: 'right'
+          halign: 'center',
+          valign: 'middle',
+          lineColor: [30, 30, 30],
+          lineWidth: 0.5
         },
         bodyStyles: {
           fontSize: 8,
-          textColor: 60,
-          lineColor: [200, 200, 200],
-          lineWidth: 0.1
+          textColor: [40, 40, 40],
+          lineColor: [180, 180, 180],
+          lineWidth: 0.3
         },
         alternateRowStyles: {
-          fillColor: [252, 250, 248] // Cinza muito suave com tom quente
+          fillColor: [248, 250, 252] // Cinza muito suave
         },
         columnStyles: {
-          0: { cellWidth: 10, halign: 'center' },
-          1: { cellWidth: 30, halign: 'center' },
-          2: { cellWidth: 40 },
-          3: { cellWidth: 22, halign: 'center' },
-          4: { cellWidth: 50 },
-          5: { cellWidth: 25, halign: 'right' }
+          0: { cellWidth: 8, halign: 'center', valign: 'middle' },
+          1: { cellWidth: 28, halign: 'center', valign: 'middle' },
+          2: { cellWidth: 44, valign: 'middle' },
+          3: { cellWidth: 20, halign: 'center', valign: 'middle' },
+          4: { cellWidth: 56, valign: 'middle' },
+          5: { cellWidth: 24, halign: 'right', valign: 'middle' }
         },
-        margin: { left: 10, right: 10 }
+        margin: { left: 15, right: 15 }
       });
 
       // ========== OBSERVAÇÕES (SUAVE) ==========
@@ -719,15 +710,15 @@ const SyncPage = () => {
       }
 
       doc.setFillColor(255, 248, 230); // Laranja muito suave
-      doc.rect(10, footerY, pageWidth - 20, 22, 'F');
+      doc.rect(15, footerY, pageWidth - 30, 22, 'F');
       doc.setDrawColor(200, 120, 0);
       doc.setLineWidth(0.3);
-      doc.rect(10, footerY, pageWidth - 20, 22);
+      doc.rect(15, footerY, pageWidth - 30, 22);
 
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(200, 120, 0);
-      doc.text('⚠ Reapresentação Registrada', 15, footerY + 6);
+      doc.text('⚠ Reapresentação Registrada', 18, footerY + 6);
 
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(80, 80, 80);
@@ -738,7 +729,7 @@ const SyncPage = () => {
       ];
       
       obsText.forEach((line, index) => {
-        doc.text(line, 15, footerY + 13 + (index * 4));
+        doc.text(line, 18, footerY + 13 + (index * 4));
       });
 
       footerY += 30;
@@ -750,16 +741,16 @@ const SyncPage = () => {
       }
 
       doc.setDrawColor(200, 200, 200);
-      doc.line(15, footerY + 20, 90, footerY + 20);
-      doc.line(110, footerY + 20, 185, footerY + 20);
+      doc.line(15, footerY + 20, 100, footerY + 20);
+      doc.line(110, footerY + 20, 195, footerY + 20);
 
       doc.setFontSize(8);
       doc.setTextColor(100, 100, 100);
-      doc.text('Responsável pela Operação', 52.5, footerY + 25, { align: 'center' });
-      doc.text('Data: ___/___/______', 52.5, footerY + 30, { align: 'center' });
+      doc.text('Responsável pela Operação', 57.5, footerY + 25, { align: 'center' });
+      doc.text('Data: ___/___/______', 57.5, footerY + 30, { align: 'center' });
 
-      doc.text('Supervisor/Auditor', 147.5, footerY + 25, { align: 'center' });
-      doc.text('Data: ___/___/______', 147.5, footerY + 30, { align: 'center' });
+      doc.text('Supervisor/Auditor', 152.5, footerY + 25, { align: 'center' });
+      doc.text('Data: ___/___/______', 152.5, footerY + 30, { align: 'center' });
 
       // ========== RODAPÉ SUAVE ==========
       doc.setDrawColor(200, 120, 0);
@@ -811,20 +802,28 @@ const SyncPage = () => {
       return;
     }
 
-    const confirmar = window.confirm(
-      `Deseja reapresentar ${aihsSelecionadas.size} AIH(s) na competência ${formatarCompetencia(proximaCompetencia)}?\n\n` +
-      `Competência atual: ${formatarCompetencia(competenciaAIHSelecionada)}\n` +
-      `Próxima competência: ${formatarCompetencia(proximaCompetencia)}\n\n` +
-      `Esta ação irá atualizar a competência dessas AIHs no sistema.`
-    );
+    // Abrir diálogo de confirmação customizado
+    setDadosReapresentacao({
+      quantidade: aihsSelecionadas.size,
+      competenciaAtual: competenciaAIHSelecionada,
+      proximaCompetencia: proximaCompetencia
+    });
+    setDialogReapresentacaoAberto(true);
+  };
 
-    if (!confirmar) return;
+  // Função para confirmar reapresentação (chamada pelo diálogo)
+  const confirmarReapresentacao = async () => {
+    if (!dadosReapresentacao) return;
 
+    const { quantidade, competenciaAtual, proximaCompetencia } = dadosReapresentacao;
+
+    // Fechar diálogo e iniciar processamento
+    setDialogReapresentacaoAberto(false);
     setProcessandoReapresentacao(true);
 
     try {
-      console.log(`🔄 Reapresentando ${aihsSelecionadas.size} AIHs...`);
-      console.log(`   Competência atual: ${competenciaAIHSelecionada}`);
+      console.log(`🔄 Reapresentando ${quantidade} AIHs...`);
+      console.log(`   Competência atual: ${competenciaAtual}`);
       console.log(`   Próxima competência: ${proximaCompetencia}`);
       
       const aihsArray = Array.from(aihsSelecionadas);
@@ -838,7 +837,7 @@ const SyncPage = () => {
         const pdfGerado = gerarRelatorioPDFReapresentacao(
           aihsArray,
           resultadoSync.detalhes,
-          competenciaAIHSelecionada,
+          competenciaAtual,
           proximaCompetencia,
           nomeHospital
         );
@@ -865,14 +864,15 @@ const SyncPage = () => {
       console.log(`✅ ${data?.length || 0} AIHs atualizadas com sucesso`);
       
       toast.success(
-        `${aihsSelecionadas.size} AIH(s) reapresentada(s) com sucesso para ${formatarCompetencia(proximaCompetencia)}!`,
+        `${quantidade} AIH(s) reapresentada(s) com sucesso para ${formatarCompetencia(proximaCompetencia)}!`,
         {
           duration: 5000,
         }
       );
 
-      // Limpar seleções
+      // Limpar seleções e dados
       setAihsSelecionadas(new Set());
+      setDadosReapresentacao(null);
 
       // Recarregar dados da Etapa 1 para refletir as mudanças
       await buscarAIHs();
@@ -908,7 +908,7 @@ const SyncPage = () => {
       // Buscar AIHs da tabela
       const { data: aihsData, error } = await supabase
         .from('aihs')
-        .select('aih_number, patient_id, admission_date, competencia, created_at, total_procedures, procedure_requested, calculated_total_value')
+        .select('aih_number, patient_id, admission_date, discharge_date, competencia, created_at, total_procedures, procedure_requested, calculated_total_value')
         .eq('hospital_id', hospitalAIHSelecionado);
 
       if (error) {
@@ -978,7 +978,7 @@ const SyncPage = () => {
       // Buscar registros da tabela aih_registros
       const { data: sisaih01Data, error } = await supabase
         .from('aih_registros')
-        .select('numero_aih, nome_paciente, data_internacao, competencia, hospital_id, created_at')
+        .select('numero_aih, nome_paciente, data_internacao, data_saida, competencia, hospital_id, created_at')
         .eq('hospital_id', hospitalSISAIH01Selecionado);
 
       if (error) {
@@ -1840,11 +1840,11 @@ const SyncPage = () => {
               <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="flex items-center gap-2 text-green-900">
-                      ✅ AIHs Sincronizadas
-                      <span className="text-sm font-normal text-green-600">
-                        ({resultadoSync.sincronizados} registros)
-                      </span>
+                <CardTitle className="flex items-center gap-2 text-green-900">
+                  ✅ AIHs Sincronizadas
+                  <span className="text-sm font-normal text-green-600">
+                    ({resultadoSync.sincronizados} registros)
+                  </span>
                       <span className="text-sm font-semibold text-green-700 ml-auto">
                         Valor Total: {new Intl.NumberFormat('pt-BR', {
                           style: 'currency',
@@ -1854,11 +1854,11 @@ const SyncPage = () => {
                             .filter(d => d.status === 'sincronizado')
                             .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0) / 100
                         )}
-                      </span>
-                    </CardTitle>
+                  </span>
+                </CardTitle>
                     <CardDescription className="mt-2">
-                      Números das AIHs que foram encontradas em ambas as bases (AIH Avançado e SISAIH01)
-                    </CardDescription>
+                  Números das AIHs que foram encontradas em ambas as bases (AIH Avançado e SISAIH01)
+                </CardDescription>
                   </div>
                   <Button
                     onClick={gerarRelatorioPDFSincronizadas}
@@ -1879,7 +1879,7 @@ const SyncPage = () => {
                           <TableHead className="font-semibold text-green-900 w-12">#</TableHead>
                           <TableHead className="font-semibold text-green-900 w-32">Número AIH</TableHead>
                           <TableHead className="font-semibold text-green-900">Paciente</TableHead>
-                          <TableHead className="font-semibold text-green-900 w-28">Data Intern.</TableHead>
+                          <TableHead className="font-semibold text-green-900 w-28">Data de Alta</TableHead>
                           <TableHead className="font-semibold text-green-900 text-center w-20">Qtd.</TableHead>
                           <TableHead className="font-semibold text-green-900 w-64">Procedimento Principal</TableHead>
                           <TableHead className="font-semibold text-green-900 text-right w-32">Valor Total</TableHead>
@@ -1902,9 +1902,11 @@ const SyncPage = () => {
                                 {detalhe.aih_avancado?.patient_name || detalhe.sisaih01?.nome_paciente || '-'}
                               </TableCell>
                               <TableCell className="text-gray-600 text-xs w-28">
-                                {detalhe.sisaih01?.data_internacao 
-                                  ? new Date(detalhe.sisaih01.data_internacao).toLocaleDateString('pt-BR')
-                                  : '-'}
+                                {detalhe.sisaih01?.data_saida 
+                                  ? new Date(detalhe.sisaih01.data_saida).toLocaleDateString('pt-BR')
+                                  : (detalhe.aih_avancado?.discharge_date 
+                                      ? new Date(detalhe.aih_avancado.discharge_date).toLocaleDateString('pt-BR')
+                                      : '-')}
                               </TableCell>
                               <TableCell className="text-center w-20">
                                 <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">
@@ -1958,13 +1960,13 @@ const SyncPage = () => {
                   </span>
                   <span className="text-sm font-semibold text-orange-700 ml-auto">
                     Valor Total: {new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL'
-                    }).format(
-                      resultadoSync.detalhes
+                          style: 'currency',
+                          currency: 'BRL'
+                        }).format(
+                          resultadoSync.detalhes
                         .filter(d => d.status === 'pendente')
-                        .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0) / 100
-                    )}
+                            .reduce((acc, d) => acc + (d.aih_avancado?.calculated_total_value || 0), 0) / 100
+                        )}
                   </span>
                 </CardTitle>
                 <CardDescription>
@@ -2020,7 +2022,7 @@ const SyncPage = () => {
                           <TableHead className="font-semibold text-orange-900 w-12">#</TableHead>
                           <TableHead className="font-semibold text-orange-900 w-32">Número AIH</TableHead>
                           <TableHead className="font-semibold text-orange-900">Paciente</TableHead>
-                          <TableHead className="font-semibold text-orange-900 w-28">Data Intern.</TableHead>
+                          <TableHead className="font-semibold text-orange-900 w-28">Data de Alta</TableHead>
                           <TableHead className="font-semibold text-orange-900 text-center w-20">Qtd.</TableHead>
                           <TableHead className="font-semibold text-orange-900 w-64">Procedimento Principal</TableHead>
                           <TableHead className="font-semibold text-orange-900 text-right w-32">Valor Total</TableHead>
@@ -2062,8 +2064,8 @@ const SyncPage = () => {
                                 )}
                               </TableCell>
                               <TableCell className="text-gray-600 text-xs w-28">
-                                {detalhe.aih_avancado?.admission_date 
-                                  ? new Date(detalhe.aih_avancado.admission_date).toLocaleDateString('pt-BR')
+                                {detalhe.aih_avancado?.discharge_date 
+                                  ? new Date(detalhe.aih_avancado.discharge_date).toLocaleDateString('pt-BR')
                                   : '-'}
                               </TableCell>
                               <TableCell className="text-center w-20">
@@ -2130,7 +2132,7 @@ const SyncPage = () => {
                           <TableHead className="font-semibold text-red-900 w-12">#</TableHead>
                           <TableHead className="font-semibold text-red-900 w-32">Número AIH</TableHead>
                           <TableHead className="font-semibold text-red-900">Paciente</TableHead>
-                          <TableHead className="font-semibold text-red-900 w-28">Data Intern.</TableHead>
+                          <TableHead className="font-semibold text-red-900 w-28">Data de Alta</TableHead>
                           <TableHead className="font-semibold text-red-900 text-center w-20">Qtd.</TableHead>
                           <TableHead className="font-semibold text-red-900 w-64">Procedimento Principal</TableHead>
                           <TableHead className="font-semibold text-red-900 text-right w-32">Valor Total</TableHead>
@@ -2158,9 +2160,11 @@ const SyncPage = () => {
                                 {detalhe.sisaih01?.nome_paciente || '-'}
                               </TableCell>
                               <TableCell className="text-gray-600 text-xs w-28">
-                                {detalhe.sisaih01?.data_internacao 
-                                  ? new Date(detalhe.sisaih01.data_internacao).toLocaleDateString('pt-BR')
-                                  : '-'}
+                                {detalhe.sisaih01?.data_saida 
+                                  ? new Date(detalhe.sisaih01.data_saida).toLocaleDateString('pt-BR')
+                                  : (detalhe.aih_avancado?.discharge_date 
+                                      ? new Date(detalhe.aih_avancado.discharge_date).toLocaleDateString('pt-BR')
+                                      : '-')}
                               </TableCell>
                               <TableCell className="text-center w-20">
                                 <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 text-xs font-semibold">
@@ -2253,6 +2257,53 @@ const SyncPage = () => {
           </div>
         </div>
       )}
+
+      {/* Diálogo de Confirmação de Reapresentação */}
+      <AlertDialog open={dialogReapresentacaoAberto} onOpenChange={setDialogReapresentacaoAberto}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
+              <RefreshCw className="h-5 w-5" />
+              Confirmar Reapresentação
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 pt-2">
+              <p className="text-base text-gray-700">
+                Deseja reapresentar <strong className="text-orange-600">{dadosReapresentacao?.quantidade} AIH(s)</strong> na competência seguinte?
+              </p>
+              
+              <div className="bg-orange-50 rounded-lg p-4 space-y-2 border border-orange-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600">Competência atual:</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {dadosReapresentacao ? formatarCompetencia(dadosReapresentacao.competenciaAtual) : ''}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-600">Próxima competência:</span>
+                  <span className="text-sm font-semibold text-orange-600">
+                    {dadosReapresentacao ? formatarCompetencia(dadosReapresentacao.proximaCompetencia) : ''}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600">
+                Esta ação irá atualizar a competência dessas AIHs no sistema e gerar um relatório PDF para registro.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="hover:bg-gray-100">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmarReapresentacao}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              Confirmar Reapresentação
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
