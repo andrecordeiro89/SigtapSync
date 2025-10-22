@@ -63,6 +63,7 @@ import {
 import { toast } from './ui/use-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 // ================================================================
 // TIPOS E INTERFACES
@@ -479,6 +480,71 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     }
   };
 
+  // 📊 EXPORTAR EXCEL COM NOME E CNS DOS MÉDICOS
+  const handleExportExcel = async () => {
+    try {
+      console.log('📊 Iniciando exportação Excel...');
+      
+      // Usar exatamente o que está na tela (filtros e ordenação aplicados)
+      const rows = (sortedDoctorRows || []).map(({ doctor: d, hospital }) => ({
+        'Nome': d.name || 'Médico não informado',
+        'CNS': d.cns || 'Não informado',
+        'CRM': d.crm || 'Não informado',
+        'Especialidade': d.speciality || 'Não informado',
+        'Hospital': hospital || 'Não informado',
+      }));
+
+      if (rows.length === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Sem dados para exportar',
+          description: 'Nenhum profissional encontrado para o relatório.'
+        });
+        return;
+      }
+
+      console.log(`✅ ${rows.length} médicos serão exportados para Excel`);
+
+      // Criar workbook e worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+
+      // Ajustar largura das colunas
+      const colWidths = [
+        { wch: 35 }, // Nome
+        { wch: 18 }, // CNS
+        { wch: 15 }, // CRM
+        { wch: 25 }, // Especialidade
+        { wch: 35 }, // Hospital
+      ];
+      ws['!cols'] = colWidths;
+
+      // Adicionar worksheet ao workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Corpo Médico');
+
+      // Gerar nome do arquivo
+      const timestamp = new Date().toISOString().slice(0,19).replace(/[-:T]/g,'');
+      const fileName = `Relatorio_SUS_Corpo_Medico_${timestamp}.xlsx`;
+
+      // Salvar arquivo
+      XLSX.writeFile(wb, fileName);
+
+      console.log(`✅ Arquivo Excel gerado: ${fileName}`);
+
+      toast({
+        title: 'Relatório Excel gerado com sucesso!',
+        description: `${fileName} foi baixado com ${rows.length} médico(s).`
+      });
+    } catch (error) {
+      console.error('❌ Erro ao exportar Excel:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao exportar Excel',
+        description: 'Ocorreu um erro ao gerar o arquivo Excel. Tente novamente.'
+      });
+    }
+  };
+
   // Função removida - não mais necessária
 
   const getHospitalBadgeColor = (hospitalName: string) => {
@@ -643,9 +709,19 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 onClick={handleExport}
                 size="sm"
                 variant="outline"
+                className="bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                PDF
+              </Button>
+              <Button
+                onClick={handleExportExcel}
+                size="sm"
+                variant="outline"
+                className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
               >
                 <Download className="h-4 w-4 mr-2" />
-                Exportar
+                Excel
               </Button>
             </div>
           </CardTitle>
