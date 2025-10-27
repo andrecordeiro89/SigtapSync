@@ -3995,6 +3995,43 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     </div>
                                                   </div>
                                                 )} */}
+
+                                                {/* 💰 VALOR DE REPASSE PARA O MÉDICO */}
+                                                {(() => {
+                                                  // ✅ IMPORTANTE: Filtrar procedimentos de anestesista antes de calcular
+                                                  // Evita duplicação de valores com procedimentos 04.xxx de anestesistas
+                                                  const proceduresWithPayment = patient.procedures
+                                                    .filter(filterCalculableProcedures) // 🚫 Remove anestesistas 04.xxx (exceto cesarianas)
+                                                    .map((proc: any) => ({
+                                                      procedure_code: proc.procedure_code,
+                                                      procedure_description: proc.procedure_description,
+                                                      value_reais: proc.value_reais || 0,
+                                                    }));
+
+                                                  const paymentResult = calculateDoctorPayment(
+                                                    doctor.doctor_info.name,
+                                                    proceduresWithPayment,
+                                                    doctor.hospitals?.[0]?.hospital_id
+                                                  );
+
+                                                  const totalPayment = paymentResult.totalPayment || 0;
+                                                  
+                                                  // Só mostra se houver valor de repasse
+                                                  if (totalPayment > 0) {
+                                                    return (
+                                                      <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg p-3 border-2 border-teal-300">
+                                                        <div className="flex items-center justify-between">
+                                                          <div className="flex items-center gap-2">
+                                                            <Stethoscope className="h-4 w-4 text-teal-600" />
+                                                            <span className="text-xs font-bold text-teal-900 uppercase tracking-wide">Repasse Médico</span>
+                                                          </div>
+                                                          <span className="text-lg font-black text-teal-700">{formatCurrency(totalPayment)}</span>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  }
+                                                  return null;
+                                                })()}
                                               </div>
                                             );
                                           })()}

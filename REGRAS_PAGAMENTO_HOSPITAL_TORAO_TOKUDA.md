@@ -16,10 +16,11 @@
 
 | Métrica | Valor |
 |---------|-------|
-| **Total de médicos com regras** | 7 |
-| **Médicos com regras de múltiplos procedimentos** | 3 |
-| **Total de procedimentos individuais** | 62 |
-| **Total de combinações de múltiplos** | 34+ |
+| **Total de médicos com regras** | 8 |
+| **Médicos com regras de múltiplos procedimentos** | 4 |
+| **Total de procedimentos individuais** | 82 |
+| **Total de combinações de múltiplos** | 48 |
+| **Última atualização** | 27/10/2025 |
 
 ---
 
@@ -59,7 +60,7 @@
 
 ### 3️⃣ **HELIO SHINDY KISSINA** - Urologia
 
-#### Procedimentos Individuais (22 procedimentos)
+#### Procedimentos Individuais (21 procedimentos)
 
 | Código | Descrição | Valor |
 |--------|-----------|-------|
@@ -75,7 +76,8 @@
 | `04.09.04.013-4` | ORQUIDOPEXIA UNILATERAL | R$ 400,00 |
 | `04.09.04.012-6` | ORQUIDOPEXIA BILATERAL | R$ 450,00 |
 | `04.09.01.006-5` | CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA | R$ 600,00 |
-| `04.09.05.007-5` | PLASTICA TOTAL DO PENIS (INCLUI PEYRONIE) | R$ 500,00 |
+| `04.09.05.007-5` | PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) | R$ 500,00 |
+| `RESSECÇÃO_CISTOS` | RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES | R$ 250,00 |
 | `04.09.04.016-9` | ORQUIECTOMIA UNILATERAL | R$ 500,00 |
 | `04.09.01.032-4` | PIELOPLASTIA | R$ 700,00 |
 | `04.09.01.021-9` | NEFRECTOMIA TOTAL | R$ 1.200,00 |
@@ -83,32 +85,67 @@
 | `04.09.01.022-7` | NEFROLITOTOMIA (ANATRÓFICA) | R$ 900,00 |
 | `04.09.01.029-4` | NEFROSTOMIA PERCUTÂNEA | R$ 400,00 |
 | `04.09.02.017-6` | URETROTOMIA INTERNA | R$ 250,00 |
-| `RESSECÇÃO_CISTOS` | RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES | R$ 250,00 |
 
-#### Regras de Múltiplos Procedimentos (18 combinações)
+#### Regras de Múltiplos Procedimentos (16 combinações)
 
 | # | Combinação | Valor Total | Descrição |
 |---|------------|-------------|-----------|
-| 1 | `04.09.01.023-5` + `04.09.01.017-0` | R$ 1.100,00 | NEFROLITOTOMIA PERCUTÂNEA + CATETER DUPLO J |
-| 2 | `04.09.01.023-5` + `04.09.01.014-6` | R$ 1.300,00 | NEFROLITOTOMIA + EXTRAÇÃO CÁLCULO |
-| 3 | `04.09.01.023-5` + `04.09.01.017-0` + `04.09.01.014-6` | R$ 1.400,00 | NEFROLITOTOMIA + CATETER + EXTRAÇÃO |
+| 1 | `04.09.01.023-5` + `04.09.01.017-0` | R$ 1.100,00 | NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J |
+| 2 | `04.09.01.023-5` + `04.09.01.014-6` | R$ 1.300,00 | NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL |
+| 3 | `04.09.01.023-5` + `04.09.01.017-0` + `04.09.01.014-6` | R$ 1.400,00 | NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO + EXTRAÇÃO |
 | 4 | `04.09.01.023-5` + `04.09.01.014-6` + `04.09.01.059-6` | R$ 1.500,00 | NEFROLITOTOMIA + EXTRAÇÃO + URETEROLITOTRIPSIA |
-| 5 | `04.09.01.023-5` + `04.09.01.017-0` + `04.09.01.014-6` + `04.09.01.059-6` | R$ 1.600,00 | NEFROLITOTOMIA + CATETER + EXTRAÇÃO + URETEROLITOTRIPSIA |
-| 6 | `04.09.01.059-6` + `04.09.01.017-0` | R$ 1.000,00 | URETEROLITOTRIPSIA + CATETER DUPLO J |
-| 7 | `04.09.01.018-9` + `04.09.01.017-0` | R$ 1.100,00 | LITOTRIPSIA + CATETER DUPLO J |
-| 8 | `04.09.01.018-9` + `04.09.01.014-6` + `04.09.01.017-0` | R$ 1.200,00 | LITOTRIPSIA + EXTRAÇÃO + CATETER |
-| 9 | `04.09.01.018-9` + `04.09.01.059-6` + `04.09.01.014-6` + `04.09.01.017-0` | R$ 1.300,00 | LITOTRIPSIA + URETEROLITOTRIPSIA + EXTRAÇÃO + CATETER |
-| 10 | `04.09.03.004-0` + `04.09.01.038-3` | R$ 1.200,00 | RESSECÇÃO PRÓSTATA + RESSECÇÃO LESÃO VESICAL |
-| 11 | `04.09.04.021-5` + `04.09.04.019-3` | R$ 400,00 | HIDROCELE + RESSECÇÃO BOLSA ESCROTAL |
-| 12 | `04.09.04.021-5` + `04.09.04.019-3` + `04.09.04.017-7` | R$ 500,00 | HIDROCELE + RESSECÇÃO + PLÁSTICA BOLSA |
-| 13 | `04.09.04.013-4` + `04.09.04.017-7` | R$ 550,00 | ORQUIDOPEXIA + PLÁSTICA BOLSA ESCROTAL |
-| 14 | `04.09.04.012-6` + `04.09.04.017-7` | R$ 550,00 | ORQUIDOPEXIA BILATERAL + PLÁSTICA BOLSA |
+| 5 | `04.09.01.023-5` + `04.09.01.017-0` + `04.09.01.014-6` + `04.09.01.059-6` | R$ 1.600,00 | NEFROLITOTOMIA + INSTALAÇÃO + EXTRAÇÃO + URETEROLITOTRIPSIA |
+| 6 | `04.09.01.059-6` + `04.09.01.017-0` | R$ 1.000,00 | URETEROLITOTRIPSIA TRANSURETEROSCÓPICA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J |
+| 7 | `04.09.01.018-9` + `04.09.01.017-0` | R$ 1.100,00 | LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J |
+| 8 | `04.09.01.018-9` + `04.09.01.014-6` + `04.09.01.017-0` | R$ 1.200,00 | LITOTRIPSIA + EXTRAÇÃO + INSTALAÇÃO |
+| 9 | `04.09.01.018-9` + `04.09.01.059-6` + `04.09.01.014-6` + `04.09.01.017-0` | R$ 1.300,00 | LITOTRIPSIA + URETEROLITOTRIPSIA + EXTRAÇÃO + INSTALAÇÃO |
+| 10 | `04.09.03.004-0` + `04.09.01.038-3` | R$ 1.200,00 | RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL |
+| 11 | `04.09.04.021-5` + `04.09.04.019-3` | R$ 400,00 | HIDROCELE + RESSECÇÃO PARCIAL DA BOLSA ESCROTAL |
+| 12 | `04.09.04.021-5` + `04.09.04.019-3` + `04.09.04.017-7` | R$ 500,00 | HIDROCELE + RESSECÇÃO + PLÁSTICA DA BOLSA ESCROTAL |
+| 13 | `04.09.04.013-4` + `04.09.04.017-7` | R$ 550,00 | ORQUIDOPEXIA UNILATERAL + PLÁSTICA DA BOLSA ESCROTAL |
+| 14 | `04.09.04.012-6` + `04.09.04.017-7` | R$ 550,00 | ORQUIDOPEXIA BILATERAL + PLÁSTICA DA BOLSA ESCROTAL |
 | 15 | `04.09.01.032-4` + `04.09.01.057-0` | R$ 1.000,00 | PIELOPLASTIA + URETEROPLASTIA |
-| 16 | `04.09.01.032-4` + `04.09.01.057-0` + `04.09.01.017-0` | R$ 1.100,00 | PIELOPLASTIA + URETEROPLASTIA + CATETER |
+| 16 | `04.09.01.032-4` + `04.09.01.057-0` + `04.09.01.017-0` | R$ 1.100,00 | PIELOPLASTIA + URETEROPLASTIA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J |
 
 ---
 
-### 4️⃣ **ROGERIO YOSHIKAZU NABESHIMA** - Cirurgia Vascular
+### 4️⃣ **GUILHERME AUGUSTO STORER** - Urologia ⭐
+
+#### Procedimentos Individuais (21 procedimentos)
+
+**Mesmas regras do Dr. HELIO SHINDY KISSINA**
+
+| Código | Descrição | Valor |
+|--------|-----------|-------|
+| `04.09.01.023-5` | NEFROLITOTOMIA PERCUTÂNEA | R$ 1.000,00 |
+| `04.09.01.059-6` | URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) | R$ 900,00 |
+| `04.09.01.018-9` | LITOTRIPSIA (FLEXÍVEL) | R$ 1.000,00 |
+| `04.09.01.017-0` | INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J | R$ 250,00 |
+| `04.09.03.004-0` | RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA | R$ 1.000,00 |
+| `04.09.03.002-3` | PROSTATECTOMIA SUPRAPÚBICA | R$ 1.000,00 |
+| `04.09.04.021-5` | TRATAMENTO CIRÚRGICO DE HIDROCELE | R$ 300,00 |
+| `04.09.05.008-3` | POSTECTOMIA | R$ 250,00 |
+| `04.09.04.024-0` | VASECTOMIA | R$ 450,00 |
+| `04.09.04.013-4` | ORQUIDOPEXIA UNILATERAL | R$ 400,00 |
+| `04.09.04.012-6` | ORQUIDOPEXIA BILATERAL | R$ 450,00 |
+| `04.09.01.006-5` | CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA | R$ 600,00 |
+| `04.09.05.007-5` | PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) | R$ 500,00 |
+| `RESSECÇÃO_CISTOS` | RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES | R$ 250,00 |
+| `04.09.04.016-9` | ORQUIECTOMIA UNILATERAL | R$ 500,00 |
+| `04.09.01.032-4` | PIELOPLASTIA | R$ 700,00 |
+| `04.09.01.021-9` | NEFRECTOMIA TOTAL | R$ 1.200,00 |
+| `04.09.01.020-0` | NEFRECTOMIA PARCIAL | R$ 1.000,00 |
+| `04.09.01.022-7` | NEFROLITOTOMIA (ANATRÓFICA) | R$ 900,00 |
+| `04.09.01.029-4` | NEFROSTOMIA PERCUTÂNEA | R$ 400,00 |
+| `04.09.02.017-6` | URETROTOMIA INTERNA | R$ 250,00 |
+
+#### Regras de Múltiplos Procedimentos (16 combinações)
+
+**Mesmas 16 combinações do Dr. HELIO SHINDY KISSINA** (valores de R$ 400,00 a R$ 1.600,00)
+
+---
+
+### 5️⃣ **ROGERIO YOSHIKAZU NABESHIMA** - Cirurgia Vascular
 
 #### Procedimentos Individuais (2 procedimentos)
 | Código | Descrição | Valor |
@@ -164,7 +201,7 @@
 
 ---
 
-### 6️⃣ **JOÃO VICTOR RODRIGUES** - Cirurgia Geral
+### 7️⃣ **JOÃO VICTOR RODRIGUES** - Cirurgia Geral
 
 #### Procedimentos Individuais (10 procedimentos)
 
@@ -190,7 +227,7 @@
 
 ---
 
-### 7️⃣ **JOAO VICTOR RODRIGUES** (sem acento) - Cirurgia Geral
+### 8️⃣ **JOAO VICTOR RODRIGUES** (sem acento) - Cirurgia Geral
 
 #### Procedimentos Individuais (11 procedimentos)
 
@@ -277,15 +314,15 @@ multipleRule: {
 
 | Categoria | Quantidade |
 |-----------|------------|
-| **Médicos cadastrados** | 7 |
+| **Médicos cadastrados** | 8 |
 | **Oftalmologistas** | 1 |
 | **Cirurgiões Vasculares** | 2 |
-| **Urologistas** | 1 |
+| **Urologistas** | 2 |
 | **Cirurgiões Gerais** | 3 |
-| **Total de procedimentos únicos** | 62 |
-| **Total de combinações** | 34+ |
+| **Total de procedimentos únicos** | 82 |
+| **Total de combinações** | 48 |
 | **Valor médio por procedimento** | ~R$ 600,00 |
-| **Valor mais alto** | R$ 1.250,00 |
+| **Valor mais alto** | R$ 1.600,00 |
 | **Valor mais baixo** | R$ 100,00 |
 
 ---

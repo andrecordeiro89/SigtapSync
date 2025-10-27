@@ -145,7 +145,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
   'HELIO SHINDY KISSINA': {
     doctorName: 'HELIO SHINDY KISSINA',
     rules: [
-      // Procedimentos individuais
+      // ================================================================
+      // 🔬 PROCEDIMENTOS INDIVIDUAIS - DR. HELIO SHINDY KISSINA
+      // Especialidade: Urologia
+      // Última atualização: 27/10/2025
+      // ================================================================
       {
         procedureCode: '04.09.01.023-5',
         standardValue: 1000.00,
@@ -204,12 +208,17 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.09.01.006-5',
         standardValue: 600.00,
-        description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00'
+        description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA (RETIRADA DE CÁLCULO VESICAL ENDOSCÓPICA OU CONVENCIONAL) - R$ 600,00'
       },
       {
         procedureCode: '04.09.05.007-5',
         standardValue: 500.00,
-        description: 'PLASTICA TOTAL DO PENIS (INCLUI PEYRONIE) - R$ 500,00'
+        description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00'
+      },
+      {
+        procedureCode: 'RESSECÇÃO_CISTOS',
+        standardValue: 250.00,
+        description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00'
       },
       {
         procedureCode: '04.09.04.016-9',
@@ -245,85 +254,97 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.09.02.017-6',
         standardValue: 250.00,
         description: 'URETROTOMIA INTERNA - R$ 250,00'
-      },
-      {
-        procedureCode: 'RESSECÇÃO_CISTOS',
-        standardValue: 250.00,
-        description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00'
       }
     ],
-    // Regras para múltiplos procedimentos específicos
+    // ================================================================
+    // 🔗 REGRAS DE MÚLTIPLOS PROCEDIMENTOS - DR. HELIO SHINDY KISSINA
+    // Sistema: Valores fixos para combinações específicas
+    // Total: 16 combinações cadastradas
+    // ================================================================
     multipleRules: [
+      // Grupo 1: NEFROLITOTOMIA PERCUTÂNEA + Combinações
       {
         codes: ['04.09.01.023-5', '04.09.01.017-0'],
         totalValue: 1100.00,
-        description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00'
+        description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
       },
       {
         codes: ['04.09.01.023-5', '04.09.01.014-6'],
         totalValue: 1300.00,
-        description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO CÁLCULO PELVE RENAL - R$ 1.300,00'
+        description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL - R$ 1.300,00'
       },
       {
         codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6'],
         totalValue: 1400.00,
-        description: 'NEFROLITOTOMIA + CATETER + EXTRAÇÃO CÁLCULO - R$ 1.400,00'
+        description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL - R$ 1.400,00'
       },
       {
         codes: ['04.09.01.023-5', '04.09.01.014-6', '04.09.01.059-6'],
         totalValue: 1500.00,
-        description: 'NEFROLITOTOMIA + EXTRAÇÃO + URETEROLITOTRIPSIA - R$ 1.500,00'
+        description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (FLEXÍVEL OU SEMIRRÍGIDA) - R$ 1.500,00'
       },
       {
         codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'],
         totalValue: 1600.00,
-        description: 'NEFROLITOTOMIA + CATETER + EXTRAÇÃO + URETEROLITOTRIPSIA - R$ 1.600,00'
+        description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (FLEXÍVEL OU SEMIRRÍGIDA) - R$ 1.600,00'
       },
+      
+      // Grupo 2: URETEROLITOTRIPSIA + Combinações
       {
         codes: ['04.09.01.059-6', '04.09.01.017-0'],
         totalValue: 1000.00,
-        description: 'URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.000,00'
+        description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J (SEMIRRÍGIDA) - R$ 1.000,00'
       },
+      
+      // Grupo 3: LITOTRIPSIA (FLEXÍVEL) + Combinações
       {
         codes: ['04.09.01.018-9', '04.09.01.017-0'],
         totalValue: 1100.00,
-        description: 'LITOTRIPSIA + CATETER DUPLO J - R$ 1.100,00'
+        description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
       },
       {
         codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'],
         totalValue: 1200.00,
-        description: 'LITOTRIPSIA + EXTRAÇÃO + CATETER - R$ 1.200,00'
+        description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00'
       },
       {
         codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'],
         totalValue: 1300.00,
-        description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + EXTRAÇÃO + CATETER - R$ 1.300,00'
+        description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.300,00'
       },
+      
+      // Grupo 4: PRÓSTATA + Combinações
       {
         codes: ['04.09.03.004-0', '04.09.01.038-3'],
         totalValue: 1200.00,
-        description: 'RESSECÇÃO PRÓSTATA + RESSECÇÃO LESÃO VESICAL - R$ 1.200,00'
+        description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 1.200,00'
       },
+      
+      // Grupo 5: HIDROCELE + Combinações
       {
         codes: ['04.09.04.021-5', '04.09.04.019-3'],
         totalValue: 400.00,
-        description: 'HIDROCELE + RESSECÇÃO BOLSA ESCROTAL - R$ 400,00'
+        description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE + RESSECÇÃO PARCIAL DA BOLSA ESCROTAL - R$ 400,00'
       },
       {
         codes: ['04.09.04.021-5', '04.09.04.019-3', '04.09.04.017-7'],
         totalValue: 500.00,
-        description: 'HIDROCELE + RESSECÇÃO + PLÁSTICA BOLSA - R$ 500,00'
+        description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE + RESSECÇÃO PARCIAL DA BOLSA ESCROTAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 500,00'
       },
+      
+      // Grupo 6: ORQUIDOPEXIA + PLÁSTICA BOLSA ESCROTAL
       {
         codes: ['04.09.04.013-4', '04.09.04.017-7'],
         totalValue: 550.00,
-        description: 'ORQUIDOPEXIA + PLÁSTICA BOLSA ESCROTAL - R$ 550,00'
+        description: 'ORQUIDOPEXIA UNILATERAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 550,00'
       },
       {
         codes: ['04.09.04.012-6', '04.09.04.017-7'],
         totalValue: 550.00,
-        description: 'ORQUIDOPEXIA BILATERAL + PLÁSTICA BOLSA - R$ 550,00'
+        description: 'ORQUIDOPEXIA BILATERAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 550,00'
       },
+      
+      // Grupo 7: PIELOPLASTIA + Combinações
       {
         codes: ['04.09.01.032-4', '04.09.01.057-0'],
         totalValue: 1000.00,
@@ -332,7 +353,225 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         codes: ['04.09.01.032-4', '04.09.01.057-0', '04.09.01.017-0'],
         totalValue: 1100.00,
-        description: 'PIELOPLASTIA + URETEROPLASTIA + CATETER - R$ 1.100,00'
+        description: 'PIELOPLASTIA + URETEROPLASTIA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
+      }
+    ]
+  },
+  
+  'GUILHERME AUGUSTO STORER': {
+    doctorName: 'GUILHERME AUGUSTO STORER',
+    rules: [
+      // ================================================================
+      // 🔬 PROCEDIMENTOS INDIVIDUAIS - DR. GUILHERME AUGUSTO STORER
+      // Especialidade: Urologia
+      // Última atualização: 27/10/2025
+      // Mesmas regras do Dr. HELIO SHINDY KISSINA
+      // ================================================================
+      {
+        procedureCode: '04.09.01.023-5',
+        standardValue: 1000.00,
+        description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00'
+      },
+      {
+        procedureCode: '04.09.01.059-6',
+        standardValue: 900.00,
+        description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00'
+      },
+      {
+        procedureCode: '04.09.01.018-9',
+        standardValue: 1000.00,
+        description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00'
+      },
+      {
+        procedureCode: '04.09.01.017-0',
+        standardValue: 250.00,
+        description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00'
+      },
+      {
+        procedureCode: '04.09.03.004-0',
+        standardValue: 1000.00,
+        description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00'
+      },
+      {
+        procedureCode: '04.09.03.002-3',
+        standardValue: 1000.00,
+        description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00'
+      },
+      {
+        procedureCode: '04.09.04.021-5',
+        standardValue: 300.00,
+        description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00'
+      },
+      {
+        procedureCode: '04.09.05.008-3',
+        standardValue: 250.00,
+        description: 'POSTECTOMIA - R$ 250,00'
+      },
+      {
+        procedureCode: '04.09.04.024-0',
+        standardValue: 450.00,
+        description: 'VASECTOMIA - R$ 450,00'
+      },
+      {
+        procedureCode: '04.09.04.013-4',
+        standardValue: 400.00,
+        description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00'
+      },
+      {
+        procedureCode: '04.09.04.012-6',
+        standardValue: 450.00,
+        description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00'
+      },
+      {
+        procedureCode: '04.09.01.006-5',
+        standardValue: 600.00,
+        description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA (RETIRADA DE CÁLCULO VESICAL ENDOSCÓPICA OU CONVENCIONAL) - R$ 600,00'
+      },
+      {
+        procedureCode: '04.09.05.007-5',
+        standardValue: 500.00,
+        description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00'
+      },
+      {
+        procedureCode: 'RESSECÇÃO_CISTOS',
+        standardValue: 250.00,
+        description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00'
+      },
+      {
+        procedureCode: '04.09.04.016-9',
+        standardValue: 500.00,
+        description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00'
+      },
+      {
+        procedureCode: '04.09.01.032-4',
+        standardValue: 700.00,
+        description: 'PIELOPLASTIA - R$ 700,00'
+      },
+      {
+        procedureCode: '04.09.01.021-9',
+        standardValue: 1200.00,
+        description: 'NEFRECTOMIA TOTAL - R$ 1.200,00'
+      },
+      {
+        procedureCode: '04.09.01.020-0',
+        standardValue: 1000.00,
+        description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00'
+      },
+      {
+        procedureCode: '04.09.01.022-7',
+        standardValue: 900.00,
+        description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00'
+      },
+      {
+        procedureCode: '04.09.01.029-4',
+        standardValue: 400.00,
+        description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00'
+      },
+      {
+        procedureCode: '04.09.02.017-6',
+        standardValue: 250.00,
+        description: 'URETROTOMIA INTERNA - R$ 250,00'
+      }
+    ],
+    // ================================================================
+    // 🔗 REGRAS DE MÚLTIPLOS PROCEDIMENTOS - DR. GUILHERME AUGUSTO STORER
+    // Sistema: Valores fixos para combinações específicas
+    // Total: 16 combinações cadastradas
+    // Mesmas regras do Dr. HELIO SHINDY KISSINA
+    // ================================================================
+    multipleRules: [
+      // Grupo 1: NEFROLITOTOMIA PERCUTÂNEA + Combinações
+      {
+        codes: ['04.09.01.023-5', '04.09.01.017-0'],
+        totalValue: 1100.00,
+        description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
+      },
+      {
+        codes: ['04.09.01.023-5', '04.09.01.014-6'],
+        totalValue: 1300.00,
+        description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL - R$ 1.300,00'
+      },
+      {
+        codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6'],
+        totalValue: 1400.00,
+        description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL - R$ 1.400,00'
+      },
+      {
+        codes: ['04.09.01.023-5', '04.09.01.014-6', '04.09.01.059-6'],
+        totalValue: 1500.00,
+        description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (FLEXÍVEL OU SEMIRRÍGIDA) - R$ 1.500,00'
+      },
+      {
+        codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'],
+        totalValue: 1600.00,
+        description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (FLEXÍVEL OU SEMIRRÍGIDA) - R$ 1.600,00'
+      },
+      
+      // Grupo 2: URETEROLITOTRIPSIA + Combinações
+      {
+        codes: ['04.09.01.059-6', '04.09.01.017-0'],
+        totalValue: 1000.00,
+        description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J (SEMIRRÍGIDA) - R$ 1.000,00'
+      },
+      
+      // Grupo 3: LITOTRIPSIA (FLEXÍVEL) + Combinações
+      {
+        codes: ['04.09.01.018-9', '04.09.01.017-0'],
+        totalValue: 1100.00,
+        description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
+      },
+      {
+        codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'],
+        totalValue: 1200.00,
+        description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00'
+      },
+      {
+        codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'],
+        totalValue: 1300.00,
+        description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.300,00'
+      },
+      
+      // Grupo 4: PRÓSTATA + Combinações
+      {
+        codes: ['04.09.03.004-0', '04.09.01.038-3'],
+        totalValue: 1200.00,
+        description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 1.200,00'
+      },
+      
+      // Grupo 5: HIDROCELE + Combinações
+      {
+        codes: ['04.09.04.021-5', '04.09.04.019-3'],
+        totalValue: 400.00,
+        description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE + RESSECÇÃO PARCIAL DA BOLSA ESCROTAL - R$ 400,00'
+      },
+      {
+        codes: ['04.09.04.021-5', '04.09.04.019-3', '04.09.04.017-7'],
+        totalValue: 500.00,
+        description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE + RESSECÇÃO PARCIAL DA BOLSA ESCROTAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 500,00'
+      },
+      
+      // Grupo 6: ORQUIDOPEXIA + PLÁSTICA BOLSA ESCROTAL
+      {
+        codes: ['04.09.04.013-4', '04.09.04.017-7'],
+        totalValue: 550.00,
+        description: 'ORQUIDOPEXIA UNILATERAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 550,00'
+      },
+      {
+        codes: ['04.09.04.012-6', '04.09.04.017-7'],
+        totalValue: 550.00,
+        description: 'ORQUIDOPEXIA BILATERAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 550,00'
+      },
+      
+      // Grupo 7: PIELOPLASTIA + Combinações
+      {
+        codes: ['04.09.01.032-4', '04.09.01.057-0'],
+        totalValue: 1000.00,
+        description: 'PIELOPLASTIA + URETEROPLASTIA - R$ 1.000,00'
+      },
+      {
+        codes: ['04.09.01.032-4', '04.09.01.057-0', '04.09.01.017-0'],
+        totalValue: 1100.00,
+        description: 'PIELOPLASTIA + URETEROPLASTIA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
       }
     ]
   },
@@ -422,6 +661,53 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.07.04.008-0',
         standardValue: 600.00,
         description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00'
+      },
+      
+      // ================================================================
+      // 🆕 PROCEDIMENTOS ORIFICIAIS - FÍSTULAS, FISSURAS E HEMORRÓIDAS
+      // Data: 27/10/2025
+      // Valor padrão: R$ 450,00 por procedimento
+      // ================================================================
+      {
+        procedureCode: '04.07.02.027-6',
+        standardValue: 450.00,
+        description: 'FISTULECTOMIA/FISTULOTOMIA ANAL - R$ 450,00'
+      },
+      {
+        procedureCode: '04.07.02.028-4',
+        standardValue: 450.00,
+        description: 'HEMORROIDECTOMIA - R$ 450,00'
+      },
+      {
+        procedureCode: '04.07.02.031-4',
+        standardValue: 450.00,
+        description: 'TRATAMENTO CIRÚRGICO DE FISSURA ANAL - R$ 450,00'
+      },
+      
+      // ================================================================
+      // 🆕 CISTOS E LIPOMAS
+      // Data: 27/10/2025
+      // Valor padrão: R$ 250,00 por procedimento
+      // ================================================================
+      {
+        procedureCode: '04.01.02.007-0',
+        standardValue: 250.00,
+        description: 'EXÉRESE DE CISTO DERMOIDE - R$ 250,00'
+      },
+      {
+        procedureCode: '04.01.02.010-0',
+        standardValue: 250.00,
+        description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 250,00'
+      },
+      {
+        procedureCode: '04.01.02.008-8',
+        standardValue: 250.00,
+        description: 'EXÉRESE DE LIPOMA - R$ 250,00'
+      },
+      {
+        procedureCode: '04.01.02.009-6',
+        standardValue: 250.00,
+        description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00'
       }
     ],
     
@@ -508,108 +794,168 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         codes: ['04.07.03.002-6', '04.07.04.018-8', '04.07.03.014-0', '04.07.04.002-1', '04.07.03.006-9'],
         totalValue: 2050.00,
         description: 'COLECISTECTOMIA + 4 SEQUENCIAIS (MÁXIMO) - R$ 2.050,00'
+      },
+      
+      // ================================================================
+      // 🆕 REGRAS DE MÚLTIPLAS HÉRNIAS
+      // Nova lógica: 1ª hérnia = valor original, 2ª+ hérnias = R$ 300,00
+      // Data: 27/10/2025
+      // ================================================================
+      
+      // Combinações com HERNIOPLASTIA INGUINAL UNILATERAL como 1ª (R$ 700)
+      {
+        codes: ['04.07.04.010-2', '04.07.04.009-9'],
+        totalValue: 1000.00,
+        description: 'INGUINAL UNILATERAL (1ª) + INGUINAL BILATERAL (2ª) - R$ 1.000,00'
+      },
+      {
+        codes: ['04.07.04.010-2', '04.07.04.006-4'],
+        totalValue: 1000.00,
+        description: 'INGUINAL UNILATERAL (1ª) + EPIGÁSTRICA (2ª) - R$ 1.000,00'
+      },
+      {
+        codes: ['04.07.04.010-2', '04.07.04.012-9'],
+        totalValue: 1000.00,
+        description: 'INGUINAL UNILATERAL (1ª) + UMBILICAL (2ª) - R$ 1.000,00'
+      },
+      {
+        codes: ['04.07.04.010-2', '04.07.04.008-0'],
+        totalValue: 1000.00,
+        description: 'INGUINAL UNILATERAL (1ª) + INCISIONAL/VENTRAL (2ª) - R$ 1.000,00'
+      },
+      
+      // Combinações com HERNIOPLASTIA INGUINAL BILATERAL como 1ª (R$ 700)
+      {
+        codes: ['04.07.04.009-9', '04.07.04.010-2'],
+        totalValue: 1000.00,
+        description: 'INGUINAL BILATERAL (1ª) + INGUINAL UNILATERAL (2ª) - R$ 1.000,00'
+      },
+      {
+        codes: ['04.07.04.009-9', '04.07.04.006-4'],
+        totalValue: 1000.00,
+        description: 'INGUINAL BILATERAL (1ª) + EPIGÁSTRICA (2ª) - R$ 1.000,00'
+      },
+      {
+        codes: ['04.07.04.009-9', '04.07.04.012-9'],
+        totalValue: 1000.00,
+        description: 'INGUINAL BILATERAL (1ª) + UMBILICAL (2ª) - R$ 1.000,00'
+      },
+      {
+        codes: ['04.07.04.009-9', '04.07.04.008-0'],
+        totalValue: 1000.00,
+        description: 'INGUINAL BILATERAL (1ª) + INCISIONAL/VENTRAL (2ª) - R$ 1.000,00'
+      },
+      
+      // Combinações com HERNIOPLASTIA EPIGÁSTRICA como 1ª (R$ 800)
+      {
+        codes: ['04.07.04.006-4', '04.07.04.010-2'],
+        totalValue: 1100.00,
+        description: 'EPIGÁSTRICA (1ª) + INGUINAL UNILATERAL (2ª) - R$ 1.100,00'
+      },
+      {
+        codes: ['04.07.04.006-4', '04.07.04.009-9'],
+        totalValue: 1100.00,
+        description: 'EPIGÁSTRICA (1ª) + INGUINAL BILATERAL (2ª) - R$ 1.100,00'
+      },
+      {
+        codes: ['04.07.04.006-4', '04.07.04.012-9'],
+        totalValue: 1100.00,
+        description: 'EPIGÁSTRICA (1ª) + UMBILICAL (2ª) - R$ 1.100,00'
+      },
+      {
+        codes: ['04.07.04.006-4', '04.07.04.008-0'],
+        totalValue: 1100.00,
+        description: 'EPIGÁSTRICA (1ª) + INCISIONAL/VENTRAL (2ª) - R$ 1.100,00'
+      },
+      
+      // Combinações com HERNIOPLASTIA UMBILICAL como 1ª (R$ 450)
+      {
+        codes: ['04.07.04.012-9', '04.07.04.010-2'],
+        totalValue: 750.00,
+        description: 'UMBILICAL (1ª) + INGUINAL UNILATERAL (2ª) - R$ 750,00'
+      },
+      {
+        codes: ['04.07.04.012-9', '04.07.04.009-9'],
+        totalValue: 750.00,
+        description: 'UMBILICAL (1ª) + INGUINAL BILATERAL (2ª) - R$ 750,00'
+      },
+      {
+        codes: ['04.07.04.012-9', '04.07.04.006-4'],
+        totalValue: 750.00,
+        description: 'UMBILICAL (1ª) + EPIGÁSTRICA (2ª) - R$ 750,00'
+      },
+      {
+        codes: ['04.07.04.012-9', '04.07.04.008-0'],
+        totalValue: 750.00,
+        description: 'UMBILICAL (1ª) + INCISIONAL/VENTRAL (2ª) - R$ 750,00'
+      },
+      
+      // Combinações com HERNIOPLASTIA INCISIONAL/VENTRAL como 1ª (R$ 600)
+      {
+        codes: ['04.07.04.008-0', '04.07.04.010-2'],
+        totalValue: 900.00,
+        description: 'INCISIONAL/VENTRAL (1ª) + INGUINAL UNILATERAL (2ª) - R$ 900,00'
+      },
+      {
+        codes: ['04.07.04.008-0', '04.07.04.009-9'],
+        totalValue: 900.00,
+        description: 'INCISIONAL/VENTRAL (1ª) + INGUINAL BILATERAL (2ª) - R$ 900,00'
+      },
+      {
+        codes: ['04.07.04.008-0', '04.07.04.006-4'],
+        totalValue: 900.00,
+        description: 'INCISIONAL/VENTRAL (1ª) + EPIGÁSTRICA (2ª) - R$ 900,00'
+      },
+      {
+        codes: ['04.07.04.008-0', '04.07.04.012-9'],
+        totalValue: 900.00,
+        description: 'INCISIONAL/VENTRAL (1ª) + UMBILICAL (2ª) - R$ 900,00'
+      },
+      
+      // Combinações de 3 hérnias (exemplos principais)
+      {
+        codes: ['04.07.04.006-4', '04.07.04.010-2', '04.07.04.012-9'],
+        totalValue: 1400.00,
+        description: 'EPIGÁSTRICA (1ª) + INGUINAL UNILATERAL (2ª) + UMBILICAL (3ª) - R$ 1.400,00'
+      },
+      {
+        codes: ['04.07.04.006-4', '04.07.04.009-9', '04.07.04.012-9'],
+        totalValue: 1400.00,
+        description: 'EPIGÁSTRICA (1ª) + INGUINAL BILATERAL (2ª) + UMBILICAL (3ª) - R$ 1.400,00'
+      },
+      {
+        codes: ['04.07.04.010-2', '04.07.04.012-9', '04.07.04.008-0'],
+        totalValue: 1300.00,
+        description: 'INGUINAL UNILATERAL (1ª) + UMBILICAL (2ª) + INCISIONAL (3ª) - R$ 1.300,00'
+      },
+      
+      // Combinações de 4 hérnias
+      {
+        codes: ['04.07.04.006-4', '04.07.04.010-2', '04.07.04.012-9', '04.07.04.008-0'],
+        totalValue: 1700.00,
+        description: 'EPIGÁSTRICA (1ª) + INGUINAL UNI (2ª) + UMBILICAL (3ª) + INCISIONAL (4ª) - R$ 1.700,00'
       }
     ]
   },
 
-  'JOÃO VICTOR RODRIGUES': {
-    doctorName: 'JOÃO VICTOR RODRIGUES',
-    rules: [
-      // ================================================================
-      // 🏥 NOVA REGRA PRINCIPAL - COLECISTECTOMIA BASE + PROCEDIMENTOS ADICIONAIS
-      // Procedimento principal sempre R$ 900,00 + soma dos procedimentos sequenciais
-      // ================================================================
-      
-      // Procedimento Principal
-      {
-        procedureCode: '04.07.03.002-6',
-        standardValue: 900.00,
-        description: 'COLECISTECTOMIA (PRINCIPAL) - R$ 900,00'
-      },
-      
-      // Procedimentos Sequenciais/Adicionais (somam ao principal)
-      {
-        procedureCode: '04.07.04.018-8',
-        standardValue: 300.00,
-        description: 'LIBERAÇÃO DE ADERÊNCIAS INTESTINAIS - R$ 300,00'
-      },
-      {
-        procedureCode: '04.07.04.002-1',
-        standardValue: 300.00,
-        description: 'DRENAGEM DE ABSCESSO SUBFRÊNICO - R$ 300,00'
-      },
-      {
-        procedureCode: '04.07.03.014-0',
-        standardValue: 300.00,
-        description: 'HEPATORRAFIA - R$ 300,00'
-      },
-      {
-        procedureCode: '04.07.03.006-9',
-        standardValue: 250.00,
-        description: 'COLEDOCOTOMIA COM OU SEM COLECISTECTOMIA - R$ 250,00'
-      },
-      {
-        procedureCode: '04.07.03.005-0',
-        standardValue: 200.00,
-        description: 'COLEDOCOPLASTIA - R$ 200,00'
-      },
-      {
-        procedureCode: '04.07.04.012-9',
-        standardValue: 300.00,
-        description: 'HERNIOPLASTIA UMBILICAL - R$ 300,00'
-      },
-      {
-        procedureCode: '04.07.04.010-2',
-        standardValue: 300.00,
-        description: 'HERNIOPLASTIA INGUINAL / CRURAL (UNILATERAL) - R$ 300,00'
-      },
-      
-      // ================================================================
-      // CIRURGIAS VASCULARES (mantidas)
-      // ================================================================
-      {
-        procedureCode: '04.06.02.056-6',
-        standardValue: 1050.00,
-        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
-      },
-      {
-        procedureCode: '04.06.02.057-4',
-        standardValue: 1000.00,
-        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
-      },
-      
-      // ================================================================
-      // OUTRAS CIRURGIAS GASTROINTESTINAIS (mantidas)
-      // ================================================================
-      {
-        procedureCode: '04.07.02.010-1',
-        standardValue: 1250.00,
-        description: 'SITO INTESTINAL (REVERSÃO DE COLOSTOMIA) - R$ 1.250,00'
-      },
-      {
-        procedureCode: '04.07.04.008-0',
-        standardValue: 300.00,
-        description: 'HERNIA VENTRAL - R$ 300,00'
-      }
-    ]
-  },
-  
   'JOAO VICTOR RODRIGUES': {
     doctorName: 'JOAO VICTOR RODRIGUES',
     rules: [
       // ================================================================
-      // 🏥 NOVA REGRA PRINCIPAL - COLECISTECTOMIA BASE + PROCEDIMENTOS ADICIONAIS
-      // Procedimento principal sempre R$ 900,00 + soma dos procedimentos sequenciais
+      // 🏥 PROCEDIMENTO PRINCIPAL - COLECISTECTOMIA BASE
+      // Mesmas regras da FABIANE GREGORIO BATISTELA
+      // Última atualização: 27/10/2025
       // ================================================================
-      
-      // Procedimento Principal
       {
         procedureCode: '04.07.03.002-6',
         standardValue: 900.00,
         description: 'COLECISTECTOMIA (PRINCIPAL) - R$ 900,00'
       },
       
-      // Procedimentos Sequenciais/Adicionais (somam ao principal)
+      // ================================================================
+      // 🔧 PROCEDIMENTOS SEQUENCIAIS - SOMAM À COLECISTECTOMIA
+      // Limite: até 4 procedimentos sequenciais
+      // ================================================================
       {
         procedureCode: '04.07.04.018-8',
         standardValue: 300.00,
@@ -628,74 +974,52 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.07.03.006-9',
         standardValue: 250.00,
-        description: 'COLEDOCOTOMIA COM OU SEM COLECISTECTOMIA - R$ 250,00'
+        description: 'COLEDOCOTOMIA - R$ 250,00'
       },
       {
         procedureCode: '04.07.03.005-0',
         standardValue: 200.00,
         description: 'COLEDOCOPLASTIA - R$ 200,00'
       },
-      {
-        procedureCode: '04.07.04.012-9',
-        standardValue: 300.00,
-        description: 'HERNIOPLASTIA UMBILICAL - R$ 300,00'
-      },
+      
+      // ================================================================
+      // 🏥 HÉRNIAS COMO PROCEDIMENTO PRINCIPAL - NOVOS VALORES
+      // ================================================================
       {
         procedureCode: '04.07.04.010-2',
-        standardValue: 300.00,
-        description: 'HERNIOPLASTIA INGUINAL / CRURAL (UNILATERAL) - R$ 300,00'
-      },
-      
-      // ================================================================
-      // CIRURGIAS VASCULARES (mantidas)
-      // ================================================================
-      {
-        procedureCode: '04.06.02.056-6',
-        standardValue: 1050.00,
-        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
+        standardValue: 700.00,
+        description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00'
       },
       {
-        procedureCode: '04.06.02.057-4',
-        standardValue: 1000.00,
-        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
-      },
-      
-      // ================================================================
-      // OUTRAS CIRURGIAS GASTROINTESTINAIS (mantidas)
-      // ================================================================
-      {
-        procedureCode: '04.07.02.010-1',
-        standardValue: 1250.00,
-        description: 'SITO INTESTINAL (REVERSÃO DE COLOSTOMIA) - R$ 1.250,00'
-      },
-      {
-        procedureCode: '04.07.04.008-0',
-        standardValue: 300.00,
-        description: 'HERNIA VENTRAL - R$ 300,00'
-      },
-      
-      // ================================================================
-      // 🆕 NOVAS REGRAS ADICIONAIS - DEZEMBRO 2024
-      // ================================================================
-      {
-        procedureCode: '04.01.02.007-0',
-        standardValue: 100.00,
-        description: 'EXÉRESE DE CISTO DERMOIDE - R$ 100,00'
+        procedureCode: '04.07.04.009-9',
+        standardValue: 700.00,
+        description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00'
       },
       {
         procedureCode: '04.07.04.006-4',
         standardValue: 800.00,
-        description: 'HERNIOPLASTIA EPIGASTRICA - R$ 800,00'
+        description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00'
       },
       {
-        procedureCode: '04.01.02.010-0',
-        standardValue: 150.00,
-        description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 150,00'
+        procedureCode: '04.07.04.012-9',
+        standardValue: 450.00,
+        description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00'
       },
+      {
+        procedureCode: '04.07.04.008-0',
+        standardValue: 600.00,
+        description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00'
+      },
+      
+      // ================================================================
+      // 🆕 PROCEDIMENTOS ORIFICIAIS - FÍSTULAS, FISSURAS E HEMORRÓIDAS
+      // Data: 27/10/2025
+      // Valor padrão: R$ 450,00 por procedimento
+      // ================================================================
       {
         procedureCode: '04.07.02.027-6',
-        standardValue: 100.00,
-        description: 'FISTULECTOMIA / FISTULOTOMIA ANAL - R$ 100,00'
+        standardValue: 450.00,
+        description: 'FISTULECTOMIA/FISTULOTOMIA ANAL - R$ 450,00'
       },
       {
         procedureCode: '04.07.02.028-4',
@@ -703,235 +1027,261 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         description: 'HEMORROIDECTOMIA - R$ 450,00'
       },
       {
-        procedureCode: '04.08.06.031-0',
+        procedureCode: '04.07.02.031-4',
+        standardValue: 450.00,
+        description: 'TRATAMENTO CIRÚRGICO DE FISSURA ANAL - R$ 450,00'
+      },
+      
+      // ================================================================
+      // 🆕 CISTOS E LIPOMAS
+      // Data: 27/10/2025
+      // Valor padrão: R$ 250,00 por procedimento
+      // ================================================================
+      {
+        procedureCode: '04.01.02.007-0',
         standardValue: 250.00,
-        description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
+        description: 'EXÉRESE DE CISTO DERMOIDE - R$ 250,00'
       },
       {
-        procedureCode: '04.09.04.013-4',
+        procedureCode: '04.01.02.010-0',
         standardValue: 250.00,
-        description: 'ORQUIDOPEXIA UNILATERAL - R$ 250,00'
+        description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 250,00'
       },
       {
-        procedureCode: '04.09.04.021-5',
+        procedureCode: '04.01.02.008-8',
         standardValue: 250.00,
-        description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 250,00'
+        description: 'EXÉRESE DE LIPOMA - R$ 250,00'
       },
       {
-        procedureCode: '04.09.06.013-5',
-        standardValue: 1000.00,
-        description: 'HISTERECTOMIA TOTAL - R$ 1.000,00'
-      },
-      {
-        procedureCode: '04.07.04.009-9',
-        standardValue: 300.00,
-        description: 'HERNIOPLASTIA INGUINAL (BILATERAL) - R$ 300,00'
+        procedureCode: '04.01.02.009-6',
+        standardValue: 250.00,
+        description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00'
       }
     ],
     
     // ================================================================
-    // 🔗 REGRAS MÚLTIPLAS - Combinações específicas de procedimentos
+    // 🔗 REGRAS MÚLTIPLAS - COLECISTECTOMIA + SEQUENCIAIS
+    // Sistema: Colecistectomia R$ 900 + soma dos procedimentos sequenciais
     // ================================================================
     multipleRules: [
+      // Colecistectomia + 1 Sequencial
       {
-        codes: ['04.09.04.013-4', '04.09.04.021-5'],
-        totalValue: 500.00,
-        description: 'ORQUIDOPEXIA UNILATERAL + TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 500,00'
-      }
-    ]
-  },
-
-  'GUILHERME AUGUSTO STORER': {
-    doctorName: 'GUILHERME AUGUSTO STORER',
-    rules: [
-      // Procedimentos individuais
-      {
-        procedureCode: '04.09.01.023-5',
-        standardValue: 1000.00,
-        description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00'
+        codes: ['04.07.03.002-6', '04.07.04.018-8'],
+        totalValue: 1200.00,
+        description: 'COLECISTECTOMIA + LIBERAÇÃO DE ADERÊNCIAS - R$ 1.200,00'
       },
       {
-        procedureCode: '04.09.01.059-6',
-        standardValue: 900.00,
-        description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00'
+        codes: ['04.07.03.002-6', '04.07.04.002-1'],
+        totalValue: 1200.00,
+        description: 'COLECISTECTOMIA + DRENAGEM ABSCESSO SUBFRÊNICO - R$ 1.200,00'
       },
       {
-        procedureCode: '04.09.01.018-9',
-        standardValue: 1000.00,
-        description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00'
+        codes: ['04.07.03.002-6', '04.07.03.014-0'],
+        totalValue: 1200.00,
+        description: 'COLECISTECTOMIA + HEPATORRAFIA - R$ 1.200,00'
       },
       {
-        procedureCode: '04.09.01.017-0',
-        standardValue: 250.00,
-        description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00'
+        codes: ['04.07.03.002-6', '04.07.03.006-9'],
+        totalValue: 1150.00,
+        description: 'COLECISTECTOMIA + COLEDOCOTOMIA - R$ 1.150,00'
       },
       {
-        procedureCode: '04.09.03.004-0',
-        standardValue: 1000.00,
-        description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00'
-      },
-      {
-        procedureCode: '04.09.03.002-3',
-        standardValue: 1000.00,
-        description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00'
-      },
-      {
-        procedureCode: '04.09.04.021-5',
-        standardValue: 300.00,
-        description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00'
-      },
-      {
-        procedureCode: '04.09.05.008-3',
-        standardValue: 250.00,
-        description: 'POSTECTOMIA - R$ 250,00'
-      },
-      {
-        procedureCode: '04.09.04.024-0',
-        standardValue: 450.00,
-        description: 'VASECTOMIA - R$ 450,00'
-      },
-      {
-        procedureCode: '04.09.04.013-4',
-        standardValue: 400.00,
-        description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00'
-      },
-      {
-        procedureCode: '04.09.04.012-6',
-        standardValue: 450.00,
-        description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00'
-      },
-      {
-        procedureCode: '04.09.01.006-5',
-        standardValue: 600.00,
-        description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00'
-      },
-      {
-        procedureCode: '04.09.05.007-5',
-        standardValue: 500.00,
-        description: 'PLASTICA TOTAL DO PENIS (INCLUI PEYRONIE) - R$ 500,00'
-      },
-      {
-        procedureCode: '04.09.04.016-9',
-        standardValue: 500.00,
-        description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00'
-      },
-      {
-        procedureCode: '04.09.01.032-4',
-        standardValue: 700.00,
-        description: 'PIELOPLASTIA - R$ 700,00'
-      },
-      {
-        procedureCode: '04.09.01.021-9',
-        standardValue: 1200.00,
-        description: 'NEFRECTOMIA TOTAL - R$ 1.200,00'
-      },
-      {
-        procedureCode: '04.09.01.020-0',
-        standardValue: 1000.00,
-        description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00'
-      },
-      {
-        procedureCode: '04.09.01.022-7',
-        standardValue: 900.00,
-        description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00'
-      },
-      {
-        procedureCode: '04.09.01.029-4',
-        standardValue: 400.00,
-        description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00'
-      },
-      {
-        procedureCode: '04.09.02.017-6',
-        standardValue: 250.00,
-        description: 'URETROTOMIA INTERNA - R$ 250,00'
-      },
-      {
-        procedureCode: 'RESSECÇÃO_CISTOS',
-        standardValue: 250.00,
-        description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00'
-      }
-    ],
-    // Regras para múltiplos procedimentos específicos
-    multipleRules: [
-      {
-        codes: ['04.09.01.023-5', '04.09.01.017-0'],
+        codes: ['04.07.03.002-6', '04.07.03.005-0'],
         totalValue: 1100.00,
-        description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00'
+        description: 'COLECISTECTOMIA + COLEDOCOPLASTIA - R$ 1.100,00'
       },
+      
+      // Colecistectomia + Hérnias (soma valores originais)
       {
-        codes: ['04.09.01.023-5', '04.09.01.014-6'],
-        totalValue: 1300.00,
-        description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO CÁLCULO PELVE RENAL - R$ 1.300,00'
-      },
-      {
-        codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6'],
-        totalValue: 1400.00,
-        description: 'NEFROLITOTOMIA + CATETER + EXTRAÇÃO CÁLCULO - R$ 1.400,00'
-      },
-      {
-        codes: ['04.09.01.023-5', '04.09.01.014-6', '04.09.01.059-6'],
-        totalValue: 1500.00,
-        description: 'NEFROLITOTOMIA + EXTRAÇÃO + URETEROLITOTRIPSIA - R$ 1.500,00'
-      },
-      {
-        codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'],
+        codes: ['04.07.03.002-6', '04.07.04.010-2'],
         totalValue: 1600.00,
-        description: 'NEFROLITOTOMIA + CATETER + EXTRAÇÃO + URETEROLITOTRIPSIA - R$ 1.600,00'
+        description: 'COLECISTECTOMIA + HERNIOPLASTIA INGUINAL UNILATERAL - R$ 1.600,00'
       },
       {
-        codes: ['04.09.01.059-6', '04.09.01.017-0'],
+        codes: ['04.07.03.002-6', '04.07.04.009-9'],
+        totalValue: 1600.00,
+        description: 'COLECISTECTOMIA + HERNIOPLASTIA INGUINAL BILATERAL - R$ 1.600,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.04.006-4'],
+        totalValue: 1700.00,
+        description: 'COLECISTECTOMIA + HERNIOPLASTIA EPIGÁSTRICA - R$ 1.700,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.04.012-9'],
+        totalValue: 1350.00,
+        description: 'COLECISTECTOMIA + HERNIOPLASTIA UMBILICAL - R$ 1.350,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.04.008-0'],
+        totalValue: 1500.00,
+        description: 'COLECISTECTOMIA + HERNIOPLASTIA INCISIONAL/VENTRAL - R$ 1.500,00'
+      },
+      
+      // Colecistectomia + 2 Sequenciais (exemplos principais)
+      {
+        codes: ['04.07.03.002-6', '04.07.04.018-8', '04.07.03.014-0'],
+        totalValue: 1500.00,
+        description: 'COLECISTECTOMIA + LIBERAÇÃO ADERÊNCIAS + HEPATORRAFIA - R$ 1.500,00'
+      },
+      {
+        codes: ['04.07.03.002-6', '04.07.03.006-9', '04.07.03.005-0'],
+        totalValue: 1350.00,
+        description: 'COLECISTECTOMIA + COLEDOCOTOMIA + COLEDOCOPLASTIA - R$ 1.350,00'
+      },
+      
+      // Colecistectomia + 3 Sequenciais
+      {
+        codes: ['04.07.03.002-6', '04.07.04.018-8', '04.07.03.014-0', '04.07.04.002-1'],
+        totalValue: 1800.00,
+        description: 'COLECISTECTOMIA + LIBERAÇÃO + HEPATORRAFIA + DRENAGEM - R$ 1.800,00'
+      },
+      
+      // Colecistectomia + 4 Sequenciais (máximo)
+      {
+        codes: ['04.07.03.002-6', '04.07.04.018-8', '04.07.03.014-0', '04.07.04.002-1', '04.07.03.006-9'],
+        totalValue: 2050.00,
+        description: 'COLECISTECTOMIA + 4 SEQUENCIAIS (MÁXIMO) - R$ 2.050,00'
+      },
+      
+      // ================================================================
+      // 🆕 REGRAS DE MÚLTIPLAS HÉRNIAS
+      // Nova lógica: 1ª hérnia = valor original, 2ª+ hérnias = R$ 300,00
+      // Data: 27/10/2025
+      // ================================================================
+      
+      // Combinações com HERNIOPLASTIA INGUINAL UNILATERAL como 1ª (R$ 700)
+      {
+        codes: ['04.07.04.010-2', '04.07.04.009-9'],
         totalValue: 1000.00,
-        description: 'URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.000,00'
+        description: 'INGUINAL UNILATERAL (1ª) + INGUINAL BILATERAL (2ª) - R$ 1.000,00'
       },
       {
-        codes: ['04.09.01.018-9', '04.09.01.017-0'],
+        codes: ['04.07.04.010-2', '04.07.04.006-4'],
+        totalValue: 1000.00,
+        description: 'INGUINAL UNILATERAL (1ª) + EPIGÁSTRICA (2ª) - R$ 1.000,00'
+      },
+      {
+        codes: ['04.07.04.010-2', '04.07.04.012-9'],
+        totalValue: 1000.00,
+        description: 'INGUINAL UNILATERAL (1ª) + UMBILICAL (2ª) - R$ 1.000,00'
+      },
+      {
+        codes: ['04.07.04.010-2', '04.07.04.008-0'],
+        totalValue: 1000.00,
+        description: 'INGUINAL UNILATERAL (1ª) + INCISIONAL/VENTRAL (2ª) - R$ 1.000,00'
+      },
+      
+      // Combinações com HERNIOPLASTIA INGUINAL BILATERAL como 1ª (R$ 700)
+      {
+        codes: ['04.07.04.009-9', '04.07.04.010-2'],
+        totalValue: 1000.00,
+        description: 'INGUINAL BILATERAL (1ª) + INGUINAL UNILATERAL (2ª) - R$ 1.000,00'
+      },
+      {
+        codes: ['04.07.04.009-9', '04.07.04.006-4'],
+        totalValue: 1000.00,
+        description: 'INGUINAL BILATERAL (1ª) + EPIGÁSTRICA (2ª) - R$ 1.000,00'
+      },
+      {
+        codes: ['04.07.04.009-9', '04.07.04.012-9'],
+        totalValue: 1000.00,
+        description: 'INGUINAL BILATERAL (1ª) + UMBILICAL (2ª) - R$ 1.000,00'
+      },
+      {
+        codes: ['04.07.04.009-9', '04.07.04.008-0'],
+        totalValue: 1000.00,
+        description: 'INGUINAL BILATERAL (1ª) + INCISIONAL/VENTRAL (2ª) - R$ 1.000,00'
+      },
+      
+      // Combinações com HERNIOPLASTIA EPIGÁSTRICA como 1ª (R$ 800)
+      {
+        codes: ['04.07.04.006-4', '04.07.04.010-2'],
         totalValue: 1100.00,
-        description: 'LITOTRIPSIA + CATETER DUPLO J - R$ 1.100,00'
+        description: 'EPIGÁSTRICA (1ª) + INGUINAL UNILATERAL (2ª) - R$ 1.100,00'
       },
       {
-        codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'],
-        totalValue: 1200.00,
-        description: 'LITOTRIPSIA + EXTRAÇÃO + CATETER - R$ 1.200,00'
+        codes: ['04.07.04.006-4', '04.07.04.009-9'],
+        totalValue: 1100.00,
+        description: 'EPIGÁSTRICA (1ª) + INGUINAL BILATERAL (2ª) - R$ 1.100,00'
       },
       {
-        codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'],
+        codes: ['04.07.04.006-4', '04.07.04.012-9'],
+        totalValue: 1100.00,
+        description: 'EPIGÁSTRICA (1ª) + UMBILICAL (2ª) - R$ 1.100,00'
+      },
+      {
+        codes: ['04.07.04.006-4', '04.07.04.008-0'],
+        totalValue: 1100.00,
+        description: 'EPIGÁSTRICA (1ª) + INCISIONAL/VENTRAL (2ª) - R$ 1.100,00'
+      },
+      
+      // Combinações com HERNIOPLASTIA UMBILICAL como 1ª (R$ 450)
+      {
+        codes: ['04.07.04.012-9', '04.07.04.010-2'],
+        totalValue: 750.00,
+        description: 'UMBILICAL (1ª) + INGUINAL UNILATERAL (2ª) - R$ 750,00'
+      },
+      {
+        codes: ['04.07.04.012-9', '04.07.04.009-9'],
+        totalValue: 750.00,
+        description: 'UMBILICAL (1ª) + INGUINAL BILATERAL (2ª) - R$ 750,00'
+      },
+      {
+        codes: ['04.07.04.012-9', '04.07.04.006-4'],
+        totalValue: 750.00,
+        description: 'UMBILICAL (1ª) + EPIGÁSTRICA (2ª) - R$ 750,00'
+      },
+      {
+        codes: ['04.07.04.012-9', '04.07.04.008-0'],
+        totalValue: 750.00,
+        description: 'UMBILICAL (1ª) + INCISIONAL/VENTRAL (2ª) - R$ 750,00'
+      },
+      
+      // Combinações com HERNIOPLASTIA INCISIONAL/VENTRAL como 1ª (R$ 600)
+      {
+        codes: ['04.07.04.008-0', '04.07.04.010-2'],
+        totalValue: 900.00,
+        description: 'INCISIONAL/VENTRAL (1ª) + INGUINAL UNILATERAL (2ª) - R$ 900,00'
+      },
+      {
+        codes: ['04.07.04.008-0', '04.07.04.009-9'],
+        totalValue: 900.00,
+        description: 'INCISIONAL/VENTRAL (1ª) + INGUINAL BILATERAL (2ª) - R$ 900,00'
+      },
+      {
+        codes: ['04.07.04.008-0', '04.07.04.006-4'],
+        totalValue: 900.00,
+        description: 'INCISIONAL/VENTRAL (1ª) + EPIGÁSTRICA (2ª) - R$ 900,00'
+      },
+      {
+        codes: ['04.07.04.008-0', '04.07.04.012-9'],
+        totalValue: 900.00,
+        description: 'INCISIONAL/VENTRAL (1ª) + UMBILICAL (2ª) - R$ 900,00'
+      },
+      
+      // Combinações de 3 hérnias (exemplos principais)
+      {
+        codes: ['04.07.04.006-4', '04.07.04.010-2', '04.07.04.012-9'],
+        totalValue: 1400.00,
+        description: 'EPIGÁSTRICA (1ª) + INGUINAL UNILATERAL (2ª) + UMBILICAL (3ª) - R$ 1.400,00'
+      },
+      {
+        codes: ['04.07.04.006-4', '04.07.04.009-9', '04.07.04.012-9'],
+        totalValue: 1400.00,
+        description: 'EPIGÁSTRICA (1ª) + INGUINAL BILATERAL (2ª) + UMBILICAL (3ª) - R$ 1.400,00'
+      },
+      {
+        codes: ['04.07.04.010-2', '04.07.04.012-9', '04.07.04.008-0'],
         totalValue: 1300.00,
-        description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + EXTRAÇÃO + CATETER - R$ 1.300,00'
+        description: 'INGUINAL UNILATERAL (1ª) + UMBILICAL (2ª) + INCISIONAL (3ª) - R$ 1.300,00'
       },
+      
+      // Combinações de 4 hérnias
       {
-        codes: ['04.09.03.004-0', '04.09.01.038-3'],
-        totalValue: 1200.00,
-        description: 'RESSECÇÃO PRÓSTATA + RESSECÇÃO LESÃO VESICAL - R$ 1.200,00'
-      },
-      {
-        codes: ['04.09.04.021-5', '04.09.04.019-3'],
-        totalValue: 400.00,
-        description: 'HIDROCELE + RESSECÇÃO BOLSA ESCROTAL - R$ 400,00'
-      },
-      {
-        codes: ['04.09.04.021-5', '04.09.04.019-3', '04.09.04.017-7'],
-        totalValue: 500.00,
-        description: 'HIDROCELE + RESSECÇÃO + PLÁSTICA BOLSA - R$ 500,00'
-      },
-      {
-        codes: ['04.09.04.013-4', '04.09.04.017-7'],
-        totalValue: 550.00,
-        description: 'ORQUIDOPEXIA + PLÁSTICA BOLSA ESCROTAL - R$ 550,00'
-      },
-      {
-        codes: ['04.09.04.012-6', '04.09.04.017-7'],
-        totalValue: 550.00,
-        description: 'ORQUIDOPEXIA BILATERAL + PLÁSTICA BOLSA - R$ 550,00'
-      },
-      {
-        codes: ['04.09.01.032-4', '04.09.01.057-0'],
-        totalValue: 1000.00,
-        description: 'PIELOPLASTIA + URETEROPLASTIA - R$ 1.000,00'
-      },
-      {
-        codes: ['04.09.01.032-4', '04.09.01.057-0', '04.09.01.017-0'],
-        totalValue: 1100.00,
-        description: 'PIELOPLASTIA + URETEROPLASTIA + CATETER - R$ 1.100,00'
+        codes: ['04.07.04.006-4', '04.07.04.010-2', '04.07.04.012-9', '04.07.04.008-0'],
+        totalValue: 1700.00,
+        description: 'EPIGÁSTRICA (1ª) + INGUINAL UNI (2ª) + UMBILICAL (3ª) + INCISIONAL (4ª) - R$ 1.700,00'
       }
     ]
   },
@@ -1227,18 +1577,20 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       doctorName: 'JOAO VICTOR RODRIGUES',
       rules: [
         // ================================================================
-        // 🏥 REGRAS COLECISTECTOMIA BASE + PROCEDIMENTOS ADICIONAIS
-        // Procedimento principal sempre R$ 900,00 + soma dos procedimentos sequenciais
+        // 🏥 PROCEDIMENTO PRINCIPAL - COLECISTECTOMIA BASE
+        // Mesmas regras da FABIANE GREGORIO BATISTELA
+        // Última atualização: 27/10/2025
         // ================================================================
-        
-        // Procedimento Principal
         {
           procedureCode: '04.07.03.002-6',
           standardValue: 900.00,
           description: 'COLECISTECTOMIA (PRINCIPAL) - R$ 900,00'
         },
         
-        // Procedimentos Sequenciais/Adicionais (somam ao principal)
+        // ================================================================
+        // 🔧 PROCEDIMENTOS SEQUENCIAIS - SOMAM À COLECISTECTOMIA
+        // Limite: até 4 procedimentos sequenciais
+        // ================================================================
         {
           procedureCode: '04.07.04.018-8',
           standardValue: 300.00,
@@ -1257,74 +1609,52 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.07.03.006-9',
           standardValue: 250.00,
-          description: 'COLEDOCOTOMIA COM OU SEM COLECISTECTOMIA - R$ 250,00'
+          description: 'COLEDOCOTOMIA - R$ 250,00'
         },
         {
           procedureCode: '04.07.03.005-0',
           standardValue: 200.00,
           description: 'COLEDOCOPLASTIA - R$ 200,00'
         },
-        {
-          procedureCode: '04.07.04.012-9',
-          standardValue: 300.00,
-          description: 'HERNIOPLASTIA UMBILICAL - R$ 300,00'
-        },
+        
+        // ================================================================
+        // 🏥 HÉRNIAS COMO PROCEDIMENTO PRINCIPAL - NOVOS VALORES
+        // ================================================================
         {
           procedureCode: '04.07.04.010-2',
-          standardValue: 300.00,
-          description: 'HERNIOPLASTIA INGUINAL / CRURAL (UNILATERAL) - R$ 300,00'
-        },
-        
-        // ================================================================
-        // CIRURGIAS VASCULARES (mantidas)
-        // ================================================================
-        {
-          procedureCode: '04.06.02.056-6',
-          standardValue: 1050.00,
-          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
+          standardValue: 700.00,
+          description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00'
         },
         {
-          procedureCode: '04.06.02.057-4',
-          standardValue: 1000.00,
-          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
-        },
-        
-        // ================================================================
-        // OUTRAS CIRURGIAS GASTROINTESTINAIS (mantidas)
-        // ================================================================
-        {
-          procedureCode: '04.07.02.010-1',
-          standardValue: 1250.00,
-          description: 'SITO INTESTINAL (REVERSÃO DE COLOSTOMIA) - R$ 1.250,00'
-        },
-        {
-          procedureCode: '04.07.04.008-0',
-          standardValue: 300.00,
-          description: 'HERNIA VENTRAL - R$ 300,00'
-        },
-        
-        // ================================================================
-        // 🆕 NOVAS REGRAS ADICIONAIS - DEZEMBRO 2024
-        // ================================================================
-        {
-          procedureCode: '04.01.02.007-0',
-          standardValue: 100.00,
-          description: 'EXÉRESE DE CISTO DERMOIDE - R$ 100,00'
+          procedureCode: '04.07.04.009-9',
+          standardValue: 700.00,
+          description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00'
         },
         {
           procedureCode: '04.07.04.006-4',
           standardValue: 800.00,
-          description: 'HERNIOPLASTIA EPIGASTRICA - R$ 800,00'
+          description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00'
         },
         {
-          procedureCode: '04.01.02.010-0',
-          standardValue: 150.00,
-          description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 150,00'
+          procedureCode: '04.07.04.012-9',
+          standardValue: 450.00,
+          description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00'
         },
+        {
+          procedureCode: '04.07.04.008-0',
+          standardValue: 600.00,
+          description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00'
+        },
+        
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ORIFICIAIS - FÍSTULAS, FISSURAS E HEMORRÓIDAS
+        // Data: 27/10/2025
+        // Valor padrão: R$ 450,00 por procedimento
+        // ================================================================
         {
           procedureCode: '04.07.02.027-6',
-          standardValue: 100.00,
-          description: 'FISTULECTOMIA / FISTULOTOMIA ANAL - R$ 100,00'
+          standardValue: 450.00,
+          description: 'FISTULECTOMIA/FISTULOTOMIA ANAL - R$ 450,00'
         },
         {
           procedureCode: '04.07.02.028-4',
@@ -1332,188 +1662,261 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           description: 'HEMORROIDECTOMIA - R$ 450,00'
         },
         {
-          procedureCode: '04.08.06.031-0',
-          standardValue: 250.00,
-          description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
-        },
-        {
-          procedureCode: '04.09.04.013-4',
-          standardValue: 250.00,
-          description: 'ORQUIDOPEXIA UNILATERAL - R$ 250,00'
-        },
-        {
-          procedureCode: '04.09.04.021-5',
-          standardValue: 250.00,
-          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 250,00'
-        },
-        {
-          procedureCode: '04.09.06.013-5',
-          standardValue: 1000.00,
-          description: 'HISTERECTOMIA TOTAL - R$ 1.000,00'
-        },
-        {
-          procedureCode: '04.07.04.009-9',
-          standardValue: 300.00,
-          description: 'HERNIOPLASTIA INGUINAL (BILATERAL) - R$ 300,00'
-        }
-      ],
-      
-      // ================================================================
-      // 🔗 REGRAS MÚLTIPLAS - Combinações específicas de procedimentos
-      // ================================================================
-      multipleRules: [
-        {
-          codes: ['04.09.04.013-4', '04.09.04.021-5'],
-          totalValue: 500.00,
-          description: 'ORQUIDOPEXIA UNILATERAL + TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 500,00'
-        }
-      ]
-    },
-
-    // 🔄 COMPATIBILIDADE: Versão com acento para JOÃO VICTOR RODRIGUES
-    'JOÃO VICTOR RODRIGUES': {
-      doctorName: 'JOÃO VICTOR RODRIGUES',
-      rules: [
-        // ================================================================
-        // 🏥 REGRAS COLECISTECTOMIA BASE + PROCEDIMENTOS ADICIONAIS
-        // Procedimento principal sempre R$ 900,00 + soma dos procedimentos sequenciais
-        // ================================================================
-        
-        // Procedimento Principal
-        {
-          procedureCode: '04.07.03.002-6',
-          standardValue: 900.00,
-          description: 'COLECISTECTOMIA (PRINCIPAL) - R$ 900,00'
-        },
-        
-        // Procedimentos Sequenciais/Adicionais (somam ao principal)
-        {
-          procedureCode: '04.07.04.018-8',
-          standardValue: 300.00,
-          description: 'LIBERAÇÃO DE ADERÊNCIAS INTESTINAIS - R$ 300,00'
-        },
-        {
-          procedureCode: '04.07.04.002-1',
-          standardValue: 300.00,
-          description: 'DRENAGEM DE ABSCESSO SUBFRÊNICO - R$ 300,00'
-        },
-        {
-          procedureCode: '04.07.03.014-0',
-          standardValue: 300.00,
-          description: 'HEPATORRAFIA - R$ 300,00'
-        },
-        {
-          procedureCode: '04.07.03.006-9',
-          standardValue: 250.00,
-          description: 'COLEDOCOTOMIA COM OU SEM COLECISTECTOMIA - R$ 250,00'
-        },
-        {
-          procedureCode: '04.07.03.005-0',
-          standardValue: 200.00,
-          description: 'COLEDOCOPLASTIA - R$ 200,00'
-        },
-        {
-          procedureCode: '04.07.04.012-9',
-          standardValue: 300.00,
-          description: 'HERNIOPLASTIA UMBILICAL - R$ 300,00'
-        },
-        {
-          procedureCode: '04.07.04.010-2',
-          standardValue: 300.00,
-          description: 'HERNIOPLASTIA INGUINAL / CRURAL (UNILATERAL) - R$ 300,00'
+          procedureCode: '04.07.02.031-4',
+          standardValue: 450.00,
+          description: 'TRATAMENTO CIRÚRGICO DE FISSURA ANAL - R$ 450,00'
         },
         
         // ================================================================
-        // CIRURGIAS VASCULARES (mantidas)
-        // ================================================================
-        {
-          procedureCode: '04.06.02.056-6',
-          standardValue: 1050.00,
-          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
-        },
-        {
-          procedureCode: '04.06.02.057-4',
-          standardValue: 1000.00,
-          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
-        },
-        
-        // ================================================================
-        // OUTRAS CIRURGIAS GASTROINTESTINAIS (mantidas)
-        // ================================================================
-        {
-          procedureCode: '04.07.02.010-1',
-          standardValue: 1250.00,
-          description: 'SITO INTESTINAL (REVERSÃO DE COLOSTOMIA) - R$ 1.250,00'
-        },
-        {
-          procedureCode: '04.07.04.008-0',
-          standardValue: 300.00,
-          description: 'HERNIA VENTRAL - R$ 300,00'
-        },
-        
-        // ================================================================
-        // 🆕 NOVAS REGRAS ADICIONAIS - DEZEMBRO 2024
+        // 🆕 CISTOS E LIPOMAS
+        // Data: 27/10/2025
+        // Valor padrão: R$ 250,00 por procedimento
         // ================================================================
         {
           procedureCode: '04.01.02.007-0',
-          standardValue: 100.00,
-          description: 'EXÉRESE DE CISTO DERMOIDE - R$ 100,00'
-        },
-        {
-          procedureCode: '04.07.04.006-4',
-          standardValue: 800.00,
-          description: 'HERNIOPLASTIA EPIGASTRICA - R$ 800,00'
+          standardValue: 250.00,
+          description: 'EXÉRESE DE CISTO DERMOIDE - R$ 250,00'
         },
         {
           procedureCode: '04.01.02.010-0',
-          standardValue: 150.00,
-          description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 150,00'
-        },
-        {
-          procedureCode: '04.07.02.027-6',
-          standardValue: 100.00,
-          description: 'FISTULECTOMIA / FISTULOTOMIA ANAL - R$ 100,00'
-        },
-        {
-          procedureCode: '04.07.02.028-4',
-          standardValue: 450.00,
-          description: 'HEMORROIDECTOMIA - R$ 450,00'
-        },
-        {
-          procedureCode: '04.08.06.031-0',
           standardValue: 250.00,
-          description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
+          description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 250,00'
         },
         {
-          procedureCode: '04.09.04.013-4',
+          procedureCode: '04.01.02.008-8',
           standardValue: 250.00,
-          description: 'ORQUIDOPEXIA UNILATERAL - R$ 250,00'
+          description: 'EXÉRESE DE LIPOMA - R$ 250,00'
         },
         {
-          procedureCode: '04.09.04.021-5',
+          procedureCode: '04.01.02.009-6',
           standardValue: 250.00,
-          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 250,00'
-        },
-        {
-          procedureCode: '04.09.06.013-5',
-          standardValue: 1000.00,
-          description: 'HISTERECTOMIA TOTAL - R$ 1.000,00'
-        },
-        {
-          procedureCode: '04.07.04.009-9',
-          standardValue: 300.00,
-          description: 'HERNIOPLASTIA INGUINAL (BILATERAL) - R$ 300,00'
+          description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00'
         }
       ],
       
       // ================================================================
-      // 🔗 REGRAS MÚLTIPLAS - Combinações específicas de procedimentos
+      // 🔗 REGRAS MÚLTIPLAS - COLECISTECTOMIA + SEQUENCIAIS
+      // Sistema: Colecistectomia R$ 900 + soma dos procedimentos sequenciais
       // ================================================================
       multipleRules: [
+        // Colecistectomia + 1 Sequencial
         {
-          codes: ['04.09.04.013-4', '04.09.04.021-5'],
-          totalValue: 500.00,
-          description: 'ORQUIDOPEXIA UNILATERAL + TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 500,00'
+          codes: ['04.07.03.002-6', '04.07.04.018-8'],
+          totalValue: 1200.00,
+          description: 'COLECISTECTOMIA + LIBERAÇÃO DE ADERÊNCIAS - R$ 1.200,00'
+        },
+        {
+          codes: ['04.07.03.002-6', '04.07.04.002-1'],
+          totalValue: 1200.00,
+          description: 'COLECISTECTOMIA + DRENAGEM ABSCESSO SUBFRÊNICO - R$ 1.200,00'
+        },
+        {
+          codes: ['04.07.03.002-6', '04.07.03.014-0'],
+          totalValue: 1200.00,
+          description: 'COLECISTECTOMIA + HEPATORRAFIA - R$ 1.200,00'
+        },
+        {
+          codes: ['04.07.03.002-6', '04.07.03.006-9'],
+          totalValue: 1150.00,
+          description: 'COLECISTECTOMIA + COLEDOCOTOMIA - R$ 1.150,00'
+        },
+        {
+          codes: ['04.07.03.002-6', '04.07.03.005-0'],
+          totalValue: 1100.00,
+          description: 'COLECISTECTOMIA + COLEDOCOPLASTIA - R$ 1.100,00'
+        },
+        
+        // Colecistectomia + Hérnias (soma valores originais)
+        {
+          codes: ['04.07.03.002-6', '04.07.04.010-2'],
+          totalValue: 1600.00,
+          description: 'COLECISTECTOMIA + HERNIOPLASTIA INGUINAL UNILATERAL - R$ 1.600,00'
+        },
+        {
+          codes: ['04.07.03.002-6', '04.07.04.009-9'],
+          totalValue: 1600.00,
+          description: 'COLECISTECTOMIA + HERNIOPLASTIA INGUINAL BILATERAL - R$ 1.600,00'
+        },
+        {
+          codes: ['04.07.03.002-6', '04.07.04.006-4'],
+          totalValue: 1700.00,
+          description: 'COLECISTECTOMIA + HERNIOPLASTIA EPIGÁSTRICA - R$ 1.700,00'
+        },
+        {
+          codes: ['04.07.03.002-6', '04.07.04.012-9'],
+          totalValue: 1350.00,
+          description: 'COLECISTECTOMIA + HERNIOPLASTIA UMBILICAL - R$ 1.350,00'
+        },
+        {
+          codes: ['04.07.03.002-6', '04.07.04.008-0'],
+          totalValue: 1500.00,
+          description: 'COLECISTECTOMIA + HERNIOPLASTIA INCISIONAL/VENTRAL - R$ 1.500,00'
+        },
+        
+        // Colecistectomia + 2 Sequenciais (exemplos principais)
+        {
+          codes: ['04.07.03.002-6', '04.07.04.018-8', '04.07.03.014-0'],
+          totalValue: 1500.00,
+          description: 'COLECISTECTOMIA + LIBERAÇÃO ADERÊNCIAS + HEPATORRAFIA - R$ 1.500,00'
+        },
+        {
+          codes: ['04.07.03.002-6', '04.07.03.006-9', '04.07.03.005-0'],
+          totalValue: 1350.00,
+          description: 'COLECISTECTOMIA + COLEDOCOTOMIA + COLEDOCOPLASTIA - R$ 1.350,00'
+        },
+        
+        // Colecistectomia + 3 Sequenciais
+        {
+          codes: ['04.07.03.002-6', '04.07.04.018-8', '04.07.03.014-0', '04.07.04.002-1'],
+          totalValue: 1800.00,
+          description: 'COLECISTECTOMIA + LIBERAÇÃO + HEPATORRAFIA + DRENAGEM - R$ 1.800,00'
+        },
+        
+        // Colecistectomia + 4 Sequenciais (máximo)
+        {
+          codes: ['04.07.03.002-6', '04.07.04.018-8', '04.07.03.014-0', '04.07.04.002-1', '04.07.03.006-9'],
+          totalValue: 2050.00,
+          description: 'COLECISTECTOMIA + 4 SEQUENCIAIS (MÁXIMO) - R$ 2.050,00'
+        },
+        
+        // ================================================================
+        // 🆕 REGRAS DE MÚLTIPLAS HÉRNIAS
+        // Nova lógica: 1ª hérnia = valor original, 2ª+ hérnias = R$ 300,00
+        // Data: 27/10/2025
+        // ================================================================
+        
+        // Combinações com HERNIOPLASTIA INGUINAL UNILATERAL como 1ª (R$ 700)
+        {
+          codes: ['04.07.04.010-2', '04.07.04.009-9'],
+          totalValue: 1000.00,
+          description: 'INGUINAL UNILATERAL (1ª) + INGUINAL BILATERAL (2ª) - R$ 1.000,00'
+        },
+        {
+          codes: ['04.07.04.010-2', '04.07.04.006-4'],
+          totalValue: 1000.00,
+          description: 'INGUINAL UNILATERAL (1ª) + EPIGÁSTRICA (2ª) - R$ 1.000,00'
+        },
+        {
+          codes: ['04.07.04.010-2', '04.07.04.012-9'],
+          totalValue: 1000.00,
+          description: 'INGUINAL UNILATERAL (1ª) + UMBILICAL (2ª) - R$ 1.000,00'
+        },
+        {
+          codes: ['04.07.04.010-2', '04.07.04.008-0'],
+          totalValue: 1000.00,
+          description: 'INGUINAL UNILATERAL (1ª) + INCISIONAL/VENTRAL (2ª) - R$ 1.000,00'
+        },
+        
+        // Combinações com HERNIOPLASTIA INGUINAL BILATERAL como 1ª (R$ 700)
+        {
+          codes: ['04.07.04.009-9', '04.07.04.010-2'],
+          totalValue: 1000.00,
+          description: 'INGUINAL BILATERAL (1ª) + INGUINAL UNILATERAL (2ª) - R$ 1.000,00'
+        },
+        {
+          codes: ['04.07.04.009-9', '04.07.04.006-4'],
+          totalValue: 1000.00,
+          description: 'INGUINAL BILATERAL (1ª) + EPIGÁSTRICA (2ª) - R$ 1.000,00'
+        },
+        {
+          codes: ['04.07.04.009-9', '04.07.04.012-9'],
+          totalValue: 1000.00,
+          description: 'INGUINAL BILATERAL (1ª) + UMBILICAL (2ª) - R$ 1.000,00'
+        },
+        {
+          codes: ['04.07.04.009-9', '04.07.04.008-0'],
+          totalValue: 1000.00,
+          description: 'INGUINAL BILATERAL (1ª) + INCISIONAL/VENTRAL (2ª) - R$ 1.000,00'
+        },
+        
+        // Combinações com HERNIOPLASTIA EPIGÁSTRICA como 1ª (R$ 800)
+        {
+          codes: ['04.07.04.006-4', '04.07.04.010-2'],
+          totalValue: 1100.00,
+          description: 'EPIGÁSTRICA (1ª) + INGUINAL UNILATERAL (2ª) - R$ 1.100,00'
+        },
+        {
+          codes: ['04.07.04.006-4', '04.07.04.009-9'],
+          totalValue: 1100.00,
+          description: 'EPIGÁSTRICA (1ª) + INGUINAL BILATERAL (2ª) - R$ 1.100,00'
+        },
+        {
+          codes: ['04.07.04.006-4', '04.07.04.012-9'],
+          totalValue: 1100.00,
+          description: 'EPIGÁSTRICA (1ª) + UMBILICAL (2ª) - R$ 1.100,00'
+        },
+        {
+          codes: ['04.07.04.006-4', '04.07.04.008-0'],
+          totalValue: 1100.00,
+          description: 'EPIGÁSTRICA (1ª) + INCISIONAL/VENTRAL (2ª) - R$ 1.100,00'
+        },
+        
+        // Combinações com HERNIOPLASTIA UMBILICAL como 1ª (R$ 450)
+        {
+          codes: ['04.07.04.012-9', '04.07.04.010-2'],
+          totalValue: 750.00,
+          description: 'UMBILICAL (1ª) + INGUINAL UNILATERAL (2ª) - R$ 750,00'
+        },
+        {
+          codes: ['04.07.04.012-9', '04.07.04.009-9'],
+          totalValue: 750.00,
+          description: 'UMBILICAL (1ª) + INGUINAL BILATERAL (2ª) - R$ 750,00'
+        },
+        {
+          codes: ['04.07.04.012-9', '04.07.04.006-4'],
+          totalValue: 750.00,
+          description: 'UMBILICAL (1ª) + EPIGÁSTRICA (2ª) - R$ 750,00'
+        },
+        {
+          codes: ['04.07.04.012-9', '04.07.04.008-0'],
+          totalValue: 750.00,
+          description: 'UMBILICAL (1ª) + INCISIONAL/VENTRAL (2ª) - R$ 750,00'
+        },
+        
+        // Combinações com HERNIOPLASTIA INCISIONAL/VENTRAL como 1ª (R$ 600)
+        {
+          codes: ['04.07.04.008-0', '04.07.04.010-2'],
+          totalValue: 900.00,
+          description: 'INCISIONAL/VENTRAL (1ª) + INGUINAL UNILATERAL (2ª) - R$ 900,00'
+        },
+        {
+          codes: ['04.07.04.008-0', '04.07.04.009-9'],
+          totalValue: 900.00,
+          description: 'INCISIONAL/VENTRAL (1ª) + INGUINAL BILATERAL (2ª) - R$ 900,00'
+        },
+        {
+          codes: ['04.07.04.008-0', '04.07.04.006-4'],
+          totalValue: 900.00,
+          description: 'INCISIONAL/VENTRAL (1ª) + EPIGÁSTRICA (2ª) - R$ 900,00'
+        },
+        {
+          codes: ['04.07.04.008-0', '04.07.04.012-9'],
+          totalValue: 900.00,
+          description: 'INCISIONAL/VENTRAL (1ª) + UMBILICAL (2ª) - R$ 900,00'
+        },
+        
+        // Combinações de 3 hérnias (exemplos principais)
+        {
+          codes: ['04.07.04.006-4', '04.07.04.010-2', '04.07.04.012-9'],
+          totalValue: 1400.00,
+          description: 'EPIGÁSTRICA (1ª) + INGUINAL UNILATERAL (2ª) + UMBILICAL (3ª) - R$ 1.400,00'
+        },
+        {
+          codes: ['04.07.04.006-4', '04.07.04.009-9', '04.07.04.012-9'],
+          totalValue: 1400.00,
+          description: 'EPIGÁSTRICA (1ª) + INGUINAL BILATERAL (2ª) + UMBILICAL (3ª) - R$ 1.400,00'
+        },
+        {
+          codes: ['04.07.04.010-2', '04.07.04.012-9', '04.07.04.008-0'],
+          totalValue: 1300.00,
+          description: 'INGUINAL UNILATERAL (1ª) + UMBILICAL (2ª) + INCISIONAL (3ª) - R$ 1.300,00'
+        },
+        
+        // Combinações de 4 hérnias
+        {
+          codes: ['04.07.04.006-4', '04.07.04.010-2', '04.07.04.012-9', '04.07.04.008-0'],
+          totalValue: 1700.00,
+          description: 'EPIGÁSTRICA (1ª) + INGUINAL UNI (2ª) + UMBILICAL (3ª) + INCISIONAL (4ª) - R$ 1.700,00'
         }
       ]
     },
@@ -2311,6 +2714,60 @@ export function calculateDoctorPayment(
       
       if (hasAllCodes && multiRule.codes.length === procedureCodes.length) {
         // Combinação exata encontrada
+        
+        // 🆕 LÓGICA ESPECIAL PARA HÉRNIAS DA DRA. FABIANE
+        // Códigos de hérnias
+        const herniaCodes = ['04.07.04.010-2', '04.07.04.009-9', '04.07.04.006-4', '04.07.04.012-9', '04.07.04.008-0'];
+        const isHerniaRule = multiRule.codes.every(code => herniaCodes.includes(code));
+        
+        if (isHerniaRule && doctorName.toUpperCase().includes('FABIANE')) {
+          // Mapear valores originais das hérnias
+          const herniaValues: Record<string, number> = {
+            '04.07.04.010-2': 700.00,  // Inguinal Unilateral
+            '04.07.04.009-9': 700.00,  // Inguinal Bilateral
+            '04.07.04.006-4': 800.00,  // Epigástrica
+            '04.07.04.012-9': 450.00,  // Umbilical
+            '04.07.04.008-0': 600.00   // Incisional/Ventral
+          };
+          
+          // Mapear nomes das hérnias
+          const herniaNames: Record<string, string> = {
+            '04.07.04.010-2': 'INGUINAL UNILATERAL',
+            '04.07.04.009-9': 'INGUINAL BILATERAL',
+            '04.07.04.006-4': 'EPIGÁSTRICA',
+            '04.07.04.012-9': 'UMBILICAL',
+            '04.07.04.008-0': 'INCISIONAL/VENTRAL'
+          };
+          
+          // Calcular valores individuais: 1ª hérnia mantém valor, demais R$ 300
+          const calculatedProcedures = filteredProcedures.map((proc, index) => {
+            const isFirstHernia = index === 0;
+            const individualValue = isFirstHernia 
+              ? (herniaValues[proc.procedure_code] || 0) 
+              : 300.00;
+            
+            const herniaName = herniaNames[proc.procedure_code] || 'HÉRNIA';
+            const position = index === 0 ? '1ª' : index === 1 ? '2ª' : index === 2 ? '3ª' : '4ª';
+            
+            return {
+              ...proc,
+              calculatedPayment: individualValue,
+              paymentRule: `${herniaName} (${position}) - R$ ${individualValue.toFixed(2)}`,
+              isSpecialRule: true
+            };
+          });
+          
+          // ✅ SOMA CORRETA: Somar os valores calculados individuais
+          const totalPayment = calculatedProcedures.reduce((sum, proc) => sum + proc.calculatedPayment, 0);
+          
+          return {
+            procedures: calculatedProcedures,
+            totalPayment: totalPayment,
+            appliedRule: multiRule.description
+          };
+        }
+        
+        // Lógica padrão para outras regras de múltiplos
         const calculatedProcedures = filteredProcedures.map(proc => ({
           ...proc,
           calculatedPayment: 0, // Valor individual zerado
