@@ -1289,6 +1289,10 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
   'MAIRA RECHI CASSAPULA': {
     doctorName: 'MAIRA RECHI CASSAPULA',
     rules: [
+      // ================================================================
+      // 🏥 PROCEDIMENTOS PRINCIPAIS - GINECOLOGIA E OBSTETRÍCIA
+      // Última atualização: 27/10/2025
+      // ================================================================
       {
         procedureCode: '04.09.06.013-5',
         standardValue: 1000.00,
@@ -1308,11 +1312,6 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.09.06.021-6',
         standardValue: 700.00,
         description: 'OOFORECTOMIA / OOFOROPLASTIA - R$ 700,00'
-      },
-      {
-        procedureCode: '04.09.06.023-2',
-        standardValue: 900.00,
-        description: 'SALPINGECTOMIA UNI / BILATERAL - R$ 900,00'
       },
       {
         procedureCode: '04.09.06.018-6',
@@ -1365,6 +1364,16 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         description: 'MIOMECTOMIA - R$ 550,00'
       },
       {
+        procedureCode: '04.09.07.014-9',
+        standardValue: 300.00,
+        description: 'EXERESE DE CISTO VAGINAL - R$ 300,00'
+      },
+      
+      // ================================================================
+      // 🔧 PROCEDIMENTOS ADICIONAIS - SOMAM AO PROCEDIMENTO PRINCIPAL
+      // Última atualização: 27/10/2025
+      // ================================================================
+      {
         procedureCode: '04.09.06.022-4',
         standardValue: 100.00,
         description: 'RESSECCAO DE VARIZES PELVICAS (ADICIONAL AO PROCEDIMENTO PRINCIPAL) - R$ 100,00'
@@ -1383,11 +1392,6 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.08.06.020-4',
         standardValue: 100.00,
         description: 'REINSERÇÃO MUSCULAR (CORREÇÃO DE DIÁSTESE DE RETO ABDOMINAL - ADICIONAL DO PROCEDIMENTO PRINCIPAL) - R$ 100,00'
-      },
-      {
-        procedureCode: '04.09.07.014-9',
-        standardValue: 300.00,
-        description: 'EXERESE DE CISTO VAGINAL - R$ 300,00'
       }
     ],
     // Regras para múltiplos procedimentos específicos
@@ -1413,6 +1417,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
   'DJAVANI BLUM': {
     doctorName: 'DJAVANI BLUM',
     rules: [
+      // ================================================================
+      // 🏥 PROCEDIMENTOS PRINCIPAIS - GINECOLOGIA E OBSTETRÍCIA
+      // Última atualização: 27/10/2025
+      // Mesmas regras da MAIRA RECHI CASSAPULA
+      // ================================================================
       {
         procedureCode: '04.09.06.013-5',
         standardValue: 1000.00,
@@ -1427,6 +1436,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.09.06.011-9',
         standardValue: 1200.00,
         description: 'HISTERECTOMIA C/ ANEXECTOMIA (UNI / BILATERAL) - R$ 1.200,00'
+      },
+      {
+        procedureCode: '04.09.06.021-6',
+        standardValue: 700.00,
+        description: 'OOFORECTOMIA / OOFOROPLASTIA - R$ 700,00'
       },
       {
         procedureCode: '04.09.06.018-6',
@@ -1479,6 +1493,16 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         description: 'MIOMECTOMIA - R$ 550,00'
       },
       {
+        procedureCode: '04.09.07.014-9',
+        standardValue: 300.00,
+        description: 'EXERESE DE CISTO VAGINAL - R$ 300,00'
+      },
+      
+      // ================================================================
+      // 🔧 PROCEDIMENTOS ADICIONAIS - SOMAM AO PROCEDIMENTO PRINCIPAL
+      // Última atualização: 27/10/2025
+      // ================================================================
+      {
         procedureCode: '04.09.06.022-4',
         standardValue: 100.00,
         description: 'RESSECCAO DE VARIZES PELVICAS (ADICIONAL AO PROCEDIMENTO PRINCIPAL) - R$ 100,00'
@@ -1497,11 +1521,6 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.08.06.020-4',
         standardValue: 100.00,
         description: 'REINSERÇÃO MUSCULAR (CORREÇÃO DE DIÁSTESE DE RETO ABDOMINAL - ADICIONAL DO PROCEDIMENTO PRINCIPAL) - R$ 100,00'
-      },
-      {
-        procedureCode: '04.09.07.014-9',
-        standardValue: 300.00,
-        description: 'EXERESE DE CISTO VAGINAL - R$ 300,00'
       }
     ],
     // Regras para múltiplos procedimentos específicos
