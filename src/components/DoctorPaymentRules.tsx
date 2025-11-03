@@ -196,6 +196,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         description: 'VASECTOMIA - R$ 450,00'
       },
       {
+        procedureCode: '04.09.04.023-1',
+        standardValue: 250.00,
+        description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00'
+      },
+      {
         procedureCode: '04.09.04.013-4',
         standardValue: 400.00,
         description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00'
@@ -411,6 +416,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.09.04.024-0',
         standardValue: 450.00,
         description: 'VASECTOMIA - R$ 450,00'
+      },
+      {
+        procedureCode: '04.09.04.023-1',
+        standardValue: 250.00,
+        description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00'
       },
       {
         procedureCode: '04.09.04.013-4',
@@ -1549,6 +1559,38 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         codes: ['04.09.07.005-0', '04.09.07.027-0'],
         totalValue: 900.00,
         description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR + TRATAMENTO INCONTINÊNCIA URINÁRIA - R$ 900,00'
+      }
+    ]
+  },
+
+  'JOAO ROBERTO SEIDEL DE ARAUJO': {
+    doctorName: 'JOAO ROBERTO SEIDEL DE ARAUJO',
+    // 🆕 REGRA DE VALOR FIXO PARA PROCEDIMENTOS NÃO LISTADOS
+    // Qualquer procedimento que NÃO esteja nos 3 códigos abaixo = R$ 450,00
+    fixedPaymentRule: {
+      amount: 450.00,
+      description: 'Valor padrão para procedimentos não listados: R$ 450,00'
+    },
+    rules: [
+      // ================================================================
+      // 🦶 PROCEDIMENTOS ORTOPÉDICOS ESPECÍFICOS - HALUX VALGUS/RIGIDUS
+      // Especialidade: Ortopedia (Pé e Tornozelo)
+      // Última atualização: Hoje
+      // ================================================================
+      {
+        procedureCode: '04.08.05.065-9',
+        standardValue: 400.00,
+        description: 'TRATAMENTO CIRÚRGICO DE HALUX VALGUS COM OSTEOTOMIA - R$ 400,00'
+      },
+      {
+        procedureCode: '04.08.05.091-8',
+        standardValue: 400.00,
+        description: 'TRATAMENTO CIRÚRGICO DO HALUX VALGUS S/ OSTEOTOMIA - R$ 400,00'
+      },
+      {
+        procedureCode: '04.08.05.090-0',
+        standardValue: 400.00,
+        description: 'TRATAMENTO CIRÚRGICO DO HALUX RIGIDUS - R$ 400,00'
       }
     ]
   },
@@ -2693,24 +2735,7 @@ export function calculateDoctorPayment(
     };
   }
 
-  // 🆕 VERIFICAR SE É REGRA DE VALOR FIXO
-  if (rule.fixedPaymentRule) {
-    // Para regra fixa, aplicar valor total ao primeiro procedimento (se houver)
-    const calculatedProcedures = procedures.map((proc, index) => ({
-      ...proc,
-      calculatedPayment: index === 0 ? rule.fixedPaymentRule!.amount : 0,
-      paymentRule: rule.fixedPaymentRule!.description,
-      isSpecialRule: true
-    }));
-
-    return {
-      procedures: calculatedProcedures,
-      totalPayment: rule.fixedPaymentRule.amount,
-      appliedRule: rule.fixedPaymentRule.description
-    };
-  }
-
-  // Filtrar apenas procedimentos que estão nas regras definidas
+  // 🎯 FILTRAR PROCEDIMENTOS QUE ESTÃO NAS REGRAS ESPECÍFICAS
   const allRuleCodes = [
     ...rule.rules.map(r => r.procedureCode),
     ...(rule.multipleRule?.codes || []),
@@ -2721,8 +2746,26 @@ export function calculateDoctorPayment(
     allRuleCodes.includes(proc.procedure_code)
   );
 
-  // Se não há procedimentos com regras, retornar vazio
+  // 🆕 SE NÃO HÁ PROCEDIMENTOS COM REGRAS ESPECÍFICAS, USAR fixedPaymentRule COMO FALLBACK
   if (filteredProcedures.length === 0) {
+    // Verificar se tem regra de valor fixo (fallback)
+    if (rule.fixedPaymentRule) {
+      // Aplicar valor fixo ao primeiro procedimento
+      const calculatedProcedures = procedures.map((proc, index) => ({
+        ...proc,
+        calculatedPayment: index === 0 ? rule.fixedPaymentRule!.amount : 0,
+        paymentRule: rule.fixedPaymentRule!.description,
+        isSpecialRule: true
+      }));
+
+      return {
+        procedures: calculatedProcedures,
+        totalPayment: rule.fixedPaymentRule.amount,
+        appliedRule: rule.fixedPaymentRule.description
+      };
+    }
+    
+    // Sem regras específicas nem fixedPaymentRule
     return {
       procedures: [],
       totalPayment: 0,

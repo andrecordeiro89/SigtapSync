@@ -219,26 +219,18 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   );
   
   // 🎯 CALCULAR SOMA DOS VALORES DO DETALHAMENTO POR PROCEDIMENTO (POR PACIENTE)
-  // 🆕 VERIFICAR TIPO DE REGRA: FIXA, PERCENTUAL OU INDIVIDUAL
+  // 🆕 VERIFICAR TIPO DE REGRA: PERCENTUAL OU INDIVIDUAL (fixedPaymentRule é tratada internamente)
   const hospitalId = doctorData.hospitals?.[0]?.hospital_id;
   
-  // 1. Verificar regra de valor fixo primeiro
-  const fixedCalculation = calculateFixedPayment(doctorData.doctor_info.name, hospitalId);
+  // 1. Verificar regra de percentual primeiro (única regra agregada válida)
+  const percentageCalculation = calculatePercentagePayment(doctorData.doctor_info.name, totalValue, hospitalId);
   
-  if (fixedCalculation.hasFixedRule) {
-    // ✅ USAR REGRA DE VALOR FIXO
-    calculatedPaymentValue = fixedCalculation.calculatedPayment;
-    console.log(`🎯 ${doctorData.doctor_info.name}: ${fixedCalculation.appliedRule}`);
+  if (percentageCalculation.hasPercentageRule) {
+    // ✅ USAR REGRA DE PERCENTUAL SOBRE VALOR TOTAL
+    calculatedPaymentValue = percentageCalculation.calculatedPayment;
+    console.log(`🎯 ${doctorData.doctor_info.name}: ${percentageCalculation.appliedRule}`);
   } else {
-    // 2. Verificar regra de percentual
-    const percentageCalculation = calculatePercentagePayment(doctorData.doctor_info.name, totalValue, hospitalId);
-    
-    if (percentageCalculation.hasPercentageRule) {
-      // ✅ USAR REGRA DE PERCENTUAL SOBRE VALOR TOTAL
-      calculatedPaymentValue = percentageCalculation.calculatedPayment;
-      console.log(`🎯 ${doctorData.doctor_info.name}: ${percentageCalculation.appliedRule}`);
-    } else {
-    // ✅ USAR REGRAS INDIVIDUAIS POR PROCEDIMENTO
+    // ✅ USAR REGRAS INDIVIDUAIS POR PROCEDIMENTO (inclui fixedPaymentRule tratada por paciente)
     calculatedPaymentValue = patientsForStats.reduce((totalSum, patient) => {
       // Coletar procedimentos médicos deste paciente (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
       const patientMedicalProcedures = patient.procedures
@@ -253,6 +245,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
         }));
       
       // Se há procedimentos médicos para este paciente, calcular o valor baseado nas regras
+      // 💡 calculateDoctorPayment já trata fixedPaymentRule internamente como fallback
       if (patientMedicalProcedures.length > 0) {
         const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures, hospitalId);
         // Somar os valores calculados individuais (detalhamento por procedimento)
@@ -262,7 +255,6 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
       
       return totalSum;
     }, 0);
-    }
   }
   
   return {
