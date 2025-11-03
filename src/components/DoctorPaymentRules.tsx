@@ -1637,7 +1637,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // ================================================================
       // ✋ PROCEDIMENTOS DE CIRURGIA DA MÃO E PUNHO
       // Especialidade: Ortopedia (Mão e Punho)
-      // Última atualização: Hoje
+      // Última atualização: 03/11/2025
       // ================================================================
       {
         procedureCode: '04.03.02.012-3',
@@ -1653,6 +1653,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.08.02.032-6',
         standardValue: 450.00,
         description: 'TRATAMENTO CIRÚRGICO DE DEDO EM GATILHO - R$ 450,00'
+      },
+      {
+        procedureCode: '04.08.06.047-6',
+        standardValue: 400.00,
+        description: 'TENOPLASTIA OU ENXERTO DE TENDÃO UNICO - R$ 400,00'
       }
     ]
   },
