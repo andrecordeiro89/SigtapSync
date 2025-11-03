@@ -323,8 +323,11 @@ const HospitalDischargesManager = () => {
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription className="text-sm">
-              <strong>Formato esperado:</strong> O arquivo deve conter o cabeçalho na linha 4 com as colunas:
-              LEITO, PACIENTE, DATA ENTRADA, DATA SAÍDA, DURAÇÃO, RESPONSÁVEL, USUÁRIO FINALIZAÇÃO, STATUS, JUSTIFICATIVA/OBSERVAÇÃO
+              <strong>Formato esperado:</strong> O arquivo pode conter as colunas na linha 4:
+              <br />
+              LEITO, PACIENTE, <span className="text-gray-400 line-through">CNS/CPF (ignorada)</span>, ID PRONTUÁRIO, DATA ENTRADA, DATA SAÍDA, DURAÇÃO, RESPONSÁVEL, USUÁRIO FINALIZAÇÃO, STATUS, JUSTIFICATIVA/OBSERVAÇÃO
+              <br />
+              <span className="text-xs text-gray-500 mt-1 block">💡 A coluna CNS/CPF será ignorada automaticamente se existir no arquivo.</span>
             </AlertDescription>
           </Alert>
 
@@ -408,6 +411,7 @@ const HospitalDischargesManager = () => {
                     <TableRow>
                       <TableHead>Leito</TableHead>
                       <TableHead>Paciente</TableHead>
+                      <TableHead>ID Prontuário</TableHead>
                       <TableHead>Entrada</TableHead>
                       <TableHead>Saída</TableHead>
                       <TableHead>Duração</TableHead>
@@ -421,6 +425,7 @@ const HospitalDischargesManager = () => {
                       <TableRow key={discharge.id}>
                         <TableCell className="font-medium">{discharge.leito || '-'}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{discharge.paciente}</TableCell>
+                        <TableCell className="text-sm font-mono">{discharge.id_prontuario || '-'}</TableCell>
                         <TableCell className="text-sm">{formatDate(discharge.data_entrada)}</TableCell>
                         <TableCell className="text-sm">{formatDate(discharge.data_saida)}</TableCell>
                         <TableCell className="text-sm">{discharge.duracao || '-'}</TableCell>

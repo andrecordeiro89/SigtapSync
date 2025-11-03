@@ -10,6 +10,7 @@ export interface HospitalDischarge {
   hospital_id: string;
   leito: string | null;
   paciente: string;
+  id_prontuario: string | null;  // Identificador principal do paciente
   data_entrada: string; // ISO format
   data_saida: string; // ISO format
   duracao: string | null;
@@ -77,10 +78,11 @@ export class HospitalDischargeService {
       const headerRow = rawData[3];
       console.log('📋 Cabeçalho encontrado:', headerRow);
 
-      // Validar colunas esperadas
+      // Validar colunas esperadas (CNS/CPF será ignorada se existir)
       const expectedColumns = [
         'LEITO',
         'PACIENTE',
+        'ID PRONTUÁRIO',
         'DATA ENTRADA',
         'DATA SAÍDA',
         'DURAÇÃO',
@@ -89,6 +91,14 @@ export class HospitalDischargeService {
         'STATUS',
         'JUSTIFICATIVA/OBSERVAÇÃO'
       ];
+
+      // 🔍 DEBUG: Verificar se CNS/CPF existe no Excel
+      const cnsCpfIndex = headerRow.findIndex((h: string) =>
+        h?.toString().toUpperCase().includes('CNS') || h?.toString().toUpperCase().includes('CPF')
+      );
+      if (cnsCpfIndex !== -1) {
+        console.log(`ℹ️ Coluna CNS/CPF detectada na posição ${cnsCpfIndex + 1} - será ignorada automaticamente`);
+      }
 
       // 5. MAPEAR ÍNDICES DE COLUNAS
       const columnIndexes: { [key: string]: number } = {};
@@ -117,6 +127,7 @@ export class HospitalDischargeService {
             hospital_id: hospitalId,
             leito: this.cleanValue(row[columnIndexes['LEITO']]),
             paciente: this.cleanValue(row[columnIndexes['PACIENTE']]) || 'Nome não informado',
+            id_prontuario: this.cleanValue(row[columnIndexes['ID PRONTUÁRIO']]),  // Identificador principal
             data_entrada: this.parseDateTime(row[columnIndexes['DATA ENTRADA']]),
             data_saida: this.parseDateTime(row[columnIndexes['DATA SAÍDA']]),
             duracao: this.cleanValue(row[columnIndexes['DURAÇÃO']]),
@@ -137,6 +148,43 @@ export class HospitalDischargeService {
       }
 
       console.log(`✅ ${discharges.length} registros extraídos com sucesso`);
+
+      // 🔍 MOSTRAR AMOSTRA DOS PRIMEIROS 3 REGISTROS PARA VALIDAÇÃO
+      console.log('📋 === AMOSTRA DE DADOS EXTRAÍDOS (3 primeiros registros) ===');
+      discharges.slice(0, 3).forEach((discharge, index) => {
+        console.log(`\n🔹 Registro #${index + 1}:`);
+        console.log(`   Leito: "${discharge.leito}"`);
+        console.log(`   Paciente: "${discharge.paciente}"`);
+        console.log(`   🆔 ID Prontuário: "${discharge.id_prontuario}" (length: ${discharge.id_prontuario?.length || 0})`);
+        console.log(`   Data Entrada: "${discharge.data_entrada}"`);
+        console.log(`   Data Saída: "${discharge.data_saida}"`);
+        console.log(`   Duração: "${discharge.duracao}"`);
+        console.log(`   Responsável: "${discharge.responsavel}"`);
+        console.log(`   Usuário Finalização: "${discharge.usuario_finalizacao}"`);
+        console.log(`   Status: "${discharge.status}"`);
+        console.log(`   Justificativa: "${discharge.justificativa_observacao}"`);
+      });
+
+      // 🔍 VALIDAR TAMANHOS DE CAMPOS
+      const problematicRecords = discharges.filter((d, idx) => {
+        const issues = [];
+        if (d.id_prontuario && d.id_prontuario.length > 100) issues.push(`ID Prontuário muito longo (${d.id_prontuario.length} chars)`);
+        if (d.paciente && d.paciente.length > 255) issues.push(`Nome muito longo (${d.paciente.length} chars)`);
+        if (d.responsavel && d.responsavel.length > 255) issues.push(`Responsável muito longo (${d.responsavel.length} chars)`);
+        
+        if (issues.length > 0) {
+          console.warn(`⚠️ Linha ${idx + 5} tem problemas:`, issues);
+          console.warn(`   ID Prontuário: "${d.id_prontuario}" (${d.id_prontuario?.length || 0} chars)`);
+          console.warn(`   Paciente: "${d.paciente}" (${d.paciente?.length || 0} chars)`);
+          return true;
+        }
+        return false;
+      });
+
+      if (problematicRecords.length > 0) {
+        console.error(`❌ ${problematicRecords.length} registros com campos muito longos foram encontrados!`);
+        console.error('Primeiros 5 registros problemáticos:', problematicRecords.slice(0, 5));
+      }
 
       // 7. SALVAR NO BANCO DE DADOS
       if (discharges.length > 0) {
