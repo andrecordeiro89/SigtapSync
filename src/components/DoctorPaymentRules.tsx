@@ -129,15 +129,33 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
   'JOSE GABRIEL GUERREIRO': {
     doctorName: 'JOSE GABRIEL GUERREIRO',
     rules: [
-      {
-        procedureCode: '04.06.02.056-6',
-        standardValue: 1050.00,
-        description: 'TRATAMENTO CIRURGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
-      },
+      // ================================================================
+      // 🩺 PROCEDIMENTOS VASCULARES - CIRURGIA DE VARIZES
+      // Especialidade: Cirurgia Vascular
+      // Última atualização: Hoje
+      // ================================================================
       {
         procedureCode: '04.06.02.057-4',
-        standardValue: 1000.00,
-        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
+        standardValue: 900.00,
+        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 900,00'
+      },
+      {
+        procedureCode: '04.06.02.056-6',
+        standardValue: 900.00,
+        description: 'TRATAMENTO CIRURGICO DE VARIZES (BILATERAL) - R$ 900,00'
+      },
+      // ================================================================
+      // 💉 PROCEDIMENTOS ESCLEROSANTES NÃO ESTÉTICOS
+      // ================================================================
+      {
+        procedureCode: '03.09.07.001-5',
+        standardValue: 100.00,
+        description: 'TRATAMENTO ESCLEROSANTE NÃO ESTÉTICO DE VARIZES - R$ 100,00'
+      },
+      {
+        procedureCode: '03.09.07.002-3',
+        standardValue: 150.00,
+        description: 'TRATAMENTO ESCLEROSANTE NÃO ESTÉTICO DE VARIZES - R$ 150,00'
       }
     ]
   },
@@ -589,15 +607,33 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
   'ROGERIO YOSHIKAZU NABESHIMA': {
     doctorName: 'ROGERIO YOSHIKAZU NABESHIMA',
     rules: [
-      {
-        procedureCode: '04.06.02.056-6',
-        standardValue: 1050.00,
-        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 1.050,00'
-      },
+      // ================================================================
+      // 🩺 PROCEDIMENTOS VASCULARES - CIRURGIA DE VARIZES
+      // Especialidade: Cirurgia Vascular
+      // Última atualização: Hoje
+      // ================================================================
       {
         procedureCode: '04.06.02.057-4',
-        standardValue: 1000.00,
-        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.000,00'
+        standardValue: 900.00,
+        description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 900,00'
+      },
+      {
+        procedureCode: '04.06.02.056-6',
+        standardValue: 900.00,
+        description: 'TRATAMENTO CIRURGICO DE VARIZES (BILATERAL) - R$ 900,00'
+      },
+      // ================================================================
+      // 💉 PROCEDIMENTOS ESCLEROSANTES NÃO ESTÉTICOS
+      // ================================================================
+      {
+        procedureCode: '03.09.07.001-5',
+        standardValue: 100.00,
+        description: 'TRATAMENTO ESCLEROSANTE NÃO ESTÉTICO DE VARIZES - R$ 100,00'
+      },
+      {
+        procedureCode: '03.09.07.002-3',
+        standardValue: 150.00,
+        description: 'TRATAMENTO ESCLEROSANTE NÃO ESTÉTICO DE VARIZES - R$ 150,00'
       }
     ]
   },
@@ -1591,6 +1627,32 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.08.05.090-0',
         standardValue: 400.00,
         description: 'TRATAMENTO CIRÚRGICO DO HALUX RIGIDUS - R$ 400,00'
+      }
+    ]
+  },
+
+  'RENAN RODRIGUES DE LIMA GONCALVES': {
+    doctorName: 'RENAN RODRIGUES DE LIMA GONCALVES',
+    rules: [
+      // ================================================================
+      // ✋ PROCEDIMENTOS DE CIRURGIA DA MÃO E PUNHO
+      // Especialidade: Ortopedia (Mão e Punho)
+      // Última atualização: Hoje
+      // ================================================================
+      {
+        procedureCode: '04.03.02.012-3',
+        standardValue: 400.00,
+        description: 'TRATAMENTO CIRURGICO DE SINDROME COMPRESSIVA EM TUNEL OSTEO-FIBROSO AO NIVEL DO CARPO - R$ 400,00'
+      },
+      {
+        procedureCode: '04.08.06.044-1',
+        standardValue: 400.00,
+        description: 'TENÓLISE - R$ 400,00'
+      },
+      {
+        procedureCode: '04.08.02.032-6',
+        standardValue: 450.00,
+        description: 'TRATAMENTO CIRÚRGICO DE DEDO EM GATILHO - R$ 450,00'
       }
     ]
   },
