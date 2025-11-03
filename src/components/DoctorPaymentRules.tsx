@@ -1354,6 +1354,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         description: 'EXERESE DE GLÂNDULA DE BARTHOLIN / SKENE - R$ 250,00'
       },
       {
+        procedureCode: '04.09.07.019-0',
+        standardValue: 150.00,
+        description: 'MARSUPIALIZAÇÃO DE GLÂNDULA DE BARTOLIN - R$ 150,00'
+      },
+      {
         procedureCode: '04.09.07.003-3',
         standardValue: 300.00,
         description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - R$ 300,00'
@@ -1481,6 +1486,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.09.07.015-7',
         standardValue: 250.00,
         description: 'EXERESE DE GLÂNDULA DE BARTHOLIN / SKENE - R$ 250,00'
+      },
+      {
+        procedureCode: '04.09.07.019-0',
+        standardValue: 150.00,
+        description: 'MARSUPIALIZAÇÃO DE GLÂNDULA DE BARTOLIN - R$ 150,00'
       },
       {
         procedureCode: '04.09.07.003-3',
