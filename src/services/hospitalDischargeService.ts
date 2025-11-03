@@ -13,6 +13,7 @@ export interface HospitalDischarge {
   id_prontuario: string | null;  // Identificador principal do paciente
   data_entrada: string; // ISO format
   data_saida: string; // ISO format
+  competencia?: string; // Competência (YYYY-MM-DD) - calculada automaticamente
   duracao: string | null;
   responsavel: string | null;
   usuario_finalizacao: string | null;

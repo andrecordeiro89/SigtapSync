@@ -105,15 +105,15 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       order: 5,
       color: 'from-teal-500 to-cyan-600'
     },
-    {
-      id: 'sisaih01',
-      label: 'SISAIH01',
-      icon: FileText,
-      description: 'Processador de arquivos SISAIH01 do DATASUS',
-      requiresAdmin: false,
-      order: 6,
-      color: 'from-indigo-500 to-purple-600'
-    },
+    // {
+    //   id: 'sisaih01',
+    //   label: 'SISAIH01',
+    //   icon: FileText,
+    //   description: 'Processador de arquivos SISAIH01 do DATASUS',
+    //   requiresAdmin: false,
+    //   order: 6,
+    //   color: 'from-indigo-500 to-purple-600'
+    // },
     {
       id: 'aih-sync',
       label: 'Sync',
