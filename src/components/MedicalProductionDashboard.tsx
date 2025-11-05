@@ -219,42 +219,52 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   );
   
   // 🎯 CALCULAR SOMA DOS VALORES DO DETALHAMENTO POR PROCEDIMENTO (POR PACIENTE)
-  // 🆕 VERIFICAR TIPO DE REGRA: PERCENTUAL OU INDIVIDUAL (fixedPaymentRule é tratada internamente)
+  // 🆕 VERIFICAR TIPO DE REGRA: VALOR FIXO → PERCENTUAL → INDIVIDUAL
   const hospitalId = doctorData.hospitals?.[0]?.hospital_id;
   
-  // 1. Verificar regra de percentual primeiro (única regra agregada válida)
-  const percentageCalculation = calculatePercentagePayment(doctorData.doctor_info.name, totalValue, hospitalId);
+  // 🔥 1. PRIORIDADE MÁXIMA: Verificar regra de VALOR FIXO primeiro
+  const fixedPaymentCalculation = calculateFixedPayment(doctorData.doctor_info.name, hospitalId);
   
-  if (percentageCalculation.hasPercentageRule) {
-    // ✅ USAR REGRA DE PERCENTUAL SOBRE VALOR TOTAL
-    calculatedPaymentValue = percentageCalculation.calculatedPayment;
-    console.log(`🎯 ${doctorData.doctor_info.name}: ${percentageCalculation.appliedRule}`);
+  console.log(`🔍 DEBUG MÉDICO: ${doctorData.doctor_info.name} | Hospital ID: ${hospitalId} | Has Fixed Rule: ${fixedPaymentCalculation.hasFixedRule} | Amount: ${fixedPaymentCalculation.calculatedPayment}`);
+  
+  if (fixedPaymentCalculation.hasFixedRule) {
+    // ✅ REGRA DE VALOR FIXO: Retornar valor fixo UMA VEZ, independente de pacientes
+    calculatedPaymentValue = fixedPaymentCalculation.calculatedPayment;
+    console.log(`💰 ${doctorData.doctor_info.name}: ${fixedPaymentCalculation.appliedRule} - R$ ${fixedPaymentCalculation.calculatedPayment.toFixed(2)} (${patientsForStats.length} pacientes)`);
   } else {
-    // ✅ USAR REGRAS INDIVIDUAIS POR PROCEDIMENTO (inclui fixedPaymentRule tratada por paciente)
-    calculatedPaymentValue = patientsForStats.reduce((totalSum, patient) => {
-      // Coletar procedimentos médicos deste paciente (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
-      const patientMedicalProcedures = patient.procedures
-        .filter(proc => 
-          isMedicalProcedure(proc.procedure_code) && 
-          shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
-        )
-        .map(proc => ({
-          procedure_code: proc.procedure_code,
-          procedure_description: proc.procedure_description,
-          value_reais: proc.value_reais || 0
-        }));
-      
-      // Se há procedimentos médicos para este paciente, calcular o valor baseado nas regras
-      // 💡 calculateDoctorPayment já trata fixedPaymentRule internamente como fallback
-      if (patientMedicalProcedures.length > 0) {
-        const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures, hospitalId);
-        // Somar os valores calculados individuais (detalhamento por procedimento)
-        const patientCalculatedSum = paymentCalculation.procedures.reduce((sum, proc) => sum + proc.calculatedPayment, 0);
-        return totalSum + patientCalculatedSum;
-      }
-      
-      return totalSum;
-    }, 0);
+    // 2. Verificar regra de percentual
+    const percentageCalculation = calculatePercentagePayment(doctorData.doctor_info.name, totalValue, hospitalId);
+    
+    if (percentageCalculation.hasPercentageRule) {
+      // ✅ USAR REGRA DE PERCENTUAL SOBRE VALOR TOTAL
+      calculatedPaymentValue = percentageCalculation.calculatedPayment;
+      console.log(`🎯 ${doctorData.doctor_info.name}: ${percentageCalculation.appliedRule}`);
+    } else {
+      // ✅ USAR REGRAS INDIVIDUAIS POR PROCEDIMENTO
+      calculatedPaymentValue = patientsForStats.reduce((totalSum, patient) => {
+        // Coletar procedimentos médicos deste paciente (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
+        const patientMedicalProcedures = patient.procedures
+          .filter(proc => 
+            isMedicalProcedure(proc.procedure_code) && 
+            shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+          )
+          .map(proc => ({
+            procedure_code: proc.procedure_code,
+            procedure_description: proc.procedure_description,
+            value_reais: proc.value_reais || 0
+          }));
+        
+        // Se há procedimentos médicos para este paciente, calcular o valor baseado nas regras
+        if (patientMedicalProcedures.length > 0) {
+          const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures, hospitalId);
+          // Somar os valores calculados individuais (detalhamento por procedimento)
+          const patientCalculatedSum = paymentCalculation.procedures.reduce((sum, proc) => sum + proc.calculatedPayment, 0);
+          return totalSum + patientCalculatedSum;
+        }
+        
+        return totalSum;
+      }, 0);
+    }
   }
   
   return {
@@ -2689,7 +2699,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   <DollarSign className="h-5 w-5 text-green-600" />
                                   <span className="text-sm font-bold text-green-900 uppercase tracking-wide">Pagamento Médico</span>
                                 </div>
-                                <span className="text-xl font-black text-green-700">{doctorStats.calculatedPaymentValue > 0 ? formatCurrency(doctorStats.calculatedPaymentValue) : formatCurrency(doctorStats.medicalProceduresValue)}</span>
+                                <span className="text-xl font-black text-green-700">
+                                  {formatCurrency(doctorStats.calculatedPaymentValue || doctorStats.medicalProceduresValue)}
+                                </span>
                               </div>
                             </div>
                           </div>
