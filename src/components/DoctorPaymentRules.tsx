@@ -1664,12 +1664,40 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
 
     'RENE SERPA ROUEDE': {
       doctorName: 'RENE SERPA ROUEDE',
-      // 🆕 REGRA DE PERCENTUAL: 65% sobre o valor total
-      percentageRule: {
-        percentage: 65,
-        description: 'Produção Médica: 65% sobre valor total do médico'
-      },
-      rules: [] // Sem regras individuais, usa apenas percentual
+      // 🦴 ORTOPEDIA - Procedimentos Artroscópicos
+      // Última atualização: 06/11/2025
+      rules: [
+        {
+          procedureCode: '04.08.01.021-5',
+          standardValue: 0, // Valor definido na regra de múltiplos
+          description: 'TRATAMENTO CIRÚRGICO DE LUXAÇÃO RECIDIVANTE / HABITUAL DE ARTICULAÇÃO ESCAPULO-UMERAL'
+        },
+        {
+          procedureCode: '04.08.01.014-2',
+          standardValue: 0, // Valor definido na regra de múltiplos
+          description: 'REPARO DE ROTURA DO MANGUITO ROTADOR (INCLUI PROCEDIMENTOS DESCOMPRESSIVOS)'
+        },
+        {
+          procedureCode: '04.08.06.071-9',
+          standardValue: 0, // Valor definido na regra de múltiplos
+          description: 'VIDEOARTROSCOPIA'
+        }
+      ],
+      // ================================================================
+      // 🔧 REGRAS DE MÚLTIPLOS PROCEDIMENTOS ARTROSCÓPICOS
+      // ================================================================
+      multipleRules: [
+        {
+          codes: ['04.08.01.021-5', '04.08.06.071-9'],
+          totalValue: 500.00,
+          description: 'TRATAMENTO CIRÚRGICO DE LUXAÇÃO RECIDIVANTE + VIDEOARTROSCOPIA - R$ 500,00'
+        },
+        {
+          codes: ['04.08.01.014-2', '04.08.06.071-9'],
+          totalValue: 900.00,
+          description: 'REPARO DE ROTURA DO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00'
+        }
+      ]
     },
 
     'GEOVANA GONZALES STORTI': {
