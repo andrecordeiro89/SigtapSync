@@ -1633,11 +1633,22 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
 
   'RENAN RODRIGUES DE LIMA GONCALVES': {
     doctorName: 'RENAN RODRIGUES DE LIMA GONCALVES',
+    // ================================================================
+    // ✋ REGRA ESPECIAL: APENAS PROCEDIMENTO PRINCIPAL
+    // Quando realizar múltiplos procedimentos na mesma cirurgia,
+    // paga-se APENAS o valor do procedimento PRINCIPAL (maior valor).
+    // NÃO soma os valores dos demais procedimentos.
+    // Última atualização: 06/11/2025
+    // ================================================================
+    onlyMainProcedureRule: {
+      enabled: true,
+      description: 'Múltiplos procedimentos: paga apenas o procedimento principal (maior valor)',
+      logic: 'Quando 2+ procedimentos forem realizados juntos, aplica-se apenas o valor do procedimento de maior valor, ignorando os demais.'
+    },
     rules: [
       // ================================================================
       // ✋ PROCEDIMENTOS DE CIRURGIA DA MÃO E PUNHO
       // Especialidade: Ortopedia (Mão e Punho)
-      // Última atualização: 03/11/2025
       // ================================================================
       {
         procedureCode: '04.03.02.012-3',
@@ -2869,6 +2880,45 @@ export function calculateDoctorPayment(
   }
 
   const procedureCodes = filteredProcedures.map(p => p.procedure_code);
+  
+  // 🆕 REGRA ESPECIAL: APENAS PROCEDIMENTO PRINCIPAL (onlyMainProcedureRule)
+  // Se habilitada, quando há múltiplos procedimentos, paga apenas o de maior valor
+  if (rule.onlyMainProcedureRule?.enabled && filteredProcedures.length > 1) {
+    // Encontrar o procedimento de maior valor
+    const proceduresWithValues = filteredProcedures.map(proc => {
+      const standardRule = rule.rules.find(r => r.procedureCode === proc.procedure_code);
+      return {
+        procedure: proc,
+        value: standardRule?.standardValue || 0,
+        rule: standardRule
+      };
+    });
+    
+    // Ordenar por valor (maior para menor)
+    proceduresWithValues.sort((a, b) => b.value - a.value);
+    
+    // Pegar apenas o procedimento principal (maior valor)
+    const mainProcedure = proceduresWithValues[0];
+    
+    // Criar array com todos os procedimentos, mas apenas o principal tem valor
+    const calculatedProcedures = proceduresWithValues.map((item, index) => {
+      const isMain = index === 0;
+      return {
+        ...item.procedure,
+        calculatedPayment: isMain ? item.value : 0,
+        paymentRule: isMain 
+          ? `${rule.onlyMainProcedureRule!.description} - R$ ${item.value.toFixed(2)}` 
+          : `Procedimento secundário (não pago - regra especial)`,
+        isSpecialRule: true
+      };
+    });
+    
+    return {
+      procedures: calculatedProcedures,
+      totalPayment: mainProcedure.value,
+      appliedRule: `${rule.onlyMainProcedureRule.description} - ${filteredProcedures.length} procedimentos, pagando apenas o principal (R$ ${mainProcedure.value.toFixed(2)})`
+    };
+  }
   
   // Verificar se há regras para múltiplas combinações específicas (multipleRules)
   if (rule.multipleRules && procedureCodes.length > 1) {
