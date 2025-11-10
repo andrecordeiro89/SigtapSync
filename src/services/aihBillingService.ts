@@ -347,14 +347,14 @@ export class AIHBillingService {
       }
       
       // Sem filtros: usar view global
+      // ✅ CORREÇÃO: Aplicar limite padrão de 500 se não especificado (evita timeout)
+      const effectiveLimit = limit && limit > 0 ? limit : 500;
+      
       let query = supabase
         .from('v_aih_billing_by_procedure')
         .select('*')
-        .order('total_value', { ascending: false });
-
-      if (limit && limit > 0) {
-        query = query.limit(limit);
-      }
+        .order('total_value', { ascending: false })
+        .limit(effectiveLimit); // ✅ Sempre aplicar limite para evitar timeout
 
       const { data, error } = await query;
 
@@ -595,21 +595,31 @@ export class AIHBillingService {
       }
       
       // Buscar todos os dados em paralelo
-      const [
-        summary,
-        byHospital,
-        byMonth,
-        byDoctor,
-        byProcedure,
-        byHospitalSpecialty
-      ] = await Promise.all([
+      // ✅ CORREÇÃO: Usar Promise.allSettled para continuar mesmo se uma view falhar (timeout)
+      const results = await Promise.allSettled([
         this.getBillingSummary(dateRange),
         this.getBillingByHospital(dateRange),
         this.getBillingByMonth(dateRange),
         this.getBillingByDoctor(50, dateRange),
-        this.getBillingByProcedure(options?.procedureLimit, dateRange),
+        this.getBillingByProcedure(options?.procedureLimit || 500, dateRange), // ✅ Limite padrão de 500 para evitar timeout
         this.getBillingByHospitalSpecialty(dateRange)
       ]);
+
+      // Extrair resultados, usando valores padrão se alguma promise falhar
+      const summary = results[0].status === 'fulfilled' ? results[0].value : null;
+      const byHospital = results[1].status === 'fulfilled' ? results[1].value : [];
+      const byMonth = results[2].status === 'fulfilled' ? results[2].value : [];
+      const byDoctor = results[3].status === 'fulfilled' ? results[3].value : [];
+      const byProcedure = results[4].status === 'fulfilled' ? results[4].value : [];
+      const byHospitalSpecialty = results[5].status === 'fulfilled' ? results[5].value : [];
+
+      // Log de erros se houver
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const viewNames = ['Summary', 'ByHospital', 'ByMonth', 'ByDoctor', 'ByProcedure', 'ByHospitalSpecialty'];
+          console.warn(`⚠️ Erro ao carregar ${viewNames[index]}:`, result.reason);
+        }
+      });
 
       // Aplicar filtros globais (client-side quando views não suportam filtros diretos)
       const filteredByHospital = (() => {

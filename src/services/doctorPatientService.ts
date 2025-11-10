@@ -160,6 +160,22 @@ export class DoctorPatientService {
         console.log('💵 Filtrando por Pgt. Administrativo:', options.filterPgtAdm);
       }
 
+      // ✅ CORREÇÃO: Limitar a 500 AIHs apenas no carregamento inicial (sem filtros)
+      // Se há filtros aplicados, carregar todos os dados filtrados
+      const hasFilters = (options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all')) ||
+                         (options?.competencia && options.competencia !== 'all') ||
+                         (options?.filterPgtAdm && options.filterPgtAdm !== 'all');
+      
+      const initialLoadLimit = 500; // ✅ Limite inicial reduzido de 1000 para 500
+      
+      // Aplicar limite apenas se NÃO há filtros (carregamento inicial)
+      if (!hasFilters) {
+        aihsQuery = aihsQuery.limit(initialLoadLimit);
+        console.log(`📊 Carregamento inicial: limitando a ${initialLoadLimit} AIHs (sem filtros aplicados)`);
+      } else {
+        console.log('🔍 Filtros aplicados: carregando todas as AIHs que correspondem aos filtros');
+      }
+      
       // 🚀 EXECUTAR QUERY DE AIHs PRIMEIRO (necessária para obter IDs)
       const { data: aihs, error: aihsError } = await aihsQuery.order('admission_date', { ascending: false });
       if (aihsError) {
@@ -171,7 +187,7 @@ export class DoctorPatientService {
         return [];
       }
 
-      console.log(`✅ ${aihs.length} AIHs carregadas em ${(performance.now() - startTime).toFixed(0)}ms`);
+      console.log(`✅ ${aihs.length} AIHs carregadas em ${(performance.now() - startTime).toFixed(0)}ms${!hasFilters ? ' (carregamento inicial limitado)' : ' (com filtros aplicados)'}`);
 
       // 2) Extrair IDs para queries dependentes
       const patientIds = Array.from(new Set(aihs.map(a => a.patient_id).filter(Boolean)));
