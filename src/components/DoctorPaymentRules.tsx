@@ -3185,6 +3185,17 @@ export function calculateFixedPayment(
 }
 
 /**
+ * 🔍 VERIFICAR SE MÉDICO TEM REGRAS INDIVIDUAIS (rules)
+ * Útil para distinguir entre valor fixo mensal e fixedPaymentRule como fallback
+ */
+export function hasIndividualPaymentRules(doctorName: string, hospitalId?: string): boolean {
+  const hospitalKey = detectHospitalFromContext(doctorName, hospitalId);
+  const hospitalRules = DOCTOR_PAYMENT_RULES_BY_HOSPITAL[hospitalKey];
+  const rule = hospitalRules?.[doctorName.toUpperCase()];
+  return !!(rule?.rules && rule.rules.length > 0);
+}
+
+/**
  * 🆕 CALCULAR VALOR BASEADO EM PERCENTUAL DO TOTAL
  * Para médicos que têm regra de percentual sobre o valor total
  * 🚀 OTIMIZADO: Usa cache Map para busca O(1)

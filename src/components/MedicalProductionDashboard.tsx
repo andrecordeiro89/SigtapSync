@@ -46,7 +46,7 @@ import { DoctorsHierarchyV2Service } from '../services/doctorsHierarchyV2';
 import { DoctorsCrudService } from '../services/doctorsCrudService';
 import { ProcedureRecordsService, type ProcedureRecord } from '../services/simplifiedProcedureService';
 import { DateRange } from '../types';
-import DoctorPaymentRules, { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayment } from './DoctorPaymentRules';
+import DoctorPaymentRules, { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayment, hasIndividualPaymentRules } from './DoctorPaymentRules';
 import ProcedurePatientDiagnostic from './ProcedurePatientDiagnostic';
 import CleuezaDebugComponent from './CleuezaDebugComponent';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
@@ -1508,18 +1508,40 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   }, [filteredDoctors]);
 
   // 🧮 NOVO KPI: Soma dos Pagamentos Médicos (por médico) para comparação
+  // ✅ CORREÇÃO: Somar repasses individuais de cada paciente (igual aos cards individuais)
   const aggregatedMedicalPayments = React.useMemo(() => {
     try {
       let totalPayments = 0;
       for (const doctor of filteredDoctors) {
-        const stats = calculateDoctorStats(doctor);
-        const doctorPayment = (stats.calculatedPaymentValue && stats.calculatedPaymentValue > 0)
-          ? stats.calculatedPaymentValue
-          : (stats.medicalProceduresValue || 0);
-        totalPayments += doctorPayment;
+        const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+        
+        // ✅ CORREÇÃO: Somar repasses individuais de cada paciente (igual aos cards)
+        const doctorTotalPayment = doctor.patients.reduce((sum, patient) => {
+          // Filtrar procedimentos calculáveis (excluindo anestesistas 04.xxx)
+          const proceduresWithPayment = patient.procedures
+            .filter(filterCalculableProcedures)
+            .map((proc: any) => ({
+              procedure_code: proc.procedure_code,
+              procedure_description: proc.procedure_description,
+              value_reais: proc.value_reais || 0,
+            }));
+
+          if (proceduresWithPayment.length > 0) {
+            const paymentResult = calculateDoctorPayment(
+              doctor.doctor_info.name,
+              proceduresWithPayment,
+              hospitalId
+            );
+            return sum + (paymentResult.totalPayment || 0);
+          }
+          return sum;
+        }, 0);
+        
+        totalPayments += doctorTotalPayment;
       }
       return totalPayments;
-    } catch {
+    } catch (error) {
+      console.error('Erro ao calcular pagamentos médicos agregados:', error);
       return 0;
     }
   }, [filteredDoctors]);
@@ -2642,11 +2664,25 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Regra Pagamento:</span>
                                 <span className="text-xs font-medium text-gray-900">{(() => {
                                         const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                        
+                                        // ✅ CORREÇÃO: Verificar se médico tem regras individuais (rules)
+                                        // Se tiver rules, não é "Valor Fixo", é "Regras por Proc."
+                                        const hasIndividualRules = hasIndividualPaymentRules(doctor.doctor_info.name, hospitalId);
                                         const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
-                                        if (fixedCalc.hasFixedRule) return 'Valor Fixo';
+                                        
+                                        // ✅ Se tem fixedPaymentRule MAS também tem rules individuais, não é "Valor Fixo"
+                                        if (fixedCalc.hasFixedRule && hasIndividualRules) {
+                                          // Tem regras individuais, então é "Regras por Proc." (fixedPaymentRule é apenas fallback)
+                                          if (doctorStats.calculatedPaymentValue > 0) return 'Regras por Proc.';
+                                          return '—';
+                                        }
+                                        
+                                        // Se tem fixedPaymentRule SEM rules individuais, é "Valor Fixo" (valor fixo mensal)
+                                        if (fixedCalc.hasFixedRule && !hasIndividualRules) return 'Valor Fixo';
+                                        
                                         const percentageCalc = calculatePercentagePayment(doctor.doctor_info.name, doctorStats.totalValue, hospitalId);
                                         if (percentageCalc.hasPercentageRule) return `${percentageCalc.appliedRule.match(/\d+%/)?.[0] || '65%'} do Total`;
-                                  if (doctorStats.calculatedPaymentValue > 0) return 'Regras por Proc.';
+                                        if (doctorStats.calculatedPaymentValue > 0) return 'Regras por Proc.';
                                         return '—';
                                 })()}</span>
                                     </div>
@@ -2700,7 +2736,31 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   <span className="text-sm font-bold text-green-900 uppercase tracking-wide">Pagamento Médico</span>
                                 </div>
                                 <span className="text-xl font-black text-green-700">
-                                  {formatCurrency(doctorStats.calculatedPaymentValue || doctorStats.medicalProceduresValue)}
+                                  {formatCurrency((() => {
+                                    // ✅ CORREÇÃO: Calcular soma dos repasses individuais (igual ao card total)
+                                    const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                    const doctorTotalPayment = doctor.patients.reduce((sum, patient) => {
+                                      const proceduresWithPayment = patient.procedures
+                                        .filter(filterCalculableProcedures)
+                                        .map((proc: any) => ({
+                                          procedure_code: proc.procedure_code,
+                                          procedure_description: proc.procedure_description,
+                                          value_reais: proc.value_reais || 0,
+                                        }));
+
+                                      if (proceduresWithPayment.length > 0) {
+                                        const paymentResult = calculateDoctorPayment(
+                                          doctor.doctor_info.name,
+                                          proceduresWithPayment,
+                                          hospitalId
+                                        );
+                                        return sum + (paymentResult.totalPayment || 0);
+                                      }
+                                      return sum;
+                                    }, 0);
+                                    
+                                    return doctorTotalPayment > 0 ? doctorTotalPayment : (doctorStats.calculatedPaymentValue || doctorStats.medicalProceduresValue);
+                                  })())}
                                 </span>
                               </div>
                             </div>
