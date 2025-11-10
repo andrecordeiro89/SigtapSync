@@ -891,6 +891,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   }, [selectedHospitals, selectedCompetency, hasExecutiveAccess]);
 
   // ✅ Carregar competências disponíveis do campo `competencia` da tabela `aihs`
+  // ✅ CORREÇÃO: Implementar paginação para buscar TODAS as competências (sem limite de 1000)
   useEffect(() => {
     if (!showCompetencyTabs) {
       setAvailableCompetencies([]);
@@ -898,25 +899,58 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     }
     (async () => {
       try {
-        let q = supabase
-          .from('aihs')
-          .select('competencia,hospital_id')
-          .not('competencia', 'is', null);
-        if (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) {
-          q = q.in('hospital_id', selectedHospitals);
+        console.log('📋 Carregando competências disponíveis...');
+        const pageSize = 1000; // Supabase limita a 1000 por request
+        let offset = 0;
+        const allAIHs: any[] = [];
+        
+        // ✅ Buscar TODAS as AIHs em batches (com paginação)
+        while (true) {
+          let q = supabase
+            .from('aihs')
+            .select('competencia,hospital_id')
+            .not('competencia', 'is', null)
+            .limit(pageSize)
+            .range(offset, offset + pageSize - 1);
+          
+          // Aplicar filtro de hospital se selecionado
+          if (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) {
+            q = q.in('hospital_id', selectedHospitals);
+          }
+          
+          const { data: batch, error } = await q;
+          
+          if (error) {
+            console.warn('⚠️ Erro ao carregar batch de competências:', error);
+            break;
+          }
+          
+          const batchLen = batch?.length || 0;
+          if (batchLen === 0) break;
+          
+          allAIHs.push(...batch);
+          
+          // Se retornou menos que o pageSize, chegamos ao fim
+          if (batchLen < pageSize) break;
+          
+          offset += pageSize;
+          
+          // Evitar UI freeze em listas enormes
+          await new Promise(r => setTimeout(r, 0));
         }
-        const { data, error } = await q;
-        if (error) {
-          console.warn('⚠️ Erro ao carregar competências:', error);
-          setAvailableCompetencies([]);
-          return;
-        }
+        
+        console.log(`✅ Total de AIHs carregadas para extrair competências: ${allAIHs.length}`);
+        
+        // Extrair competências únicas
         const setYM = new Set<string>();
-        (data || []).forEach((row: any) => {
+        allAIHs.forEach((row: any) => {
           const comp = row.competencia;
           if (comp) setYM.add(comp); // Mantém formato YYYY-MM-DD do banco
         });
+        
         const arr = Array.from(setYM).sort((a, b) => (a < b ? 1 : -1));
+        console.log(`✅ ${arr.length} competências únicas encontradas`);
+        
         const formatted = arr.map((competenciaFull) => {
           // ✅ CORREÇÃO: Usar formato completo YYYY-MM-DD (não apenas YYYY-MM)
           const [y, m] = competenciaFull.split('-'); // pega ano e mês para label
@@ -924,7 +958,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
           return { value: competenciaFull, label }; // ✅ value mantém YYYY-MM-DD completo
         });
+        
         setAvailableCompetencies(formatted);
+        console.log(`✅ Competências formatadas e disponíveis no dropdown: ${formatted.length}`);
       } catch (e) {
         console.warn('⚠️ Falha ao montar competências:', e);
         setAvailableCompetencies([]);
