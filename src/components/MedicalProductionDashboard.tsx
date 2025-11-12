@@ -2971,24 +2971,33 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   </Button>
                                    <Button
                                      type="button"
-                                     onClick={(e) => {
+                                     onClick={async (e) => {
                                        e.stopPropagation();
                                        try {
-                                        const rows: Array<Array<string | number>> = [];
-                                        // ✅ MESMAS COLUNAS DO RELATÓRIO GERAL SIMPLIFICADO
-                                        const header = [
-                                          '#', 
-                                          'Nome do Paciente',
-                                          'Prontuário',
-                                          'Nº AIH', 
-                                          'Data de Admissão',
-                                          'Data de Alta'
-                                        ];
-                                         let idx = 1;
+                                         // 🖼️ Carregar logo do CIS
+                                         let logoBase64 = null;
+                                         try {
+                                           const response = await fetch('/CIS Sem fundo.jpg');
+                                           const blob = await response.blob();
+                                           logoBase64 = await new Promise<string>((resolve) => {
+                                             const reader = new FileReader();
+                                             reader.onloadend = () => resolve(reader.result as string);
+                                             reader.readAsDataURL(blob);
+                                           });
+                                         } catch (error) {
+                                           console.error('⚠️ Erro ao carregar logo:', error);
+                                         }
+
                                          const doctorName = doctor.doctor_info?.name || '';
+                                         const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                         const hospitalName = doctor.hospitals?.[0]?.hospital_name || 'Hospital não identificado';
                                          
-                                         console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO] Gerando para ${doctorName}`);
-                                         console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO] Sem filtro de data`);
+                                         console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO PDF] Gerando para ${doctorName}`);
+                                         console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO PDF] Hospital: ${hospitalName}`);
+                                         
+                                         // Preparar dados para a tabela
+                                         const tableData: Array<Array<string>> = [];
+                                         let totalRepasse = 0; // ✅ Calcular total durante o loop
                                          
                                          (doctor.patients || []).forEach((p: any) => {
                                            // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo dos outros relatórios)
@@ -3007,30 +3016,91 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                              }
                                            }
                                            
-                                          const name = p.patient_info?.name || 'Paciente';
                                           const medicalRecord = p.patient_info?.medical_record || '-';
-                                          const aih = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '');
-                                          const aihDisplay = aih || 'Aguardando geração';
+                                          const name = p.patient_info?.name || 'Paciente';
                                           
-                                          const admissionISO = p?.aih_info?.admission_date || '';
-                                          const admissionLabel = parseISODateToLocal(admissionISO);
+                                          // ✅ NOVO: Filtrar apenas procedimentos com código 04 (procedimentos médicos)
+                                          // 🚫 EXCLUIR: Códigos 04 de anestesista (CBO 225151)
+                                          const procedures04 = (p.procedures || [])
+                                            .filter((proc: any) => {
+                                              const code = proc.procedure_code || '';
+                                              const cbo = proc.cbo || '';
+                                              
+                                              // Verificar se é código 04
+                                              if (!code.toString().trim().startsWith('04')) {
+                                                return false;
+                                              }
+                                              
+                                              // 🚫 EXCLUIR: Se é anestesista (CBO 225151) com código 04, não incluir
+                                              // ✅ EXCEÇÕES: Cesariana e códigos específicos devem ser incluídos
+                                              if (cbo === '225151') {
+                                                // Exceções que devem ser incluídas mesmo sendo anestesista
+                                                const exceptions = [
+                                                  '04.17.01.001-0', // Cesariana
+                                                  '04.17.01.005-2',
+                                                  '04.17.01.006-0'
+                                                ];
+                                                
+                                                // Se não é uma exceção, excluir (é anestesista 04.xxx)
+                                                if (!exceptions.includes(code)) {
+                                                  return false;
+                                                }
+                                              }
+                                              
+                                              return true;
+                                            })
+                                            .map((proc: any) => proc.procedure_code || '')
+                                            .filter((code: string) => code !== '');
+                                          
+                                          const codes04Display = procedures04.length > 0 
+                                            ? procedures04.join(', ') 
+                                            : 'Nenhum código 04';
+                                          
                                           const dischargeISO = p?.aih_info?.discharge_date || '';
                                           const dischargeLabel = parseISODateToLocal(dischargeISO);
                                           
-                                          rows.push([
-                                            idx++,
-                                            name,
+                                          // ✅ NOVO: Caráter de atendimento
+                                          const careCharacter = p?.aih_info?.care_character || '';
+                                          const careCharacterDisplay = careCharacter 
+                                            ? CareCharacterUtils.getDescription(careCharacter) || careCharacter
+                                            : '-';
+                                          
+                                          // ✅ NOVO: Calcular valor de repasse (mesma lógica do card)
+                                          const proceduresWithPayment = p.procedures
+                                            .filter(filterCalculableProcedures) // Remove anestesistas 04.xxx (exceto cesarianas)
+                                            .map((proc: any) => ({
+                                              procedure_code: proc.procedure_code,
+                                              procedure_description: proc.procedure_description,
+                                              value_reais: proc.value_reais || 0,
+                                            }));
+                                          
+                                          let repasseValue = 0;
+                                          if (proceduresWithPayment.length > 0) {
+                                            const paymentResult = calculateDoctorPayment(
+                                              doctorName,
+                                              proceduresWithPayment,
+                                              hospitalId
+                                            );
+                                            repasseValue = paymentResult.totalPayment || 0;
+                                            totalRepasse += repasseValue; // ✅ Somar ao total
+                                          }
+                                          
+                                          tableData.push([
                                             medicalRecord,
-                                            aihDisplay,
-                                            admissionLabel,
-                                            dischargeLabel
+                                            name,
+                                            codes04Display,
+                                            dischargeLabel,
+                                            careCharacterDisplay,
+                                            doctorName,
+                                            hospitalName,
+                                            formatCurrency(repasseValue)
                                           ]);
                                          });
                                          
                                         // ✅ ORDENAÇÃO: Por Data de Alta (mais recente primeiro)
-                                        rows.sort((a, b) => {
-                                          const dateA = a[5] as string; // Data de Alta está na posição 5
-                                          const dateB = b[5] as string;
+                                        tableData.sort((a, b) => {
+                                          const dateA = a[3] as string; // Data de Alta está na posição 3
+                                          const dateB = b[3] as string;
                                            
                                            // Sem data → final
                                            if (!dateA && !dateB) return 0;
@@ -3053,31 +3123,133 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                            return parsedDateB.getTime() - parsedDateA.getTime();
                                          });
                                          
-                                         // Renumerar após ordenação
-                                         rows.forEach((row, index) => {
-                                           row[0] = index + 1;
-                                         });
+                                         console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO PDF] Total de linhas: ${tableData.length} (ordenadas por data de alta DESC)`);
                                          
-                                         console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO] Total de linhas: ${rows.length} (ordenadas por data de alta DESC)`);
-                                         
-                                        const wb = XLSX.utils.book_new();
-                                        const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-                                        // ✅ LARGURAS DAS COLUNAS (mesmas do relatório geral simplificado)
-                                        (ws as any)['!cols'] = [
-                                          { wch: 5 },   // #
-                                          { wch: 40 },  // Nome do Paciente
-                                          { wch: 16 },  // Prontuário
-                                          { wch: 18 },  // Nº AIH
-                                          { wch: 18 },  // Data de Admissão
-                                          { wch: 18 },  // Data de Alta
-                                        ];
-                                        XLSX.utils.book_append_sheet(wb, ws, 'Pacientes Simplificado');
-                                         const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
-                                         XLSX.writeFile(wb, fileName);
-                                         toast.success('Relatório simplificado do médico gerado com sucesso!');
+                                        // Criar PDF
+                                        const doc = new jsPDF('landscape');
+                                        const pageWidth = doc.internal.pageSize.getWidth();
+                                        const pageHeight = doc.internal.pageSize.getHeight();
+                                        
+                                        // ========== CABEÇALHO PROFISSIONAL COM LOGO ==========
+                                        let yPosition = 20;
+                                        
+                                        // Logo CIS (se carregado)
+                                        if (logoBase64) {
+                                          const logoWidth = 40;
+                                          const logoHeight = 20;
+                                          const logoX = 20;
+                                          const logoY = 8;
+                                          doc.addImage(logoBase64, 'JPEG', logoX, logoY, logoWidth, logoHeight);
+                                          yPosition = logoY + logoHeight + 10;
+                                        }
+                                        
+                                        // Título do Documento
+                                        doc.setFontSize(16);
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.setTextColor(0, 51, 102); // Azul escuro
+                                        doc.text('RELATÓRIO DE PACIENTES - MÉDICO', pageWidth / 2, yPosition, { align: 'center' });
+                                        
+                                        // Subtítulo com informações do médico
+                                        yPosition += 8;
+                                        doc.setFontSize(11);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.setTextColor(60, 60, 60);
+                                        doc.text(`Médico: ${doctorName}`, pageWidth / 2, yPosition, { align: 'center' });
+                                        
+                                        yPosition += 6;
+                                        doc.setFontSize(10);
+                                        doc.setTextColor(100, 100, 100);
+                                        doc.text(`Hospital: ${hospitalName}`, pageWidth / 2, yPosition, { align: 'center' });
+                                        
+                                        yPosition += 6;
+                                        const dataGeracao = new Date().toLocaleDateString('pt-BR', { 
+                                          day: '2-digit', 
+                                          month: '2-digit', 
+                                          year: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        });
+                                        doc.text(`Gerado em: ${dataGeracao}`, pageWidth / 2, yPosition, { align: 'center' });
+                                        
+                                        // Linha separadora
+                                        yPosition += 8;
+                                        doc.setDrawColor(200, 200, 200);
+                                        doc.setLineWidth(0.5);
+                                        doc.line(20, yPosition, pageWidth - 20, yPosition);
+                                        
+                                        // ========== TABELA COM DADOS ==========
+                                        const startY = yPosition + 10;
+                                        
+                                        autoTable(doc, {
+                                          head: [['Prontuário', 'Nome do Paciente', 'Códigos 04 Realizados', 'Data Alta', 'Caráter de Atendimento', 'Médico', 'Hospital', 'Valor de Repasse']],
+                                          body: tableData,
+                                          startY: startY,
+                                          theme: 'striped',
+                                          tableWidth: 'auto',
+                                          headStyles: {
+                                            fillColor: [0, 51, 102],
+                                            textColor: [255, 255, 255],
+                                            fontStyle: 'bold',
+                                            fontSize: 9,
+                                            halign: 'center'
+                                          },
+                                          bodyStyles: {
+                                            fontSize: 8,
+                                            textColor: [50, 50, 50],
+                                            cellPadding: 2
+                                          },
+                                          columnStyles: {
+                                            0: { cellWidth: 18, halign: 'center' }, // Prontuário
+                                            1: { cellWidth: 42, halign: 'left' },   // Nome do Paciente
+                                            2: { cellWidth: 52, halign: 'left', fontSize: 7 }, // Códigos 04
+                                            3: { cellWidth: 20, halign: 'center' }, // Data Alta
+                                            4: { cellWidth: 30, halign: 'left' },   // Caráter
+                                            5: { cellWidth: 32, halign: 'left' },   // Médico
+                                            6: { cellWidth: 32, halign: 'left' },   // Hospital
+                                            7: { cellWidth: 30, halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }   // Valor de Repasse (verde escuro)
+                                          },
+                                          styles: {
+                                            overflow: 'linebreak',
+                                            cellPadding: 2,
+                                            fontSize: 8
+                                          },
+                                          margin: { left: 15, right: 15 },
+                                          alternateRowStyles: {
+                                            fillColor: [245, 245, 245]
+                                          }
+                                        });
+                                        
+                                        // ========== RODAPÉ PROFISSIONAL ==========
+                                        const finalY = (doc as any).lastAutoTable.finalY || startY + 50;
+                                        const footerY = pageHeight - 20;
+                                        
+                                        // Linha separadora do rodapé
+                                        doc.setDrawColor(200, 200, 200);
+                                        doc.setLineWidth(0.5);
+                                        doc.line(20, footerY - 10, pageWidth - 20, footerY - 10);
+                                        
+                                        // Texto do rodapé
+                                        doc.setFontSize(8);
+                                        doc.setFont('helvetica', 'normal');
+                                        doc.setTextColor(120, 120, 120);
+                                        doc.text('CIS - Centro Integrado em Saúde', pageWidth / 2, footerY - 5, { align: 'center' });
+                                        
+                                        // Total de pacientes e repasse
+                                        doc.setFontSize(9);
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.setTextColor(0, 51, 102);
+                                        
+                                        doc.text(`Total de Pacientes: ${tableData.length} | Valor Total de Repasse: ${formatCurrency(totalRepasse)}`, 
+                                                 pageWidth / 2, footerY + 5, { align: 'center' });
+                                        
+                                        // Salvar PDF
+                                        const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`;
+                                        doc.save(fileName);
+                                        
+                                        toast.success('Relatório PDF gerado com sucesso!');
                                        } catch (err) {
-                                         console.error('Erro ao exportar Relatório Simplificado (card):', err);
-                                         toast.error('Erro ao gerar relatório simplificado do médico');
+                                         console.error('Erro ao exportar Relatório Simplificado (PDF):', err);
+                                         toast.error('Erro ao gerar relatório PDF');
                                        }
                                      }}
                                      className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
