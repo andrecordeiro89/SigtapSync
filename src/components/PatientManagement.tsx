@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, AlertCircle, RotateCcw, Info, Activity, CreditCard, Stethoscope, FileSpreadsheet, X } from 'lucide-react';
@@ -17,7 +18,7 @@ import { hasAnyExcludedCodeInProcedures } from '@/config/operaParana';
 import { formatCurrency as baseCurrency } from '../utils/validation';
 import { useToast } from '@/hooks/use-toast';
 import { CareCharacterUtils } from '../config/careCharacterCodes';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { filterCalculableProcedures } from '../utils/anesthetistLogic';
@@ -195,6 +196,20 @@ const PatientManagement = () => {
   const [editingCompetencia, setEditingCompetencia] = useState<{ [aihId: string]: boolean }>({});
   const [competenciaValue, setCompetenciaValue] = useState<{ [aihId: string]: string }>({});
   const [savingCompetencia, setSavingCompetencia] = useState<{ [aihId: string]: boolean }>({});
+  
+  // ✅ NOVO: Estados para aba "Mudança de Competência"
+  const [activeTab, setActiveTab] = useState<'pacientes' | 'mudanca-competencia'>('pacientes');
+  const [selectedAIHsForBatch, setSelectedAIHsForBatch] = useState<Set<string>>(new Set());
+  const [isUpdatingBatch, setIsUpdatingBatch] = useState(false);
+  const [selectedCompetenciaForBatch, setSelectedCompetenciaForBatch] = useState<string>('all');
+
+  // ✅ NOVO: Limpar seleção ao trocar de aba
+  useEffect(() => {
+    if (activeTab === 'pacientes') {
+      setSelectedAIHsForBatch(new Set());
+      setSelectedCompetenciaForBatch('all'); // Resetar filtro ao sair da aba
+    }
+  }, [activeTab]);
   
   // ✅ NOVO: Estado para atualização de pagamento administrativo
   const [savingPgtAdm, setSavingPgtAdm] = useState<{ [aihId: string]: boolean }>({});
@@ -975,7 +990,18 @@ const PatientManagement = () => {
 
   // ✅ OTIMIZADO: Filtros aplicados (backend já filtrou competência, data e caráter)
   const filteredData = unifiedData.filter(item => {
-    // ✅ COMPETÊNCIA JÁ FILTRADA NO BACKEND (SQL) - não precisa filtrar aqui
+    // ✅ NOVO: Filtro de competência específico para aba "Mudança de Competência"
+    if (activeTab === 'mudanca-competencia' && selectedCompetenciaForBatch !== 'all') {
+      if (selectedCompetenciaForBatch === 'sem_competencia') {
+        if (item.competencia) return false;
+      } else {
+        if (!item.competencia || item.competencia !== selectedCompetenciaForBatch) {
+          return false;
+        }
+      }
+    } else if (activeTab === 'pacientes') {
+      // ✅ COMPETÊNCIA JÁ FILTRADA NO BACKEND (SQL) para aba Pacientes - não precisa filtrar aqui
+    }
     
     // ✅ NOVO: Filtro de médico (frontend - apenas para administradores)
     if (isDirector && selectedDoctorFilter !== 'all') {
@@ -1111,6 +1137,144 @@ const PatientManagement = () => {
       return `${month}/${year}`;
     } catch {
       return s;
+    }
+  };
+
+  // ✅ NOVO: Função para calcular próxima competência (adiciona 1 mês)
+  const calcularProximaCompetencia = (competenciaAtual: string | undefined): string | null => {
+    if (!competenciaAtual) return null;
+    
+    try {
+      // Formato esperado: YYYY-MM-DD
+      const match = competenciaAtual.match(/^(\d{4})-(\d{2})-\d{2}$/);
+      if (!match) return null;
+      
+      const ano = parseInt(match[1]);
+      const mes = parseInt(match[2]);
+      
+      // Calcular próximo mês
+      let proximoAno = ano;
+      let proximoMes = mes + 1;
+      
+      if (proximoMes > 12) {
+        proximoMes = 1;
+        proximoAno += 1;
+      }
+      
+      // Retornar no formato YYYY-MM-01
+      return `${proximoAno}-${String(proximoMes).padStart(2, '0')}-01`;
+    } catch {
+      return null;
+    }
+  };
+
+  // ✅ NOVO: Função para alternar seleção de AIH na tabela de mudança de competência
+  const toggleAIHSelection = (aihId: string) => {
+    setSelectedAIHsForBatch(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(aihId)) {
+        newSet.delete(aihId);
+      } else {
+        newSet.add(aihId);
+      }
+      return newSet;
+    });
+  };
+
+
+  // ✅ NOVO: Função para atualizar competência em lote
+  const handleBatchUpdateCompetencia = async () => {
+    if (selectedAIHsForBatch.size === 0) {
+      toast({
+        title: "Nenhuma AIH selecionada",
+        description: "Selecione pelo menos uma AIH para alterar a competência.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsUpdatingBatch(true);
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    try {
+      const aihsToUpdate = Array.from(selectedAIHsForBatch);
+      
+      for (const aihId of aihsToUpdate) {
+        const aih = aihs.find(a => a.id === aihId);
+        if (!aih) {
+          errorCount++;
+          errors.push(`AIH ${aihId} não encontrada`);
+          continue;
+        }
+
+        const proximaCompetencia = calcularProximaCompetencia(aih.competencia);
+        if (!proximaCompetencia) {
+          errorCount++;
+          errors.push(`AIH ${aih.aih_number}: Não foi possível calcular próxima competência`);
+          continue;
+        }
+
+        try {
+          const { error } = await supabase
+            .from('aihs')
+            .update({
+              competencia: proximaCompetencia,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', aihId);
+
+          if (error) {
+            errorCount++;
+            errors.push(`AIH ${aih.aih_number}: ${error.message}`);
+          } else {
+            successCount++;
+            // Atualizar estado local
+            setAIHs(prev => prev.map(a => 
+              a.id === aihId 
+                ? { ...a, competencia: proximaCompetencia, updated_at: new Date().toISOString() }
+                : a
+            ));
+          }
+        } catch (err: any) {
+          errorCount++;
+          errors.push(`AIH ${aih.aih_number}: ${err.message || 'Erro desconhecido'}`);
+        }
+      }
+
+      // Limpar seleção
+      setSelectedAIHsForBatch(new Set());
+
+      // Mostrar resultado
+      if (successCount > 0) {
+        toast({
+          title: "✅ Competências atualizadas",
+          description: `${successCount} AIH(s) atualizada(s) com sucesso.${errorCount > 0 ? ` ${errorCount} erro(s).` : ''}`,
+        });
+      }
+
+      if (errorCount > 0 && errors.length > 0) {
+        console.error('Erros na atualização em lote:', errors);
+        toast({
+          title: "⚠️ Alguns erros ocorreram",
+          description: `${errorCount} AIH(s) não puderam ser atualizadas. Verifique o console para detalhes.`,
+          variant: "destructive"
+        });
+      }
+
+      // Recarregar dados
+      await loadAIHs();
+      await loadAllData();
+    } catch (error: any) {
+      console.error('Erro na atualização em lote:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Falha ao atualizar competências em lote",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUpdatingBatch(false);
     }
   };
 
@@ -1363,6 +1527,15 @@ const PatientManagement = () => {
 
 
 
+      {/* ✅ NOVO: Sistema de Tabs */}
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pacientes' | 'mudanca-competencia')} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+          <TabsTrigger value="pacientes">Pacientes</TabsTrigger>
+          <TabsTrigger value="mudanca-competencia">Mudança de Competência</TabsTrigger>
+        </TabsList>
+
+        {/* Aba: Pacientes (conteúdo atual) */}
+        <TabsContent value="pacientes" className="space-y-6 mt-0">
       {/* Filtros Refinados */}
       <Card className="bg-gradient-to-r from-slate-50 via-white to-slate-50/50 border-slate-200/60 shadow-md hover:shadow-lg transition-all duration-300">
         <CardContent className="p-6">
@@ -2276,8 +2449,268 @@ const PatientManagement = () => {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
 
+        {/* ✅ NOVA ABA: Mudança de Competência */}
+        <TabsContent value="mudanca-competencia" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-xl">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="w-5 h-5" />
+                  <span>Mudança de Competência em Lote</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-normal text-gray-600">
+                    {selectedAIHsForBatch.size > 0 && (
+                      <span className="text-blue-600 font-semibold">
+                        {selectedAIHsForBatch.size} AIH(s) selecionada(s)
+                      </span>
+                    )}
+                  </span>
+                  <Button
+                    onClick={handleBatchUpdateCompetencia}
+                    disabled={selectedAIHsForBatch.size === 0 || isUpdatingBatch}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                  >
+                    {isUpdatingBatch ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Atualizando...
+                      </>
+                    ) : (
+                      <>
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Atualizar Competência ({selectedAIHsForBatch.size})
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* ✅ NOVO: Filtro de Competência para Mudança em Lote */}
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Filter className="w-4 h-4 text-gray-500" />
+                    <label className="text-sm font-semibold text-gray-700">
+                      Filtrar por Competência Atual
+                    </label>
+                  </div>
+                  {selectedCompetenciaForBatch !== 'all' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedCompetenciaForBatch('all');
+                        setSelectedAIHsForBatch(new Set());
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      <X className="w-3 h-3 mr-1" />
+                      Limpar filtro
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <Select 
+                    value={selectedCompetenciaForBatch} 
+                    onValueChange={(value) => {
+                      setSelectedCompetenciaForBatch(value);
+                      setSelectedAIHsForBatch(new Set()); // Limpar seleção ao mudar filtro
+                      setCurrentPage(0); // Resetar página
+                    }}
+                  >
+                    <SelectTrigger className="w-full max-w-xs border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white">
+                      <SelectValue placeholder="Selecione a competência..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">
+                        <div className="flex items-center gap-2">
+                          <span>Todas as Competências</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="sem_competencia">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                          <span className="text-orange-700 font-medium">⚠️ Sem Competência</span>
+                        </div>
+                      </SelectItem>
+                      {availableCompetencias.map(comp => (
+                        <SelectItem key={comp} value={comp}>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                            <span>{formatCompetencia(comp)}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedCompetenciaForBatch !== 'all' && selectedCompetenciaForBatch !== 'sem_competencia' && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                      <Calendar className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm text-blue-800">
+                        <span className="font-medium">Próxima:</span>{' '}
+                        {formatCompetencia(calcularProximaCompetencia(selectedCompetenciaForBatch) || '')}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {selectedCompetenciaForBatch !== 'all' && (
+                  <div className="mt-3 text-xs text-gray-600">
+                    <Info className="w-3 h-3 inline mr-1" />
+                    Mostrando apenas AIHs da competência <strong>{formatCompetencia(selectedCompetenciaForBatch)}</strong>
+                    {selectedCompetenciaForBatch !== 'sem_competencia' && (
+                      <span> que serão movidas para <strong>{formatCompetencia(calcularProximaCompetencia(selectedCompetenciaForBatch) || '')}</strong></span>
+                    )}
+                  </div>
+                )}
+              </div>
 
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                </div>
+              ) : filteredData.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>Nenhuma AIH encontrada</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Tabela de Mudança de Competência */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-4 py-3 text-left">
+                            <Checkbox
+                              checked={
+                                filteredData.length > 0 && selectedAIHsForBatch.size === filteredData.length
+                                  ? true
+                                  : selectedAIHsForBatch.size > 0
+                                  ? 'indeterminate'
+                                  : false
+                              }
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedAIHsForBatch(new Set(filteredData.map(item => item.id)));
+                                } else {
+                                  setSelectedAIHsForBatch(new Set());
+                                }
+                              }}
+                              className="data-[state=checked]:bg-blue-600"
+                            />
+                          </th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Paciente</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Nº AIH</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Data Admissão</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Data Alta</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Competência Atual</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Nova Competência</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {paginatedData.map((item) => {
+                          const proximaCompetencia = calcularProximaCompetencia(item.competencia);
+                          const isSelected = selectedAIHsForBatch.has(item.id);
+                          
+                          return (
+                            <tr 
+                              key={item.id} 
+                              className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-blue-50' : ''}`}
+                            >
+                              <td className="px-4 py-3">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={() => toggleAIHSelection(item.id)}
+                                  className="data-[state=checked]:bg-blue-600"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="font-medium text-gray-900">
+                                  {item.patient?.name || item.patients?.name || 'Paciente não identificado'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="font-mono text-xs text-gray-700">{item.aih_number || '-'}</span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="text-gray-700">{formatDate(item.admission_date)}</span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="text-gray-700">
+                                  {item.discharge_date ? formatDate(item.discharge_date) : '-'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="font-semibold text-blue-600">
+                                  {formatCompetencia(item.competencia)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                {proximaCompetencia ? (
+                                  <span className="font-semibold text-green-600">
+                                    {formatCompetencia(proximaCompetencia)}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 text-xs">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Paginação */}
+                  {filteredData.length > itemsPerPage && (
+                    <div className="flex justify-between items-center mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                        disabled={currentPage === 0}
+                      >
+                        Anterior
+                      </Button>
+                      <span className="text-sm text-gray-600">
+                        Página {currentPage + 1} de {Math.ceil(filteredData.length / itemsPerPage)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(Math.min(Math.ceil(filteredData.length / itemsPerPage) - 1, currentPage + 1))}
+                        disabled={currentPage >= Math.ceil(filteredData.length / itemsPerPage) - 1}
+                      >
+                        Próximo
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Informação sobre a funcionalidade */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start space-x-3">
+                      <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-blue-800">
+                        <p className="font-semibold mb-1">Como funciona:</p>
+                        <ul className="list-disc list-inside space-y-1 text-blue-700">
+                          <li>Selecione uma ou mais AIHs usando os checkboxes</li>
+                          <li>A competência será alterada automaticamente para o mês seguinte</li>
+                          <li>Use esta funcionalidade quando uma AIH for rejeitada e precisar ser reapresentada na próxima competência</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Dialog de Confirmação de Deleção - ATUALIZADO */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
