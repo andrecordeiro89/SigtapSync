@@ -202,12 +202,14 @@ const PatientManagement = () => {
   const [selectedAIHsForBatch, setSelectedAIHsForBatch] = useState<Set<string>>(new Set());
   const [isUpdatingBatch, setIsUpdatingBatch] = useState(false);
   const [selectedCompetenciaForBatch, setSelectedCompetenciaForBatch] = useState<string>('all');
+  const [searchPatientName, setSearchPatientName] = useState<string>(''); // ✅ NOVO: Busca por nome do paciente na aba Mudança de Competência
 
   // ✅ NOVO: Limpar seleção ao trocar de aba
   useEffect(() => {
     if (activeTab === 'pacientes') {
       setSelectedAIHsForBatch(new Set());
       setSelectedCompetenciaForBatch('all'); // Resetar filtro ao sair da aba
+      setSearchPatientName(''); // ✅ NOVO: Limpar busca ao sair da aba
     }
   }, [activeTab]);
   
@@ -1010,15 +1012,26 @@ const PatientManagement = () => {
       }
     }
     
-    // Apenas filtro de busca textual (frontend) - os demais já foram aplicados no SQL
-    if (!globalSearch) return true;
+    // ✅ NOVO: Filtro de busca por nome do paciente (aba Mudança de Competência)
+    if (activeTab === 'mudanca-competencia' && searchPatientName.trim()) {
+      const patientName = (item.patient?.name || item.patients?.name || '').toLowerCase();
+      const searchLower = searchPatientName.toLowerCase().trim();
+      if (!patientName.includes(searchLower)) {
+        return false;
+      }
+    }
     
-    const searchLower = globalSearch.toLowerCase();
-    return (
-      item.aih_number.toLowerCase().includes(searchLower) ||
-      (item.patient?.name && item.patient.name.toLowerCase().includes(searchLower)) ||
-      (item.patient?.cns && item.patient.cns.includes(globalSearch))
-    );
+    // Filtro de busca textual (aba Pacientes) - os demais já foram aplicados no SQL
+    if (activeTab === 'pacientes' && globalSearch) {
+      const searchLower = globalSearch.toLowerCase();
+      return (
+        item.aih_number.toLowerCase().includes(searchLower) ||
+        (item.patient?.name && item.patient.name.toLowerCase().includes(searchLower)) ||
+        (item.patient?.cns && item.patient.cns.includes(globalSearch))
+      );
+    }
+    
+    return true;
   }).sort((a, b) => {
     // ✅ Ordenação por updated_at (processados mais recentemente primeiro)
     const updatedA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
@@ -2465,6 +2478,11 @@ const PatientManagement = () => {
                     {selectedAIHsForBatch.size > 0 && (
                       <span className="text-blue-600 font-semibold">
                         {selectedAIHsForBatch.size} AIH(s) selecionada(s)
+                        {searchPatientName && filteredData.length !== selectedAIHsForBatch.size && (
+                          <span className="text-gray-500 font-normal ml-1">
+                            ({filteredData.filter(item => selectedAIHsForBatch.has(item.id)).length} visíveis)
+                          </span>
+                        )}
                       </span>
                     )}
                   </span>
@@ -2490,6 +2508,55 @@ const PatientManagement = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* ✅ NOVO: Campo de Busca por Nome do Paciente */}
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Search className="w-4 h-4 text-gray-500" />
+                    <label className="text-sm font-semibold text-gray-700">
+                      Buscar por Nome do Paciente
+                    </label>
+                  </div>
+                  {searchPatientName && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSearchPatientName('');
+                        // ✅ MANTÉM seleção ao limpar busca - não limpar setSelectedAIHsForBatch
+                        setCurrentPage(0); // Resetar página
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      <X className="w-3 h-3 mr-1" />
+                      Limpar busca
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Digite o nome do paciente..."
+                      value={searchPatientName}
+                      onChange={(e) => {
+                        setSearchPatientName(e.target.value);
+                        // ✅ MANTÉM seleção ao buscar - não limpar setSelectedAIHsForBatch
+                        setCurrentPage(0); // Resetar página ao buscar para mostrar resultados
+                      }}
+                      className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white"
+                    />
+                  </div>
+                  {searchPatientName && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                      <User className="w-4 h-4 text-blue-600" />
+                      <span className="text-sm text-blue-800">
+                        {filteredData.length} AIH(s) encontrada(s)
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* ✅ NOVO: Filtro de Competência para Mudança em Lote */}
               <div className="mb-6 pb-4 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-4">
@@ -2588,17 +2655,28 @@ const PatientManagement = () => {
                           <th className="px-4 py-3 text-left">
                             <Checkbox
                               checked={
-                                filteredData.length > 0 && selectedAIHsForBatch.size === filteredData.length
+                                filteredData.length > 0 && 
+                                filteredData.every(item => selectedAIHsForBatch.has(item.id))
                                   ? true
-                                  : selectedAIHsForBatch.size > 0
+                                  : filteredData.some(item => selectedAIHsForBatch.has(item.id))
                                   ? 'indeterminate'
                                   : false
                               }
                               onCheckedChange={(checked) => {
                                 if (checked) {
-                                  setSelectedAIHsForBatch(new Set(filteredData.map(item => item.id)));
+                                  // ✅ ADICIONAR itens visíveis à seleção existente (não substituir)
+                                  setSelectedAIHsForBatch(prev => {
+                                    const newSet = new Set(prev);
+                                    filteredData.forEach(item => newSet.add(item.id));
+                                    return newSet;
+                                  });
                                 } else {
-                                  setSelectedAIHsForBatch(new Set());
+                                  // ✅ REMOVER apenas itens visíveis da seleção (manter os não visíveis)
+                                  setSelectedAIHsForBatch(prev => {
+                                    const newSet = new Set(prev);
+                                    filteredData.forEach(item => newSet.delete(item.id));
+                                    return newSet;
+                                  });
                                 }
                               }}
                               className="data-[state=checked]:bg-blue-600"
