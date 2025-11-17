@@ -149,9 +149,16 @@ export class DoctorPatientService {
       }
       
       // ✅ SIMPLIFICADO: Filtrar APENAS por competência (sem filtros de data)
-      if (options?.competencia && options.competencia !== 'all') {
-        aihsQuery = aihsQuery.eq('competencia', options.competencia);
-        console.log('🗓️ Filtrando por competência:', options.competencia);
+      // ✅ CORREÇÃO: Verificar se competência é válida antes de aplicar filtro
+      if (options?.competencia && 
+          options.competencia !== 'all' && 
+          options.competencia.trim() !== '' && 
+          options.competencia !== undefined && 
+          options.competencia !== null) {
+        aihsQuery = aihsQuery.eq('competencia', options.competencia.trim());
+        console.log('🗓️ [getDoctorsWithPatientsFromProceduresView] Filtrando por competência:', options.competencia.trim());
+      } else {
+        console.log('🗓️ [getDoctorsWithPatientsFromProceduresView] Sem filtro de competência (carregando todas)');
       }
       
       // ✅ NOVO: Filtro Pgt. Administrativo
@@ -162,18 +169,40 @@ export class DoctorPatientService {
 
       // ✅ CORREÇÃO: Limitar a 500 AIHs apenas no carregamento inicial (sem filtros)
       // Se há filtros aplicados, carregar todos os dados filtrados
-      const hasFilters = (options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all')) ||
-                         (options?.competencia && options.competencia !== 'all') ||
-                         (options?.filterPgtAdm && options.filterPgtAdm !== 'all');
+      // IMPORTANTE: Verificar se há QUALQUER filtro ativo (competência, hospital específico, ou pgt_adm)
+      const hasHospitalFilter = options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all');
+      // ✅ CORREÇÃO: Usar a mesma lógica de validação do filtro acima
+      const hasCompetenciaFilter = options?.competencia && 
+                                   options.competencia !== 'all' && 
+                                   options.competencia.trim() !== '' && 
+                                   options.competencia !== undefined && 
+                                   options.competencia !== null;
+      const hasPgtAdmFilter = options?.filterPgtAdm && options.filterPgtAdm !== 'all' && options.filterPgtAdm !== undefined;
+      
+      const hasFilters = hasHospitalFilter || hasCompetenciaFilter || hasPgtAdmFilter;
       
       const initialLoadLimit = 500; // ✅ Limite inicial reduzido de 1000 para 500
+      
+      // ✅ DEBUG: Log detalhado dos filtros
+      console.log('🔍 [getDoctorsWithPatientsFromProceduresView] Verificação de filtros:', {
+        hasHospitalFilter,
+        hasCompetenciaFilter,
+        hasPgtAdmFilter,
+        hasFilters,
+        competencia: options?.competencia,
+        hospitalIds: options?.hospitalIds,
+        filterPgtAdm: options?.filterPgtAdm
+      });
       
       // Aplicar limite apenas se NÃO há filtros (carregamento inicial)
       if (!hasFilters) {
         aihsQuery = aihsQuery.limit(initialLoadLimit);
-        console.log(`📊 Carregamento inicial: limitando a ${initialLoadLimit} AIHs (sem filtros aplicados)`);
+        console.log(`📊 [getDoctorsWithPatientsFromProceduresView] Carregamento inicial: limitando a ${initialLoadLimit} AIHs (sem filtros aplicados)`);
       } else {
-        console.log('🔍 Filtros aplicados: carregando todas as AIHs que correspondem aos filtros');
+        console.log(`🔍 [getDoctorsWithPatientsFromProceduresView] Filtros aplicados: carregando TODAS as AIHs que correspondem aos filtros (sem limite)`);
+        console.log(`   - Filtro Hospital: ${hasHospitalFilter ? 'SIM' : 'NÃO'}`);
+        console.log(`   - Filtro Competência: ${hasCompetenciaFilter ? `SIM (${options?.competencia})` : 'NÃO'}`);
+        console.log(`   - Filtro Pgt. Adm: ${hasPgtAdmFilter ? `SIM (${options?.filterPgtAdm})` : 'NÃO'}`);
       }
       
       // 🚀 EXECUTAR QUERY DE AIHs PRIMEIRO (necessária para obter IDs)

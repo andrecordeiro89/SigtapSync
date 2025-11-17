@@ -1803,30 +1803,33 @@ export class AIHPersistenceService {
       // ✅ MODO ADMINISTRADOR: Se hospitalId for "ALL", undefined ou inválido, agregar todos os hospitais
       const isAdminMode = !hospitalId || hospitalId === 'ALL' || hospitalId === 'undefined';
       
+      console.log(`📊 [getHospitalStats] Modo: ${isAdminMode ? 'ADMIN (todos hospitais)' : `USUÁRIO (hospital: ${hospitalId})`}`);
+      
       // Base queries (aplicando filtro por hospital quando necessário)
       const baseAIHFilter = (q: any) => isAdminMode ? q : q.eq('hospital_id', hospitalId);
 
       // ✅ Contagens robustas sem limite de 1000 (usa count exato com head=true)
-      const totalCountQuery = baseAIHFilter(
-        supabase.from('aihs').select('id', { count: 'exact', head: true })
-      );
-      const pendingCountQuery = baseAIHFilter(
-        supabase.from('aihs').select('id', { count: 'exact', head: true }).eq('processing_status', 'pending')
-      );
-      const completedCountQuery = baseAIHFilter(
-        supabase.from('aihs').select('id', { count: 'exact', head: true }).eq('processing_status', 'completed')
-      );
-      // ✅ CORREÇÃO: Contar AIHs em vez de pacientes únicos
-      // total_patients agora representa total de AIHs/internações
-      const aihsCountQuery = baseAIHFilter(
-        supabase.from('aihs').select('id', { count: 'exact', head: true })
-      );
+      // IMPORTANTE: Em modo admin, não aplicar filtro de hospital para contar TODAS as AIHs
+      let totalCountQuery = supabase.from('aihs').select('id', { count: 'exact', head: true });
+      if (!isAdminMode) {
+        totalCountQuery = totalCountQuery.eq('hospital_id', hospitalId);
+      }
+      // ✅ Queries para status específicos (aplicar filtro apenas se não for admin)
+      let pendingCountQuery = supabase.from('aihs').select('id', { count: 'exact', head: true }).eq('processing_status', 'pending');
+      let completedCountQuery = supabase.from('aihs').select('id', { count: 'exact', head: true }).eq('processing_status', 'completed');
+      let aihsCountQuery = supabase.from('aihs').select('id', { count: 'exact', head: true });
+      
+      if (!isAdminMode) {
+        pendingCountQuery = pendingCountQuery.eq('hospital_id', hospitalId);
+        completedCountQuery = completedCountQuery.eq('hospital_id', hospitalId);
+        aihsCountQuery = aihsCountQuery.eq('hospital_id', hospitalId);
+      }
 
       const [
-        { count: totalAIHs },
-        { count: pendingAIHs },
-        { count: completedAIHs },
-        { count: aihsCount }
+        { count: totalAIHs, error: totalError },
+        { count: pendingAIHs, error: pendingError },
+        { count: completedAIHs, error: completedError },
+        { count: aihsCount, error: aihsCountError }
       ] = await Promise.all([
         totalCountQuery,
         pendingCountQuery,
@@ -1834,49 +1837,78 @@ export class AIHPersistenceService {
         aihsCountQuery
       ]);
 
+      // ✅ DEBUG: Log dos resultados das queries
+      console.log(`📊 [getHospitalStats] Resultados das queries:`, {
+        totalAIHs: totalAIHs || 0,
+        totalError: totalError?.message,
+        pendingAIHs: pendingAIHs || 0,
+        pendingError: pendingError?.message,
+        completedAIHs: completedAIHs || 0,
+        completedError: completedError?.message,
+        aihsCount: aihsCount || 0,
+        aihsCountError: aihsCountError?.message
+      });
+
+      // ✅ VALIDAÇÃO: Se houver erro na query principal, logar e usar 0 como fallback
+      if (totalError) {
+        console.error('❌ [getHospitalStats] Erro ao contar TOTAL DE AIHs:', totalError);
+      }
+
       // Calcular número de hospitais com AIHs processadas (modo admin)
       let processedHospitalsCount: number | undefined = undefined;
       if (isAdminMode) {
         try {
+          // ✅ Tentar usar view se existir (pode não existir, então tratamos o erro)
           const { data: hospitalAgg, error: viewErr } = await supabase
             .from('v_aih_stats_by_hospital')
             .select('hospital_id, total_aihs');
-          processedHospitalsCount = (hospitalAgg || []).filter((h: any) => (h.total_aihs || 0) > 0).length;
-          // Fallback: se view estiver vazia/indisponível, contar DISTINCT hospital_id diretamente na tabela aihs
-          if (viewErr || !processedHospitalsCount || processedHospitalsCount === 0) {
-            // Supabase (PostgREST) exige formato especial para DISTINCT
-            // select: 'hospital_id', head:false & use .neq/.is para nulls
+          
+          // ✅ Se a view não existir (404) ou retornar erro, usar fallback
+          if (viewErr) {
+            // View não existe ou erro de acesso - usar fallback direto
+            console.log('ℹ️ [getHospitalStats] View v_aih_stats_by_hospital não disponível, usando fallback direto');
+          } else if (hospitalAgg && hospitalAgg.length > 0) {
+            // View existe e retornou dados
+            processedHospitalsCount = (hospitalAgg || []).filter((h: any) => (h.total_aihs || 0) > 0).length;
+            console.log(`✅ [getHospitalStats] Hospitais contados via view: ${processedHospitalsCount}`);
+          }
+          
+          // ✅ Fallback: contar DISTINCT hospital_id diretamente na tabela aihs
+          // Usar .not('hospital_id', 'is', null) em vez de .neq() para verificar null corretamente
+          if (!processedHospitalsCount || processedHospitalsCount === 0) {
             const { data: distinctHospitals, error: distinctErr } = await supabase
               .from('aihs')
               .select('hospital_id', { head: false })
-              .neq('hospital_id', null)
-              .order('hospital_id', { ascending: true });
+              .not('hospital_id', 'is', null); // ✅ CORREÇÃO: Usar .not('is', null) em vez de .neq(null)
+            
             if (distinctErr) {
-              console.warn('⚠️ Falha no fallback DISTINCT hospital_id:', distinctErr);
+              console.warn('⚠️ [getHospitalStats] Falha no fallback DISTINCT hospital_id:', distinctErr);
               processedHospitalsCount = 0;
             } else {
-              const unique = new Set((distinctHospitals || []).map((r: any) => r.hospital_id));
+              const unique = new Set((distinctHospitals || []).map((r: any) => r.hospital_id).filter(Boolean));
               processedHospitalsCount = unique.size;
+              console.log(`✅ [getHospitalStats] Hospitais contados via fallback: ${processedHospitalsCount}`);
             }
           }
         } catch (e) {
-          console.warn('⚠️ Falha ao obter hospitais processados pela view v_aih_stats_by_hospital:', e);
-          // Fallback direto em caso de erro
+          console.warn('⚠️ [getHospitalStats] Erro ao obter hospitais processados:', e);
+          // ✅ Fallback direto em caso de erro
           try {
             const { data: distinctHospitals, error: distinctErr } = await supabase
               .from('aihs')
               .select('hospital_id', { head: false })
-              .neq('hospital_id', null)
-              .order('hospital_id', { ascending: true });
+              .not('hospital_id', 'is', null); // ✅ CORREÇÃO: Usar .not('is', null)
+            
             if (distinctErr) {
-              console.warn('⚠️ Falha no fallback DISTINCT hospital_id:', distinctErr);
+              console.warn('⚠️ [getHospitalStats] Falha no fallback DISTINCT hospital_id:', distinctErr);
               processedHospitalsCount = 0;
             } else {
-              const unique = new Set((distinctHospitals || []).map((r: any) => r.hospital_id));
+              const unique = new Set((distinctHospitals || []).map((r: any) => r.hospital_id).filter(Boolean));
               processedHospitalsCount = unique.size;
+              console.log(`✅ [getHospitalStats] Hospitais contados via fallback (catch): ${processedHospitalsCount}`);
             }
           } catch (e2) {
-            console.warn('⚠️ Falha no fallback em aihs para contar hospitais distintos:', e2);
+            console.warn('⚠️ [getHospitalStats] Falha no fallback em aihs para contar hospitais distintos:', e2);
             processedHospitalsCount = 0;
           }
         }
@@ -1884,8 +1916,10 @@ export class AIHPersistenceService {
 
       // ✅ total_patients agora representa total de AIHs (não pacientes únicos)
       // Isso permite contar corretamente pacientes com múltiplas AIHs
+      const finalTotalAIHs = totalAIHs ?? 0; // ✅ Garantir que nunca seja null/undefined
+      
       const stats = {
-        total_aihs: totalAIHs || 0,
+        total_aihs: finalTotalAIHs, // ✅ Usar valor garantido (não null/undefined)
         pending_aihs: pendingAIHs || 0,
         completed_aihs: completedAIHs || 0,
         total_patients: aihsCount || 0, // Representa total de AIHs/internações
@@ -1895,7 +1929,9 @@ export class AIHPersistenceService {
         is_admin_mode: isAdminMode
       };
 
-      console.log(`📊 Estatísticas ${isAdminMode ? 'de TODOS os hospitais' : `do hospital ${hospitalId}`}:`, stats);
+      console.log(`📊 [getHospitalStats] Estatísticas ${isAdminMode ? 'de TODOS os hospitais' : `do hospital ${hospitalId}`}:`, stats);
+      console.log(`✅ [getHospitalStats] TOTAL DE AIHs retornado: ${stats.total_aihs}`);
+      
       return stats;
     } catch (error) {
       console.error('❌ Erro ao buscar estatísticas:', error);

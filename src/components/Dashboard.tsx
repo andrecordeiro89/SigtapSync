@@ -102,45 +102,108 @@ const Dashboard = () => {
         // Carregar estatísticas reais do hospital
         const realStats = await persistenceService.getHospitalStats(hospitalId);
         
-        // Calcular AIHs processadas hoje (usando limites do dia local)
-        const nowLocal = new Date();
+        // ✅ DEBUG: Log das estatísticas recebidas
+        console.log('📊 [Dashboard] Estatísticas recebidas do getHospitalStats:', realStats);
+        console.log(`📊 [Dashboard] TOTAL DE AIHs recebido: ${realStats.total_aihs}`);
+        
+        // ✅ Calcular AIHs processadas hoje (corrigido para timezone)
+        // O banco armazena em TIMESTAMP WITH TIME ZONE (UTC)
+        // Precisamos calcular o início e fim do dia considerando o timezone local do usuário
+        const now = new Date();
+        const timezoneOffset = now.getTimezoneOffset(); // offset em minutos (ex: -180 para UTC-3)
+        
+        // Criar data de início do dia no timezone local
         const startOfTodayLocal = new Date(
-          nowLocal.getFullYear(),
-          nowLocal.getMonth(),
-          nowLocal.getDate(),
-          0,
-          0,
-          0,
-          0
-        );
-        const startOfTomorrowLocal = new Date(
-          nowLocal.getFullYear(),
-          nowLocal.getMonth(),
-          nowLocal.getDate() + 1,
-          0,
-          0,
-          0,
-          0
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+          0, 0, 0, 0
         );
         
-        // Buscar contagem de AIHs criadas hoje no sistema (usa count exato para evitar limite de linhas)
+        // Criar data de fim do dia (início do próximo dia) no timezone local
+        const startOfTomorrowLocal = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() + 1,
+          0, 0, 0, 0
+        );
+        
+        // Converter para UTC para comparar com o banco (que armazena em UTC)
+        // O toISOString() já converte para UTC automaticamente
+        const startOfTodayUTC = startOfTodayLocal.toISOString();
+        const startOfTomorrowUTC = startOfTomorrowLocal.toISOString();
+        
+        console.log(`📅 [Dashboard] Calculando AIHs processadas hoje:`, {
+          dataHoje: now.toLocaleDateString('pt-BR'),
+          timezoneOffset: `${timezoneOffset} minutos (UTC${timezoneOffset > 0 ? '-' : '+'}${Math.abs(timezoneOffset / 60)})`,
+          inicioDiaLocal: startOfTodayLocal.toLocaleString('pt-BR'),
+          fimDiaLocal: startOfTomorrowLocal.toLocaleString('pt-BR'),
+          inicioDiaUTC: startOfTodayUTC,
+          fimDiaUTC: startOfTomorrowUTC,
+          modoAdmin: isAdminMode,
+          hospitalId: hospitalId
+        });
+        
+        // ✅ Buscar contagem de AIHs criadas hoje no sistema (usa count exato para evitar limite de linhas)
+        // IMPORTANTE: Em modo admin, não aplicar filtro de hospital para contar TODAS as AIHs de hoje
+        // Usar comparação por data completa (com hora) em UTC para garantir precisão
         let todayQuery = supabase
           .from('aihs')
           .select('id', { count: 'exact', head: true })
-          .gte('created_at', startOfTodayLocal.toISOString())
-          .lt('created_at', startOfTomorrowLocal.toISOString());
+          .gte('created_at', startOfTodayUTC)
+          .lt('created_at', startOfTomorrowUTC);
           
         // Se não é admin, filtrar por hospital
         if (!isAdminMode) {
           todayQuery = todayQuery.eq('hospital_id', hospitalId);
+          console.log(`🔍 [Dashboard] Modo USUÁRIO: Filtrando por hospital ${hospitalId}`);
+        } else {
+          console.log(`🔍 [Dashboard] Modo ADMIN: Contando TODAS as AIHs de todos os hospitais`);
         }
         
         const { count: todayCount, error: todayError } = await todayQuery;
         
         if (todayError) {
-          console.error('Erro ao buscar AIHs de hoje:', todayError);
+          console.error('❌ [Dashboard] Erro ao buscar AIHs de hoje:', todayError);
         } else {
-          console.log(`📊 AIHs processadas hoje (${nowLocal.toLocaleDateString('pt-BR')}):`, todayCount || 0);
+          console.log(`✅ [Dashboard] AIHs processadas hoje (${now.toLocaleDateString('pt-BR')}):`, todayCount || 0);
+          console.log(`📊 [Dashboard] Detalhes da query:`, {
+            count: todayCount,
+            countType: typeof todayCount,
+            isNull: todayCount === null,
+            isUndefined: todayCount === undefined,
+            finalValue: todayCount || 0,
+            queryRange: {
+              from: startOfTodayUTC,
+              to: startOfTomorrowUTC
+            }
+          });
+          
+          // ✅ DIAGNÓSTICO: Buscar algumas AIHs de hoje para verificar formato das datas
+          if (todayCount !== null && todayCount !== undefined) {
+            const sampleQuery = supabase
+              .from('aihs')
+              .select('id, created_at, aih_number')
+              .gte('created_at', startOfTodayUTC)
+              .lt('created_at', startOfTomorrowUTC)
+              .limit(5);
+            
+            if (!isAdminMode) {
+              sampleQuery.eq('hospital_id', hospitalId);
+            }
+            
+            const { data: sampleData, error: sampleError } = await sampleQuery;
+            if (!sampleError && sampleData && sampleData.length > 0) {
+              console.log(`🔍 [Dashboard] Amostra de AIHs de hoje (formato das datas):`, 
+                sampleData.map(a => ({
+                  aih_number: a.aih_number,
+                  created_at: a.created_at,
+                  created_at_type: typeof a.created_at,
+                  created_at_parsed: new Date(a.created_at).toLocaleString('pt-BR')
+                }))
+              );
+            }
+          }
         }
 
         // Buscar atividades recentes (AIHs criadas recentemente)
@@ -178,9 +241,20 @@ const Dashboard = () => {
         }
 
         // Processar dados para os cards
+        const finalTotalAIHs = realStats.total_aihs ?? 0; // ✅ Garantir que nunca seja null/undefined
+        const finalProcessedToday = todayCount ?? 0; // ✅ Garantir que nunca seja null/undefined
+        
+        console.log(`📊 [Dashboard] Definindo stats:`, {
+          totalAIHs: finalTotalAIHs,
+          processedToday: finalProcessedToday,
+          processedTodayRaw: todayCount,
+          hospitals_count: realStats.hospitals_count,
+          is_admin_mode: realStats.is_admin_mode
+        });
+        
         setStats({
-          totalAIHs: realStats.total_aihs,
-          processedToday: todayCount || 0,
+          totalAIHs: finalTotalAIHs, // ✅ Usar valor garantido
+          processedToday: finalProcessedToday, // ✅ Usar valor garantido
           hospitals_count: realStats.hospitals_count,
           is_admin_mode: realStats.is_admin_mode
         });

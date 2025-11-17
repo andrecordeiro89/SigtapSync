@@ -1078,15 +1078,26 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         try {
           // ✅ SIMPLIFICADO: Usar APENAS competência como filtro (sem filtros de data)
           const selectedHospitalIds = (selectedHospitals && !selectedHospitals.includes('all')) ? selectedHospitals : undefined;
-          const competenciaFilter = (selectedCompetencia && selectedCompetencia !== 'all') ? selectedCompetencia : undefined;
+          // ✅ CORREÇÃO: Verificar se competência é válida (não 'all', não vazia, não undefined/null)
+          const competenciaFilter = (selectedCompetencia && 
+                                     selectedCompetencia !== 'all' && 
+                                     selectedCompetencia.trim() !== '' && 
+                                     selectedCompetencia !== undefined && 
+                                     selectedCompetencia !== null) 
+                                     ? selectedCompetencia.trim() 
+                                     : undefined;
           const pgtAdmFilter = (filterPgtAdm && filterPgtAdm !== 'all') ? filterPgtAdm : undefined;
           
-          console.log('🗓️ Carregando dados com filtro de competência:', competenciaFilter || 'TODAS');
-          console.log('💵 Carregando dados com filtro pgt_adm:', pgtAdmFilter || 'TODOS');
+          console.log('🗓️ [MedicalProductionDashboard] Carregando dados:', {
+            competencia: competenciaFilter || 'TODAS',
+            pgtAdm: pgtAdmFilter || 'TODOS',
+            hospitals: selectedHospitalIds || 'TODOS',
+            selectedCompetenciaRaw: selectedCompetencia
+          });
           
           const doctorsWithPatients = await DoctorPatientService.getDoctorsWithPatientsFromProceduresView({
             hospitalIds: selectedHospitalIds,
-            competencia: competenciaFilter,
+            competencia: competenciaFilter, // ✅ Passar undefined se não houver filtro
             filterPgtAdm: pgtAdmFilter
           });
           // Usar diretamente a fonte das tabelas, garantindo pacientes e procedimentos
