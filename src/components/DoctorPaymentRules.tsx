@@ -4435,11 +4435,11 @@ export function calculateFixedPayment(
   const hospitalKey = detectHospitalFromContext(doctorName, hospitalId);
   const cacheKey = `${doctorName.toUpperCase()}::${hospitalKey}`;
   
-  // Tentar buscar com hospital específico primeiro
+  // ✅ CORREÇÃO: Buscar APENAS com hospital específico se hospitalId foi fornecido
   let rule = FIXED_RULES_CACHE!.get(cacheKey);
   
-  // Fallback: buscar sem hospital
-  if (!rule) {
+  // Fallback: buscar sem hospital APENAS se hospitalId NÃO foi fornecido
+  if (!rule && !hospitalId) {
     rule = FIXED_RULES_CACHE!.get(doctorName.toUpperCase());
   }
   
@@ -4490,11 +4490,11 @@ export function calculatePercentagePayment(
   const hospitalKey = detectHospitalFromContext(doctorName, hospitalId);
   const cacheKey = `${doctorName.toUpperCase()}::${hospitalKey}`;
   
-  // Tentar buscar com hospital específico primeiro
+  // ✅ CORREÇÃO: Buscar APENAS com hospital específico se hospitalId foi fornecido
   let rule = PERCENTAGE_RULES_CACHE!.get(cacheKey);
   
-  // Fallback: buscar sem hospital
-  if (!rule) {
+  // Fallback: buscar sem hospital APENAS se hospitalId NÃO foi fornecido
+  if (!rule && !hospitalId) {
     rule = PERCENTAGE_RULES_CACHE!.get(doctorName.toUpperCase());
   }
   
