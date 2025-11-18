@@ -3,6 +3,7 @@ import { shouldCalculateAnesthetistProcedure } from '../utils/anesthetistLogic'
 import {
   calculateDoctorPayment,
   calculatePercentagePayment,
+  calculateFixedPayment,
   type ProcedurePaymentInfo,
 } from '../components/DoctorPaymentRules'
 
@@ -111,6 +112,10 @@ export async function getDoctorPatientReport(
 
   const items: PatientReportItem[] = []
 
+  // 🔥 VERIFICAR SE MÉDICO TEM REGRA DE PAGAMENTO FIXO (antes do loop)
+  const hospitalId = doctorCards[0]?.hospitals?.[0]?.hospital_id
+  const fixedPaymentCalc = calculateFixedPayment(doctorName, hospitalId)
+
   for (const [patientId, patient] of patientMap.entries()) {
     // Aplicar filtro por período, se fornecido
     if (filters.dateFromISO && filters.dateToISO) {
@@ -149,21 +154,31 @@ export async function getDoctorPatientReport(
         value_reais: Number(proc.value_reais || 0),
       }))
 
-    // Regras específicas por procedimento
-    const perProcedureCalc = calculateDoctorPayment(doctorName, procedures04)
+    // ✅ CALCULAR VALOR POR PACIENTE (será zero se médico tem pagamento fixo)
+    let doctorReceivableReais = 0
+    let appliedRule = ''
 
-    // Regra de percentual (quando existir) – base padrão: soma dos procedimentos 04 calculáveis
-    const baseProceduresSum = procedures04.reduce((s, p) => s + (p.value_reais || 0), 0)
-    const percentageCalc = calculatePercentagePayment(doctorName, baseProceduresSum)
+    if (fixedPaymentCalc.hasFixedRule) {
+      // 🔒 PAGAMENTO FIXO: Não atribuir valor por paciente (será calculado no total)
+      doctorReceivableReais = 0
+      appliedRule = fixedPaymentCalc.appliedRule
+    } else {
+      // Regras específicas por procedimento
+      const perProcedureCalc = calculateDoctorPayment(doctorName, procedures04)
 
-    // Precedência: percentual substitui cálculo individual (conforme regra de negócio)
-    const doctorReceivableReais = percentageCalc.hasPercentageRule
-      ? percentageCalc.calculatedPayment
-      : perProcedureCalc.totalPayment
+      // Regra de percentual (quando existir) – base padrão: soma dos procedimentos 04 calculáveis
+      const baseProceduresSum = procedures04.reduce((s, p) => s + (p.value_reais || 0), 0)
+      const percentageCalc = calculatePercentagePayment(doctorName, baseProceduresSum)
 
-    const appliedRule = percentageCalc.hasPercentageRule
-      ? percentageCalc.appliedRule
-      : perProcedureCalc.appliedRule
+      // Precedência: percentual substitui cálculo individual (conforme regra de negócio)
+      doctorReceivableReais = percentageCalc.hasPercentageRule
+        ? percentageCalc.calculatedPayment
+        : perProcedureCalc.totalPayment
+
+      appliedRule = percentageCalc.hasPercentageRule
+        ? percentageCalc.appliedRule
+        : perProcedureCalc.appliedRule
+    }
 
     items.push({
       patientId,
@@ -180,10 +195,13 @@ export async function getDoctorPatientReport(
     })
   }
 
+  // ✅ CALCULAR TOTAIS (se pagamento fixo, usar valor fixo UMA VEZ)
   const totals = {
     patients: items.length,
     aihTotalReais: items.reduce((s, r) => s + r.aihTotalReais, 0),
-    doctorReceivableReais: items.reduce((s, r) => s + r.doctorReceivableReais, 0),
+    doctorReceivableReais: fixedPaymentCalc.hasFixedRule
+      ? fixedPaymentCalc.calculatedPayment  // 🔒 Valor fixo UMA VEZ
+      : items.reduce((s, r) => s + r.doctorReceivableReais, 0),  // Soma por paciente
   }
 
   return {

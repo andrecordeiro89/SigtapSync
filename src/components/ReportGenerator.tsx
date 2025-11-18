@@ -14,7 +14,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { DoctorPatientService, type DoctorWithPatients } from '@/services/doctorPatientService';
-import { calculateDoctorPayment, calculatePercentagePayment } from './DoctorPaymentRules';
+import { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayment } from './DoctorPaymentRules';
 import { ptBR } from 'date-fns/locale';
 import { ProcedureRecordsService } from '@/services/simplifiedProcedureService';
 import { isMedicalProcedure } from '@/config/susCalculationRules';
@@ -735,23 +735,32 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     const medicalProceduresCount = medicalProcedures.length;
     const medicalProceduresValue = medicalProcedures.reduce((sum, proc) => sum + (proc.value_reais || 0), 0);
     
-    // 🆕 VERIFICAR SE O MÉDICO TEM REGRA DE PERCENTUAL
-    const percentageCalculation = calculatePercentagePayment(doctorData.doctor_info.name, totalValue);
+    // 🔥 PRIORIDADE 1: VERIFICAR SE O MÉDICO TEM REGRA DE PAGAMENTO FIXO
+    const hospitalId = doctorData.hospitals?.[0]?.hospital_id;
+    const fixedPaymentCalc = calculateFixedPayment(doctorData.doctor_info.name, hospitalId);
     let calculatedPaymentValue = 0;
     
-    if (percentageCalculation.hasPercentageRule) {
-      // ✅ USAR REGRA DE PERCENTUAL SOBRE VALOR TOTAL
-      calculatedPaymentValue = percentageCalculation.calculatedPayment;
+    if (fixedPaymentCalc.hasFixedRule) {
+      // ✅ PAGAMENTO FIXO: Retornar valor fixo UMA VEZ (independente de pacientes/procedimentos)
+      calculatedPaymentValue = fixedPaymentCalc.calculatedPayment;
     } else {
-      // ✅ USAR REGRAS INDIVIDUAIS POR PROCEDIMENTO
-      const patientMedicalProcedures = medicalProcedures.map(proc => ({
-        procedure_code: proc.procedure_code,
-        value_reais: proc.value_reais || 0,
-        quantity: 1
-      }));
+      // 🎯 PRIORIDADE 2: VERIFICAR SE O MÉDICO TEM REGRA DE PERCENTUAL
+      const percentageCalculation = calculatePercentagePayment(doctorData.doctor_info.name, totalValue);
       
-      const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures);
-      calculatedPaymentValue = paymentCalculation.totalPayment;
+      if (percentageCalculation.hasPercentageRule) {
+        // ✅ USAR REGRA DE PERCENTUAL SOBRE VALOR TOTAL
+        calculatedPaymentValue = percentageCalculation.calculatedPayment;
+      } else {
+        // ✅ USAR REGRAS INDIVIDUAIS POR PROCEDIMENTO
+        const patientMedicalProcedures = medicalProcedures.map(proc => ({
+          procedure_code: proc.procedure_code,
+          value_reais: proc.value_reais || 0,
+          quantity: 1
+        }));
+        
+        const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures);
+        calculatedPaymentValue = paymentCalculation.totalPayment;
+      }
     }
     
     // Taxa de aprovação (assumindo 100% se não houver dados específicos)
