@@ -3433,6 +3433,36 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.08.06.021-2',
           standardValue: 850.00,
           description: 'RESSECÇÃO DE CISTO SINOVIAL - R$ 850,00'
+        },
+        {
+          procedureCode: '04.08.04.009-0',
+          standardValue: 2500.00,
+          description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
+        },
+        {
+          procedureCode: '04.08.05.089-6',
+          standardValue: 900.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL - R$ 900,00'
+        },
+        {
+          procedureCode: '04.08.05.088-8',
+          standardValue: 1000.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DE MENISCO COM SUTURA MENISCAL UNI / BICOMPARTIMENTAL - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.08.05.016-0',
+          standardValue: 2000.00,
+          description: 'RECONSTRUÇÃO LIGAMENTAR INTRA-ARTICULAR DO JOELHO (CRUZADO ANTERIOR) - R$ 2.000,00'
+        },
+        {
+          procedureCode: '04.08.05.015-2',
+          standardValue: 750.00,
+          description: 'RECONSTRUÇÃO LIGAMENTAR EXTRA-ARTICULAR DO JOELHO - R$ 750,00'
+        },
+        {
+          procedureCode: '04.08.05.006-3',
+          standardValue: 2000.00,
+          description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO - R$ 2.000,00'
         }
       ],
       multipleRules: [
@@ -3451,6 +3481,17 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     // Total: 3 médicos com mesma regra
     // ================================================================
 
+    'ANDRE FELIPE AGUIAR RABELO': {
+      doctorName: 'ANDRE FELIPE AGUIAR RABELO',
+      rules: [
+        {
+          procedureCode: '04.08.04.009-0',
+          standardValue: 2500.00,
+          description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
+        }
+      ]
+    },
+
     'VILSON DALMINA': {
       doctorName: 'VILSON DALMINA',
       rules: [
@@ -3458,6 +3499,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.08.05.006-3',
           standardValue: 2000.00,
           description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO - R$ 2.000,00'
+        },
+        {
+          procedureCode: '04.08.04.009-0',
+          standardValue: 2500.00,
+          description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
         }
       ]
     },
@@ -3469,6 +3515,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.08.05.006-3',
           standardValue: 2000.00,
           description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO - R$ 2.000,00'
+        },
+        {
+          procedureCode: '04.08.04.009-0',
+          standardValue: 2500.00,
+          description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
         }
       ]
     },
@@ -3480,6 +3531,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.08.05.006-3',
           standardValue: 2000.00,
           description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO - R$ 2.000,00'
+        },
+        {
+          procedureCode: '04.08.04.009-0',
+          standardValue: 2500.00,
+          description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
         }
       ]
     }
