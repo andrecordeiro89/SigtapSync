@@ -4020,6 +4020,57 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
   },
 
   // ================================================================
+  // HOSPITAL MUNICIPAL JUAREZ BARRETO DE MACEDO
+  // Hospital ID: (a definir)
+  // ================================================================
+  'HOSPITAL_MUNICIPAL_JUAREZ_BARRETO_MACEDO': {
+    // ================================================================
+    // DR. HUMBERTO MOREIRA DA SILVA - OTORRINOLARINGOLOGIA
+    // Hospital: Municipal Juarez Barreto de Macedo
+    // Especialidade: Otorrinolaringologia
+    // Baseado em: Dr. HUMBERTO MOREIRA DA SILVA (Torao Tokuda)
+    // Data: 18/11/2025
+    // ================================================================
+    'HUMBERTO MOREIRA DA SILVA': {
+      doctorName: 'HUMBERTO MOREIRA DA SILVA',
+      // 🩺 PROCEDIMENTOS DE OTORRINOLARINGOLOGIA
+      rules: [
+        {
+          procedureCode: '04.04.01.048-2',
+          standardValue: 650.00,
+          description: 'SEPTOPLASTIA - R$ 650,00'
+        },
+        {
+          procedureCode: '04.04.01.041-5',
+          standardValue: 650.00,
+          description: 'TURBINECTOMIA - R$ 650,00'
+        },
+        {
+          procedureCode: '04.04.01.002-4',
+          standardValue: 650.00,
+          description: 'AMIGDALECTOMIA - R$ 650,00'
+        },
+        {
+          procedureCode: '04.04.01.001-6',
+          standardValue: 650.00,
+          description: 'ADENOIDECTOMIA - R$ 650,00'
+        },
+        {
+          procedureCode: '04.04.01.003-2',
+          standardValue: 650.00,
+          description: 'ADENOAMIGDALECTOMIA - R$ 650,00'
+        }
+      ],
+      // 🔗 REGRA MÚLTIPLA: Quando 2 ou mais procedimentos, valor total fixo
+      multipleRule: {
+        codes: ['04.04.01.048-2', '04.04.01.041-5', '04.04.01.002-4', '04.04.01.001-6', '04.04.01.003-2'],
+        totalValue: 800.00,
+        description: 'DOIS OU MAIS PROCEDIMENTOS ORL - R$ 800,00 TOTAL (não soma)'
+      }
+    }
+  },
+
+  // ================================================================
   // OUTROS HOSPITAIS (adicionar conforme necessário)
   // ================================================================
 };
@@ -4079,7 +4130,12 @@ function detectHospitalFromContext(doctorName: string, hospitalId?: string): str
     return 'HOSPITAL_MATERNIDADE_NOSSA_SENHORA_APARECIDA_FRG';
   }
   
-  // Prioridade 6: Verificar se médico existe no Torao Tokuda (padrão)
+  // Prioridade 6: Verificar se médico existe no Hospital Juarez Barreto de Macedo
+  if (DOCTOR_PAYMENT_RULES_BY_HOSPITAL['HOSPITAL_MUNICIPAL_JUAREZ_BARRETO_MACEDO']?.[doctorName.toUpperCase()]) {
+    return 'HOSPITAL_MUNICIPAL_JUAREZ_BARRETO_MACEDO';
+  }
+  
+  // Prioridade 7: Verificar se médico existe no Torao Tokuda (padrão)
   if (DOCTOR_PAYMENT_RULES_BY_HOSPITAL['TORAO_TOKUDA_APUCARANA']?.[doctorName.toUpperCase()]) {
     return 'TORAO_TOKUDA_APUCARANA';
   }
