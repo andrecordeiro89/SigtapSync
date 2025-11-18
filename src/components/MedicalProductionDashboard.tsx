@@ -1523,41 +1523,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const aggregatedMedicalPayments = React.useMemo(() => {
     try {
       let totalPayments = 0;
+      console.log('🔍 [TOTAL PAGAMENTOS] Calculando agregado para', filteredDoctors.length, 'médicos');
+      
       for (const doctor of filteredDoctors) {
         const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+        const doctorStats = calculateDoctorStats(doctor);
         
-        // 🔥 PRIORIDADE 1: Verificar se médico tem regra de VALOR FIXO
-        const fixedPaymentCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
-        if (fixedPaymentCalc.hasFixedRule) {
-          // ✅ PAGAMENTO FIXO: Adicionar valor fixo UMA VEZ (não soma por paciente)
-          totalPayments += fixedPaymentCalc.calculatedPayment;
-          continue; // Pular para o próximo médico
-        }
+        // ✅ USAR O MESMO CÁLCULO DOS CARDS INDIVIDUAIS
+        const doctorPayment = doctorStats.calculatedPaymentValue;
         
-        // Se não tem pagamento fixo, calcular normalmente somando por paciente
-        const doctorTotalPayment = doctor.patients.reduce((sum, patient) => {
-          // Filtrar procedimentos calculáveis (excluindo anestesistas 04.xxx)
-          const proceduresWithPayment = patient.procedures
-            .filter(filterCalculableProcedures)
-            .map((proc: any) => ({
-              procedure_code: proc.procedure_code,
-              procedure_description: proc.procedure_description,
-              value_reais: proc.value_reais || 0,
-            }));
-
-          if (proceduresWithPayment.length > 0) {
-            const paymentResult = calculateDoctorPayment(
-              doctor.doctor_info.name,
-              proceduresWithPayment,
-              hospitalId
-            );
-            return sum + (paymentResult.totalPayment || 0);
-          }
-          return sum;
-        }, 0);
+        console.log(`💰 [TOTAL] ${doctor.doctor_info.name}: R$ ${doctorPayment.toFixed(2)}`);
         
-        totalPayments += doctorTotalPayment;
+        totalPayments += doctorPayment;
       }
+      
+      console.log('💵 [TOTAL PAGAMENTOS] FINAL: R$', totalPayments.toFixed(2));
       return totalPayments;
     } catch (error) {
       console.error('Erro ao calcular pagamentos médicos agregados:', error);

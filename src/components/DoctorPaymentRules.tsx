@@ -32,6 +32,12 @@ export interface DoctorPaymentRule {
     amount: number;
     description: string;
   };
+  // 🆕 REGRA DE APENAS PROCEDIMENTO PRINCIPAL (múltiplos procedimentos)
+  onlyMainProcedureRule?: {
+    enabled: boolean;
+    description: string;
+    logic?: string;
+  };
   rules: {
     procedureCode: string;
     standardValue: number;
@@ -2280,9 +2286,64 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       ]
     },
 
+    // ================================================================
+    // DR. JAIR DEMETRIO DE SOUZA - OTORRINOLARINGOLOGIA
+    // Hospital: Municipal 18 de Dezembro (Arapoti)
+    // Especialidade: Otorrinolaringologia
+    // Baseado em: Dr. HUMBERTO MOREIRA DA SILVA (Torao Tokuda)
+    // Data: 18/11/2025
+    // ================================================================
+    'JAIR DEMETRIO DE SOUZA': {
+      doctorName: 'JAIR DEMETRIO DE SOUZA',
+      // 🩺 PROCEDIMENTOS DE OTORRINOLARINGOLOGIA
+      rules: [
+        {
+          procedureCode: '04.04.01.048-2',
+          standardValue: 650.00,
+          description: 'SEPTOPLASTIA - R$ 650,00'
+        },
+        {
+          procedureCode: '04.04.01.041-5',
+          standardValue: 650.00,
+          description: 'TURBINECTOMIA - R$ 650,00'
+        },
+        {
+          procedureCode: '04.04.01.002-4',
+          standardValue: 650.00,
+          description: 'AMIGDALECTOMIA - R$ 650,00'
+        },
+        {
+          procedureCode: '04.04.01.001-6',
+          standardValue: 650.00,
+          description: 'ADENOIDECTOMIA - R$ 650,00'
+        },
+        {
+          procedureCode: '04.04.01.003-2',
+          standardValue: 650.00,
+          description: 'ADENOAMIGDALECTOMIA - R$ 650,00'
+        }
+      ],
+      // 🔗 REGRA MÚLTIPLA: Quando 2 ou mais procedimentos, valor total fixo
+      multipleRule: {
+        codes: ['04.04.01.048-2', '04.04.01.041-5', '04.04.01.002-4', '04.04.01.001-6', '04.04.01.003-2'],
+        totalValue: 800.00,
+        description: 'DOIS OU MAIS PROCEDIMENTOS ORL - R$ 800,00 TOTAL (não soma)'
+      }
+    },
+
+    // ================================================================
+    // DR. GUILHERME VINICIUS SAWCZYN - UROLOGIA
+    // Hospital: Municipal 18 de Dezembro (Arapoti)
+    // Especialidade: Urologia
+    // Baseado em: Dr. GUILHERME AUGUSTO STORER (Torao Tokuda)
+    // Data: 18/11/2025
+    // ================================================================
     'GUILHERME VINICIUS SAWCZYN': {
       doctorName: 'GUILHERME VINICIUS SAWCZYN',
-      // 🔬 REGRAS INDIVIDUAIS - Procedimentos únicos
+      // ================================================================
+      // 🔬 PROCEDIMENTOS INDIVIDUAIS - UROLOGIA
+      // Total: 21 procedimentos
+      // ================================================================
       rules: [
         {
           procedureCode: '04.09.01.023-5',
@@ -2330,6 +2391,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           description: 'VASECTOMIA - R$ 450,00'
         },
         {
+          procedureCode: '04.09.04.023-1',
+          standardValue: 250.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00'
+        },
+        {
           procedureCode: '04.09.04.013-4',
           standardValue: 400.00,
           description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00'
@@ -2347,7 +2413,12 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.05.007-5',
           standardValue: 500.00,
-          description: 'PLASTICA TOTAL DO PENIS (INCLUI PEYRONIE) - R$ 500,00'
+          description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00'
+        },
+        {
+          procedureCode: 'RESSECÇÃO_CISTOS',
+          standardValue: 250.00,
+          description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00'
         },
         {
           procedureCode: '04.09.04.016-9',
@@ -2383,103 +2454,96 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.09.02.017-6',
           standardValue: 250.00,
           description: 'URETROTOMIA INTERNA - R$ 250,00'
-        },
-        {
-          procedureCode: '04.09.04.023-1',
-          standardValue: 250.00,
-          description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00'
-        },
-        {
-          procedureCode: 'RESSECCAO_CISTOS_CAUTERIZACOES',
-          standardValue: 250.00,
-          description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00'
         }
       ],
-      // 🔬 REGRAS MÚLTIPLAS - Combinações específicas de procedimentos
+      // ================================================================
+      // 🔗 REGRAS DE MÚLTIPLOS PROCEDIMENTOS
+      // Total: 16 combinações
+      // ================================================================
       multipleRules: [
-        // NEFROLITOTOMIA PERCUTÂNEA + Combinações
+        // Grupo 1: NEFROLITOTOMIA PERCUTÂNEA + Combinações
         {
           codes: ['04.09.01.023-5', '04.09.01.017-0'],
           totalValue: 1100.00,
-          description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00'
         },
         {
           codes: ['04.09.01.023-5', '04.09.01.014-6'],
           totalValue: 1300.00,
-          description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL - R$ 1.300,00'
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO CÁLCULO PELVE RENAL - R$ 1.300,00'
         },
         {
           codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6'],
           totalValue: 1400.00,
-          description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER DUPLO J + EXTRAÇÃO CÁLCULO PELVE RENAL - R$ 1.400,00'
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + CATETER DUPLO J + EXTRAÇÃO CÁLCULO - R$ 1.400,00'
         },
         {
           codes: ['04.09.01.023-5', '04.09.01.014-6', '04.09.01.059-6'],
           totalValue: 1500.00,
-          description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO CÁLCULO PELVE RENAL + URETEROLITOTRIPSIA - R$ 1.500,00'
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO CÁLCULO + URETEROLITOTRIPSIA - R$ 1.500,00'
         },
         {
           codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'],
           totalValue: 1600.00,
-          description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER + EXTRAÇÃO CÁLCULO + URETEROLITOTRIPSIA - R$ 1.600,00'
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + CATETER + EXTRAÇÃO + URETEROLITOTRIPSIA - R$ 1.600,00'
         },
         
-        // URETEROLITOTRIPSIA + Combinações
+        // Grupo 2: URETEROLITOTRIPSIA + Combinações
         {
           codes: ['04.09.01.059-6', '04.09.01.017-0'],
           totalValue: 1000.00,
-          description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA + INSTALAÇÃO CATETER DUPLO J (SEMIRRÍGIDA) - R$ 1.000,00'
+          description: 'URETEROLITOTRIPSIA + INSTALAÇÃO CATETER DUPLO J - R$ 1.000,00'
         },
         
-        // LITOTRIPSIA (FLEXÍVEL) + Combinações
+        // Grupo 3: LITOTRIPSIA (FLEXÍVEL) + Combinações
         {
           codes: ['04.09.01.018-9', '04.09.01.017-0'],
           totalValue: 1100.00,
-          description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
+          description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00'
         },
         {
           codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'],
           totalValue: 1200.00,
-          description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO CÁLCULO PELVE RENAL + INSTALAÇÃO CATETER - R$ 1.200,00'
+          description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO CÁLCULO + CATETER DUPLO J - R$ 1.200,00'
         },
         {
           codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'],
           totalValue: 1300.00,
-          description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA + EXTRAÇÃO CÁLCULO + INSTALAÇÃO CATETER - R$ 1.300,00'
+          description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + EXTRAÇÃO + CATETER - R$ 1.300,00'
         },
         
-        // RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + Combinações
+        // Grupo 4: PRÓSTATA + Combinações
         {
           codes: ['04.09.03.004-0', '04.09.01.038-3'],
           totalValue: 1200.00,
-          description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + RESSECCAO ENDOSCOPICA DE LESÃO VESICAL - R$ 1.200,00'
+          description: 'RESSECÇÃO PRÓSTATA + RESSECÇÃO LESÃO VESICAL - R$ 1.200,00'
         },
         
-        // HIDROCELE + Combinações
+        // Grupo 5: HIDROCELE + Combinações
         {
           codes: ['04.09.04.021-5', '04.09.04.019-3'],
           totalValue: 400.00,
-          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE + RESSECÇÃO PARCIAL DA BOLSA ESCROTAL - R$ 400,00'
+          description: 'HIDROCELE + RESSECÇÃO PARCIAL BOLSA ESCROTAL - R$ 400,00'
         },
         {
           codes: ['04.09.04.021-5', '04.09.04.019-3', '04.09.04.017-7'],
           totalValue: 500.00,
-          description: 'HIDROCELE + RESSECÇÃO PARCIAL BOLSA ESCROTAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 500,00'
+          description: 'HIDROCELE + RESSECÇÃO BOLSA + PLÁSTICA BOLSA ESCROTAL - R$ 500,00'
         },
         
-        // ORQUIDOPEXIA + PLÁSTICA
+        // Grupo 6: ORQUIDOPEXIA + PLÁSTICA BOLSA ESCROTAL
         {
           codes: ['04.09.04.013-4', '04.09.04.017-7'],
           totalValue: 550.00,
-          description: 'ORQUIDOPEXIA UNILATERAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 550,00'
+          description: 'ORQUIDOPEXIA UNILATERAL + PLÁSTICA BOLSA ESCROTAL - R$ 550,00'
         },
         {
           codes: ['04.09.04.012-6', '04.09.04.017-7'],
           totalValue: 550.00,
-          description: 'ORQUIDOPEXIA BILATERAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 550,00'
+          description: 'ORQUIDOPEXIA BILATERAL + PLÁSTICA BOLSA ESCROTAL - R$ 550,00'
         },
         
-        // PIELOPLASTIA + Combinações
+        // Grupo 7: PIELOPLASTIA + Combinações
         {
           codes: ['04.09.01.032-4', '04.09.01.057-0'],
           totalValue: 1000.00,
