@@ -2555,6 +2555,37 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           description: 'PIELOPLASTIA + URETEROPLASTIA + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00'
         }
       ]
+    },
+
+    // ================================================================
+    // DR. BRUNO BOSIO DA SILVA - ORTOPEDIA
+    // Hospital: Municipal 18 de Dezembro (Arapoti)
+    // Especialidade: Ortopedia (Ombro/Manguito Rotador)
+    // Data: 18/11/2025
+    // Observação: No Hospital São José, este médico tem valor fixo de R$ 40.000,00
+    //             No Hospital 18 de Dezembro, ele trabalha com regras por procedimento
+    // ================================================================
+    'BRUNO BOSIO DA SILVA': {
+      doctorName: 'BRUNO BOSIO DA SILVA',
+      // 🔬 PROCEDIMENTOS INDIVIDUAIS - ORTOPEDIA
+      rules: [
+        {
+          procedureCode: '04.08.01.014-2',
+          standardValue: 900.00,
+          description: 'REPARO DE ROTURA DO MANGUITO ROTADOR (INCLUI PROCEDIMENTOS DESCOMPRESSIVOS) - R$ 900,00'
+        },
+        {
+          procedureCode: '04.08.06.071-9',
+          standardValue: 900.00,
+          description: 'VIDEOARTROSCOPIA - R$ 900,00'
+        }
+      ],
+      // 🔗 REGRA MÚLTIPLA: Combinação específica
+      multipleRule: {
+        codes: ['04.08.01.014-2', '04.08.06.071-9'],
+        totalValue: 900.00,
+        description: 'REPARO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00 TOTAL (não soma)'
+      }
     }
   },
 
