@@ -192,10 +192,13 @@ const PatientManagement = () => {
   const [inlineNameEdit, setInlineNameEdit] = useState<{ [patientId: string]: string }>({});
   const [savingName, setSavingName] = useState<{ [patientId: string]: boolean }>({});
 
-  // Estados para edição de competência
+  // Estados para edição de competência e número da AIH
   const [editingCompetencia, setEditingCompetencia] = useState<{ [aihId: string]: boolean }>({});
   const [competenciaValue, setCompetenciaValue] = useState<{ [aihId: string]: string }>({});
   const [savingCompetencia, setSavingCompetencia] = useState<{ [aihId: string]: boolean }>({});
+  
+  // ✅ NOVO: Estados para edição do número da AIH
+  const [aihNumberValue, setAihNumberValue] = useState<{ [aihId: string]: string }>({});
   
   // ✅ NOVO: Estados para aba "Mudança de Competência"
   const [activeTab, setActiveTab] = useState<'pacientes' | 'mudanca-competencia'>('pacientes');
@@ -266,16 +269,24 @@ const PatientManagement = () => {
     }
   };
 
-  // Funções para edição de competência
-  const handleStartEditCompetencia = (aihId: string, currentCompetencia: string | undefined) => {
-    // 🔧 DEBUG: Verificar valor recebido
-    console.log('📝 INICIANDO EDIÇÃO DE COMPETÊNCIA:', {
+  // Funções para edição de competência e número da AIH
+  const handleStartEditCompetencia = (aihId: string, currentCompetencia: string | undefined, currentAihNumber: string | undefined) => {
+    // 🔧 DEBUG: Verificar valores recebidos
+    console.log('📝 INICIANDO EDIÇÃO DE COMPETÊNCIA E Nº AIH:', {
       aihId,
       competenciaRecebida: currentCompetencia,
+      aihNumberRecebido: currentAihNumber,
       tipo: typeof currentCompetencia
     });
 
     setEditingCompetencia(prev => ({ ...prev, [aihId]: true }));
+    
+    // ✅ Carregar número da AIH atual
+    if (currentAihNumber && currentAihNumber.trim() !== '') {
+      setAihNumberValue(prev => ({ ...prev, [aihId]: currentAihNumber.trim() }));
+    } else {
+      setAihNumberValue(prev => ({ ...prev, [aihId]: '' }));
+    }
     
     // Converter YYYY-MM-DD para YYYY-MM (formato do input type="month")
     if (currentCompetencia && currentCompetencia.trim() !== '') {
@@ -304,18 +315,32 @@ const PatientManagement = () => {
   const handleCancelEditCompetencia = (aihId: string) => {
     setEditingCompetencia(prev => ({ ...prev, [aihId]: false }));
     setCompetenciaValue(prev => { const copy = { ...prev }; delete copy[aihId]; return copy; });
+    setAihNumberValue(prev => { const copy = { ...prev }; delete copy[aihId]; return copy; });
   };
 
   const handleSaveCompetencia = async (aihId: string) => {
-    // Guardar valor original para rollback se necessário
-    const originalCompetencia = aihs.find(a => a.id === aihId)?.competencia;
+    // Guardar valores originais para rollback se necessário
+    const aihOriginal = aihs.find(a => a.id === aihId);
+    const originalCompetencia = aihOriginal?.competencia;
+    const originalAihNumber = aihOriginal?.aih_number;
     const newCompetencia = competenciaValue[aihId];
+    const newAihNumber = aihNumberValue[aihId]?.trim();
     
     try {
+      // Validações
       if (!newCompetencia) {
         toast({
           title: 'Competência inválida',
           description: 'Selecione uma competência válida.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (!newAihNumber || newAihNumber === '') {
+        toast({
+          title: 'Número da AIH inválido',
+          description: 'Digite um número de AIH válido.',
           variant: 'destructive'
         });
         return;
@@ -338,10 +363,12 @@ const PatientManagement = () => {
       const competenciaDate = `${newCompetencia}-01`;
 
       // 🔧 DEBUG: Verificar valores antes de salvar
-      console.log('💾 SALVANDO COMPETÊNCIA:', {
+      console.log('💾 SALVANDO COMPETÊNCIA E Nº AIH:', {
         aihId,
         competenciaInput: newCompetencia,
         competenciaFinal: competenciaDate,
+        aihNumberAtual: originalAihNumber,
+        aihNumberNovo: newAihNumber,
         formatoEsperado: 'YYYY-MM-DD'
       });
 
@@ -350,7 +377,8 @@ const PatientManagement = () => {
         aih.id === aihId 
           ? { 
               ...aih, 
-              competencia: competenciaDate, 
+              competencia: competenciaDate,
+              aih_number: newAihNumber,
               updated_at: new Date().toISOString() 
             }
           : aih
@@ -359,16 +387,18 @@ const PatientManagement = () => {
       // Fechar modal imediatamente para parecer instantâneo
       setEditingCompetencia(prev => ({ ...prev, [aihId]: false }));
       setCompetenciaValue(prev => { const copy = { ...prev }; delete copy[aihId]; return copy; });
+      setAihNumberValue(prev => { const copy = { ...prev }; delete copy[aihId]; return copy; });
 
       // Atualizar no banco usando Supabase direto (em background)
       const { data: updatedData, error } = await supabase
         .from('aihs')
         .update({ 
           competencia: competenciaDate,
+          aih_number: newAihNumber,
           updated_at: new Date().toISOString()
         })
         .eq('id', aihId)
-        .select('id, competencia, updated_at'); // 🆕 Retornar dados atualizados para confirmar
+        .select('id, competencia, aih_number, updated_at'); // 🆕 Retornar dados atualizados para confirmar
 
       if (error) {
         console.error('❌ Erro do Supabase:', error);
@@ -393,15 +423,16 @@ const PatientManagement = () => {
       // ✅ Toast de confirmação
       toast({ 
         title: '✅ Salvo!', 
-        description: `Competência: ${formatCompetencia(competenciaDate)}`,
+        description: `Competência: ${formatCompetencia(competenciaDate)} | AIH: ${newAihNumber}`,
         duration: 2000
       });
     } catch (e: any) {
-      console.error('❌ ERRO AO ATUALIZAR COMPETÊNCIA:', e);
+      console.error('❌ ERRO AO ATUALIZAR COMPETÊNCIA E Nº AIH:', e);
       
       // Reabrir modal de edição para tentar novamente
       setEditingCompetencia(prev => ({ ...prev, [aihId]: true }));
       setCompetenciaValue(prev => ({ ...prev, [aihId]: newCompetencia }));
+      setAihNumberValue(prev => ({ ...prev, [aihId]: newAihNumber || '' }));
       
       toast({ 
         title: 'Erro ao salvar', 
@@ -1948,10 +1979,10 @@ const PatientManagement = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleStartEditCompetencia(item.id, item.competencia)}
+                                onClick={() => handleStartEditCompetencia(item.id, item.competencia, item.aih_number)}
                                 disabled={savingCompetencia[item.id]}
                                 className="text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300 hover:bg-blue-50 transition-colors h-8 px-3 flex items-center gap-1.5"
-                                title="Editar competência"
+                                title="Editar competência e Nº AIH"
                               >
                                 {savingCompetencia[item.id] ? (
                                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
@@ -2073,20 +2104,39 @@ const PatientManagement = () => {
                     </table>
                   </div>
 
-                  {/* Modal de Edição de Competência */}
+                  {/* Modal de Edição de Competência e Nº AIH */}
                   {editingCompetencia[item.id] && (
                     <div className="bg-blue-50 border-t border-blue-200 p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center space-x-2">
                           <Calendar className="w-5 h-5 text-blue-600" />
-                          <h4 className="text-sm font-semibold text-blue-900">Editar Competência</h4>
+                          <h4 className="text-sm font-semibold text-blue-900">Editar Competência e Nº AIH</h4>
                         </div>
                       </div>
                       
-                      <div className="flex items-end space-x-3">
-                        <div className="flex-1">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                        {/* Campo: Número da AIH */}
+                        <div>
                           <label className="block text-xs font-medium text-blue-700 mb-1">
-                            Selecione o mês/ano da competência
+                            Número da AIH
+                          </label>
+                          <input
+                            type="text"
+                            value={aihNumberValue[item.id] || ''}
+                            onChange={(e) => setAihNumberValue(prev => ({ ...prev, [item.id]: e.target.value }))}
+                            placeholder="Digite o número da AIH"
+                            className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                            disabled={savingCompetencia[item.id]}
+                          />
+                          <p className="mt-1 text-xs text-blue-600">
+                            Atual: <strong>{item.aih_number}</strong>
+                          </p>
+                        </div>
+
+                        {/* Campo: Competência */}
+                        <div>
+                          <label className="block text-xs font-medium text-blue-700 mb-1">
+                            Competência (Mês/Ano)
                           </label>
                           <input
                             type="month"
@@ -2096,9 +2146,21 @@ const PatientManagement = () => {
                             disabled={savingCompetencia[item.id]}
                           />
                           <p className="mt-1 text-xs text-blue-600">
-                            Competência atual: <strong>{formatCompetencia(item.competencia)}</strong>
+                            Atual: <strong>{formatCompetencia(item.competencia)}</strong>
                           </p>
                         </div>
+                      </div>
+                      
+                      <div className="flex justify-end space-x-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCancelEditCompetencia(item.id)}
+                          disabled={savingCompetencia[item.id]}
+                          className="h-10"
+                        >
+                          Cancelar
+                        </Button>
                         
                         <Button
                           size="sm"
@@ -2112,18 +2174,8 @@ const PatientManagement = () => {
                               Salvando...
                             </>
                           ) : (
-                            'Salvar'
+                            'Salvar Alterações'
                           )}
-                        </Button>
-                        
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleCancelEditCompetencia(item.id)}
-                          disabled={savingCompetencia[item.id]}
-                          className="h-10"
-                        >
-                          Cancelar
                         </Button>
                       </div>
                     </div>
