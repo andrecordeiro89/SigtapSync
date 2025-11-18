@@ -1526,7 +1526,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       for (const doctor of filteredDoctors) {
         const hospitalId = doctor.hospitals?.[0]?.hospital_id;
         
-        // ✅ CORREÇÃO: Somar repasses individuais de cada paciente (igual aos cards)
+        // 🔥 PRIORIDADE 1: Verificar se médico tem regra de VALOR FIXO
+        const fixedPaymentCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
+        if (fixedPaymentCalc.hasFixedRule) {
+          // ✅ PAGAMENTO FIXO: Adicionar valor fixo UMA VEZ (não soma por paciente)
+          totalPayments += fixedPaymentCalc.calculatedPayment;
+          continue; // Pular para o próximo médico
+        }
+        
+        // Se não tem pagamento fixo, calcular normalmente somando por paciente
         const doctorTotalPayment = doctor.patients.reduce((sum, patient) => {
           // Filtrar procedimentos calculáveis (excluindo anestesistas 04.xxx)
           const proceduresWithPayment = patient.procedures
@@ -2748,8 +2756,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 </div>
                                 <span className="text-xl font-black text-green-700">
                                   {formatCurrency((() => {
-                                    // ✅ CORREÇÃO: Calcular soma dos repasses individuais (igual ao card total)
+                                    // ✅ CORREÇÃO: Verificar se médico tem pagamento FIXO primeiro
                                     const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                    
+                                    // 🔥 PRIORIDADE 1: Verificar regra de VALOR FIXO (independente de pacientes)
+                                    const fixedPaymentCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
+                                    if (fixedPaymentCalc.hasFixedRule) {
+                                      // ✅ PAGAMENTO FIXO: Retornar valor fixo UMA VEZ (não soma por paciente)
+                                      return fixedPaymentCalc.calculatedPayment;
+                                    }
+                                    
+                                    // Se não tem pagamento fixo, calcular normalmente somando por paciente
                                     const doctorTotalPayment = doctor.patients.reduce((sum, patient) => {
                                       const proceduresWithPayment = patient.procedures
                                         .filter(filterCalculableProcedures)

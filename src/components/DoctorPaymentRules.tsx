@@ -2501,7 +2501,12 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
   'HOSPITAL_MUNICIPAL_SAO_JOSE': {
     'THIAGO TIESSI SUZUKI': {
       doctorName: 'THIAGO TIESSI SUZUKI',
-      // 🔬 REGRAS UROLÓGICAS COMPLETAS - Procedimentos especializados
+      // ================================================================
+      // 🔬 REGRAS UROLÓGICAS - DR. THIAGO TIESSI SUZUKI
+      // Especialidade: Urologia
+      // Baseado em: Dr. GUILHERME AUGUSTO STORER (Torao Tokuda)
+      // Última atualização: 18/11/2025
+      // ================================================================
       rules: [
         // ================================================================
         // PROCEDIMENTOS INDIVIDUAIS BÁSICOS
@@ -2716,6 +2721,375 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           description: 'PIELOPLASTIA + URETEROPLASTIA + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00'
         }
       ]
+    },
+
+    // ================================================================
+    // DRA. SUELLEN FERNANDA BAGATIM - OTORRINOLARINGOLOGIA
+    // Hospital: Municipal São José (Carlópolis)
+    // Especialidade: Otorrinolaringologia (ORL)
+    // Data: 18/11/2025
+    // ================================================================
+    'SUELLEN FERNANDA BAGATIM': {
+      doctorName: 'SUELLEN FERNANDA BAGATIM',
+      // 👃 PROCEDIMENTOS ORL - Otorrinolaringologia
+      rules: [
+        // ================================================================
+        // PROCEDIMENTOS INDIVIDUAIS - TODOS R$ 700,00
+        // ================================================================
+        {
+          procedureCode: '04.04.01.048-2',
+          standardValue: 700.00,
+          description: 'SEPTOPLASTIA - R$ 700,00'
+        },
+        {
+          procedureCode: '04.04.01.041-5',
+          standardValue: 700.00,
+          description: 'TURBINECTOMIA - R$ 700,00'
+        },
+        {
+          procedureCode: '04.04.01.002-4',
+          standardValue: 700.00,
+          description: 'AMIGDALECTOMIA - R$ 700,00'
+        },
+        {
+          procedureCode: '04.04.01.001-6',
+          standardValue: 700.00,
+          description: 'ADENOIDECTOMIA - R$ 700,00'
+        },
+        {
+          procedureCode: '04.04.01.003-2',
+          standardValue: 700.00,
+          description: 'ADENOAMIGDALECTOMIA - R$ 700,00'
+        }
+      ],
+      
+      // ================================================================
+      // 🔗 REGRA DE MÚLTIPLOS PROCEDIMENTOS
+      // Septoplastia + Turbinectomia = R$ 700,00 TOTAL
+      // Similar ao Dr. Humberto Moreira da Silva (oftalmologia)
+      // ================================================================
+      multipleRule: {
+        codes: ['04.04.01.048-2', '04.04.01.041-5'],
+        totalValue: 700.00,
+        description: 'SEPTOPLASTIA + TURBINECTOMIA - R$ 700,00 TOTAL (não soma valores individuais)'
+      }
+    },
+
+    // ================================================================
+    // DR. VITOR BRANDANI GARBELINI - UROLOGIA
+    // Hospital: Municipal São José (Carlópolis)
+    // Especialidade: Urologia
+    // Baseado em: Dr. GUILHERME AUGUSTO STORER (Torao Tokuda)
+    // Data: 18/11/2025
+    // ================================================================
+    'VITOR BRANDANI GARBELINI': {
+      doctorName: 'VITOR BRANDANI GARBELINI',
+      // ================================================================
+      // 🔬 PROCEDIMENTOS INDIVIDUAIS - DR. VITOR BRANDANI GARBELINI
+      // Especialidade: Urologia
+      // Baseado em: Dr. GUILHERME AUGUSTO STORER / Dr. HELIO SHINDY KISSINA
+      // Última atualização: 18/11/2025
+      // ================================================================
+      rules: [
+        {
+          procedureCode: '04.09.01.023-5',
+          standardValue: 1000.00,
+          description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.09.01.059-6',
+          standardValue: 900.00,
+          description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00'
+        },
+        {
+          procedureCode: '04.09.01.018-9',
+          standardValue: 1000.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.09.01.017-0',
+          standardValue: 250.00,
+          description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.03.004-0',
+          standardValue: 1000.00,
+          description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.09.03.002-3',
+          standardValue: 1000.00,
+          description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.09.04.021-5',
+          standardValue: 300.00,
+          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00'
+        },
+        {
+          procedureCode: '04.09.05.008-3',
+          standardValue: 250.00,
+          description: 'POSTECTOMIA - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.04.024-0',
+          standardValue: 450.00,
+          description: 'VASECTOMIA - R$ 450,00'
+        },
+        {
+          procedureCode: '04.09.04.023-1',
+          standardValue: 250.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.04.013-4',
+          standardValue: 400.00,
+          description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00'
+        },
+        {
+          procedureCode: '04.09.04.012-6',
+          standardValue: 450.00,
+          description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00'
+        },
+        {
+          procedureCode: '04.09.01.006-5',
+          standardValue: 600.00,
+          description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA (RETIRADA DE CÁLCULO VESICAL ENDOSCÓPICA OU CONVENCIONAL) - R$ 600,00'
+        },
+        {
+          procedureCode: '04.09.05.007-5',
+          standardValue: 500.00,
+          description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00'
+        },
+        {
+          procedureCode: 'RESSECÇÃO_CISTOS',
+          standardValue: 250.00,
+          description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00'
+        },
+        {
+          procedureCode: '04.09.04.016-9',
+          standardValue: 500.00,
+          description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00'
+        },
+        {
+          procedureCode: '04.09.01.032-4',
+          standardValue: 700.00,
+          description: 'PIELOPLASTIA - R$ 700,00'
+        },
+        {
+          procedureCode: '04.09.01.021-9',
+          standardValue: 1200.00,
+          description: 'NEFRECTOMIA TOTAL - R$ 1.200,00'
+        },
+        {
+          procedureCode: '04.09.01.020-0',
+          standardValue: 1000.00,
+          description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00'
+        },
+        {
+          procedureCode: '04.09.01.022-7',
+          standardValue: 900.00,
+          description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00'
+        },
+        {
+          procedureCode: '04.09.01.029-4',
+          standardValue: 400.00,
+          description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00'
+        },
+        {
+          procedureCode: '04.09.02.017-6',
+          standardValue: 250.00,
+          description: 'URETROTOMIA INTERNA - R$ 250,00'
+        }
+      ],
+      
+      // ================================================================
+      // 🔗 REGRAS DE MÚLTIPLOS PROCEDIMENTOS - DR. VITOR BRANDANI GARBELINI
+      // Sistema: Valores fixos para combinações específicas
+      // Total: 16 combinações cadastradas
+      // Baseado em: Dr. GUILHERME AUGUSTO STORER / Dr. HELIO SHINDY KISSINA
+      // ================================================================
+      multipleRules: [
+        // Grupo 1: NEFROLITOTOMIA PERCUTÂNEA + Combinações
+        {
+          codes: ['04.09.01.023-5', '04.09.01.017-0'],
+          totalValue: 1100.00,
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
+        },
+        {
+          codes: ['04.09.01.023-5', '04.09.01.014-6'],
+          totalValue: 1300.00,
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL - R$ 1.300,00'
+        },
+        {
+          codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6'],
+          totalValue: 1400.00,
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL - R$ 1.400,00'
+        },
+        {
+          codes: ['04.09.01.023-5', '04.09.01.014-6', '04.09.01.059-6'],
+          totalValue: 1500.00,
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (FLEXÍVEL OU SEMIRRÍGIDA) - R$ 1.500,00'
+        },
+        {
+          codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'],
+          totalValue: 1600.00,
+          description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (FLEXÍVEL OU SEMIRRÍGIDA) - R$ 1.600,00'
+        },
+        
+        // Grupo 2: URETEROLITOTRIPSIA + Combinações
+        {
+          codes: ['04.09.01.059-6', '04.09.01.017-0'],
+          totalValue: 1000.00,
+          description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J (SEMIRRÍGIDA) - R$ 1.000,00'
+        },
+        
+        // Grupo 3: LITOTRIPSIA (FLEXÍVEL) + Combinações
+        {
+          codes: ['04.09.01.018-9', '04.09.01.017-0'],
+          totalValue: 1100.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
+        },
+        {
+          codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'],
+          totalValue: 1200.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00'
+        },
+        {
+          codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'],
+          totalValue: 1300.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.300,00'
+        },
+        
+        // Grupo 4: PRÓSTATA + Combinações
+        {
+          codes: ['04.09.03.004-0', '04.09.01.038-3'],
+          totalValue: 1200.00,
+          description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 1.200,00'
+        },
+        
+        // Grupo 5: HIDROCELE + Combinações
+        {
+          codes: ['04.09.04.021-5', '04.09.04.019-3'],
+          totalValue: 400.00,
+          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE + RESSECÇÃO PARCIAL DA BOLSA ESCROTAL - R$ 400,00'
+        },
+        {
+          codes: ['04.09.04.021-5', '04.09.04.019-3', '04.09.04.017-7'],
+          totalValue: 500.00,
+          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE + RESSECÇÃO PARCIAL DA BOLSA ESCROTAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 500,00'
+        },
+        
+        // Grupo 6: ORQUIDOPEXIA + PLÁSTICA BOLSA ESCROTAL
+        {
+          codes: ['04.09.04.013-4', '04.09.04.017-7'],
+          totalValue: 550.00,
+          description: 'ORQUIDOPEXIA UNILATERAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 550,00'
+        },
+        {
+          codes: ['04.09.04.012-6', '04.09.04.017-7'],
+          totalValue: 550.00,
+          description: 'ORQUIDOPEXIA BILATERAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 550,00'
+        },
+        
+        // Grupo 7: PIELOPLASTIA + Combinações
+        {
+          codes: ['04.09.01.032-4', '04.09.01.057-0'],
+          totalValue: 1000.00,
+          description: 'PIELOPLASTIA + URETEROPLASTIA - R$ 1.000,00'
+        },
+        {
+          codes: ['04.09.01.032-4', '04.09.01.057-0', '04.09.01.017-0'],
+          totalValue: 1100.00,
+          description: 'PIELOPLASTIA + URETEROPLASTIA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
+        }
+      ]
+    },
+
+    // ================================================================
+    // DR. PEDRO HENRIQUE RODRIGUES - CIRURGIA VASCULAR
+    // Hospital: Municipal São José (Carlópolis)
+    // Especialidade: Cirurgia Vascular
+    // Baseado em: Dr. PEDRO HENRIQUE RODRIGUES (Hospital 18 de Dezembro - Arapoti)
+    // Data: 18/11/2025
+    // ================================================================
+    'PEDRO HENRIQUE RODRIGUES': {
+      doctorName: 'PEDRO HENRIQUE RODRIGUES',
+      // 🩺 PROCEDIMENTO DE CIRURGIA VASCULAR
+      rules: [
+        {
+          procedureCode: '04.06.02.057-4',
+          standardValue: 1100.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 1.100,00'
+        }
+      ]
+    },
+
+    // ================================================================
+    // 💰 MÉDICOS COM PAGAMENTO FIXO MENSAL
+    // Hospital: Municipal São José (Carlópolis)
+    // Tipo: Valores fixos independentes de procedimentos
+    // Data: 18/11/2025
+    // ================================================================
+
+    // ================================================================
+    // DR. BRUNO BOSIO DA SILVA - PAGAMENTO FIXO MENSAL
+    // ================================================================
+    'BRUNO BOSIO DA SILVA': {
+      doctorName: 'BRUNO BOSIO DA SILVA',
+      fixedPaymentRule: {
+        amount: 40000.00,
+        description: 'PAGAMENTO FIXO MENSAL - R$ 40.000,00 (independente de procedimentos)'
+      },
+      rules: []
+    },
+
+    // ================================================================
+    // DR. ORLANDO PAPI FERNANDES - PAGAMENTO FIXO MENSAL
+    // ================================================================
+    'ORLANDO PAPI FERNANDES': {
+      doctorName: 'ORLANDO PAPI FERNANDES',
+      fixedPaymentRule: {
+        amount: 60000.00,
+        description: 'PAGAMENTO FIXO MENSAL - R$ 60.000,00 (independente de procedimentos)'
+      },
+      rules: []
+    },
+
+    // ================================================================
+    // DR. FERNANDO MERHI MANSUR - PAGAMENTO FIXO MENSAL
+    // ================================================================
+    'FERNANDO MERHI MANSUR': {
+      doctorName: 'FERNANDO MERHI MANSUR',
+      fixedPaymentRule: {
+        amount: 29400.00,
+        description: 'PAGAMENTO FIXO MENSAL - R$ 29.400,00 (independente de procedimentos)'
+      },
+      rules: []
+    },
+
+    // ================================================================
+    // DR. BRUNO COLANZI DE MEDEIROS - PAGAMENTO FIXO MENSAL
+    // ================================================================
+    'BRUNO COLANZI DE MEDEIROS': {
+      doctorName: 'BRUNO COLANZI DE MEDEIROS',
+      fixedPaymentRule: {
+        amount: 75000.00,
+        description: 'PAGAMENTO FIXO MENSAL - R$ 75.000,00 (independente de procedimentos)'
+      },
+      rules: []
+    },
+
+    // ================================================================
+    // DRA. MARIA EDUARDA CAETANO CLARO - PAGAMENTO FIXO MENSAL
+    // ================================================================
+    'MARIA EDUARDA CAETANO CLARO': {
+      doctorName: 'MARIA EDUARDA CAETANO CLARO',
+      fixedPaymentRule: {
+        amount: 15000.00,
+        description: 'PAGAMENTO FIXO MENSAL - R$ 15.000,00 (independente de procedimentos)'
+      },
+      rules: []
     }
   },
 
