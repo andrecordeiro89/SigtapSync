@@ -541,6 +541,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
   const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set());
   const [showDiagnostic, setShowDiagnostic] = useState(false); // 🆕 ESTADO PARA MOSTRAR DIAGNÓSTICO
+  // 🚨 Estado para cache de pacientes sem repasse médico
+  const [patientsWithoutPaymentCache, setPatientsWithoutPaymentCache] = useState<Map<string, {
+    count: number;
+    total: number;
+    calculated: boolean;
+  }>>(new Map());
   const [showProcedureDiagnostic, setShowProcedureDiagnostic] = useState(false); // 🆕 DIAGNÓSTICO DE PROCEDIMENTOS
   const [showCleuezaDebug, setShowCleuezaDebug] = useState(false); // 🆕 DEBUG ESPECÍFICO CLEUZA
   // 🆕 REFRESH CONTROL (manual e realtime)
@@ -1285,6 +1291,51 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
     setExpandedDoctors(newExpanded);
   };
+  
+  // 🚨 CALCULAR PACIENTES SEM REPASSE (sob demanda)
+  const calculatePatientsWithoutPayment = React.useCallback((doctor: DoctorWithPatients, doctorKey: string) => {
+    // Se já calculou, não recalcular
+    if (patientsWithoutPaymentCache.has(doctorKey)) {
+      return;
+    }
+    
+    const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+    let patientsWithoutPayment = 0;
+    const totalPatients = doctor.patients?.length || 0;
+    
+    // Contar pacientes com pagamento = 0
+    (doctor.patients || []).forEach((patient) => {
+      const proceduresWithPayment = patient.procedures
+        .filter(filterCalculableProcedures)
+        .map((proc: any) => ({
+          procedure_code: proc.procedure_code,
+          procedure_description: proc.procedure_description,
+          value_reais: proc.value_reais || 0,
+        }));
+      
+      if (proceduresWithPayment.length > 0) {
+        const paymentResult = calculateDoctorPayment(
+          doctor.doctor_info.name,
+          proceduresWithPayment,
+          hospitalId
+        );
+        
+        if ((paymentResult.totalPayment || 0) === 0) {
+          patientsWithoutPayment++;
+        }
+      } else {
+        // Sem procedimentos calculáveis = sem repasse
+        patientsWithoutPayment++;
+      }
+    });
+    
+    // Armazenar no cache
+    setPatientsWithoutPaymentCache(prev => new Map(prev).set(doctorKey, {
+      count: patientsWithoutPayment,
+      total: totalPatients,
+      calculated: true
+    }));
+  }, [patientsWithoutPaymentCache]);
 
   // ✅ TOGGLE EXPANDIR PACIENTE
   const togglePatientExpansion = (patientKey: string) => {
@@ -2614,42 +2665,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 </Badge>
                                 {/* 🚨 BADGE: Pacientes sem Repasse Médico */}
                                 {(() => {
-                                  const hospitalId = doctor.hospitals?.[0]?.hospital_id;
-                                  let patientsWithoutPayment = 0;
+                                  // Verificar se já foi calculado no cache
+                                  const cached = patientsWithoutPaymentCache.get(cardKey);
                                   
-                                  // Contar pacientes com pagamento = 0
-                                  (doctor.patients || []).forEach((patient) => {
-                                    const proceduresWithPayment = patient.procedures
-                                      .filter(filterCalculableProcedures)
-                                      .map((proc: any) => ({
-                                        procedure_code: proc.procedure_code,
-                                        procedure_description: proc.procedure_description,
-                                        value_reais: proc.value_reais || 0,
-                                      }));
-                                    
-                                    if (proceduresWithPayment.length > 0) {
-                                      const paymentResult = calculateDoctorPayment(
-                                        doctor.doctor_info.name,
-                                        proceduresWithPayment,
-                                        hospitalId
-                                      );
-                                      
-                                      if ((paymentResult.totalPayment || 0) === 0) {
-                                        patientsWithoutPayment++;
-                                      }
-                                    } else {
-                                      // Sem procedimentos calculáveis = sem repasse
-                                      patientsWithoutPayment++;
-                                    }
-                                  });
+                                  // Se foi expandido, calcular
+                                  if (isExpanded && !cached) {
+                                    // Calcular de forma assíncrona (não bloqueia a UI)
+                                    setTimeout(() => calculatePatientsWithoutPayment(doctor, cardKey), 0);
+                                  }
                                   
-                                  // Mostrar badge apenas se houver dados
-                                  if (doctor.patients && doctor.patients.length > 0) {
-                                    if (patientsWithoutPayment > 0) {
+                                  // Mostrar badge apenas se houver dados e já foi calculado
+                                  if (cached && cached.calculated && doctor.patients && doctor.patients.length > 0) {
+                                    if (cached.count > 0) {
                                       return (
                                         <Badge variant="destructive" className="text-[10px] font-semibold">
                                           <AlertCircle className="h-3 w-3 mr-1" />
-                                          {patientsWithoutPayment} sem repasse
+                                          {cached.count} sem repasse
                                         </Badge>
                                       );
                                     } else {
@@ -2661,6 +2692,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                       );
                                     }
                                   }
+                                  
+                                  // Mostrar indicador "clique para verificar" se ainda não foi expandido
+                                  if (!cached && doctor.patients && doctor.patients.length > 0) {
+                                    return (
+                                      <Badge variant="outline" className="text-[10px] font-semibold bg-gray-50 text-gray-600 border-gray-300">
+                                        <Activity className="h-3 w-3 mr-1" />
+                                        Expandir p/ verificar
+                                      </Badge>
+                                    );
+                                  }
+                                  
                                   return null;
                                 })()}
                                 {getRankingMedal(index) && (
