@@ -1727,6 +1727,94 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 900,00'
         }
       ]
+    },
+
+    'JOAO GABRIEL NOGUEIRA SCORPIONE': {
+      doctorName: 'JOAO GABRIEL NOGUEIRA SCORPIONE',
+      // ================================================================
+      // 🔬 PROCEDIMENTOS INDIVIDUAIS - UROLOGIA
+      // Baseado em: Dr. GUILHERME AUGUSTO STORER
+      // Última atualização: 19/11/2025
+      // Total: 22 procedimentos
+      // ================================================================
+      rules: [
+        { procedureCode: '04.09.01.023-5', standardValue: 1000.00, description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00' },
+        { procedureCode: '04.09.01.059-6', standardValue: 900.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00' },
+        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00' },
+        { procedureCode: '04.09.01.017-0', standardValue: 250.00, description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00' },
+        { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
+        { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
+        { procedureCode: '04.09.04.021-5', standardValue: 300.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00' },
+        { procedureCode: '04.09.05.008-3', standardValue: 250.00, description: 'POSTECTOMIA - R$ 250,00' },
+        { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
+        { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
+        { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
+        { procedureCode: '04.09.04.012-6', standardValue: 450.00, description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00' },
+        { procedureCode: '04.09.01.006-5', standardValue: 600.00, description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00' },
+        { procedureCode: '04.09.05.007-5', standardValue: 500.00, description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00' },
+        { procedureCode: 'RESSECÇÃO_CISTOS', standardValue: 250.00, description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00' },
+        { procedureCode: '04.09.04.016-9', standardValue: 500.00, description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00' },
+        { procedureCode: '04.09.01.032-4', standardValue: 700.00, description: 'PIELOPLASTIA - R$ 700,00' },
+        { procedureCode: '04.09.01.021-9', standardValue: 1200.00, description: 'NEFRECTOMIA TOTAL - R$ 1.200,00' },
+        { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
+        { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
+        { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' }
+      ],
+      // ================================================================
+      // 🔗 REGRAS DE MÚLTIPLOS PROCEDIMENTOS
+      // Total: 16 combinações cadastradas
+      // ================================================================
+      multipleRules: [
+        { codes: ['04.09.01.023-5', '04.09.01.017-0'], totalValue: 1100.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
+        { codes: ['04.09.01.023-5', '04.09.01.014-6'], totalValue: 1300.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL - R$ 1.300,00' },
+        { codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6'], totalValue: 1400.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL - R$ 1.400,00' },
+        { codes: ['04.09.01.023-5', '04.09.01.014-6', '04.09.01.059-6'], totalValue: 1500.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (FLEXÍVEL OU SEMIRRÍGIDA) - R$ 1.500,00' },
+        { codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'], totalValue: 1600.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (FLEXÍVEL OU SEMIRRÍGIDA) - R$ 1.600,00' },
+        { codes: ['04.09.01.059-6', '04.09.01.017-0'], totalValue: 1000.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J (SEMIRRÍGIDA) - R$ 1.000,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.017-0'], totalValue: 1100.00, description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1300.00, description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.300,00' },
+        { codes: ['04.09.03.004-0', '04.09.01.038-3'], totalValue: 1200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 1.200,00' },
+        { codes: ['04.09.04.021-5', '04.09.04.019-3'], totalValue: 400.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE + RESSECÇÃO PARCIAL DA BOLSA ESCROTAL - R$ 400,00' },
+        { codes: ['04.09.04.021-5', '04.09.04.019-3', '04.09.04.017-7'], totalValue: 500.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE + RESSECÇÃO PARCIAL DA BOLSA ESCROTAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 500,00' },
+        { codes: ['04.09.04.013-4', '04.09.04.017-7'], totalValue: 550.00, description: 'ORQUIDOPEXIA UNILATERAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 550,00' },
+        { codes: ['04.09.04.012-6', '04.09.04.017-7'], totalValue: 550.00, description: 'ORQUIDOPEXIA BILATERAL + PLÁSTICA DA BOLSA ESCROTAL - R$ 550,00' },
+        { codes: ['04.09.01.032-4', '04.09.01.057-0'], totalValue: 1000.00, description: 'PIELOPLASTIA + URETEROPLASTIA - R$ 1.000,00' },
+        { codes: ['04.09.01.032-4', '04.09.01.057-0', '04.09.01.017-0'], totalValue: 1100.00, description: 'PIELOPLASTIA + URETEROPLASTIA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' }
+      ]
+    },
+
+    'FELIPE BECKER MANTOVANI': {
+      doctorName: 'FELIPE BECKER MANTOVANI',
+      // ================================================================
+      // 🦴 PROCEDIMENTO ORTOPÉDICO - ARTROPLASTIA DE QUADRIL
+      // Especialidade: Ortopedia
+      // Data: 19/11/2025
+      // ================================================================
+      rules: [
+        {
+          procedureCode: '04.08.04.009-2',
+          standardValue: 2500.00,
+          description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
+        }
+      ]
+    },
+
+    'LAERCIO MARCOS SIOLARI TURCATO': {
+      doctorName: 'LAERCIO MARCOS SIOLARI TURCATO',
+      // ================================================================
+      // 🦴 PROCEDIMENTO ORTOPÉDICO - ARTROPLASTIA DE QUADRIL
+      // Especialidade: Ortopedia
+      // Data: 19/11/2025
+      // ================================================================
+      rules: [
+        {
+          procedureCode: '04.08.04.009-2',
+          standardValue: 2500.00,
+          description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
+        }
+      ]
     }
   },
 
@@ -3838,6 +3926,13 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     'DIOGO ALBERTO LOPES BADER': {
       doctorName: 'DIOGO ALBERTO LOPES BADER',
       rules: [
+        // 🦴 ARTROPLASTIA DE QUADRIL (adicionado em 19/11/2025)
+        {
+          procedureCode: '04.08.04.009-2',
+          standardValue: 2500.00,
+          description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
+        },
+        // 🖐️ CIRURGIA DE MÃO
         {
           procedureCode: '04.03.02.012-3',
           standardValue: 850.00,
@@ -3904,7 +3999,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           description: 'RESSECÇÃO DE CISTO SINOVIAL - R$ 850,00'
         },
         {
-          procedureCode: '04.08.04.009-0',
+          procedureCode: '04.08.04.009-2',
           standardValue: 2500.00,
           description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
         },
@@ -3947,19 +4042,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     // 🏥 ORTOPEDISTAS - ARTROPLASTIA DE JOELHO - FOZ DO IGUAÇU
     // Especialidade: Ortopedia e Traumatologia
     // Data: Novembro 2025
-    // Total: 3 médicos com mesma regra
+    // Total: 2 médicos com mesmas regras (ANDRE FELIPE removido pois está duplicado na seção de Quadril)
     // ================================================================
-
-    'ANDRE FELIPE AGUIAR RABELO': {
-      doctorName: 'ANDRE FELIPE AGUIAR RABELO',
-      rules: [
-        {
-          procedureCode: '04.08.04.009-0',
-          standardValue: 2500.00,
-          description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
-        }
-      ]
-    },
 
     'VILSON DALMINA': {
       doctorName: 'VILSON DALMINA',
@@ -3970,7 +4054,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO - R$ 2.000,00'
         },
         {
-          procedureCode: '04.08.04.009-0',
+          procedureCode: '04.08.04.009-2',
           standardValue: 2500.00,
           description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
         }
@@ -3986,7 +4070,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO - R$ 2.000,00'
         },
         {
-          procedureCode: '04.08.04.009-0',
+          procedureCode: '04.08.04.009-2',
           standardValue: 2500.00,
           description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
         }
@@ -4002,7 +4086,18 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO - R$ 2.000,00'
         },
         {
-          procedureCode: '04.08.04.009-0',
+          procedureCode: '04.08.04.009-2',
+          standardValue: 2500.00,
+          description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
+        }
+      ]
+    },
+
+    'ANDRE FELIPE AGUIAR RABELO': {
+      doctorName: 'ANDRE FELIPE AGUIAR RABELO',
+      rules: [
+        {
+          procedureCode: '04.08.04.009-2',
           standardValue: 2500.00,
           description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
         }
