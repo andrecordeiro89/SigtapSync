@@ -1858,59 +1858,24 @@ export class AIHPersistenceService {
       let processedHospitalsCount: number | undefined = undefined;
       if (isAdminMode) {
         try {
-          // ✅ Tentar usar view se existir (pode não existir, então tratamos o erro)
-          const { data: hospitalAgg, error: viewErr } = await supabase
-            .from('v_aih_stats_by_hospital')
-            .select('hospital_id, total_aihs');
+          // ✅ OTIMIZAÇÃO: Usar diretamente o fallback (view pode não existir e gera 404 no console)
+          // Contar DISTINCT hospital_id diretamente na tabela aihs
+          const { data: distinctHospitals, error: distinctErr } = await supabase
+            .from('aihs')
+            .select('hospital_id', { head: false })
+            .not('hospital_id', 'is', null);
           
-          // ✅ Se a view não existir (404) ou retornar erro, usar fallback
-          if (viewErr) {
-            // View não existe ou erro de acesso - usar fallback direto
-            console.log('ℹ️ [getHospitalStats] View v_aih_stats_by_hospital não disponível, usando fallback direto');
-          } else if (hospitalAgg && hospitalAgg.length > 0) {
-            // View existe e retornou dados
-            processedHospitalsCount = (hospitalAgg || []).filter((h: any) => (h.total_aihs || 0) > 0).length;
-            console.log(`✅ [getHospitalStats] Hospitais contados via view: ${processedHospitalsCount}`);
-          }
-          
-          // ✅ Fallback: contar DISTINCT hospital_id diretamente na tabela aihs
-          // Usar .not('hospital_id', 'is', null) em vez de .neq() para verificar null corretamente
-          if (!processedHospitalsCount || processedHospitalsCount === 0) {
-            const { data: distinctHospitals, error: distinctErr } = await supabase
-              .from('aihs')
-              .select('hospital_id', { head: false })
-              .not('hospital_id', 'is', null); // ✅ CORREÇÃO: Usar .not('is', null) em vez de .neq(null)
-            
-            if (distinctErr) {
-              console.warn('⚠️ [getHospitalStats] Falha no fallback DISTINCT hospital_id:', distinctErr);
-              processedHospitalsCount = 0;
-            } else {
-              const unique = new Set((distinctHospitals || []).map((r: any) => r.hospital_id).filter(Boolean));
-              processedHospitalsCount = unique.size;
-              console.log(`✅ [getHospitalStats] Hospitais contados via fallback: ${processedHospitalsCount}`);
-            }
+          if (distinctErr) {
+            console.warn('⚠️ [getHospitalStats] Erro ao contar hospitais distintos:', distinctErr);
+            processedHospitalsCount = 0;
+          } else {
+            const unique = new Set((distinctHospitals || []).map((r: any) => r.hospital_id).filter(Boolean));
+            processedHospitalsCount = unique.size;
+            console.log(`✅ [getHospitalStats] Hospitais contados: ${processedHospitalsCount}`);
           }
         } catch (e) {
-          console.warn('⚠️ [getHospitalStats] Erro ao obter hospitais processados:', e);
-          // ✅ Fallback direto em caso de erro
-          try {
-            const { data: distinctHospitals, error: distinctErr } = await supabase
-              .from('aihs')
-              .select('hospital_id', { head: false })
-              .not('hospital_id', 'is', null); // ✅ CORREÇÃO: Usar .not('is', null)
-            
-            if (distinctErr) {
-              console.warn('⚠️ [getHospitalStats] Falha no fallback DISTINCT hospital_id:', distinctErr);
-              processedHospitalsCount = 0;
-            } else {
-              const unique = new Set((distinctHospitals || []).map((r: any) => r.hospital_id).filter(Boolean));
-              processedHospitalsCount = unique.size;
-              console.log(`✅ [getHospitalStats] Hospitais contados via fallback (catch): ${processedHospitalsCount}`);
-            }
-          } catch (e2) {
-            console.warn('⚠️ [getHospitalStats] Falha no fallback em aihs para contar hospitais distintos:', e2);
-            processedHospitalsCount = 0;
-          }
+          console.warn('⚠️ [getHospitalStats] Erro ao contar hospitais distintos:', e);
+          processedHospitalsCount = 0;
         }
       }
 

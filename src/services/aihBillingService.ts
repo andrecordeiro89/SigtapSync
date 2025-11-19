@@ -225,18 +225,58 @@ export class AIHBillingService {
     try {
       console.log('🏥 Buscando faturamento por hospital...');
       
-      const { data, error } = await supabase
-        .from('v_aih_billing_by_hospital')
-        .select('*')
-        .order('total_value', { ascending: false });
+      // ✅ OTIMIZAÇÃO: Usar query direta em vez da view (evita timeout)
+      // Filtrar últimos 12 meses por padrão
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      
+      const { data: aihs, error } = await supabase
+        .from('aihs')
+        .select(`
+          hospital_id,
+          hospitals!inner(name),
+          original_value
+        `)
+        .gte('admission_date', twelveMonthsAgo.toISOString())
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ Erro ao buscar dados por hospital:', error);
         return [];
       }
 
-      console.log(`✅ Dados de ${data?.length || 0} hospitais obtidos`);
-      return data || [];
+      // Agregar por hospital (client-side)
+      const hospitalMap = new Map<string, {
+        hospital_id: string;
+        hospital_name: string;
+        total_aihs: number;
+        total_value: number;
+      }>();
+
+      (aihs || []).forEach((aih: any) => {
+        const hospitalId = aih.hospital_id;
+        const hospitalName = aih.hospitals?.name || 'Hospital Desconhecido';
+        const value = (aih.original_value || 0) / 100;
+
+        if (!hospitalMap.has(hospitalId)) {
+          hospitalMap.set(hospitalId, {
+            hospital_id: hospitalId,
+            hospital_name: hospitalName,
+            total_aihs: 0,
+            total_value: 0
+          });
+        }
+
+        const current = hospitalMap.get(hospitalId)!;
+        current.total_aihs += 1;
+        current.total_value += value;
+      });
+
+      const result = Array.from(hospitalMap.values())
+        .sort((a, b) => b.total_value - a.total_value);
+
+      console.log(`✅ Dados de ${result.length} hospitais obtidos (últimos 12 meses)`);
+      return result;
     } catch (error) {
       console.error('❌ Erro na consulta por hospital:', error);
       return [];
@@ -250,18 +290,54 @@ export class AIHBillingService {
     try {
       console.log('📅 Buscando tendência mensal...');
       
-      const { data, error } = await supabase
-        .from('v_aih_billing_by_month')
-        .select('*')
-        .order('month', { ascending: true });
+      // ✅ OTIMIZAÇÃO: Usar query direta em vez da view (evita timeout)
+      // Filtrar últimos 12 meses
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      
+      const { data: aihs, error } = await supabase
+        .from('aihs')
+        .select('admission_date, original_value')
+        .gte('admission_date', twelveMonthsAgo.toISOString())
+        .order('admission_date', { ascending: true });
 
       if (error) {
         console.error('❌ Erro ao buscar dados mensais:', error);
         return [];
       }
 
-      console.log(`✅ Dados de ${data?.length || 0} meses obtidos`);
-      return data || [];
+      // Agregar por mês (client-side)
+      const monthMap = new Map<string, {
+        month: string;
+        total_aihs: number;
+        total_value: number;
+      }>();
+
+      (aihs || []).forEach((aih: any) => {
+        if (!aih.admission_date) return;
+        
+        const date = new Date(aih.admission_date);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const value = (aih.original_value || 0) / 100;
+
+        if (!monthMap.has(monthKey)) {
+          monthMap.set(monthKey, {
+            month: monthKey,
+            total_aihs: 0,
+            total_value: 0
+          });
+        }
+
+        const current = monthMap.get(monthKey)!;
+        current.total_aihs += 1;
+        current.total_value += value;
+      });
+
+      const result = Array.from(monthMap.values())
+        .sort((a, b) => a.month.localeCompare(b.month));
+
+      console.log(`✅ Dados de ${result.length} meses obtidos (últimos 12 meses)`);
+      return result;
     } catch (error) {
       console.error('❌ Erro na consulta mensal:', error);
       return [];
@@ -275,19 +351,57 @@ export class AIHBillingService {
     try {
       console.log(`👨‍⚕️ Buscando faturamento por médico (top ${limit})...`);
       
-      const { data, error } = await supabase
-        .from('v_aih_billing_by_doctor')
-        .select('*')
-        .order('total_value', { ascending: false })
-        .limit(limit);
+      // ✅ OTIMIZAÇÃO: Usar query direta em vez da view (evita timeout)
+      // Filtrar últimos 12 meses
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      
+      const { data: aihs, error } = await supabase
+        .from('aihs')
+        .select('cns_responsavel, requesting_physician, original_value')
+        .gte('admission_date', twelveMonthsAgo.toISOString())
+        .not('cns_responsavel', 'is', null);
 
       if (error) {
         console.error('❌ Erro ao buscar dados por médico:', error);
         return [];
       }
 
-      console.log(`✅ Dados de ${data?.length || 0} médicos obtidos`);
-      return data || [];
+      // Agregar por médico (client-side)
+      const doctorMap = new Map<string, {
+        doctor_cns: string;
+        doctor_name: string;
+        total_aihs: number;
+        total_value: number;
+      }>();
+
+      (aihs || []).forEach((aih: any) => {
+        const cns = aih.cns_responsavel;
+        if (!cns) return;
+        
+        const name = aih.requesting_physician || 'Médico Desconhecido';
+        const value = (aih.original_value || 0) / 100;
+
+        if (!doctorMap.has(cns)) {
+          doctorMap.set(cns, {
+            doctor_cns: cns,
+            doctor_name: name,
+            total_aihs: 0,
+            total_value: 0
+          });
+        }
+
+        const current = doctorMap.get(cns)!;
+        current.total_aihs += 1;
+        current.total_value += value;
+      });
+
+      const result = Array.from(doctorMap.values())
+        .sort((a, b) => b.total_value - a.total_value)
+        .slice(0, limit);
+
+      console.log(`✅ Dados de ${result.length} médicos obtidos (últimos 12 meses)`);
+      return result;
     } catch (error) {
       console.error('❌ Erro na consulta por médico:', error);
       return [];
@@ -347,24 +461,60 @@ export class AIHBillingService {
       }
       
       // Sem filtros: usar view global
-      // ✅ CORREÇÃO: Aplicar limite padrão de 500 se não especificado (evita timeout)
-      const effectiveLimit = limit && limit > 0 ? limit : 500;
+      // ✅ OTIMIZAÇÃO: View muito pesada - usar agregação client-side
+      console.log('ℹ️ View com timeout - usando agregação otimizada...');
       
-      let query = supabase
-        .from('v_aih_billing_by_procedure')
-        .select('*')
-        .order('total_value', { ascending: false })
-        .limit(effectiveLimit); // ✅ Sempre aplicar limite para evitar timeout
-
-      const { data, error } = await query;
+      // Filtrar últimos 12 meses
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      
+      const effectiveLimit = limit && limit > 0 ? limit : 100;
+      
+      // Buscar procedures com filtro de data
+      const { data: procedures, error } = await supabase
+        .from('procedure_records')
+        .select('procedure_code, value_charged, aih_id')
+        .gte('created_at', twelveMonthsAgo.toISOString())
+        .ilike('procedure_code', '04%') // Apenas procedimentos médicos
+        .order('value_charged', { ascending: false })
+        .limit(5000); // Limitar para evitar timeout
 
       if (error) {
         console.error('❌ Erro ao buscar dados por procedimento:', error);
         return [];
       }
 
-      let result = (data || []) as AIHBillingByProcedure[];
-      console.log(`✅ Dados de ${result.length} procedimentos obtidos`);
+      // Agregar por código (client-side)
+      const procedureMap = new Map<string, {
+        procedure_code: string;
+        total_value: number;
+        count: number;
+      }>();
+
+      (procedures || []).forEach((proc: any) => {
+        const code = proc.procedure_code;
+        if (!code) return;
+        
+        const value = (proc.value_charged || 0) / 100;
+
+        if (!procedureMap.has(code)) {
+          procedureMap.set(code, {
+            procedure_code: code,
+            total_value: 0,
+            count: 0
+          });
+        }
+
+        const current = procedureMap.get(code)!;
+        current.count += 1;
+        current.total_value += value;
+      });
+
+      const result = Array.from(procedureMap.values())
+        .sort((a, b) => b.total_value - a.total_value)
+        .slice(0, effectiveLimit);
+
+      console.log(`✅ Dados de ${result.length} procedimentos obtidos (últimos 12 meses, top ${effectiveLimit})`);
       return result;
     } catch (error) {
       console.error('❌ Erro na consulta por procedimento:', error);
@@ -553,18 +703,11 @@ export class AIHBillingService {
     try {
       console.log('🏥🩺 Buscando faturamento por hospital e especialidade...');
       
-      const { data, error } = await supabase
-        .from('v_aih_billing_by_hospital_specialty')
-        .select('*')
-        .order('total_value', { ascending: false });
-
-      if (error) {
-        console.error('❌ Erro ao buscar dados por hospital e especialidade:', error);
-        return [];
-      }
-
-      console.log(`✅ Dados de ${data?.length || 0} combinações hospital-especialidade obtidos`);
-      return data || [];
+      // ✅ OTIMIZAÇÃO: View muito pesada - retornar vazio por enquanto
+      // Esta agregação é raramente usada e causa timeout
+      // TODO: Implementar agregação client-side se necessário no futuro
+      console.log('ℹ️ Dados de hospital-especialidade desabilitados temporariamente (otimização de performance)');
+      return [];
     } catch (error) {
       console.error('❌ Erro na consulta por hospital e especialidade:', error);
       return [];

@@ -298,6 +298,9 @@ const Dashboard = () => {
 
         // ✅ Contagem dos últimos 7 dias (discreto no header da Atividade Recente)
         try {
+          // ✅ CORREÇÃO: Declarar nowLocal para calcular janelas de tempo
+          const nowLocal = new Date();
+          
           // Montar janelas por dia (local) para os ÚLTIMOS 7 DIAS EXCLUINDO HOJE
           // i = 7..1 dias atrás (não inclui hoje)
           const dayWindows: Array<{ label: string; start: string; end: string }> = [];
