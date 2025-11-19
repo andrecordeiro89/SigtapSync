@@ -62,7 +62,6 @@ import { useDoctorsRevenue } from '../hooks/useDoctorsRevenue';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from './ui/use-toast';
 import { getSpecialtyColor, getSpecialtyIcon, AVAILABLE_SPECIALTIES } from '../utils/specialtyColors';
-import { checkUnruledProcedures } from './DoctorPaymentRules';
 import { DoctorsRevenueService } from '../services/doctorsRevenueService';
 
 // ================================================================
@@ -118,12 +117,18 @@ const ProfessionalsTableNew: React.FC<ProfessionalsTableNewProps> = ({ className
   const [editingSpecialty, setEditingSpecialty] = useState<string | null>(null);
   const [tempSpecialty, setTempSpecialty] = useState('');
   
-  // 🚨 Estado para procedimentos sem regras
-  const [unruledProceduresMap, setUnruledProceduresMap] = useState<Map<string, {
-    hasUnruled: boolean;
-    codes: string[];
-    total: number;
+  // 🚨 Estado para pacientes sem repasse médico (pagamento = 0)
+  const [patientsWithoutPaymentMap, setPatientsWithoutPaymentMap] = useState<Map<string, {
+    patientsWithoutPayment: number;
+    totalPatients: number;
     isLoading: boolean;
+    patientsList: Array<{
+      patientId: string;
+      patientName: string;
+      aihNumber: string;
+      calculatedPayment: number;
+      procedureCodes: string[];
+    }>;
   }>>(new Map());
 
   // Estados para filtros da interface
@@ -241,44 +246,47 @@ const ProfessionalsTableNew: React.FC<ProfessionalsTableNewProps> = ({ className
     }
     setExpandedRows(newExpandedRows);
 
-    // 🚨 Se está expandindo E ainda não carregou procedimentos órfãos, carregar agora
-    if (isExpanding && !unruledProceduresMap.has(doctorId)) {
+    // 🚨 Se está expandindo E ainda não carregou contagem de pacientes sem repasse, carregar agora
+    if (isExpanding && !patientsWithoutPaymentMap.has(doctorId)) {
       try {
         // Marcar como carregando
-        setUnruledProceduresMap(prev => new Map(prev).set(doctorId, {
-          hasUnruled: false,
-          codes: [],
-          total: 0,
+        setPatientsWithoutPaymentMap(prev => new Map(prev).set(doctorId, {
+          patientsWithoutPayment: 0,
+          totalPatients: 0,
+          patientsList: [],
           isLoading: true
         }));
 
-        // Buscar procedimentos únicos realizados pelo médico
-        const performedProcedures = await DoctorsRevenueService.getDoctorUniqueProcedures(doctorCns);
-        
         // Extrair primeiro hospital ID da lista
         const firstHospitalId = hospitalIds?.split(',')[0];
         
-        // Verificar quais não têm regras
-        const unruledCheck = checkUnruledProcedures(doctorName, performedProcedures, firstHospitalId);
+        // Contar pacientes com pagamento médico = 0
+        const paymentCheck = await DoctorsRevenueService.countPatientsWithoutPayment(
+          doctorCns,
+          doctorName,
+          firstHospitalId
+        );
         
         // Atualizar estado
-        setUnruledProceduresMap(prev => new Map(prev).set(doctorId, {
-          hasUnruled: unruledCheck.hasUnruledProcedures,
-          codes: unruledCheck.unruledProcedures,
-          total: unruledCheck.totalUnruled,
+        setPatientsWithoutPaymentMap(prev => new Map(prev).set(doctorId, {
+          patientsWithoutPayment: paymentCheck.patientsWithoutPayment,
+          totalPatients: paymentCheck.totalPatients,
+          patientsList: paymentCheck.patientsWithoutPaymentList,
           isLoading: false
         }));
 
-        if (unruledCheck.hasUnruledProcedures) {
-          console.log(`⚠️ ${doctorName}: ${unruledCheck.totalUnruled} procedimentos sem regras`, unruledCheck.unruledProcedures);
+        if (paymentCheck.patientsWithoutPayment > 0) {
+          console.log(`⚠️ ${doctorName}: ${paymentCheck.patientsWithoutPayment} pacientes SEM repasse (de ${paymentCheck.totalPatients} pacientes)`);
+        } else {
+          console.log(`✅ ${doctorName}: Todos os ${paymentCheck.totalPatients} pacientes têm repasse médico definido`);
         }
 
       } catch (error) {
-        console.error('❌ Erro ao verificar procedimentos órfãos:', error);
-        setUnruledProceduresMap(prev => new Map(prev).set(doctorId, {
-          hasUnruled: false,
-          codes: [],
-          total: 0,
+        console.error('❌ Erro ao verificar pacientes sem repasse:', error);
+        setPatientsWithoutPaymentMap(prev => new Map(prev).set(doctorId, {
+          patientsWithoutPayment: 0,
+          totalPatients: 0,
+          patientsList: [],
           isLoading: false
         }));
       }
@@ -679,11 +687,19 @@ const ProfessionalsTableNew: React.FC<ProfessionalsTableNewProps> = ({ className
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
                               <div className="font-medium">{doctor.doctor_name}</div>
-                              {/* 🚨 Badge de Alerta para Procedimentos Sem Regras */}
-                              {unruledProceduresMap.get(doctor.doctor_id)?.hasUnruled && (
+                              {/* 🚨 Badge de Alerta para Pacientes Sem Repasse Médico */}
+                              {patientsWithoutPaymentMap.get(doctor.doctor_id)?.patientsWithoutPayment > 0 && (
                                 <Badge variant="destructive" className="text-xs">
                                   <AlertCircle className="h-3 w-3 mr-1" />
-                                  {unruledProceduresMap.get(doctor.doctor_id)?.total} sem regra
+                                  {patientsWithoutPaymentMap.get(doctor.doctor_id)?.patientsWithoutPayment} sem repasse
+                                </Badge>
+                              )}
+                              {/* ✅ Badge de Sucesso quando todos têm repasse */}
+                              {patientsWithoutPaymentMap.get(doctor.doctor_id)?.patientsWithoutPayment === 0 && 
+                               patientsWithoutPaymentMap.get(doctor.doctor_id)?.totalPatients > 0 && (
+                                <Badge variant="default" className="text-xs bg-green-100 text-green-800">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  0 sem repasse
                                 </Badge>
                               )}
                             </div>
@@ -837,46 +853,67 @@ const ProfessionalsTableNew: React.FC<ProfessionalsTableNewProps> = ({ className
                                 </div>
                               </div>
 
-                              {/* 🚨 SEÇÃO DE PROCEDIMENTOS SEM REGRAS */}
+                              {/* 🚨 SEÇÃO DE PACIENTES SEM REPASSE MÉDICO */}
                               {(() => {
-                                const unruledData = unruledProceduresMap.get(doctor.doctor_id);
+                                const paymentData = patientsWithoutPaymentMap.get(doctor.doctor_id);
                                 
-                                if (unruledData?.isLoading) {
+                                if (paymentData?.isLoading) {
                                   return (
                                     <div className="mt-4 p-3 bg-gray-100 rounded-lg flex items-center gap-2">
                                       <Loader2 className="h-4 w-4 animate-spin" />
-                                      <span className="text-sm text-gray-600">Verificando procedimentos...</span>
+                                      <span className="text-sm text-gray-600">Verificando pacientes sem repasse médico...</span>
                                     </div>
                                   );
                                 }
                                 
-                                if (unruledData?.hasUnruled) {
+                                if (paymentData?.patientsWithoutPayment > 0) {
                                   return (
                                     <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
                                       <div className="flex items-start gap-2 mb-2">
                                         <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
                                         <div className="flex-1">
                                           <h5 className="font-semibold text-red-800 mb-1">
-                                            ⚠️ Procedimentos Sem Regras de Pagamento
+                                            🚨 Pacientes Sem Repasse Médico (Pagamento = R$ 0,00)
                                           </h5>
                                           <p className="text-sm text-red-700 mb-3">
-                                            Foram identificados <strong>{unruledData.total}</strong> procedimentos médicos (04.xxx) realizados 
-                                            nos últimos 12 meses que NÃO possuem regras de pagamento definidas:
+                                            <strong>{paymentData.patientsWithoutPayment}</strong> de <strong>{paymentData.totalPatients}</strong> pacientes 
+                                            têm pagamento médico calculado igual a zero. Defina regras para garantir o repasse!
                                           </p>
                                           
-                                          <div className="bg-white rounded p-3 max-h-40 overflow-y-auto">
-                                            <ul className="space-y-1">
-                                              {unruledData.codes.map((code, idx) => (
-                                                <li key={idx} className="flex items-center gap-2 text-sm font-mono">
-                                                  <span className="text-red-600">•</span>
-                                                  <code className="bg-red-100 px-2 py-0.5 rounded">{code}</code>
-                                                </li>
+                                          <div className="bg-white rounded p-3 max-h-60 overflow-y-auto">
+                                            <div className="space-y-3">
+                                              {paymentData.patientsList.slice(0, 10).map((patient, idx) => (
+                                                <div key={idx} className="border-b pb-2 last:border-0">
+                                                  <div className="flex items-center justify-between mb-1">
+                                                    <div className="font-medium text-sm">
+                                                      {patient.patientName}
+                                                    </div>
+                                                    <span className="text-xs font-mono text-gray-600">
+                                                      AIH: {patient.aihNumber}
+                                                    </span>
+                                                  </div>
+                                                  <div className="text-xs text-gray-600 mb-1">
+                                                    Procedimentos realizados:
+                                                  </div>
+                                                  <div className="flex flex-wrap gap-1">
+                                                    {patient.procedureCodes.map((code, cIdx) => (
+                                                      <code key={cIdx} className="text-xs bg-red-100 px-1.5 py-0.5 rounded font-mono">
+                                                        {code}
+                                                      </code>
+                                                    ))}
+                                                  </div>
+                                                </div>
                                               ))}
-                                            </ul>
+                                              {paymentData.patientsList.length > 10 && (
+                                                <div className="text-xs text-gray-600 text-center pt-2">
+                                                  + {paymentData.patientsList.length - 10} pacientes adicionais
+                                                </div>
+                                              )}
+                                            </div>
                                           </div>
                                           
                                           <p className="text-xs text-red-600 mt-2">
-                                            💡 Considere adicionar regras de pagamento para esses procedimentos em <code>DoctorPaymentRules.tsx</code>
+                                            💡 Acesse <code>DoctorPaymentRules.tsx</code> e defina regras para esses procedimentos
                                           </p>
                                         </div>
                                       </div>
@@ -884,12 +921,12 @@ const ProfessionalsTableNew: React.FC<ProfessionalsTableNewProps> = ({ className
                                   );
                                 }
                                 
-                                if (unruledData && !unruledData.hasUnruled) {
+                                if (paymentData && paymentData.patientsWithoutPayment === 0 && paymentData.totalPatients > 0) {
                                   return (
                                     <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
                                       <CheckCircle className="h-5 w-5 text-green-600" />
                                       <span className="text-sm text-green-700">
-                                        ✅ Todos os procedimentos médicos possuem regras de pagamento definidas
+                                        ✅ Todos os {paymentData.totalPatients} pacientes possuem repasse médico calculado (≠ R$ 0,00)
                                       </span>
                                     </div>
                                   );

@@ -2612,6 +2612,57 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-semibold">
                                   {doctorStats.totalProcedures} PROC
                                 </Badge>
+                                {/* 🚨 BADGE: Pacientes sem Repasse Médico */}
+                                {(() => {
+                                  const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                  let patientsWithoutPayment = 0;
+                                  
+                                  // Contar pacientes com pagamento = 0
+                                  (doctor.patients || []).forEach((patient) => {
+                                    const proceduresWithPayment = patient.procedures
+                                      .filter(filterCalculableProcedures)
+                                      .map((proc: any) => ({
+                                        procedure_code: proc.procedure_code,
+                                        procedure_description: proc.procedure_description,
+                                        value_reais: proc.value_reais || 0,
+                                      }));
+                                    
+                                    if (proceduresWithPayment.length > 0) {
+                                      const paymentResult = calculateDoctorPayment(
+                                        doctor.doctor_info.name,
+                                        proceduresWithPayment,
+                                        hospitalId
+                                      );
+                                      
+                                      if ((paymentResult.totalPayment || 0) === 0) {
+                                        patientsWithoutPayment++;
+                                      }
+                                    } else {
+                                      // Sem procedimentos calculáveis = sem repasse
+                                      patientsWithoutPayment++;
+                                    }
+                                  });
+                                  
+                                  // Mostrar badge apenas se houver dados
+                                  if (doctor.patients && doctor.patients.length > 0) {
+                                    if (patientsWithoutPayment > 0) {
+                                      return (
+                                        <Badge variant="destructive" className="text-[10px] font-semibold">
+                                          <AlertCircle className="h-3 w-3 mr-1" />
+                                          {patientsWithoutPayment} sem repasse
+                                        </Badge>
+                                      );
+                                    } else {
+                                      return (
+                                        <Badge variant="default" className="text-[10px] font-semibold bg-green-100 text-green-800 border-green-300">
+                                          <CheckCircle className="h-3 w-3 mr-1" />
+                                          0 sem repasse
+                                        </Badge>
+                                      );
+                                    }
+                                  }
+                                  return null;
+                                })()}
                                 {getRankingMedal(index) && (
                                   <span className="text-2xl">{getRankingMedal(index)}</span>
                                 )}

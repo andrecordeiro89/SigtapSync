@@ -162,6 +162,152 @@ export class DoctorsRevenueService {
       return [];
     }
   }
+
+  /**
+   * 🚨 CONTAR PACIENTES SEM REPASSE MÉDICO
+   * Retorna quantos pacientes têm pagamento médico calculado = 0
+   * @param doctorCns - CNS do médico
+   * @param doctorName - Nome do médico (para cálculo de regras)
+   * @param hospitalId - ID do hospital (opcional, para regras específicas)
+   * @returns { totalPatients, patientsWithoutPayment, patientsWithoutPaymentList }
+   */
+  static async countPatientsWithoutPayment(
+    doctorCns: string,
+    doctorName: string,
+    hospitalId?: string
+  ): Promise<{
+    totalPatients: number;
+    patientsWithoutPayment: number;
+    patientsWithoutPaymentList: Array<{
+      patientId: string;
+      patientName: string;
+      aihNumber: string;
+      calculatedPayment: number;
+      procedureCodes: string[];
+    }>;
+  }> {
+    try {
+      console.log('🔍 Contando pacientes sem repasse médico:', doctorName);
+
+      // Importar funções de cálculo
+      const { calculateDoctorPayment, calculateFixedPayment, calculatePercentagePayment } = await import('../components/DoctorPaymentRules');
+
+      // Calcular data de 12 meses atrás
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+      // Buscar AIHs do médico
+      let query = supabase
+        .from('aihs')
+        .select(`
+          id,
+          aih_number,
+          patient_id,
+          admission_date,
+          patients!inner (
+            id,
+            name,
+            cns
+          )
+        `)
+        .eq('cns_responsavel', doctorCns)
+        .gte('admission_date', twelveMonthsAgo.toISOString());
+
+      if (hospitalId) {
+        query = query.eq('hospital_id', hospitalId);
+      }
+
+      const { data: aihs, error: aihsError } = await query;
+
+      if (aihsError) {
+        console.error('❌ Erro ao buscar AIHs:', aihsError);
+        return { totalPatients: 0, patientsWithoutPayment: 0, patientsWithoutPaymentList: [] };
+      }
+
+      if (!aihs || aihs.length === 0) {
+        console.log('ℹ️ Nenhuma AIH encontrada para este médico');
+        return { totalPatients: 0, patientsWithoutPayment: 0, patientsWithoutPaymentList: [] };
+      }
+
+      // Para cada AIH, buscar procedimentos e calcular pagamento
+      const patientsWithoutPaymentList: Array<{
+        patientId: string;
+        patientName: string;
+        aihNumber: string;
+        calculatedPayment: number;
+        procedureCodes: string[];
+      }> = [];
+
+      for (const aih of aihs) {
+        const patient = aih.patients as any;
+        if (!patient) continue;
+
+        // Buscar procedimentos 04.xxx da AIH
+        const { data: procedures, error: procError } = await supabase
+          .from('procedure_records')
+          .select('procedure_code, value_cents')
+          .eq('aih_id', aih.id)
+          .ilike('procedure_code', '04%');
+
+        if (procError) {
+          console.error('❌ Erro ao buscar procedimentos:', procError);
+          continue;
+        }
+
+        const procedures04 = (procedures || []).map(p => ({
+          procedure_code: p.procedure_code,
+          value_reais: (p.value_cents || 0) / 100
+        }));
+
+        // Calcular pagamento médico
+        const fixedPaymentCalc = calculateFixedPayment(doctorName, hospitalId);
+        let doctorPayment = 0;
+
+        if (fixedPaymentCalc.hasFixedRule) {
+          // Médico com pagamento fixo: não contabilizar por paciente
+          doctorPayment = 0; // Será somado no total, não por paciente
+        } else {
+          // Regras específicas por procedimento
+          const perProcedureCalc = calculateDoctorPayment(doctorName, procedures04 as any, hospitalId);
+
+          // Regra de percentual (quando existir)
+          const baseProceduresSum = procedures04.reduce((s, p) => s + (p.value_reais || 0), 0);
+          const percentageCalc = calculatePercentagePayment(doctorName, baseProceduresSum, hospitalId);
+
+          // Precedência: percentual substitui cálculo individual
+          doctorPayment = percentageCalc.hasPercentageRule
+            ? percentageCalc.calculatedPayment
+            : perProcedureCalc.totalPayment;
+        }
+
+        // Se pagamento = 0, adicionar à lista
+        if (doctorPayment === 0) {
+          patientsWithoutPaymentList.push({
+            patientId: patient.id,
+            patientName: patient.name,
+            aihNumber: aih.aih_number,
+            calculatedPayment: doctorPayment,
+            procedureCodes: procedures04.map(p => p.procedure_code)
+          });
+        }
+      }
+
+      const totalPatients = aihs.length;
+      const patientsWithoutPayment = patientsWithoutPaymentList.length;
+
+      console.log(`✅ Total: ${totalPatients} pacientes | Sem repasse: ${patientsWithoutPayment}`);
+      
+      return {
+        totalPatients,
+        patientsWithoutPayment,
+        patientsWithoutPaymentList
+      };
+
+    } catch (error) {
+      console.error('💥 Erro no countPatientsWithoutPayment:', error);
+      return { totalPatients: 0, patientsWithoutPayment: 0, patientsWithoutPaymentList: [] };
+    }
+  }
   
   /**
    * 📊 OBTER MÉDICOS AGREGADOS COM FATURAMENTO

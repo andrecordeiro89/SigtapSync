@@ -1852,6 +1852,33 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO - R$ 2.000,00'
         }
       ]
+    },
+
+    'BRUNO BOSIO DA SILVA': {
+      doctorName: 'BRUNO BOSIO DA SILVA',
+      // ================================================================
+      // 🦴 PROCEDIMENTO ORTOPÉDICO - MANGUITO ROTADOR + VIDEOARTROSCOPIA
+      // Especialidade: Ortopedia
+      // Data: 19/11/2025
+      // ================================================================
+      rules: [
+        {
+          procedureCode: '04.08.01.014-2',
+          standardValue: 0, // Valor definido na regra múltipla
+          description: 'REPARO DE ROTURA DO MANGUITO ROTADOR (INCLUI PROCEDIMENTOS DESCOMPRESSIVOS)'
+        },
+        {
+          procedureCode: '04.08.06.071-9',
+          standardValue: 0, // Valor definido na regra múltipla
+          description: 'VIDEOARTROSCOPIA'
+        }
+      ],
+      // 🔗 REGRA MÚLTIPLA: Combinação específica
+      multipleRule: {
+        codes: ['04.08.01.014-2', '04.08.06.071-9'],
+        totalValue: 900.00,
+        description: 'REPARO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00 TOTAL (não soma)'
+      }
     }
   },
 
@@ -5741,8 +5768,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
   },
 
   // ================================================================
-  // HOSPITAL MUNICIPAL JUAREZ BARRETO DE MACEDO
-  // Hospital ID: (a definir)
+  // HOSPITAL MUNICIPAL JUAREZ BARRETO DE MACEDO (FAX)
+  // Hospital ID: 019c7380-459d-4aa5-bbd8-2dba4f361e7e
   // ================================================================
   'HOSPITAL_MUNICIPAL_JUAREZ_BARRETO_MACEDO': {
     // ================================================================
@@ -5788,6 +5815,44 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         totalValue: 800.00,
         description: 'DOIS OU MAIS PROCEDIMENTOS ORL - R$ 800,00 TOTAL (não soma)'
       }
+    },
+
+    // ================================================================
+    // DR. JULIO DE CASTRO NETO - ORTOPEDIA
+    // Hospital: Municipal Juarez Barreto de Macedo
+    // Especialidade: Ortopedia - Cirurgia de Joelho
+    // Data: 19/11/2025
+    // ================================================================
+    'JULIO DE CASTRO NETO': {
+      doctorName: 'JULIO DE CASTRO NETO',
+      // 🦴 PROCEDIMENTOS ORTOPÉDICOS - CIRURGIA DE JOELHO
+      rules: [
+        {
+          procedureCode: '04.08.05.089-6',
+          standardValue: 750.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL - R$ 750,00'
+        },
+        {
+          procedureCode: '04.08.05.088-8',
+          standardValue: 750.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DE MENISCO COM SUTURA MENISCAL UNI / BICOMPATIMENTAL - R$ 750,00'
+        },
+        {
+          procedureCode: '04.08.05.016-0',
+          standardValue: 900.00,
+          description: 'RECONSTRUÇÃO LIGAMENTAR INTRA-ARTICULAR DO JOELHO (CRUZADO ANTERIOR) - R$ 900,00'
+        },
+        {
+          procedureCode: '04.08.05.015-2',
+          standardValue: 500.00,
+          description: 'RECONSTRUÇÃO LIGAMENTAR EXTRA-ARTICULAR DO JOELHO - R$ 500,00'
+        },
+        {
+          procedureCode: '04.08.05.006-3',
+          standardValue: 2000.00,
+          description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO - R$ 2.000,00'
+        }
+      ]
     }
   },
 
@@ -5826,6 +5891,9 @@ function detectHospitalFromContext(doctorName: string, hospitalId?: string): str
   }
   if (hospitalId === '1d8ca73a-1927-462e-91c0-fa7004d0b377') {
     return 'HOSPITAL_MUNICIPAL_SANTA_ALICE';
+  }
+  if (hospitalId === '019c7380-459d-4aa5-bbd8-2dba4f361e7e') {
+    return 'HOSPITAL_MUNICIPAL_JUAREZ_BARRETO_MACEDO';
   }
   
   // Se hospitalId foi fornecido mas não reconhecido, retornar padrão
@@ -6328,6 +6396,12 @@ export function checkUnruledProcedures(
     totalUnruled: unruledProcedures.length
   };
 }
+
+// ================================================================
+// 🚨 FUNÇÕES ANTIGAS REMOVIDAS - SUBSTITUÍDAS POR LÓGICA DIRETA
+// A verificação de pacientes sem repasse agora é feita diretamente
+// no serviço DoctorsRevenueService.countPatientsWithoutPayment()
+// ================================================================
 
 /**
  * 🆕 CALCULAR VALOR BASEADO EM PERCENTUAL DO TOTAL
