@@ -3282,7 +3282,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         const startY = yPosition + 10;
                                         
                                         autoTable(doc, {
-                                          head: [['Prontuário', 'Nome do Paciente', 'Códigos 04 Realizados', 'Data Alta', 'Caráter de Atendimento', 'Médico', 'Hospital', 'Valor de Repasse']],
+                                          head: [['Prontuário', 'Nome do Paciente', 'Procedimentos Realizados', 'Data Alta', 'Caráter de Atendimento', 'Médico', 'Hospital', 'Valor de Repasse']],
                                           body: tableData,
                                           startY: startY,
                                           theme: 'striped',
@@ -3300,11 +3300,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             cellPadding: 2
                                           },
                                           columnStyles: {
-                                            0: { cellWidth: 18, halign: 'center' }, // Prontuário
+                                            0: { cellWidth: 24, halign: 'center' }, // Prontuário (aumentado de 18 para 24)
                                             1: { cellWidth: 42, halign: 'left' },   // Nome do Paciente
-                                            2: { cellWidth: 52, halign: 'left', fontSize: 7 }, // Códigos 04
+                                            2: { cellWidth: 50, halign: 'left', fontSize: 7 }, // Procedimentos Realizados (ajustado de 52 para 50)
                                             3: { cellWidth: 20, halign: 'center' }, // Data Alta
-                                            4: { cellWidth: 30, halign: 'left' },   // Caráter
+                                            4: { cellWidth: 28, halign: 'left' },   // Caráter (ajustado de 30 para 28)
                                             5: { cellWidth: 32, halign: 'left' },   // Médico
                                             6: { cellWidth: 32, halign: 'left' },   // Hospital
                                             7: { cellWidth: 30, halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }   // Valor de Repasse (verde escuro)
