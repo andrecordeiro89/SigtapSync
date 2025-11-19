@@ -62,6 +62,8 @@ import { useDoctorsRevenue } from '../hooks/useDoctorsRevenue';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from './ui/use-toast';
 import { getSpecialtyColor, getSpecialtyIcon, AVAILABLE_SPECIALTIES } from '../utils/specialtyColors';
+import { checkUnruledProcedures } from './DoctorPaymentRules';
+import { DoctorsRevenueService } from '../services/doctorsRevenueService';
 
 // ================================================================
 // TIPOS E INTERFACES
@@ -115,6 +117,14 @@ const ProfessionalsTableNew: React.FC<ProfessionalsTableNewProps> = ({ className
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [editingSpecialty, setEditingSpecialty] = useState<string | null>(null);
   const [tempSpecialty, setTempSpecialty] = useState('');
+  
+  // 🚨 Estado para procedimentos sem regras
+  const [unruledProceduresMap, setUnruledProceduresMap] = useState<Map<string, {
+    hasUnruled: boolean;
+    codes: string[];
+    total: number;
+    isLoading: boolean;
+  }>>(new Map());
 
   // Estados para filtros da interface
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -220,14 +230,59 @@ const ProfessionalsTableNew: React.FC<ProfessionalsTableNewProps> = ({ className
   /**
    * 🔄 EXPANDIR/RECOLHER LINHA
    */
-  const handleToggleRow = (doctorId: string) => {
+  const handleToggleRow = async (doctorId: string, doctorCns: string, doctorName: string, hospitalIds?: string) => {
     const newExpandedRows = new Set(expandedRows);
+    const isExpanding = !newExpandedRows.has(doctorId);
+    
     if (newExpandedRows.has(doctorId)) {
       newExpandedRows.delete(doctorId);
     } else {
       newExpandedRows.add(doctorId);
     }
     setExpandedRows(newExpandedRows);
+
+    // 🚨 Se está expandindo E ainda não carregou procedimentos órfãos, carregar agora
+    if (isExpanding && !unruledProceduresMap.has(doctorId)) {
+      try {
+        // Marcar como carregando
+        setUnruledProceduresMap(prev => new Map(prev).set(doctorId, {
+          hasUnruled: false,
+          codes: [],
+          total: 0,
+          isLoading: true
+        }));
+
+        // Buscar procedimentos únicos realizados pelo médico
+        const performedProcedures = await DoctorsRevenueService.getDoctorUniqueProcedures(doctorCns);
+        
+        // Extrair primeiro hospital ID da lista
+        const firstHospitalId = hospitalIds?.split(',')[0];
+        
+        // Verificar quais não têm regras
+        const unruledCheck = checkUnruledProcedures(doctorName, performedProcedures, firstHospitalId);
+        
+        // Atualizar estado
+        setUnruledProceduresMap(prev => new Map(prev).set(doctorId, {
+          hasUnruled: unruledCheck.hasUnruledProcedures,
+          codes: unruledCheck.unruledProcedures,
+          total: unruledCheck.totalUnruled,
+          isLoading: false
+        }));
+
+        if (unruledCheck.hasUnruledProcedures) {
+          console.log(`⚠️ ${doctorName}: ${unruledCheck.totalUnruled} procedimentos sem regras`, unruledCheck.unruledProcedures);
+        }
+
+      } catch (error) {
+        console.error('❌ Erro ao verificar procedimentos órfãos:', error);
+        setUnruledProceduresMap(prev => new Map(prev).set(doctorId, {
+          hasUnruled: false,
+          codes: [],
+          total: 0,
+          isLoading: false
+        }));
+      }
+    }
   };
 
   /**
@@ -605,7 +660,12 @@ const ProfessionalsTableNew: React.FC<ProfessionalsTableNewProps> = ({ className
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleToggleRow(doctor.doctor_id)}
+                            onClick={() => handleToggleRow(
+                              doctor.doctor_id, 
+                              doctor.doctor_cns, 
+                              doctor.doctor_name,
+                              doctor.hospital_ids
+                            )}
                           >
                             {expandedRows.has(doctor.doctor_id) 
                               ? <ChevronUp className="h-4 w-4" />
@@ -617,7 +677,16 @@ const ProfessionalsTableNew: React.FC<ProfessionalsTableNewProps> = ({ className
                         {/* Nome do Médico */}
                         <TableCell>
                           <div className="space-y-1">
-                            <div className="font-medium">{doctor.doctor_name}</div>
+                            <div className="flex items-center gap-2">
+                              <div className="font-medium">{doctor.doctor_name}</div>
+                              {/* 🚨 Badge de Alerta para Procedimentos Sem Regras */}
+                              {unruledProceduresMap.get(doctor.doctor_id)?.hasUnruled && (
+                                <Badge variant="destructive" className="text-xs">
+                                  <AlertCircle className="h-3 w-3 mr-1" />
+                                  {unruledProceduresMap.get(doctor.doctor_id)?.total} sem regra
+                                </Badge>
+                              )}
+                            </div>
                             <div className="text-sm text-gray-600">
                               CRM: {doctor.doctor_crm}
                             </div>
@@ -767,6 +836,67 @@ const ProfessionalsTableNew: React.FC<ProfessionalsTableNewProps> = ({ className
                                   </div>
                                 </div>
                               </div>
+
+                              {/* 🚨 SEÇÃO DE PROCEDIMENTOS SEM REGRAS */}
+                              {(() => {
+                                const unruledData = unruledProceduresMap.get(doctor.doctor_id);
+                                
+                                if (unruledData?.isLoading) {
+                                  return (
+                                    <div className="mt-4 p-3 bg-gray-100 rounded-lg flex items-center gap-2">
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      <span className="text-sm text-gray-600">Verificando procedimentos...</span>
+                                    </div>
+                                  );
+                                }
+                                
+                                if (unruledData?.hasUnruled) {
+                                  return (
+                                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                                      <div className="flex items-start gap-2 mb-2">
+                                        <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+                                        <div className="flex-1">
+                                          <h5 className="font-semibold text-red-800 mb-1">
+                                            ⚠️ Procedimentos Sem Regras de Pagamento
+                                          </h5>
+                                          <p className="text-sm text-red-700 mb-3">
+                                            Foram identificados <strong>{unruledData.total}</strong> procedimentos médicos (04.xxx) realizados 
+                                            nos últimos 12 meses que NÃO possuem regras de pagamento definidas:
+                                          </p>
+                                          
+                                          <div className="bg-white rounded p-3 max-h-40 overflow-y-auto">
+                                            <ul className="space-y-1">
+                                              {unruledData.codes.map((code, idx) => (
+                                                <li key={idx} className="flex items-center gap-2 text-sm font-mono">
+                                                  <span className="text-red-600">•</span>
+                                                  <code className="bg-red-100 px-2 py-0.5 rounded">{code}</code>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                          
+                                          <p className="text-xs text-red-600 mt-2">
+                                            💡 Considere adicionar regras de pagamento para esses procedimentos em <code>DoctorPaymentRules.tsx</code>
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                
+                                if (unruledData && !unruledData.hasUnruled) {
+                                  return (
+                                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                                      <CheckCircle className="h-5 w-5 text-green-600" />
+                                      <span className="text-sm text-green-700">
+                                        ✅ Todos os procedimentos médicos possuem regras de pagamento definidas
+                                      </span>
+                                    </div>
+                                  );
+                                }
+                                
+                                return null;
+                              })()}
                             </div>
                           </TableCell>
                         </TableRow>

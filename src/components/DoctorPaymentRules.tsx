@@ -4526,6 +4526,81 @@ export function hasIndividualPaymentRules(doctorName: string, hospitalId?: strin
 }
 
 /**
+ * 🔍 OBTER TODOS OS CÓDIGOS DE PROCEDIMENTOS COM REGRAS DEFINIDAS
+ * Retorna lista de procedimentos que TÊM regras de pagamento para o médico
+ */
+export function getDoctorRuleProcedureCodes(doctorName: string, hospitalId?: string): string[] {
+  const hospitalKey = detectHospitalFromContext(doctorName, hospitalId);
+  const hospitalRules = DOCTOR_PAYMENT_RULES_BY_HOSPITAL[hospitalKey];
+  const rule = hospitalRules?.[doctorName.toUpperCase()];
+  
+  if (!rule) return [];
+  
+  // Coletar todos os códigos de procedimentos com regras
+  const codes = new Set<string>();
+  
+  // 1. Regras individuais
+  rule.rules?.forEach(r => codes.add(r.procedureCode));
+  
+  // 2. Regra múltipla (antiga)
+  rule.multipleRule?.codes?.forEach(c => codes.add(c));
+  
+  // 3. Regras múltiplas (array)
+  rule.multipleRules?.forEach(mr => mr.codes.forEach(c => codes.add(c)));
+  
+  return Array.from(codes);
+}
+
+/**
+ * 🚨 VERIFICAR PROCEDIMENTOS SEM REGRAS
+ * Identifica procedimentos "órfãos" - realizados pelo médico mas sem regra de pagamento
+ * Retorna { hasUnruledProcedures: boolean, unruledProcedures: string[] }
+ */
+export function checkUnruledProcedures(
+  doctorName: string,
+  performedProcedureCodes: string[],
+  hospitalId?: string
+): {
+  hasUnruledProcedures: boolean;
+  unruledProcedures: string[];
+  totalUnruled: number;
+} {
+  // Se médico tem pagamento fixo, não precisa verificar procedimentos órfãos
+  const fixedCalc = calculateFixedPayment(doctorName, hospitalId);
+  if (fixedCalc.hasFixedRule) {
+    return {
+      hasUnruledProcedures: false,
+      unruledProcedures: [],
+      totalUnruled: 0
+    };
+  }
+  
+  // Obter códigos com regras definidas
+  const ruledCodes = new Set(getDoctorRuleProcedureCodes(doctorName, hospitalId));
+  
+  // Filtrar apenas procedimentos médicos (04.xxx) que NÃO têm regras
+  const unruledProcedures = performedProcedureCodes
+    .filter(code => {
+      // Limpar código (extrair apenas o padrão XX.XX.XX.XXX-X)
+      const cleanCode = code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || code;
+      
+      // Verificar se é procedimento médico (04.xxx)
+      const isMedical = cleanCode.startsWith('04');
+      
+      // Verificar se NÃO tem regra
+      const hasNoRule = !ruledCodes.has(cleanCode);
+      
+      return isMedical && hasNoRule;
+    });
+  
+  return {
+    hasUnruledProcedures: unruledProcedures.length > 0,
+    unruledProcedures: Array.from(new Set(unruledProcedures)), // Remove duplicatas
+    totalUnruled: unruledProcedures.length
+  };
+}
+
+/**
  * 🆕 CALCULAR VALOR BASEADO EM PERCENTUAL DO TOTAL
  * Para médicos que têm regra de percentual sobre o valor total
  * 🚀 OTIMIZADO: Usa cache Map para busca O(1)

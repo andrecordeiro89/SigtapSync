@@ -126,6 +126,44 @@ export interface HospitalStats {
 export class DoctorsRevenueService {
   
   /**
+   * 🔍 OBTER PROCEDIMENTOS ÚNICOS REALIZADOS POR MÉDICO
+   * Retorna lista de códigos de procedimentos que o médico realizou (últimos 12 meses)
+   */
+  static async getDoctorUniqueProcedures(doctorCns: string): Promise<string[]> {
+    try {
+      console.log('🔍 Buscando procedimentos únicos do médico:', doctorCns);
+
+      // Calcular data de 12 meses atrás
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+      // Buscar procedimentos únicos realizados pelo médico
+      const { data, error } = await supabase
+        .from('procedure_records')
+        .select('procedure_code')
+        .or(`professional.eq.${doctorCns},professional_cbo.eq.${doctorCns}`)
+        .gte('procedure_date', twelveMonthsAgo.toISOString())
+        .neq('professional_cbo', '225151'); // Excluir anestesistas
+
+      if (error) {
+        console.error('❌ Erro ao buscar procedimentos únicos:', error);
+        return [];
+      }
+
+      // Extrair códigos únicos
+      const uniqueCodes = [...new Set(data?.map(p => p.procedure_code).filter(Boolean) || [])];
+      
+      console.log(`✅ Encontrados ${uniqueCodes.length} procedimentos únicos`);
+      
+      return uniqueCodes;
+
+    } catch (error) {
+      console.error('💥 Erro no getDoctorUniqueProcedures:', error);
+      return [];
+    }
+  }
+  
+  /**
    * 📊 OBTER MÉDICOS AGREGADOS COM FATURAMENTO
    * Retorna lista de médicos sem duplicação + múltiplos hospitais agrupados
    */
