@@ -1815,6 +1815,43 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           description: 'ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA - R$ 2.500,00'
         }
       ]
+    },
+
+    'MATEUS HRESCAK': {
+      doctorName: 'MATEUS HRESCAK',
+      // ================================================================
+      // 🦴 PROCEDIMENTOS ORTOPÉDICOS - CIRURGIA DE JOELHO
+      // Especialidade: Ortopedia
+      // Data: 19/11/2025
+      // Total: 5 procedimentos
+      // ================================================================
+      rules: [
+        {
+          procedureCode: '04.08.05.089-6',
+          standardValue: 750.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL - R$ 750,00'
+        },
+        {
+          procedureCode: '04.08.05.088-8',
+          standardValue: 750.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DE MENISCO COM SUTURA MENISCAL UNI / BICOMPATIMENTAL - R$ 750,00'
+        },
+        {
+          procedureCode: '04.08.05.016-0',
+          standardValue: 900.00,
+          description: 'RECONSTRUÇÃO LIGAMENTAR INTRA-ARTICULAR DO JOELHO (CRUZADO ANTERIOR) - R$ 900,00'
+        },
+        {
+          procedureCode: '04.08.05.015-2',
+          standardValue: 500.00,
+          description: 'RECONSTRUÇÃO LIGAMENTAR EXTRA-ARTICULAR DO JOELHO - R$ 500,00'
+        },
+        {
+          procedureCode: '04.08.05.006-3',
+          standardValue: 2000.00,
+          description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO - R$ 2.000,00'
+        }
+      ]
     }
   },
 
@@ -2674,6 +2711,49 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         totalValue: 900.00,
         description: 'REPARO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00 TOTAL (não soma)'
       }
+    }
+  },
+
+  // ================================================================
+  // HOSPITAL MUNICIPAL SANTA ALICE (CAS)
+  // Hospital ID: 1d8ca73a-1927-462e-91c0-fa7004d0b377
+  // ================================================================
+  'HOSPITAL_MUNICIPAL_SANTA_ALICE': {
+    'JULIO DE CASTRO NETO': {
+      doctorName: 'JULIO DE CASTRO NETO',
+      // ================================================================
+      // 🦴 PROCEDIMENTOS ORTOPÉDICOS - CIRURGIA DE JOELHO
+      // Especialidade: Ortopedia
+      // Data: 19/11/2025
+      // Total: 5 procedimentos
+      // ================================================================
+      rules: [
+        {
+          procedureCode: '04.08.05.089-6',
+          standardValue: 750.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL - R$ 750,00'
+        },
+        {
+          procedureCode: '04.08.05.088-8',
+          standardValue: 750.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DE MENISCO COM SUTURA MENISCAL UNI / BICOMPATIMENTAL - R$ 750,00'
+        },
+        {
+          procedureCode: '04.08.05.016-0',
+          standardValue: 900.00,
+          description: 'RECONSTRUÇÃO LIGAMENTAR INTRA-ARTICULAR DO JOELHO (CRUZADO ANTERIOR) - R$ 900,00'
+        },
+        {
+          procedureCode: '04.08.05.015-2',
+          standardValue: 500.00,
+          description: 'RECONSTRUÇÃO LIGAMENTAR EXTRA-ARTICULAR DO JOELHO - R$ 500,00'
+        },
+        {
+          procedureCode: '04.08.05.006-3',
+          standardValue: 2000.00,
+          description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO - R$ 2.000,00'
+        }
+      ]
     }
   },
 
@@ -5744,6 +5824,9 @@ function detectHospitalFromContext(doctorName: string, hospitalId?: string): str
   if (hospitalId === 'a8978eaa-b90e-4dc8-8fd5-0af984374d34') {
     return 'HOSPITAL_MATERNIDADE_NOSSA_SENHORA_APARECIDA_FRG';
   }
+  if (hospitalId === '1d8ca73a-1927-462e-91c0-fa7004d0b377') {
+    return 'HOSPITAL_MUNICIPAL_SANTA_ALICE';
+  }
   
   // Se hospitalId foi fornecido mas não reconhecido, retornar padrão
   if (hospitalId) {
@@ -5776,7 +5859,12 @@ function detectHospitalFromContext(doctorName: string, hospitalId?: string): str
     return 'HOSPITAL_MUNICIPAL_JUAREZ_BARRETO_MACEDO';
   }
   
-  // Prioridade 7: Verificar se médico existe no Torao Tokuda (padrão)
+  // Prioridade 7: Verificar se médico existe no Hospital Municipal Santa Alice
+  if (DOCTOR_PAYMENT_RULES_BY_HOSPITAL['HOSPITAL_MUNICIPAL_SANTA_ALICE']?.[doctorName.toUpperCase()]) {
+    return 'HOSPITAL_MUNICIPAL_SANTA_ALICE';
+  }
+  
+  // Prioridade 8: Verificar se médico existe no Torao Tokuda (padrão)
   if (DOCTOR_PAYMENT_RULES_BY_HOSPITAL['TORAO_TOKUDA_APUCARANA']?.[doctorName.toUpperCase()]) {
     return 'TORAO_TOKUDA_APUCARANA';
   }
