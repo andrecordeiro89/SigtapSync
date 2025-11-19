@@ -2150,7 +2150,7 @@ export class AIHPersistenceService {
     let resolvedDoctorId: string | null = null;
     try {
       const cnsRaw = (data.professional_document || data.professional_cns || '').toString().trim();
-      const crmRaw = (data.professional_code || '').toString().trim();
+      const crmRaw = (data.professional_cbo || '').toString().trim();
       if (cnsRaw) {
         const { data: docByCNS } = await supabase
           .from('doctors')
@@ -3163,14 +3163,10 @@ export class AIHPersistenceService {
             procedure_description,
             sequencia,
             quantity,
-            professional_code,
+            professional_cbo,
             professional_name,
-            amount,
-            status,
             match_status,
-            confidence,
             value_charged,
-            total_value,
             codigo_procedimento_original,
             documento_profissional,
             participacao,
@@ -3748,12 +3744,11 @@ export class AIHPersistenceService {
              procedure_code: procedureData.procedure_code,
              procedure_description: procedureData.procedure_description,
              quantity: procedureData.quantity || 1,
-             professional_code: procedureData.professional_code,
+             professional_cbo: procedureData.professional_cbo || procedureData.professional_code,
              professional_name: procedureData.professional_name,
-             amount: procedureData.amount,
-             status: procedureData.status || 'extracted',
-             confidence: procedureData.confidence || 0.8,
-             extraction_method: procedureData.extraction_method || 'hybrid'
+             value_charged: procedureData.amount || procedureData.value_charged || 0,
+             billing_status: procedureData.status || 'pending',
+             match_confidence: Math.round((procedureData.confidence || 0.8) * 100)
            });
 
          if (!error) {
