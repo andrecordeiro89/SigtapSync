@@ -194,29 +194,67 @@ export class DoctorPatientService {
         filterPgtAdm: options?.filterPgtAdm
       });
       
-      // Aplicar limite apenas se NÃO há filtros (carregamento inicial)
+      // 🚀 PAGINAÇÃO INTELIGENTE: Carregar em chunks quando necessário
+      let allAihs: any[] = [];
+      
       if (!hasFilters) {
+        // Carregamento inicial SEM filtros: limitar a 500 AIHs
         aihsQuery = aihsQuery.limit(initialLoadLimit);
         console.log(`📊 [getDoctorsWithPatientsFromProceduresView] Carregamento inicial: limitando a ${initialLoadLimit} AIHs (sem filtros aplicados)`);
+        
+        const { data: aihs, error: aihsError } = await aihsQuery.order('admission_date', { ascending: false });
+        if (aihsError) {
+          console.error('❌ [TABELAS] Erro ao consultar AIHs:', aihsError);
+          return [];
+        }
+        allAihs = aihs || [];
       } else {
-        console.log(`🔍 [getDoctorsWithPatientsFromProceduresView] Filtros aplicados: carregando TODAS as AIHs que correspondem aos filtros (sem limite)`);
+        // ✅ CORREÇÃO: Com filtros, carregar TODAS as AIHs em chunks (evitar limite de 1000 do Supabase)
+        console.log(`🔍 [getDoctorsWithPatientsFromProceduresView] Filtros aplicados: carregando TODAS as AIHs que correspondem aos filtros`);
         console.log(`   - Filtro Hospital: ${hasHospitalFilter ? 'SIM' : 'NÃO'}`);
         console.log(`   - Filtro Competência: ${hasCompetenciaFilter ? `SIM (${options?.competencia})` : 'NÃO'}`);
         console.log(`   - Filtro Pgt. Adm: ${hasPgtAdmFilter ? `SIM (${options?.filterPgtAdm})` : 'NÃO'}`);
+        
+        const chunkSize = 1000; // Supabase limit
+        let offset = 0;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const { data: chunk, error: chunkError } = await aihsQuery
+            .order('admission_date', { ascending: false })
+            .range(offset, offset + chunkSize - 1);
+          
+          if (chunkError) {
+            console.error('❌ [TABELAS] Erro ao consultar chunk de AIHs:', chunkError);
+            break;
+          }
+          
+          if (!chunk || chunk.length === 0) {
+            hasMore = false;
+            break;
+          }
+          
+          allAihs.push(...chunk);
+          console.log(`   📦 Chunk ${Math.floor(offset / chunkSize) + 1}: ${chunk.length} AIHs carregadas (total: ${allAihs.length})`);
+          
+          // Se chunk retornou menos que o limite, acabaram os dados
+          if (chunk.length < chunkSize) {
+            hasMore = false;
+          } else {
+            offset += chunkSize;
+          }
+        }
       }
       
-      // 🚀 EXECUTAR QUERY DE AIHs PRIMEIRO (necessária para obter IDs)
-      const { data: aihs, error: aihsError } = await aihsQuery.order('admission_date', { ascending: false });
-      if (aihsError) {
-        console.error('❌ [TABELAS] Erro ao consultar AIHs:', aihsError);
-        return [];
-      }
-      if (!aihs || aihs.length === 0) {
+      if (!allAihs || allAihs.length === 0) {
         console.log('⚠️ Nenhuma AIH encontrada com os filtros aplicados');
         return [];
       }
 
-      console.log(`✅ ${aihs.length} AIHs carregadas em ${(performance.now() - startTime).toFixed(0)}ms${!hasFilters ? ' (carregamento inicial limitado)' : ' (com filtros aplicados)'}`);
+      console.log(`✅ ${allAihs.length} AIHs carregadas em ${(performance.now() - startTime).toFixed(0)}ms${!hasFilters ? ' (carregamento inicial limitado)' : ' (TODAS as AIHs com filtros aplicados)'}`);
+      
+      // Renomear variável para manter compatibilidade com o código abaixo
+      const aihs = allAihs;
 
       // 2) Extrair IDs para queries dependentes
       const patientIds = Array.from(new Set(aihs.map(a => a.patient_id).filter(Boolean)));
