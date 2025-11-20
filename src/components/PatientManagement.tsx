@@ -206,6 +206,10 @@ const PatientManagement = () => {
   const [isUpdatingBatch, setIsUpdatingBatch] = useState(false);
   const [selectedCompetenciaForBatch, setSelectedCompetenciaForBatch] = useState<string>('all');
   const [searchPatientName, setSearchPatientName] = useState<string>(''); // ✅ NOVO: Busca por nome do paciente na aba Mudança de Competência
+  
+  // 🆕 Estados para modal de seleção de competência de destino
+  const [isCompetenciaModalOpen, setIsCompetenciaModalOpen] = useState(false);
+  const [selectedTargetCompetencia, setSelectedTargetCompetencia] = useState<string>('');
 
   // ✅ NOVO: Limpar seleção ao trocar de aba
   useEffect(() => {
@@ -1226,8 +1230,8 @@ const PatientManagement = () => {
   };
 
 
-  // ✅ NOVO: Função para atualizar competência em lote
-  const handleBatchUpdateCompetencia = async () => {
+  // 🆕 Função para abrir o modal de seleção de competência
+  const handleOpenCompetenciaModal = () => {
     if (selectedAIHsForBatch.size === 0) {
       toast({
         title: "Nenhuma AIH selecionada",
@@ -1236,6 +1240,44 @@ const PatientManagement = () => {
       });
       return;
     }
+
+    // Pré-selecionar uma competência sugerida
+    if (selectedCompetenciaForBatch !== 'all' && selectedCompetenciaForBatch !== 'sem_competencia') {
+      const proximaComp = calcularProximaCompetencia(selectedCompetenciaForBatch);
+      if (proximaComp && availableCompetencias.includes(proximaComp)) {
+        setSelectedTargetCompetencia(proximaComp);
+      } else if (availableCompetencias.length > 0) {
+        setSelectedTargetCompetencia(availableCompetencias[0]);
+      }
+    } else if (availableCompetencias.length > 0) {
+      setSelectedTargetCompetencia(availableCompetencias[0]);
+    }
+
+    setIsCompetenciaModalOpen(true);
+  };
+
+  // ✅ MODIFICADO: Função para atualizar competência em lote com competência de destino personalizável
+  const handleBatchUpdateCompetencia = async (targetCompetencia: string) => {
+    if (selectedAIHsForBatch.size === 0) {
+      toast({
+        title: "Nenhuma AIH selecionada",
+        description: "Selecione pelo menos uma AIH para alterar a competência.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!targetCompetencia) {
+      toast({
+        title: "Competência não selecionada",
+        description: "Selecione uma competência de destino.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Fechar modal
+    setIsCompetenciaModalOpen(false);
 
     setIsUpdatingBatch(true);
     let successCount = 0;
@@ -1253,18 +1295,11 @@ const PatientManagement = () => {
           continue;
         }
 
-        const proximaCompetencia = calcularProximaCompetencia(aih.competencia);
-        if (!proximaCompetencia) {
-          errorCount++;
-          errors.push(`AIH ${aih.aih_number}: Não foi possível calcular próxima competência`);
-          continue;
-        }
-
         try {
           const { error } = await supabase
             .from('aihs')
             .update({
-              competencia: proximaCompetencia,
+              competencia: targetCompetencia,
               updated_at: new Date().toISOString()
             })
             .eq('id', aihId);
@@ -1277,7 +1312,7 @@ const PatientManagement = () => {
             // Atualizar estado local
             setAIHs(prev => prev.map(a => 
               a.id === aihId 
-                ? { ...a, competencia: proximaCompetencia, updated_at: new Date().toISOString() }
+                ? { ...a, competencia: targetCompetencia, updated_at: new Date().toISOString() }
                 : a
             ));
           }
@@ -1294,7 +1329,7 @@ const PatientManagement = () => {
       if (successCount > 0) {
         toast({
           title: "✅ Competências atualizadas",
-          description: `${successCount} AIH(s) atualizada(s) com sucesso.${errorCount > 0 ? ` ${errorCount} erro(s).` : ''}`,
+          description: `${successCount} AIH(s) movida(s) para ${formatCompetencia(targetCompetencia)}.${errorCount > 0 ? ` ${errorCount} erro(s).` : ''}`,
         });
       }
 
@@ -2539,7 +2574,7 @@ const PatientManagement = () => {
                     )}
                   </span>
                   <Button
-                    onClick={handleBatchUpdateCompetencia}
+                    onClick={handleOpenCompetenciaModal}
                     disabled={selectedAIHsForBatch.size === 0 || isUpdatingBatch}
                     className="bg-blue-600 hover:bg-blue-700 text-white"
                     size="sm"
@@ -2667,23 +2702,11 @@ const PatientManagement = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  {selectedCompetenciaForBatch !== 'all' && selectedCompetenciaForBatch !== 'sem_competencia' && (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                      <Calendar className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm text-blue-800">
-                        <span className="font-medium">Próxima:</span>{' '}
-                        {formatCompetencia(calcularProximaCompetencia(selectedCompetenciaForBatch) || '')}
-                      </span>
-                    </div>
-                  )}
                 </div>
                 {selectedCompetenciaForBatch !== 'all' && (
                   <div className="mt-3 text-xs text-gray-600">
                     <Info className="w-3 h-3 inline mr-1" />
                     Mostrando apenas AIHs da competência <strong>{formatCompetencia(selectedCompetenciaForBatch)}</strong>
-                    {selectedCompetenciaForBatch !== 'sem_competencia' && (
-                      <span> que serão movidas para <strong>{formatCompetencia(calcularProximaCompetencia(selectedCompetenciaForBatch) || '')}</strong></span>
-                    )}
                   </div>
                 )}
               </div>
@@ -2739,12 +2762,10 @@ const PatientManagement = () => {
                           <th className="px-4 py-3 text-left font-semibold text-gray-700">Data Admissão</th>
                           <th className="px-4 py-3 text-left font-semibold text-gray-700">Data Alta</th>
                           <th className="px-4 py-3 text-left font-semibold text-gray-700">Competência Atual</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Nova Competência</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {paginatedData.map((item) => {
-                          const proximaCompetencia = calcularProximaCompetencia(item.competencia);
                           const isSelected = selectedAIHsForBatch.has(item.id);
                           
                           return (
@@ -2779,15 +2800,6 @@ const PatientManagement = () => {
                                 <span className="font-semibold text-blue-600">
                                   {formatCompetencia(item.competencia)}
                                 </span>
-                              </td>
-                              <td className="px-4 py-3">
-                                {proximaCompetencia ? (
-                                  <span className="font-semibold text-green-600">
-                                    {formatCompetencia(proximaCompetencia)}
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-400 text-xs">—</span>
-                                )}
                               </td>
                             </tr>
                           );
@@ -2829,8 +2841,9 @@ const PatientManagement = () => {
                         <p className="font-semibold mb-1">Como funciona:</p>
                         <ul className="list-disc list-inside space-y-1 text-blue-700">
                           <li>Selecione uma ou mais AIHs usando os checkboxes</li>
-                          <li>A competência será alterada automaticamente para o mês seguinte</li>
-                          <li>Use esta funcionalidade quando uma AIH for rejeitada e precisar ser reapresentada na próxima competência</li>
+                          <li>Clique em "Atualizar Competência" e escolha a competência de destino desejada</li>
+                          <li>Você pode mover AIHs para competências futuras ou anteriores conforme necessário</li>
+                          <li>Use esta funcionalidade para reapresentação após conferência com G-SUS ou ajustes de competência</li>
                         </ul>
                       </div>
                     </div>
@@ -2841,6 +2854,122 @@ const PatientManagement = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 🆕 MODAL: Seleção de Competência de Destino */}
+      <Dialog open={isCompetenciaModalOpen} onOpenChange={setIsCompetenciaModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Calendar className="w-5 h-5 text-blue-600" />
+              <span>Selecionar Competência de Destino</span>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {/* Informação sobre AIHs selecionadas */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center space-x-2 mb-2">
+                <FileText className="w-4 h-4 text-blue-600" />
+                <span className="font-semibold text-blue-800">AIHs Selecionadas:</span>
+              </div>
+              <p className="text-sm text-blue-700">
+                <strong>{selectedAIHsForBatch.size}</strong> AIH(s) será(ão) movida(s) para a competência selecionada abaixo.
+              </p>
+            </div>
+
+            {/* Dropdown de competências */}
+            <div className="space-y-3">
+              <label className="text-sm font-semibold text-gray-700 flex items-center space-x-2">
+                <Calendar className="w-4 h-4" />
+                <span>Competência de Destino:</span>
+              </label>
+              <Select 
+                value={selectedTargetCompetencia} 
+                onValueChange={setSelectedTargetCompetencia}
+              >
+                <SelectTrigger className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                  <SelectValue placeholder="Selecione a competência..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCompetencias.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      Nenhuma competência disponível
+                    </SelectItem>
+                  ) : (
+                    availableCompetencias.map((comp) => (
+                      <SelectItem key={comp} value={comp}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{formatCompetencia(comp)}</span>
+                          {comp === selectedCompetenciaForBatch && (
+                            <Badge variant="outline" className="ml-2 text-xs bg-blue-50 text-blue-700">
+                              Atual
+                            </Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              
+              {selectedTargetCompetencia && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-sm text-green-800">
+                    ✅ As AIHs serão movidas para: <strong>{formatCompetencia(selectedTargetCompetencia)}</strong>
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Aviso importante */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-start space-x-2">
+                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-800">
+                  <p className="font-semibold mb-1">⚠️ Atenção:</p>
+                  <ul className="list-disc list-inside space-y-1 text-amber-700">
+                    <li>Esta ação irá alterar a competência de todas as AIHs selecionadas</li>
+                    <li>Útil para reapresentação após conferência com G-SUS</li>
+                    <li>Pode mover para competências futuras ou anteriores conforme necessário</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Botões de ação */}
+          <div className="flex justify-end space-x-3 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCompetenciaModalOpen(false);
+                setSelectedTargetCompetencia('');
+              }}
+              disabled={isUpdatingBatch}
+            >
+              <X className="w-4 h-4 mr-2" />
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => handleBatchUpdateCompetencia(selectedTargetCompetencia)}
+              disabled={!selectedTargetCompetencia || isUpdatingBatch}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isUpdatingBatch ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Atualizando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Confirmar Alteração
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog de Confirmação de Deleção - ATUALIZADO */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
