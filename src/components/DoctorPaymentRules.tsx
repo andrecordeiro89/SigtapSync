@@ -2531,6 +2531,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // ================================================================
       // 🔬 PROCEDIMENTOS INDIVIDUAIS - UROLOGIA
       // Total: 22 procedimentos
+      // Última atualização: 21/11/2025
       // ================================================================
       rules: [
         {
@@ -2543,15 +2544,41 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           standardValue: 900.00,
           description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00'
         },
+        // ================================================================
+        // 🆕 LITOTRIPSIA - ATUALIZADO EM 21/11/2025
+        // ⚠️ ATENÇÃO: Valor varia conforme posição na AIH
+        // • Principal (1º procedimento): R$ 1.000,00
+        // • Secundário (2º+ procedimento): R$ 200,00
+        // ================================================================
         {
           procedureCode: '04.09.01.018-9',
           standardValue: 1000.00,
-          description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00'
+          secondaryValue: 200.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00 (Principal) / R$ 200,00 (Secundário)'
         },
+        // ================================================================
+        // 🆕 CATETER DUPLO J - ATUALIZADO EM 21/11/2025
+        // ⚠️ ATENÇÃO: Valor varia conforme posição na AIH
+        // • Principal (1º procedimento): R$ 250,00
+        // • Secundário (2º+ procedimento): R$ 100,00
+        // ================================================================
         {
           procedureCode: '04.09.01.017-0',
           standardValue: 250.00,
-          description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00'
+          secondaryValue: 100.00,
+          description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00 (Principal) / R$ 100,00 (Secundário)'
+        },
+        // ================================================================
+        // 🆕 MEATOTOMIA SIMPLES - ADICIONADO EM 21/11/2025
+        // ⚠️ ATENÇÃO: Valor varia conforme posição na AIH
+        // • Principal (1º procedimento): R$ 250,00
+        // • Secundário (2º+ procedimento): R$ 150,00
+        // ================================================================
+        {
+          procedureCode: '04.09.02.007-9',
+          standardValue: 250.00,
+          secondaryValue: 150.00,
+          description: 'MEATOTOMIA SIMPLES - R$ 250,00 (Principal) / R$ 150,00 (Secundário)'
         },
         {
           procedureCode: '04.09.03.004-0',
@@ -2613,10 +2640,17 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           standardValue: 500.00,
           description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00'
         },
+        // ================================================================
+        // 🆕 PIELOPLASTIA - ATUALIZADO EM 21/11/2025
+        // ⚠️ ATENÇÃO: Valor varia conforme posição na AIH
+        // • Principal (1º procedimento): R$ 700,00
+        // • Secundário (2º+ procedimento): R$ 200,00
+        // ================================================================
         {
           procedureCode: '04.09.01.032-4',
           standardValue: 700.00,
-          description: 'PIELOPLASTIA - R$ 700,00'
+          secondaryValue: 200.00,
+          description: 'PIELOPLASTIA - R$ 700,00 (Principal) / R$ 200,00 (Secundário)'
         },
         {
           procedureCode: '04.09.01.021-9',
@@ -5448,6 +5482,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.01.059-6', standardValue: 900.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00' },
         { procedureCode: '04.09.01.018-9', standardValue: 1000.00, description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00' },
         { procedureCode: '04.09.01.017-0', standardValue: 250.00, description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00' },
+        { procedureCode: '04.09.01.038-3', standardValue: 200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 200,00' },
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
         { procedureCode: '04.09.04.021-5', standardValue: 300.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00' },
@@ -5465,7 +5500,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' }
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' }
       ],
       multipleRules: [
         { codes: ['04.09.01.023-5', '04.09.01.017-0'], totalValue: 1100.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
