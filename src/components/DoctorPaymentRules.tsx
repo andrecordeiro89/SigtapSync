@@ -44,6 +44,8 @@ export interface DoctorPaymentRule {
     specialValue?: number;
     condition?: 'multiple' | 'single';
     description?: string;
+    // 🆕 Valor diferente para procedimento secundário (2º, 3º, etc.)
+    secondaryValue?: number;
   }[];
   multipleRule?: {
     codes: string[];
@@ -3150,7 +3152,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // 🔬 PROCEDIMENTOS INDIVIDUAIS - DR. VITOR BRANDANI GARBELINI
       // Especialidade: Urologia
       // Baseado em: Dr. GUILHERME AUGUSTO STORER / Dr. HELIO SHINDY KISSINA
-      // Última atualização: 18/11/2025
+      // Última atualização: 21/11/2025
       // ================================================================
       rules: [
         {
@@ -3233,10 +3235,17 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           standardValue: 500.00,
           description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00'
         },
+        // ================================================================
+        // 🆕 PIELOPLASTIA - ATUALIZADO EM 21/11/2025
+        // ⚠️ ATENÇÃO: Valor varia conforme posição na AIH
+        // • Principal (1º procedimento): R$ 700,00
+        // • Secundário (2º+ procedimento): R$ 200,00
+        // ================================================================
         {
           procedureCode: '04.09.01.032-4',
           standardValue: 700.00,
-          description: 'PIELOPLASTIA - R$ 700,00'
+          secondaryValue: 200.00,
+          description: 'PIELOPLASTIA - R$ 700,00 (Principal) / R$ 200,00 (Secundário)'
         },
         {
           procedureCode: '04.09.01.021-9',
@@ -3262,13 +3271,25 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.09.02.017-6',
           standardValue: 250.00,
           description: 'URETROTOMIA INTERNA - R$ 250,00'
+        },
+        // ================================================================
+        // 🆕 PROCEDIMENTO FÍSTULA VESICO-VAGINAL - ADICIONADO EM 21/11/2025
+        // ⚠️ ATENÇÃO: Valor varia conforme posição na AIH
+        // • Principal (1º procedimento): R$ 800,00
+        // • Secundário (2º+ procedimento): R$ 400,00
+        // ================================================================
+        {
+          procedureCode: '04.09.07.025-4',
+          standardValue: 800.00,
+          secondaryValue: 400.00,
+          description: 'TRATAMENTO CIRÚRGICO DE FÍSTULA VESICO-VAGINAL - R$ 800,00 (Principal) / R$ 400,00 (Secundário)'
         }
       ],
       
       // ================================================================
       // 🔗 REGRAS DE MÚLTIPLOS PROCEDIMENTOS - DR. VITOR BRANDANI GARBELINI
       // Sistema: Valores fixos para combinações específicas
-      // Total: 16 combinações cadastradas
+      // Total: 17 combinações cadastradas
       // Baseado em: Dr. GUILHERME AUGUSTO STORER / Dr. HELIO SHINDY KISSINA
       // ================================================================
       multipleRules: [
@@ -3311,6 +3332,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           codes: ['04.09.01.018-9', '04.09.01.017-0'],
           totalValue: 1100.00,
           description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
+        },
+        {
+          codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'],
+          totalValue: 1200.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00'
         },
         {
           codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'],
@@ -3900,6 +3926,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'], totalValue: 1600.00, description: 'NEFROLITOTOMIA + CATETER + EXTRAÇÃO + URETEROLITOTRIPSIA - R$ 1.600,00' },
         { codes: ['04.09.01.059-6', '04.09.01.017-0'], totalValue: 1000.00, description: 'URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.000,00' },
         { codes: ['04.09.01.018-9', '04.09.01.017-0'], totalValue: 1100.00, description: 'LITOTRIPSIA FLEXÍVEL + CATETER DUPLO J - R$ 1.100,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA + EXTRAÇÃO CÁLCULO + CATETER - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1300.00, description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + EXTRAÇÃO + CATETER - R$ 1.300,00' },
         { codes: ['04.09.03.004-0', '04.09.01.038-3'], totalValue: 1200.00, description: 'RESSECÇÃO PRÓSTATA + RESSECÇÃO LESÃO VESICAL - R$ 1.200,00' },
@@ -3946,6 +3973,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'], totalValue: 1600.00, description: 'NEFROLITOTOMIA + CATETER + EXTRAÇÃO + URETEROLITOTRIPSIA - R$ 1.600,00' },
         { codes: ['04.09.01.059-6', '04.09.01.017-0'], totalValue: 1000.00, description: 'URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.000,00' },
         { codes: ['04.09.01.018-9', '04.09.01.017-0'], totalValue: 1100.00, description: 'LITOTRIPSIA FLEXÍVEL + CATETER DUPLO J - R$ 1.100,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA + EXTRAÇÃO CÁLCULO + CATETER - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1300.00, description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + EXTRAÇÃO + CATETER - R$ 1.300,00' },
         { codes: ['04.09.03.004-0', '04.09.01.038-3'], totalValue: 1200.00, description: 'RESSECÇÃO PRÓSTATA + RESSECÇÃO LESÃO VESICAL - R$ 1.200,00' },
@@ -3992,6 +4020,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'], totalValue: 1600.00, description: 'NEFROLITOTOMIA + CATETER + EXTRAÇÃO + URETEROLITOTRIPSIA - R$ 1.600,00' },
         { codes: ['04.09.01.059-6', '04.09.01.017-0'], totalValue: 1000.00, description: 'URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.000,00' },
         { codes: ['04.09.01.018-9', '04.09.01.017-0'], totalValue: 1100.00, description: 'LITOTRIPSIA FLEXÍVEL + CATETER DUPLO J - R$ 1.100,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA + EXTRAÇÃO CÁLCULO + CATETER - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1300.00, description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + EXTRAÇÃO + CATETER - R$ 1.300,00' },
         { codes: ['04.09.03.004-0', '04.09.01.038-3'], totalValue: 1200.00, description: 'RESSECÇÃO PRÓSTATA + RESSECÇÃO LESÃO VESICAL - R$ 1.200,00' },
@@ -4038,6 +4067,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'], totalValue: 1600.00, description: 'NEFROLITOTOMIA + CATETER + EXTRAÇÃO + URETEROLITOTRIPSIA - R$ 1.600,00' },
         { codes: ['04.09.01.059-6', '04.09.01.017-0'], totalValue: 1000.00, description: 'URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.000,00' },
         { codes: ['04.09.01.018-9', '04.09.01.017-0'], totalValue: 1100.00, description: 'LITOTRIPSIA FLEXÍVEL + CATETER DUPLO J - R$ 1.100,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA + EXTRAÇÃO CÁLCULO + CATETER - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1300.00, description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + EXTRAÇÃO + CATETER - R$ 1.300,00' },
         { codes: ['04.09.03.004-0', '04.09.01.038-3'], totalValue: 1200.00, description: 'RESSECÇÃO PRÓSTATA + RESSECÇÃO LESÃO VESICAL - R$ 1.200,00' },
@@ -4084,6 +4114,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'], totalValue: 1600.00, description: 'NEFROLITOTOMIA + CATETER + EXTRAÇÃO + URETEROLITOTRIPSIA - R$ 1.600,00' },
         { codes: ['04.09.01.059-6', '04.09.01.017-0'], totalValue: 1000.00, description: 'URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.000,00' },
         { codes: ['04.09.01.018-9', '04.09.01.017-0'], totalValue: 1100.00, description: 'LITOTRIPSIA FLEXÍVEL + CATETER DUPLO J - R$ 1.100,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA + EXTRAÇÃO CÁLCULO + CATETER - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1300.00, description: 'LITOTRIPSIA + URETEROLITOTRIPSIA + EXTRAÇÃO + CATETER - R$ 1.300,00' },
         { codes: ['04.09.03.004-0', '04.09.01.038-3'], totalValue: 1200.00, description: 'RESSECÇÃO PRÓSTATA + RESSECÇÃO LESÃO VESICAL - R$ 1.200,00' },
@@ -5430,6 +5461,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'], totalValue: 1600.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA - R$ 1.600,00' },
         { codes: ['04.09.01.059-6', '04.09.01.017-0'], totalValue: 1000.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J (SEMIRRÍGIDA) - R$ 1.000,00' },
         { codes: ['04.09.01.018-9', '04.09.01.017-0'], totalValue: 1100.00, description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1300.00, description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.300,00' },
         { codes: ['04.09.03.004-0', '04.09.01.038-3'], totalValue: 1200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 1.200,00' },
@@ -5476,6 +5508,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'], totalValue: 1600.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA - R$ 1.600,00' },
         { codes: ['04.09.01.059-6', '04.09.01.017-0'], totalValue: 1000.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J (SEMIRRÍGIDA) - R$ 1.000,00' },
         { codes: ['04.09.01.018-9', '04.09.01.017-0'], totalValue: 1100.00, description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1300.00, description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.300,00' },
         { codes: ['04.09.03.004-0', '04.09.01.038-3'], totalValue: 1200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 1.200,00' },
@@ -5528,6 +5561,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'], totalValue: 1600.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA - R$ 1.600,00' },
         { codes: ['04.09.01.059-6', '04.09.01.017-0'], totalValue: 1000.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J (SEMIRRÍGIDA) - R$ 1.000,00' },
         { codes: ['04.09.01.018-9', '04.09.01.017-0'], totalValue: 1100.00, description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1300.00, description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.300,00' },
         { codes: ['04.09.03.004-0', '04.09.01.038-3'], totalValue: 1200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 1.200,00' },
@@ -5581,6 +5615,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'], totalValue: 1600.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA - R$ 1.600,00' },
         { codes: ['04.09.01.059-6', '04.09.01.017-0'], totalValue: 1000.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J (SEMIRRÍGIDA) - R$ 1.000,00' },
         { codes: ['04.09.01.018-9', '04.09.01.017-0'], totalValue: 1100.00, description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1300.00, description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.300,00' },
         { codes: ['04.09.03.004-0', '04.09.01.038-3'], totalValue: 1200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 1.200,00' },
@@ -6313,10 +6348,29 @@ export function calculateDoctorPayment(
           // Ignorar procedimentos que só possuem regra em combinação múltipla
           return null as unknown as (ProcedurePaymentInfo & { calculatedPayment: number; paymentRule: string; isSpecialRule: boolean });
         }
+        
+        // 🆕 VERIFICAR SE PROCEDIMENTO TEM VALOR DIFERENTE PARA SECUNDÁRIO
+        // Encontrar a posição REAL do procedimento na lista ORIGINAL (não filtrada)
+        const originalIndex = procedures.findIndex(p => 
+          p.procedure_code === proc.procedure_code && 
+          p.value_reais === proc.value_reais
+        );
+        const isPrincipal = originalIndex === 0; // Primeiro procedimento na AIH é principal (verde)
+        const hasSecondaryValue = standardRule.secondaryValue !== undefined;
+        
+        let calculatedValue = standardRule.standardValue;
+        let ruleDescription = standardRule.description || `R$ ${standardRule.standardValue.toFixed(2)}`;
+        
+        if (hasSecondaryValue && !isPrincipal) {
+          // Se não é o primeiro e tem valor secundário, usar o valor secundário
+          calculatedValue = standardRule.secondaryValue!;
+          ruleDescription = standardRule.description || `R$ ${standardRule.secondaryValue!.toFixed(2)} (Secundário)`;
+        }
+        
         return {
           ...proc,
-          calculatedPayment: standardRule.standardValue,
-          paymentRule: standardRule.description || `R$ ${standardRule.standardValue.toFixed(2)}`,
+          calculatedPayment: calculatedValue,
+          paymentRule: ruleDescription,
           isSpecialRule: true
         };
       })
