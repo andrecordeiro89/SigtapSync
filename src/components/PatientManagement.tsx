@@ -205,7 +205,7 @@ const PatientManagement = () => {
   const [selectedAIHsForBatch, setSelectedAIHsForBatch] = useState<Set<string>>(new Set());
   const [isUpdatingBatch, setIsUpdatingBatch] = useState(false);
   const [selectedCompetenciaForBatch, setSelectedCompetenciaForBatch] = useState<string>('all');
-  const [searchPatientName, setSearchPatientName] = useState<string>(''); // ✅ NOVO: Busca por nome do paciente na aba Mudança de Competência
+  const [searchPatientName, setSearchPatientName] = useState<string>(''); // ✅ NOVO: Busca por AIH, nome do paciente ou CNS na aba Mudança de Competência
   
   // 🆕 Estados para modal de seleção de competência de destino
   const [isCompetenciaModalOpen, setIsCompetenciaModalOpen] = useState(false);
@@ -1047,11 +1047,32 @@ const PatientManagement = () => {
       }
     }
     
-    // ✅ NOVO: Filtro de busca por nome do paciente (aba Mudança de Competência)
+    // ✅ NOVO: Filtro de busca por nome do paciente, AIH e CNS (aba Mudança de Competência)
     if (activeTab === 'mudanca-competencia' && searchPatientName.trim()) {
-      const patientName = (item.patient?.name || item.patients?.name || '').toLowerCase();
       const searchLower = searchPatientName.toLowerCase().trim();
-      if (!patientName.includes(searchLower)) {
+      
+      // 🔧 Função para normalizar (remove pontos, hífens e espaços)
+      const normalize = (str: string) => str.replace(/[.\-\s]/g, '').toLowerCase();
+      
+      const searchNormalized = normalize(searchPatientName);
+      
+      // Dados do paciente
+      const patientName = (item.patient?.name || item.patients?.name || '').toLowerCase();
+      const patientCNS = (item.patient?.cns || item.patients?.cns || '');
+      const patientCNSNormalized = normalize(patientCNS);
+      
+      // Número da AIH normalizado
+      const aihNumberNormalized = normalize(item.aih_number || '');
+      
+      // Buscar em: nome do paciente, número da AIH e CNS
+      const matchesSearch = 
+        patientName.includes(searchLower) || // Busca no nome
+        aihNumberNormalized.includes(searchNormalized) || // Busca normalizada no número da AIH
+        item.aih_number?.toLowerCase().includes(searchLower) || // Busca tradicional na AIH
+        patientCNSNormalized.includes(searchNormalized) || // Busca normalizada no CNS
+        patientCNS.includes(searchPatientName.trim()); // Busca tradicional no CNS
+      
+      if (!matchesSearch) {
         return false;
       }
     }
@@ -2609,13 +2630,13 @@ const PatientManagement = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {/* ✅ NOVO: Campo de Busca por Nome do Paciente */}
+              {/* ✅ NOVO: Campo de Busca por AIH, Nome do Paciente ou CNS */}
               <div className="mb-6 pb-4 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-2">
                     <Search className="w-4 h-4 text-gray-500" />
                     <label className="text-sm font-semibold text-gray-700">
-                      Buscar por Nome do Paciente
+                      Buscar Paciente
                     </label>
                   </div>
                   {searchPatientName && (
@@ -2637,7 +2658,7 @@ const PatientManagement = () => {
                 <div className="flex items-center gap-3">
                   <div className="flex-1">
                     <Input
-                      placeholder="Digite o nome do paciente..."
+                      placeholder="AIH, paciente ou CNS..."
                       value={searchPatientName}
                       onChange={(e) => {
                         setSearchPatientName(e.target.value);
