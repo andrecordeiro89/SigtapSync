@@ -16,11 +16,11 @@
 
 | Métrica | Valor |
 |---------|-------|
-| **Total de médicos com regras** | 8 |
-| **Médicos com regras de múltiplos procedimentos** | 4 |
-| **Total de procedimentos individuais** | 82 |
-| **Total de combinações de múltiplos** | 48 |
-| **Última atualização** | 27/10/2025 |
+| **Total de médicos com regras** | 9 |
+| **Médicos com regras de múltiplos procedimentos** | 5 |
+| **Total de procedimentos individuais** | 87 |
+| **Total de combinações de múltiplos** | 50 |
+| **Última atualização** | 21/11/2025 |
 
 ---
 
@@ -242,6 +242,33 @@
 
 ---
 
+### 9️⃣ **BRUNO BOSIO DA SILVA** - Ortopedia (Ombro) ⭐ 🆕
+
+#### Procedimentos Individuais (5 procedimentos)
+
+| Código | Descrição | Valor |
+|--------|-----------|-------|
+| `04.08.01.014-2` | REPARO DE ROTURA DO MANGUITO ROTADOR | Veja regras múltiplas |
+| `04.08.06.071-9` | VIDEOARTROSCOPIA | Veja regras múltiplas |
+| `04.08.01.021-5` | TRATAMENTO CIRÚRGICO DE LUXAÇÃO RECIDIVANTE / HABITUAL | Veja regras múltiplas |
+| `04.08.06.053-0` | TRANSPOSIÇÃO / TRANSFERÊNCIA MIOTENDINOSA | Veja regras múltiplas |
+| `04.08.06.046-8` | TENOMIOTOMIA / DESINSERÇÃO | Veja regras múltiplas |
+
+#### Regras de Múltiplos Procedimentos (2 combinações)
+
+| # | Combinação | Valor Total | Descrição |
+|---|------------|-------------|-----------|
+| 1 | `04.08.01.014-2` + `04.08.06.071-9` | R$ 900,00 | MANGUITO ROTADOR + VIDEOARTROSCOPIA |
+| 2 | `04.08.01.021-5` + `04.08.06.053-0` + `04.08.06.046-8` | R$ 500,00 | LUXAÇÃO RECIDIVANTE + TRANSPOSIÇÃO + TENOMIOTOMIA |
+
+**Observações:**
+- 🆕 Médico recém-adicionado ao hospital
+- Especialista em cirurgias de ombro
+- Regras baseadas em combinações específicas de procedimentos
+- Valores não são somados individualmente, aplica-se o valor total da combinação
+
+---
+
 ## 💡 Observações Importantes
 
 ### 🔍 Sistema de Cálculo
@@ -314,13 +341,14 @@ multipleRule: {
 
 | Categoria | Quantidade |
 |-----------|------------|
-| **Médicos cadastrados** | 8 |
+| **Médicos cadastrados** | 9 |
 | **Oftalmologistas** | 1 |
 | **Cirurgiões Vasculares** | 2 |
 | **Urologistas** | 2 |
 | **Cirurgiões Gerais** | 3 |
-| **Total de procedimentos únicos** | 82 |
-| **Total de combinações** | 48 |
+| **Ortopedistas** | 1 🆕 |
+| **Total de procedimentos únicos** | 87 |
+| **Total de combinações** | 50 |
 | **Valor médio por procedimento** | ~R$ 600,00 |
 | **Valor mais alto** | R$ 1.600,00 |
 | **Valor mais baixo** | R$ 100,00 |

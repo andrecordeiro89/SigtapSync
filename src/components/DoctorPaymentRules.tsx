@@ -1857,11 +1857,12 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     'BRUNO BOSIO DA SILVA': {
       doctorName: 'BRUNO BOSIO DA SILVA',
       // ================================================================
-      // 🦴 PROCEDIMENTO ORTOPÉDICO - MANGUITO ROTADOR + VIDEOARTROSCOPIA
-      // Especialidade: Ortopedia
-      // Data: 19/11/2025
+      // 🦴 PROCEDIMENTOS ORTOPÉDICOS
+      // Especialidade: Ortopedia (Ombro)
+      // Última atualização: 21/11/2025
       // ================================================================
       rules: [
+        // REGRA 1: Manguito Rotador + Videoartroscopia
         {
           procedureCode: '04.08.01.014-2',
           standardValue: 0, // Valor definido na regra múltipla
@@ -1871,14 +1872,41 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.08.06.071-9',
           standardValue: 0, // Valor definido na regra múltipla
           description: 'VIDEOARTROSCOPIA'
+        },
+        
+        // 🆕 REGRA 2: Luxação Recidivante/Habitual (Ombro)
+        {
+          procedureCode: '04.08.01.021-5',
+          standardValue: 0, // Valor definido na regra múltipla
+          description: 'TRATAMENTO CIRÚRGICO DE LUXAÇÃO RECIDIVANTE / HABITUAL DE ARTICULAÇÃO ESCAPULO-UMERAL'
+        },
+        {
+          procedureCode: '04.08.06.053-0',
+          standardValue: 0, // Valor definido na regra múltipla
+          description: 'TRANSPOSIÇÃO / TRANSFERÊNCIA MIOTENDINOSA'
+        },
+        {
+          procedureCode: '04.08.06.046-8',
+          standardValue: 0, // Valor definido na regra múltipla
+          description: 'TENOMIOTOMIA / DESINSERÇÃO'
         }
       ],
-      // 🔗 REGRA MÚLTIPLA: Combinação específica
-      multipleRule: {
-        codes: ['04.08.01.014-2', '04.08.06.071-9'],
-        totalValue: 900.00,
-        description: 'REPARO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00 TOTAL (não soma)'
-      }
+      // 🔗 REGRAS MÚLTIPLAS: Múltiplas combinações possíveis
+      multipleRules: [
+        // COMBINAÇÃO 1: Manguito Rotador + Videoartroscopia
+        {
+          codes: ['04.08.01.014-2', '04.08.06.071-9'],
+          totalValue: 900.00,
+          description: 'REPARO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00 TOTAL'
+        },
+        
+        // 🆕 COMBINAÇÃO 2: Luxação Recidivante (3 procedimentos)
+        {
+          codes: ['04.08.01.021-5', '04.08.06.053-0', '04.08.06.046-8'],
+          totalValue: 500.00,
+          description: 'TRATAMENTO LUXAÇÃO RECIDIVANTE + TRANSPOSIÇÃO MIOTENDINOSA + TENOMIOTOMIA - R$ 500,00 TOTAL'
+        }
+      ]
     }
   },
 
@@ -2713,7 +2741,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     // DR. BRUNO BOSIO DA SILVA - ORTOPEDIA
     // Hospital: Municipal 18 de Dezembro (Arapoti)
     // Especialidade: Ortopedia (Ombro/Manguito Rotador)
-    // Data: 18/11/2025
+    // Última atualização: 21/11/2025
     // Observação: No Hospital São José, este médico tem valor fixo de R$ 40.000,00
     //             No Hospital 18 de Dezembro, ele trabalha com regras por procedimento
     // ================================================================
@@ -2721,6 +2749,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       doctorName: 'BRUNO BOSIO DA SILVA',
       // 🔬 PROCEDIMENTOS INDIVIDUAIS - ORTOPEDIA
       rules: [
+        // REGRA 1: Manguito Rotador + Videoartroscopia
         {
           procedureCode: '04.08.01.014-2',
           standardValue: 900.00,
@@ -2730,14 +2759,41 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.08.06.071-9',
           standardValue: 900.00,
           description: 'VIDEOARTROSCOPIA - R$ 900,00'
+        },
+        
+        // 🆕 REGRA 2: Luxação Recidivante/Habitual (Ombro)
+        {
+          procedureCode: '04.08.01.021-5',
+          standardValue: 0, // Valor definido na regra múltipla
+          description: 'TRATAMENTO CIRÚRGICO DE LUXAÇÃO RECIDIVANTE / HABITUAL DE ARTICULAÇÃO ESCAPULO-UMERAL'
+        },
+        {
+          procedureCode: '04.08.06.053-0',
+          standardValue: 0, // Valor definido na regra múltipla
+          description: 'TRANSPOSIÇÃO / TRANSFERÊNCIA MIOTENDINOSA'
+        },
+        {
+          procedureCode: '04.08.06.046-8',
+          standardValue: 0, // Valor definido na regra múltipla
+          description: 'TENOMIOTOMIA / DESINSERÇÃO'
         }
       ],
-      // 🔗 REGRA MÚLTIPLA: Combinação específica
-      multipleRule: {
-        codes: ['04.08.01.014-2', '04.08.06.071-9'],
-        totalValue: 900.00,
-        description: 'REPARO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00 TOTAL (não soma)'
-      }
+      // 🔗 REGRAS MÚLTIPLAS: Múltiplas combinações possíveis
+      multipleRules: [
+        // COMBINAÇÃO 1: Manguito Rotador + Videoartroscopia
+        {
+          codes: ['04.08.01.014-2', '04.08.06.071-9'],
+          totalValue: 900.00,
+          description: 'REPARO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00 TOTAL'
+        },
+        
+        // 🆕 COMBINAÇÃO 2: Luxação Recidivante (3 procedimentos)
+        {
+          codes: ['04.08.01.021-5', '04.08.06.053-0', '04.08.06.046-8'],
+          totalValue: 500.00,
+          description: 'TRATAMENTO LUXAÇÃO RECIDIVANTE + TRANSPOSIÇÃO MIOTENDINOSA + TENOMIOTOMIA - R$ 500,00 TOTAL'
+        }
+      ]
     }
   },
 
@@ -5718,7 +5774,10 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         // ================================================================
         // 🦴 PROCEDIMENTOS ORTOPÉDICOS - CIRURGIA DE OMBRO
         // Especialidade: Ortopedia (Ombro - Artroscopia)
+        // Última atualização: 21/11/2025
         // ================================================================
+        
+        // REGRA 1: Manguito Rotador + Videoartroscopia
         {
           procedureCode: '04.08.01.014-2',
           standardValue: 0,
@@ -5728,13 +5787,38 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.08.06.071-9',
           standardValue: 0,
           description: 'VIDEOARTROSCOPIA - valor definido em regra de múltiplos'
+        },
+        
+        // 🆕 REGRA 2: Luxação Recidivante/Habitual (Ombro)
+        {
+          procedureCode: '04.08.01.021-5',
+          standardValue: 0,
+          description: 'TRATAMENTO CIRÚRGICO DE LUXAÇÃO RECIDIVANTE / HABITUAL DE ARTICULAÇÃO ESCAPULO-UMERAL - valor definido em regra de múltiplos'
+        },
+        {
+          procedureCode: '04.08.06.053-0',
+          standardValue: 0,
+          description: 'TRANSPOSIÇÃO / TRANSFERÊNCIA MIOTENDINOSA - valor definido em regra de múltiplos'
+        },
+        {
+          procedureCode: '04.08.06.046-8',
+          standardValue: 0,
+          description: 'TENOMIOTOMIA / DESINSERÇÃO - valor definido em regra de múltiplos'
         }
       ],
       multipleRules: [
+        // COMBINAÇÃO 1: Manguito Rotador + Videoartroscopia
         {
           codes: ['04.08.01.014-2', '04.08.06.071-9'],
           totalValue: 900.00,
           description: 'REPARO DE ROTURA DO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00'
+        },
+        
+        // 🆕 COMBINAÇÃO 2: Luxação Recidivante (3 procedimentos)
+        {
+          codes: ['04.08.01.021-5', '04.08.06.053-0', '04.08.06.046-8'],
+          totalValue: 500.00,
+          description: 'TRATAMENTO LUXAÇÃO RECIDIVANTE + TRANSPOSIÇÃO MIOTENDINOSA + TENOMIOTOMIA - R$ 500,00 TOTAL'
         }
       ]
     },
@@ -5745,7 +5829,10 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         // ================================================================
         // 🦴 PROCEDIMENTOS ORTOPÉDICOS - CIRURGIA DE OMBRO
         // Especialidade: Ortopedia (Ombro - Artroscopia)
+        // Última atualização: 21/11/2025
         // ================================================================
+        
+        // REGRA 1: Manguito Rotador + Videoartroscopia
         {
           procedureCode: '04.08.01.014-2',
           standardValue: 0,
@@ -5755,13 +5842,38 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.08.06.071-9',
           standardValue: 0,
           description: 'VIDEOARTROSCOPIA - valor definido em regra de múltiplos'
+        },
+        
+        // 🆕 REGRA 2: Luxação Recidivante/Habitual (Ombro)
+        {
+          procedureCode: '04.08.01.021-5',
+          standardValue: 0,
+          description: 'TRATAMENTO CIRÚRGICO DE LUXAÇÃO RECIDIVANTE / HABITUAL DE ARTICULAÇÃO ESCAPULO-UMERAL - valor definido em regra de múltiplos'
+        },
+        {
+          procedureCode: '04.08.06.053-0',
+          standardValue: 0,
+          description: 'TRANSPOSIÇÃO / TRANSFERÊNCIA MIOTENDINOSA - valor definido em regra de múltiplos'
+        },
+        {
+          procedureCode: '04.08.06.046-8',
+          standardValue: 0,
+          description: 'TENOMIOTOMIA / DESINSERÇÃO - valor definido em regra de múltiplos'
         }
       ],
       multipleRules: [
+        // COMBINAÇÃO 1: Manguito Rotador + Videoartroscopia
         {
           codes: ['04.08.01.014-2', '04.08.06.071-9'],
           totalValue: 900.00,
           description: 'REPARO DE ROTURA DO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00'
+        },
+        
+        // 🆕 COMBINAÇÃO 2: Luxação Recidivante (3 procedimentos)
+        {
+          codes: ['04.08.01.021-5', '04.08.06.053-0', '04.08.06.046-8'],
+          totalValue: 500.00,
+          description: 'TRATAMENTO LUXAÇÃO RECIDIVANTE + TRANSPOSIÇÃO MIOTENDINOSA + TENOMIOTOMIA - R$ 500,00 TOTAL'
         }
       ]
     }
