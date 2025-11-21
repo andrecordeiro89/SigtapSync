@@ -3165,15 +3165,29 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           standardValue: 900.00,
           description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00'
         },
+        // ================================================================
+        // 🆕 LITOTRIPSIA - ATUALIZADO EM 21/11/2025
+        // ⚠️ ATENÇÃO: Valor varia conforme posição na AIH
+        // • Principal (1º procedimento): R$ 1.000,00
+        // • Secundário (2º+ procedimento): R$ 200,00
+        // ================================================================
         {
           procedureCode: '04.09.01.018-9',
           standardValue: 1000.00,
-          description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00'
+          secondaryValue: 200.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00 (Principal) / R$ 200,00 (Secundário)'
         },
+        // ================================================================
+        // 🆕 CATETER DUPLO J - ATUALIZADO EM 21/11/2025
+        // ⚠️ ATENÇÃO: Valor varia conforme posição na AIH
+        // • Principal (1º procedimento): R$ 250,00
+        // • Secundário (2º+ procedimento): R$ 100,00
+        // ================================================================
         {
           procedureCode: '04.09.01.017-0',
           standardValue: 250.00,
-          description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00'
+          secondaryValue: 100.00,
+          description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00 (Principal) / R$ 100,00 (Secundário)'
         },
         {
           procedureCode: '04.09.03.004-0',
