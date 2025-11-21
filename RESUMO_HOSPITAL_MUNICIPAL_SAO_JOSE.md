@@ -396,10 +396,10 @@ Exemplos: Nefrectomia, Combinações Urológicas
 ### **Arquivo:** `src/components/DoctorPaymentRules.tsx`
 
 ```
-HOSPITAL_MUNICIPAL_SAO_JOSE (Linha 2501)
-├── THIAGO TIESSI SUZUKI (Linhas 2502-2724)
-│   ├── 21 procedimentos individuais
-│   └── 16 combinações de múltiplos
+HOSPITAL_MUNICIPAL_SAO_JOSE (Linha 2847)
+├── THIAGO TIESSI SUZUKI (Linhas 2848-3070) 🆕
+│   ├── 22 procedimentos individuais
+│   └── 17 combinações de múltiplos (+1 nova)
 │
 ├── SUELLEN FERNANDA BAGATIM (Linhas 2727-2776)
 │   ├── 5 procedimentos ORL
@@ -419,7 +419,8 @@ HOSPITAL_MUNICIPAL_SAO_JOSE (Linha 2501)
 
 | Data | Médico | Ação | Tipo | Procedimentos/Valor |
 |------|--------|------|------|---------------------|
-| **18/11/2025** | THIAGO TIESSI SUZUKI | ✏️ Atualizado | Procedimento | 21 + 16 comb |
+| **21/11/2025** | THIAGO TIESSI SUZUKI | ➕ Regra Adicionada | Procedimento | +1 comb (17 total) 🆕 |
+| **18/11/2025** | THIAGO TIESSI SUZUKI | ✏️ Atualizado | Procedimento | 22 + 16 comb |
 | **18/11/2025** | SUELLEN FERNANDA BAGATIM | ➕ Adicionado | Procedimento | 5 + 1 comb |
 | **18/11/2025** | VITOR BRANDANI GARBELINI | ➕ Adicionado | Procedimento | 21 + 16 comb |
 | **18/11/2025** | PEDRO HENRIQUE RODRIGUES | ➕ Adicionado | Procedimento | 1 |
@@ -435,11 +436,15 @@ HOSPITAL_MUNICIPAL_SAO_JOSE (Linha 2501)
 
 ### **Documentos Específicos:**
 
-1. **`CONFIRMACAO_UROLOGISTAS_SAO_JOSE.md`**
-   - Dr. Thiago Tiessi Suzuki
-   - Dr. Vitor Brandani Garbelini
-   - 21 procedimentos cada
-   - 16 combinações cada
+1. **`CONFIRMACAO_NOVA_REGRA_THIAGO_SUZUKI_SAO_JOSE.md`** 🆕
+   - Nova regra: Litotripsia + Ureterolitotripsia + Cateter (R$ 1.200)
+   - Data: 21/11/2025
+   - Detalhamento completo da adição
+
+2. **`CONFIRMACAO_UROLOGISTAS_SAO_JOSE.md`**
+   - Dr. Thiago Tiessi Suzuki (22 + 17)
+   - Dr. Vitor Brandani Garbelini (21 + 16)
+   - Procedimentos individuais e combinações
 
 2. **`REGRAS_SUELLEN_FERNANDA_BAGATIM.md`**
    - Dra. Suellen Fernanda Bagatim
@@ -571,7 +576,7 @@ HOSPITAL_MUNICIPAL_SAO_JOSE (Linha 2501)
 ║     • Grupo B: 5 médicos (pagamento fixo mensal)       ║
 ║                                                          ║
 ║  📋 48 procedimentos individuais configurados          ║
-║  🔗 33 combinações de múltiplos procedimentos          ║
+║  🔗 34 combinações de múltiplos (🆕 +1 em 21/11/2025)  ║
 ║  💰 Faixa de valores: R$ 250 - R$ 1.600               ║
 ║  💵 Compromisso fixo mensal: R$ 219.400,00             ║
 ║  💵 Compromisso fixo anual: R$ 2.632.800,00            ║
@@ -581,7 +586,7 @@ HOSPITAL_MUNICIPAL_SAO_JOSE (Linha 2501)
 ║     • Otorrinolaringologia (1 médica)                  ║
 ║     • Cirurgia Vascular (1 médico)                     ║
 ║                                                          ║
-║  📅 Última Atualização: 18/11/2025                     ║
+║  📅 Última Atualização: 21/11/2025 ⚡                  ║
 ║  ✅ Status: Pronto para Produção                       ║
 ║                                                          ║
 ╚══════════════════════════════════════════════════════════╝
@@ -617,5 +622,6 @@ HOSPITAL_MUNICIPAL_SAO_JOSE (Linha 2501)
 **Médicos:** 9 ativos (4 por procedimento + 5 pagamento fixo)  
 **Especialidades:** 3  
 **Compromisso Fixo Mensal:** R$ 219.400,00  
-**Data:** 18/11/2025  
-**Status:** ✅ COMPLETO E 
+**Data:** 21/11/2025 🆕  
+**Status:** ✅ COMPLETO E OPERACIONAL
+

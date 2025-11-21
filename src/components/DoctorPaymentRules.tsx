@@ -510,7 +510,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     // ================================================================
     // 🔗 REGRAS DE MÚLTIPLOS PROCEDIMENTOS - DR. GUILHERME AUGUSTO STORER
     // Sistema: Valores fixos para combinações específicas
-    // Total: 16 combinações cadastradas
+    // Total: 17 combinações cadastradas
     // Mesmas regras do Dr. HELIO SHINDY KISSINA
     // ================================================================
     multipleRules: [
@@ -553,6 +553,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         codes: ['04.09.01.018-9', '04.09.01.017-0'],
         totalValue: 1100.00,
         description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
+      },
+      {
+        codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'],
+        totalValue: 1200.00,
+        description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00'
       },
       {
         codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'],
@@ -1734,7 +1739,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // ================================================================
       // 🔬 PROCEDIMENTOS INDIVIDUAIS - UROLOGIA
       // Baseado em: Dr. GUILHERME AUGUSTO STORER
-      // Última atualização: 19/11/2025
+      // Última atualização: 21/11/2025
       // Total: 22 procedimentos
       // ================================================================
       rules: [
@@ -1763,7 +1768,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       ],
       // ================================================================
       // 🔗 REGRAS DE MÚLTIPLOS PROCEDIMENTOS
-      // Total: 16 combinações cadastradas
+      // Total: 17 combinações cadastradas
       // ================================================================
       multipleRules: [
         { codes: ['04.09.01.023-5', '04.09.01.017-0'], totalValue: 1100.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
@@ -1773,6 +1778,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { codes: ['04.09.01.023-5', '04.09.01.017-0', '04.09.01.014-6', '04.09.01.059-6'], totalValue: 1600.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (FLEXÍVEL OU SEMIRRÍGIDA) - R$ 1.600,00' },
         { codes: ['04.09.01.059-6', '04.09.01.017-0'], totalValue: 1000.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J (SEMIRRÍGIDA) - R$ 1.000,00' },
         { codes: ['04.09.01.018-9', '04.09.01.017-0'], totalValue: 1100.00, description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
+        { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1200.00, description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00' },
         { codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.014-6', '04.09.01.017-0'], totalValue: 1300.00, description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.300,00' },
         { codes: ['04.09.03.004-0', '04.09.01.038-3'], totalValue: 1200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA + RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 1.200,00' },
@@ -2522,7 +2528,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       doctorName: 'GUILHERME VINICIUS SAWCZYN',
       // ================================================================
       // 🔬 PROCEDIMENTOS INDIVIDUAIS - UROLOGIA
-      // Total: 21 procedimentos
+      // Total: 22 procedimentos
       // ================================================================
       rules: [
         {
@@ -2638,7 +2644,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       ],
       // ================================================================
       // 🔗 REGRAS DE MÚLTIPLOS PROCEDIMENTOS
-      // Total: 16 combinações
+      // Total: 17 combinações
       // ================================================================
       multipleRules: [
         // Grupo 1: NEFROLITOTOMIA PERCUTÂNEA + Combinações
@@ -2680,6 +2686,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           codes: ['04.09.01.018-9', '04.09.01.017-0'],
           totalValue: 1100.00,
           description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00'
+        },
+        {
+          codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'],
+          totalValue: 1200.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA + CATETER DUPLO J - R$ 1.200,00'
         },
         {
           codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'],
