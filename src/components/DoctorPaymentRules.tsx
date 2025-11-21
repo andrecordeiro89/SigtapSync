@@ -3014,6 +3014,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           description: 'LITOTRIPSIA (FLEXÍVEL) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00'
         },
         {
+          codes: ['04.09.01.018-9', '04.09.01.059-6', '04.09.01.017-0'],
+          totalValue: 1200.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) + URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.200,00'
+        },
+        {
           codes: ['04.09.01.018-9', '04.09.01.014-6', '04.09.01.017-0'],
           totalValue: 1200.00,
           description: 'LITOTRIPSIA (FLEXÍVEL) + EXTRAÇÃO CÁLCULO PELVE RENAL + INSTALAÇÃO CATETER - R$ 1.200,00'

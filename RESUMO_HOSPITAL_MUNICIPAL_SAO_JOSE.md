@@ -2,7 +2,7 @@
 
 ## Resumo Completo de Todos os Médicos Cadastrados
 
-**Data de Atualização:** 18/11/2025  
+**Data de Atualização:** 21/11/2025 ⚡ 🆕  
 **Hospital ID:** 792a0316-92b4-4504-8238-491d284099a3  
 **Localização:** Carlópolis - PR  
 
@@ -16,7 +16,7 @@
 ║  📊 MÉDICOS CADASTRADOS: 9                                  ║
 ║  🎯 ESPECIALIDADES: 3                                       ║
 ║  📋 TOTAL DE PROCEDIMENTOS: 48                              ║
-║  🔗 TOTAL DE COMBINAÇÕES: 33                                ║
+║  🔗 TOTAL DE COMBINAÇÕES: 34 (🆕 +1 em 21/11/2025)         ║
 ║  💰 FAIXA DE VALORES: R$ 250 - R$ 1.600                    ║
 ║  💵 PAGAMENTOS FIXOS MENSAIS: R$ 219.400,00                ║
 ║                                                              ║
@@ -42,12 +42,12 @@
 │ 👨‍⚕️ THIAGO TIESSI SUZUKI                  │
 ├────────────────────────────────────────────┤
 │ 🎯 ESPECIALIDADE: Urologia                │
-│ 📋 PROCEDIMENTOS: 21 individuais          │
-│ 🔗 COMBINAÇÕES: 16                         │
+│ 📋 PROCEDIMENTOS: 22 individuais          │
+│ 🔗 COMBINAÇÕES: 17 (🆕 +1 em 21/11/2025) │
 │ 💰 FAIXA: R$ 250 - R$ 1.600              │
 │ ⭐ COMPLEXIDADE: Máxima                   │
 │ 📄 BASEADO EM: Guilherme Augusto Storer   │
-│ 📅 DATA: 18/11/2025 (Atualizado)         │
+│ 📅 DATA: 21/11/2025 (Atualizado)         │
 │ ✅ STATUS: Ativo                          │
 └────────────────────────────────────────────┘
 ```
@@ -58,7 +58,10 @@
 - Nefrectomia Total (R$ 1.200)
 - Litotripsia Flexível (R$ 1.000)
 
-**Código:** Linhas 2502-2724
+**Nova Regra Adicionada (21/11/2025):**
+- Litotripsia + Ureterolitotripsia + Cateter Duplo J (R$ 1.200)
+
+**Código:** Linhas 2848-3070
 
 ---
 
@@ -283,7 +286,7 @@ Pagamento Fixo     ████████████████████�
 └─ Maria Eduarda Caetano Claro (R$ 15.000,00)
 
 Por Procedimento   ████████████████████ 44% (4 médicos)
-├─ Thiago Tiessi Suzuki (21 + 16)
+├─ Thiago Tiessi Suzuki (22 + 17) 🆕
 ├─ Vitor Brandani Garbelini (21 + 16)
 ├─ Suellen Fernanda Bagatim (5 + 1)
 └─ Pedro Henrique Rodrigues (1)
@@ -293,7 +296,7 @@ Por Procedimento   ████████████████████ 
 
 ```
 Urologia           ██████████████████ 50% (2 médicos)
-├─ Thiago Tiessi Suzuki (21 + 16)
+├─ Thiago Tiessi Suzuki (22 + 17) 🆕
 └─ Vitor Brandani Garbelini (21 + 16)
 
 ORL                █████████ 25% (1 médico)
@@ -352,7 +355,7 @@ Exemplos: Nefrectomia, Combinações Urológicas
 
 | # | Médico | Especialidade | Proc | Comb | Faixa $ | Complexidade | Status |
 |---|--------|---------------|------|------|---------|--------------|--------|
-| 1 | THIAGO TIESSI SUZUKI | Urologia | 21 | 16 | R$ 250-1.600 | ⭐⭐⭐⭐⭐ | ✅ |
+| 1 | THIAGO TIESSI SUZUKI | Urologia | 22 | 17 🆕 | R$ 250-1.600 | ⭐⭐⭐⭐⭐ | ✅ |
 | 2 | VITOR BRANDANI GARBELINI | Urologia | 21 | 16 | R$ 250-1.600 | ⭐⭐⭐⭐⭐ | ✅ |
 | 3 | SUELLEN FERNANDA BAGATIM | ORL | 5 | 1 | R$ 700-700 | ⭐⭐ | ✅ |
 | 4 | PEDRO HENRIQUE RODRIGUES | Cirurgia Vascular | 1 | 0 | R$ 1.100 | ⭐ | ✅ |
@@ -615,5 +618,4 @@ HOSPITAL_MUNICIPAL_SAO_JOSE (Linha 2501)
 **Especialidades:** 3  
 **Compromisso Fixo Mensal:** R$ 219.400,00  
 **Data:** 18/11/2025  
-**Status:** ✅ COMPLETO E OPERACIONAL
-
+**Status:** ✅ COMPLETO E 
