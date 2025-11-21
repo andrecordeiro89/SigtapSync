@@ -1058,11 +1058,25 @@ const PatientManagement = () => {
     
     // Filtro de busca textual (aba Pacientes) - os demais já foram aplicados no SQL
     if (activeTab === 'pacientes' && globalSearch) {
-      const searchLower = globalSearch.toLowerCase();
+      const searchLower = globalSearch.toLowerCase().trim();
+      
+      // 🔧 CORREÇÃO: Normalizar número da AIH removendo caracteres especiais para busca
+      const normalizeAihNumber = (aihNum: string) => {
+        return aihNum.replace(/[.\-\s]/g, '').toLowerCase();
+      };
+      
+      const searchNormalized = normalizeAihNumber(globalSearch);
+      const aihNumberNormalized = normalizeAihNumber(item.aih_number || '');
+      
       return (
+        // Busca normalizada no número da AIH (remove pontos, hífens e espaços)
+        aihNumberNormalized.includes(searchNormalized) ||
+        // Busca tradicional no número da AIH (caso tenha formatação igual)
         item.aih_number.toLowerCase().includes(searchLower) ||
+        // Busca no nome do paciente
         (item.patient?.name && item.patient.name.toLowerCase().includes(searchLower)) ||
-        (item.patient?.cns && item.patient.cns.includes(globalSearch))
+        // Busca no CNS do paciente
+        (item.patient?.cns && item.patient.cns.replace(/[.\-\s]/g, '').includes(searchNormalized))
       );
     }
     
