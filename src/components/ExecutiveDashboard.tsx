@@ -363,6 +363,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     totalMultipleAIHs?: number;
     totalAIHs?: number;
   } | null>(null);
+  const [showViewsWarning, setShowViewsWarning] = useState(false);
   
   const [hospitalStats, setHospitalStats] = useState<HospitalStats[]>([]);
   const [doctorStats, setDoctorStats] = useState<DoctorStats[]>([]);
@@ -676,6 +677,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         DoctorsRevenueService.getHospitalStats()
       ]);
       
+      // ✅ Verificar se as views retornaram dados vazios (indicando erro 500)
+      if (doctorsResult.doctors.length === 0 && specialtiesData.length === 0 && hospitalsData.length === 0) {
+        console.warn('⚠️ TODAS AS VIEWS RETORNARAM VAZIAS - Possível erro 500 no Supabase');
+        console.warn('💡 Execute: database/fix_missing_views_migration.sql no Supabase');
+        setShowViewsWarning(true);
+      }
+      
       // Atualizar estados com dados reais
       setSpecialtyStats(specialtiesData);
       try {
@@ -721,6 +729,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       } else {
         // ⚠️ FALLBACK: Usar dados das views de médicos (estimativas)
         console.log('⚠️ Usando dados estimados das views de médicos (sem AIHs processadas)');
+        setShowViewsWarning(true); // ⚠️ Mostrar aviso de que as views estão faltando
         
         // Normalizar valores dos médicos
         const normalizedDoctorRevenues = doctorsResult.doctors.map(d => 
@@ -1193,6 +1202,32 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {/* Abas de competência removidas conforme solicitação */}
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* ⚠️ AVISO: Views de banco de dados não encontradas */}
+            {showViewsWarning && (
+              <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold text-yellow-800 mb-1">
+                      ⚠️ Views do banco de dados não encontradas
+                    </h3>
+                    <p className="text-xs text-yellow-700 mb-2">
+                      As views <code className="bg-yellow-100 px-1 rounded">v_doctors_aggregated</code> e <code className="bg-yellow-100 px-1 rounded">v_specialty_revenue_stats</code> retornaram erro 500.
+                    </p>
+                    <p className="text-xs text-yellow-700 font-semibold">
+                      💡 Solução: Execute o script <code className="bg-yellow-100 px-1 rounded font-mono">database/fix_missing_views_migration.sql</code> no Supabase SQL Editor.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowViewsWarning(false)}
+                    className="text-yellow-600 hover:text-yellow-800 flex-shrink-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {/* FILTROS EM GRID - DESIGN MINIMALISTA */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
               {/* BUSCAR MÉDICO */}

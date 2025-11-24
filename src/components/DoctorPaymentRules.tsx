@@ -6072,6 +6072,22 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
   // ================================================================
   // OUTROS HOSPITAIS (adicionar conforme necessário)
   // ================================================================
+  
+  // ================================================================
+  // Hospital GUA - Centro de Medicina Avançada
+  // ================================================================
+  HOSPITAL_GUA_CENTRO_MEDICINA_AVANCADA: {
+    // Usar mesmo padrão do hospital padrão até configuração específica
+    ...{},
+  },
+  
+  // ================================================================
+  // Hospital SM - Santa Maria
+  // ================================================================
+  HOSPITAL_SM_SANTA_MARIA: {
+    // Usar mesmo padrão do hospital padrão até configuração específica
+    ...{},
+  },
 };
 
 // ================================================================
@@ -6107,6 +6123,12 @@ function detectHospitalFromContext(doctorName: string, hospitalId?: string): str
   }
   if (hospitalId === '019c7380-459d-4aa5-bbd8-2dba4f361e7e') {
     return 'HOSPITAL_MUNICIPAL_JUAREZ_BARRETO_MACEDO';
+  }
+  if (hospitalId === '1218dd7b-efcb-442e-ad2b-b72d04128cb9') {
+    return 'HOSPITAL_GUA_CENTRO_MEDICINA_AVANCADA';
+  }
+  if (hospitalId === '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b') {
+    return 'HOSPITAL_SM_SANTA_MARIA';
   }
   
   // Se hospitalId foi fornecido mas não reconhecido, retornar padrão

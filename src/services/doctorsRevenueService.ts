@@ -376,9 +376,18 @@ export class DoctorsRevenueService {
         totalPages: Math.ceil((count || 0) / pageSize)
       };
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('💥 Erro no getDoctorsAggregated:', error);
-      throw error;
+      console.warn('⚠️ Retornando estrutura vazia devido a erro na view v_doctors_aggregated');
+      console.warn('💡 SOLUÇÃO: Execute o script database/fix_missing_views_migration.sql no Supabase');
+      // Retornar estrutura vazia em vez de propagar o erro
+      return {
+        doctors: [],
+        totalCount: 0,
+        currentPage: 1,
+        pageSize: filters.pageSize || 50,
+        totalPages: 0
+      };
     }
   }
 
@@ -541,9 +550,12 @@ export class DoctorsRevenueService {
 
       if (error) throw error;
       return data as SpecialtyStats[];
-    } catch (error) {
+    } catch (error: any) {
       console.error('💥 Erro no getSpecialtyStats:', error);
-      throw error;
+      console.warn('⚠️ Retornando array vazio devido a erro na view v_specialty_revenue_stats');
+      console.warn('💡 SOLUÇÃO: Execute o script database/fix_missing_views_migration.sql no Supabase');
+      // Retornar array vazio em vez de propagar o erro
+      return [];
     }
   }
 
@@ -559,9 +571,12 @@ export class DoctorsRevenueService {
 
       if (error) throw error;
       return data as HospitalStats[];
-    } catch (error) {
+    } catch (error: any) {
       console.error('💥 Erro no getHospitalStats:', error);
-      throw error;
+      console.warn('⚠️ Retornando array vazio devido a erro na view v_hospital_revenue_stats');
+      console.warn('💡 SOLUÇÃO: Execute o script database/fix_missing_views_migration.sql no Supabase');
+      // Retornar array vazio em vez de propagar o erro
+      return [];
     }
   }
 
