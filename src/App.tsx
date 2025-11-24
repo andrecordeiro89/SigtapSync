@@ -14,6 +14,7 @@ import { Button } from "./components/ui/button";
 import { Card, CardContent } from "./components/ui/card";
 import { RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from 'sonner';
+import { viewRefreshService } from './services/viewRefreshService';
 
 const queryClient = new QueryClient();
 

@@ -271,10 +271,12 @@ export class DoctorPatientService {
         // Query 2: Procedimentos por AIH (fallback)
         ProcedureRecordsService.getProceduresByAihIds(aihIds),
         // Query 3: Dados dos médicos (CNS, nome, especialidade)
+        // 🚫 FILTRO: Excluir especialidade "03 - Clínico"
         supabase
           .from('doctors')
           .select('id, name, cns, crm, specialty, is_active')
-          .in('cns', doctorCnsList),
+          .in('cns', doctorCnsList)
+          .neq('specialty', '03 - Clínico'),
         // Query 4: Dados dos hospitais
         options?.hospitalIds && options.hospitalIds.length > 0 && !options.hospitalIds.includes('all')
           ? supabase
@@ -470,6 +472,7 @@ export class DoctorPatientService {
         .from('doctors')
         .select('id, name, cns, crm, specialty')
         .eq('cns', doctorCns)
+        .neq('specialty', '03 - Clínico') // 🚫 Excluir especialidade "03 - Clínico"
         .single();
 
       if (doctorError || !doctorData) {
@@ -667,6 +670,7 @@ export class DoctorPatientService {
         .from('doctors')
         .select('id, name, cns, crm, specialty')
         .ilike('name', `%${doctorName}%`)
+        .neq('specialty', '03 - Clínico') // 🚫 Excluir especialidade "03 - Clínico"
         .limit(10);
 
       if (doctorsError || !doctorsData || doctorsData.length === 0) {
@@ -772,7 +776,8 @@ export class DoctorPatientService {
       
       let query = supabase
         .from('doctors')
-        .select('id, name, cns, crm, specialty');
+        .select('id, name, cns, crm, specialty')
+        .neq('specialty', '03 - Clínico'); // 🚫 Excluir especialidade "03 - Clínico"
 
       // Aplicar filtros
       if (filters.specialty) {
@@ -850,6 +855,7 @@ export class DoctorPatientService {
         .from('doctors')
         .select('id, name, cns, crm, specialty')
         .eq('is_active', true)
+        .neq('specialty', '03 - Clínico') // 🚫 Excluir especialidade "03 - Clínico"
         .order('name');
 
       if (doctorsError) {
@@ -1869,7 +1875,8 @@ export class DoctorPatientService {
       const { data: doctorsTableData, error: doctorsTableError } = await supabase
         .from('doctors')
         .select('id, cns, name, crm, specialty')
-        .in('cns', cnsList);
+        .in('cns', cnsList)
+        .neq('specialty', '03 - Clínico'); // 🚫 Excluir especialidade "03 - Clínico"
 
       if (doctorsTableError) {
         console.error('❌ Erro ao buscar médicos:', doctorsTableError);

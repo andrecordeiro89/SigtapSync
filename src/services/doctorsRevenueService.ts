@@ -590,6 +590,7 @@ export class DoctorsRevenueService {
         .select('specialty')
         .not('specialty', 'is', null)
         .neq('specialty', '')
+        .neq('specialty', '03 - Clínico') // 🚫 Excluir especialidade "03 - Clínico"
         .order('specialty');
 
       if (error) throw error;

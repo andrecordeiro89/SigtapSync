@@ -68,6 +68,7 @@ export class DoctorsCrudService {
       console.log('🩺 [REAL] Buscando TODOS os médicos de TODOS os hospitais usando tabela doctor_hospital...');
       
       // 1. BUSCAR TODOS OS MÉDICOS COM SUAS ASSOCIAÇÕES HOSPITALARES
+      // 🚫 FILTRO: Excluir especialidade "03 - Clínico" da visualização
       let mainQuery = supabase
         .from('doctor_hospital')
         .select(`
@@ -77,7 +78,7 @@ export class DoctorsCrudService {
           department,
           is_primary_hospital,
           is_active,
-          doctors (
+          doctors!inner (
             id,
             cns,
             crm,
@@ -92,7 +93,8 @@ export class DoctorsCrudService {
             name,
             cnpj
           )
-        `);
+        `)
+        .neq('doctors.specialty', '03 - Clínico');
 
       // Aplicar filtros se necessário
       if (filters?.isActive !== undefined) {
@@ -260,7 +262,7 @@ export class DoctorsCrudService {
       const hospitalIdSet = Array.from(new Set(rows.map(r => r.hospital_id).filter(Boolean)));
 
       const [{ data: doctors }, { data: hospitals }] = await Promise.all([
-        supabase.from('doctors').select('id,cns,crm,name,specialty').in('cns', doctorCnsSet),
+        supabase.from('doctors').select('id,cns,crm,name,specialty').in('cns', doctorCnsSet).neq('specialty', '03 - Clínico'),
         supabase.from('hospitals').select('id,name').in('id', hospitalIdSet)
       ]);
 
@@ -305,6 +307,7 @@ export class DoctorsCrudService {
         .from('doctor_hospital_info')
         .select('*')
         .eq('doctor_id', id)
+        .neq('doctor_specialty', '03 - Clínico') // 🚫 Excluir especialidade "03 - Clínico"
         .single();
 
       if (error) {
@@ -357,7 +360,8 @@ export class DoctorsCrudService {
 
       let query = supabase
         .from('doctor_hospital_info')
-        .select('*');
+        .select('*')
+        .neq('doctor_specialty', '03 - Clínico'); // 🚫 Excluir especialidade "03 - Clínico"
 
       // Aplicar filtros
       if (filters?.hospitalIds && filters.hospitalIds.length > 0) {
@@ -794,6 +798,7 @@ export class DoctorsCrudService {
       const { data, error } = await supabase
         .from('doctor_hospital_info')
         .select('hospital_id, hospital_name')
+        .neq('doctor_specialty', '03 - Clínico') // 🚫 Excluir especialidade "03 - Clínico"
         .order('hospital_name', { ascending: true });
 
       if (error) {
@@ -894,6 +899,7 @@ export class DoctorsCrudService {
         .from('doctor_hospital_info')
         .select('*')
         .or(`doctor_name.ilike.%${searchTerm}%,doctor_crm.ilike.%${searchTerm}%,doctor_specialty.ilike.%${searchTerm}%`)
+        .neq('doctor_specialty', '03 - Clínico') // 🚫 Excluir especialidade "03 - Clínico"
         .limit(limit)
         .order('doctor_name');
 

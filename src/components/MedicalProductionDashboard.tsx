@@ -3099,8 +3099,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                          // Preparar dados para a tabela
                                          const tableData: Array<Array<string>> = [];
                                          let totalRepasse = 0; // ✅ Calcular total durante o loop
+                                         let totalPatientsProcessed = 0; // 📊 Total de pacientes processados
+                                         let patientsWithPayment = 0; // ✅ Pacientes com repasse > 0
                                          
                                          (doctor.patients || []).forEach((p: any) => {
+                                           totalPatientsProcessed++;
                                            // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo dos outros relatórios)
                                            if (false) {
                                              const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
@@ -3186,17 +3189,27 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             totalRepasse += repasseValue; // ✅ Somar ao total
                                           }
                                           
-                                          tableData.push([
-                                            medicalRecord,
-                                            name,
-                                            codes04Display,
-                                            dischargeLabel,
-                                            careCharacterDisplay,
-                                            doctorName,
-                                            hospitalName,
-                                            formatCurrency(repasseValue)
-                                          ]);
+                                          // 🚫 FILTRO: Remover pacientes com repasse R$ 0,00
+                                          // ✅ Mostrar apenas pacientes com repasse > 0
+                                          if (repasseValue > 0) {
+                                            patientsWithPayment++; // 📊 Contar pacientes incluídos
+                                            tableData.push([
+                                              medicalRecord,
+                                              name,
+                                              codes04Display,
+                                              dischargeLabel,
+                                              careCharacterDisplay,
+                                              doctorName,
+                                              hospitalName,
+                                              formatCurrency(repasseValue)
+                                            ]);
+                                          }
                                          });
+                                         
+                                        // 📊 LOG: Resultado do filtro de pacientes com repasse
+                                        console.log(`📊 [RELATÓRIO SIMPLIFICADO] Pacientes processados: ${totalPatientsProcessed}`);
+                                        console.log(`✅ [RELATÓRIO SIMPLIFICADO] Pacientes com repasse > R$ 0,00: ${patientsWithPayment}`);
+                                        console.log(`🚫 [RELATÓRIO SIMPLIFICADO] Pacientes filtrados (repasse R$ 0,00): ${totalPatientsProcessed - patientsWithPayment}`);
                                          
                                         // ✅ ORDENAÇÃO: Por Data de Alta (mais recente primeiro)
                                         tableData.sort((a, b) => {
