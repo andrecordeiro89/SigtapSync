@@ -2898,7 +2898,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // 🔬 REGRAS UROLÓGICAS - DR. THIAGO TIESSI SUZUKI
       // Especialidade: Urologia
       // Baseado em: Dr. GUILHERME AUGUSTO STORER (Torao Tokuda)
-      // Última atualização: 18/11/2025
+      // Última atualização: 24/11/2025
       // ================================================================
       rules: [
         // ================================================================
@@ -2912,17 +2912,20 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.01.059-6',
           standardValue: 900.00,
-          description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00'
+          secondaryValue: 200.00,
+          description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA - Principal: R$ 900,00 | Sequencial: R$ 200,00'
         },
         {
           procedureCode: '04.09.01.018-9',
           standardValue: 1000.00,
-          description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00'
+          secondaryValue: 200.00,
+          description: 'LITOTRIPSIA (FLEXÍVEL) - Principal: R$ 1.000,00 | Sequencial: R$ 200,00'
         },
         {
           procedureCode: '04.09.01.017-0',
           standardValue: 250.00,
-          description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00'
+          secondaryValue: 100.00,
+          description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - Principal: R$ 250,00 | Sequencial: R$ 100,00'
         },
         {
           procedureCode: '04.09.03.004-0',
@@ -2937,7 +2940,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.04.021-5',
           standardValue: 300.00,
-          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00'
+          secondaryValue: 225.00,
+          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - Principal: R$ 300,00 | Sequencial: R$ 225,00'
         },
         {
           procedureCode: '04.09.05.008-3',
@@ -2962,7 +2966,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.01.006-5',
           standardValue: 600.00,
-          description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00'
+          secondaryValue: 375.00,
+          description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - Principal: R$ 600,00 | Sequencial: R$ 375,00'
         },
         {
           procedureCode: '04.09.05.007-5',
@@ -2982,7 +2987,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.01.032-4',
           standardValue: 700.00,
-          description: 'PIELOPLASTIA - R$ 700,00'
+          secondaryValue: 200.00,
+          description: 'PIELOPLASTIA - Principal: R$ 700,00 | Secundário: R$ 200,00'
         },
         {
           procedureCode: '04.09.01.021-9',
@@ -3013,6 +3019,36 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.09.04.023-1',
           standardValue: 250.00,
           description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00'
+        },
+        // ================================================================
+        // 🆕 NOVOS PROCEDIMENTOS ADICIONADOS - 24/11/2025
+        // ================================================================
+        {
+          procedureCode: '04.09.07.025-4',
+          standardValue: 800.00,
+          secondaryValue: 400.00,
+          description: 'TRATAMENTO CIRÚRGICO DE FÍSTULA VESICO-VAGINAL - Principal: R$ 800,00 | Secundário: R$ 400,00'
+        },
+        {
+          procedureCode: '04.09.02.007-9',
+          standardValue: 250.00,
+          secondaryValue: 200.00,
+          description: 'MEATOTOMIA SIMPLES - Principal: R$ 250,00 | Sequencial: R$ 200,00'
+        },
+        {
+          procedureCode: '04.09.01.038-3',
+          standardValue: 200.00,
+          description: 'RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 200,00'
+        },
+        {
+          procedureCode: '04.01.02.005-3',
+          standardValue: 150.00,
+          description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00'
+        },
+        {
+          procedureCode: '04.09.01.009-0',
+          standardValue: 250.00,
+          description: 'CISTOSTOMIA - R$ 250,00'
         }
       ],
       
@@ -3186,7 +3222,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // 🔬 PROCEDIMENTOS INDIVIDUAIS - DR. VITOR BRANDANI GARBELINI
       // Especialidade: Urologia
       // Baseado em: Dr. GUILHERME AUGUSTO STORER / Dr. HELIO SHINDY KISSINA
-      // Última atualização: 21/11/2025
+      // Última atualização: 24/11/2025
       // ================================================================
       rules: [
         {
@@ -3197,7 +3233,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.01.059-6',
           standardValue: 900.00,
-          description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00'
+          secondaryValue: 200.00,
+          description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA - Principal: R$ 900,00 | Sequencial: R$ 200,00'
         },
         // ================================================================
         // 🆕 LITOTRIPSIA - ATUALIZADO EM 21/11/2025
@@ -3236,7 +3273,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.04.021-5',
           standardValue: 300.00,
-          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00'
+          secondaryValue: 225.00,
+          description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - Principal: R$ 300,00 | Sequencial: R$ 225,00'
         },
         {
           procedureCode: '04.09.05.008-3',
@@ -3266,7 +3304,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.01.006-5',
           standardValue: 600.00,
-          description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA (RETIRADA DE CÁLCULO VESICAL ENDOSCÓPICA OU CONVENCIONAL) - R$ 600,00'
+          secondaryValue: 375.00,
+          description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - Principal: R$ 600,00 | Sequencial: R$ 375,00'
         },
         {
           procedureCode: '04.09.05.007-5',
@@ -3331,6 +3370,30 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           standardValue: 800.00,
           secondaryValue: 400.00,
           description: 'TRATAMENTO CIRÚRGICO DE FÍSTULA VESICO-VAGINAL - R$ 800,00 (Principal) / R$ 400,00 (Secundário)'
+        },
+        // ================================================================
+        // 🆕 NOVOS PROCEDIMENTOS ADICIONADOS - 24/11/2025
+        // ================================================================
+        {
+          procedureCode: '04.09.02.007-9',
+          standardValue: 250.00,
+          secondaryValue: 200.00,
+          description: 'MEATOTOMIA SIMPLES - Principal: R$ 250,00 | Sequencial: R$ 200,00'
+        },
+        {
+          procedureCode: '04.09.01.038-3',
+          standardValue: 200.00,
+          description: 'RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 200,00'
+        },
+        {
+          procedureCode: '04.01.02.005-3',
+          standardValue: 150.00,
+          description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00'
+        },
+        {
+          procedureCode: '04.09.01.009-0',
+          standardValue: 250.00,
+          description: 'CISTOSTOMIA - R$ 250,00'
         }
       ],
       
@@ -3944,27 +4007,35 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       doctorName: 'LUIZ HENRIQUE WERLANG',
       rules: [
         { procedureCode: '04.09.01.023-5', standardValue: 1000.00, description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00' },
-        { procedureCode: '04.09.01.059-6', standardValue: 900.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00' },
-        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00' },
-        { procedureCode: '04.09.01.017-0', standardValue: 250.00, description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00' },
+        { procedureCode: '04.09.01.059-6', standardValue: 900.00, secondaryValue: 200.00, description: 'URETEROLITOTRIPSIA - Principal: R$ 900 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, secondaryValue: 200.00, description: 'LITOTRIPSIA - Principal: R$ 1.000 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.017-0', standardValue: 250.00, secondaryValue: 100.00, description: 'CATETER DUPLO J - Principal: R$ 250 | Sequencial: R$ 100' },
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
-        { procedureCode: '04.09.04.021-5', standardValue: 300.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00' },
+        { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
         { procedureCode: '04.09.05.008-3', standardValue: 250.00, description: 'POSTECTOMIA - R$ 250,00' },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
         { procedureCode: '04.09.04.012-6', standardValue: 450.00, description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00' },
-        { procedureCode: '04.09.01.006-5', standardValue: 600.00, description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00' },
+        { procedureCode: '04.09.01.006-5', standardValue: 600.00, secondaryValue: 375.00, description: 'CISTOLITOTOMIA - Principal: R$ 600 | Sequencial: R$ 375' },
         { procedureCode: '04.09.05.007-5', standardValue: 500.00, description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00' },
         { procedureCode: 'RESSECÇÃO_CISTOS', standardValue: 250.00, description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00' },
         { procedureCode: '04.09.04.016-9', standardValue: 500.00, description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00' },
-        { procedureCode: '04.09.01.032-4', standardValue: 700.00, description: 'PIELOPLASTIA - R$ 700,00' },
+        { procedureCode: '04.09.01.032-4', standardValue: 700.00, secondaryValue: 200.00, description: 'PIELOPLASTIA - Principal: R$ 700 | Sequencial: R$ 200' },
         { procedureCode: '04.09.01.021-9', standardValue: 1200.00, description: 'NEFRECTOMIA TOTAL - R$ 1.200,00' },
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' }
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        // ================================================================
+        // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
+        // ================================================================
+        { procedureCode: '04.09.01.038-3', standardValue: 200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 200,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        { procedureCode: '04.09.07.025-4', standardValue: 800.00, secondaryValue: 400.00, description: 'FÍSTULA VESICO-VAGINAL - Principal: R$ 800 | Sequencial: R$ 400' },
+        { procedureCode: '04.09.02.007-9', standardValue: 250.00, secondaryValue: 200.00, description: 'MEATOTOMIA SIMPLES - Principal: R$ 250 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.009-0', standardValue: 250.00, description: 'CISTOSTOMIA - R$ 250,00' }
       ],
       multipleRules: [
         { codes: ['04.09.01.023-5', '04.09.01.017-0'], totalValue: 1100.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00' },
@@ -3991,27 +4062,35 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       doctorName: 'RODRIGO FELIPE GONGORA E SILVA',
       rules: [
         { procedureCode: '04.09.01.023-5', standardValue: 1000.00, description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00' },
-        { procedureCode: '04.09.01.059-6', standardValue: 900.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00' },
-        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00' },
-        { procedureCode: '04.09.01.017-0', standardValue: 250.00, description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00' },
+        { procedureCode: '04.09.01.059-6', standardValue: 900.00, secondaryValue: 200.00, description: 'URETEROLITOTRIPSIA - Principal: R$ 900 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, secondaryValue: 200.00, description: 'LITOTRIPSIA - Principal: R$ 1.000 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.017-0', standardValue: 250.00, secondaryValue: 100.00, description: 'CATETER DUPLO J - Principal: R$ 250 | Sequencial: R$ 100' },
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
-        { procedureCode: '04.09.04.021-5', standardValue: 300.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00' },
+        { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
         { procedureCode: '04.09.05.008-3', standardValue: 250.00, description: 'POSTECTOMIA - R$ 250,00' },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
         { procedureCode: '04.09.04.012-6', standardValue: 450.00, description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00' },
-        { procedureCode: '04.09.01.006-5', standardValue: 600.00, description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00' },
+        { procedureCode: '04.09.01.006-5', standardValue: 600.00, secondaryValue: 375.00, description: 'CISTOLITOTOMIA - Principal: R$ 600 | Sequencial: R$ 375' },
         { procedureCode: '04.09.05.007-5', standardValue: 500.00, description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00' },
         { procedureCode: 'RESSECÇÃO_CISTOS', standardValue: 250.00, description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00' },
         { procedureCode: '04.09.04.016-9', standardValue: 500.00, description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00' },
-        { procedureCode: '04.09.01.032-4', standardValue: 700.00, description: 'PIELOPLASTIA - R$ 700,00' },
+        { procedureCode: '04.09.01.032-4', standardValue: 700.00, secondaryValue: 200.00, description: 'PIELOPLASTIA - Principal: R$ 700 | Sequencial: R$ 200' },
         { procedureCode: '04.09.01.021-9', standardValue: 1200.00, description: 'NEFRECTOMIA TOTAL - R$ 1.200,00' },
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' }
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        // ================================================================
+        // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
+        // ================================================================
+        { procedureCode: '04.09.01.038-3', standardValue: 200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 200,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        { procedureCode: '04.09.07.025-4', standardValue: 800.00, secondaryValue: 400.00, description: 'FÍSTULA VESICO-VAGINAL - Principal: R$ 800 | Sequencial: R$ 400' },
+        { procedureCode: '04.09.02.007-9', standardValue: 250.00, secondaryValue: 200.00, description: 'MEATOTOMIA SIMPLES - Principal: R$ 250 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.009-0', standardValue: 250.00, description: 'CISTOSTOMIA - R$ 250,00' }
       ],
       multipleRules: [
         { codes: ['04.09.01.023-5', '04.09.01.017-0'], totalValue: 1100.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00' },
@@ -4038,27 +4117,35 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       doctorName: 'FABIO LUIZ DE SOUZA',
       rules: [
         { procedureCode: '04.09.01.023-5', standardValue: 1000.00, description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00' },
-        { procedureCode: '04.09.01.059-6', standardValue: 900.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00' },
-        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00' },
-        { procedureCode: '04.09.01.017-0', standardValue: 250.00, description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00' },
+        { procedureCode: '04.09.01.059-6', standardValue: 900.00, secondaryValue: 200.00, description: 'URETEROLITOTRIPSIA - Principal: R$ 900 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, secondaryValue: 200.00, description: 'LITOTRIPSIA - Principal: R$ 1.000 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.017-0', standardValue: 250.00, secondaryValue: 100.00, description: 'CATETER DUPLO J - Principal: R$ 250 | Sequencial: R$ 100' },
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
-        { procedureCode: '04.09.04.021-5', standardValue: 300.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00' },
+        { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
         { procedureCode: '04.09.05.008-3', standardValue: 250.00, description: 'POSTECTOMIA - R$ 250,00' },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
         { procedureCode: '04.09.04.012-6', standardValue: 450.00, description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00' },
-        { procedureCode: '04.09.01.006-5', standardValue: 600.00, description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00' },
+        { procedureCode: '04.09.01.006-5', standardValue: 600.00, secondaryValue: 375.00, description: 'CISTOLITOTOMIA - Principal: R$ 600 | Sequencial: R$ 375' },
         { procedureCode: '04.09.05.007-5', standardValue: 500.00, description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00' },
         { procedureCode: 'RESSECÇÃO_CISTOS', standardValue: 250.00, description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00' },
         { procedureCode: '04.09.04.016-9', standardValue: 500.00, description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00' },
-        { procedureCode: '04.09.01.032-4', standardValue: 700.00, description: 'PIELOPLASTIA - R$ 700,00' },
+        { procedureCode: '04.09.01.032-4', standardValue: 700.00, secondaryValue: 200.00, description: 'PIELOPLASTIA - Principal: R$ 700 | Sequencial: R$ 200' },
         { procedureCode: '04.09.01.021-9', standardValue: 1200.00, description: 'NEFRECTOMIA TOTAL - R$ 1.200,00' },
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' }
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        // ================================================================
+        // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
+        // ================================================================
+        { procedureCode: '04.09.01.038-3', standardValue: 200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 200,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        { procedureCode: '04.09.07.025-4', standardValue: 800.00, secondaryValue: 400.00, description: 'FÍSTULA VESICO-VAGINAL - Principal: R$ 800 | Sequencial: R$ 400' },
+        { procedureCode: '04.09.02.007-9', standardValue: 250.00, secondaryValue: 200.00, description: 'MEATOTOMIA SIMPLES - Principal: R$ 250 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.009-0', standardValue: 250.00, description: 'CISTOSTOMIA - R$ 250,00' }
       ],
       multipleRules: [
         { codes: ['04.09.01.023-5', '04.09.01.017-0'], totalValue: 1100.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00' },
@@ -4085,27 +4172,35 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       doctorName: 'MICHEL COTAIT NETO',
       rules: [
         { procedureCode: '04.09.01.023-5', standardValue: 1000.00, description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00' },
-        { procedureCode: '04.09.01.059-6', standardValue: 900.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00' },
-        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00' },
-        { procedureCode: '04.09.01.017-0', standardValue: 250.00, description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00' },
+        { procedureCode: '04.09.01.059-6', standardValue: 900.00, secondaryValue: 200.00, description: 'URETEROLITOTRIPSIA - Principal: R$ 900 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, secondaryValue: 200.00, description: 'LITOTRIPSIA - Principal: R$ 1.000 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.017-0', standardValue: 250.00, secondaryValue: 100.00, description: 'CATETER DUPLO J - Principal: R$ 250 | Sequencial: R$ 100' },
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
-        { procedureCode: '04.09.04.021-5', standardValue: 300.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00' },
+        { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
         { procedureCode: '04.09.05.008-3', standardValue: 250.00, description: 'POSTECTOMIA - R$ 250,00' },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
         { procedureCode: '04.09.04.012-6', standardValue: 450.00, description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00' },
-        { procedureCode: '04.09.01.006-5', standardValue: 600.00, description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00' },
+        { procedureCode: '04.09.01.006-5', standardValue: 600.00, secondaryValue: 375.00, description: 'CISTOLITOTOMIA - Principal: R$ 600 | Sequencial: R$ 375' },
         { procedureCode: '04.09.05.007-5', standardValue: 500.00, description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00' },
         { procedureCode: 'RESSECÇÃO_CISTOS', standardValue: 250.00, description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00' },
         { procedureCode: '04.09.04.016-9', standardValue: 500.00, description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00' },
-        { procedureCode: '04.09.01.032-4', standardValue: 700.00, description: 'PIELOPLASTIA - R$ 700,00' },
+        { procedureCode: '04.09.01.032-4', standardValue: 700.00, secondaryValue: 200.00, description: 'PIELOPLASTIA - Principal: R$ 700 | Sequencial: R$ 200' },
         { procedureCode: '04.09.01.021-9', standardValue: 1200.00, description: 'NEFRECTOMIA TOTAL - R$ 1.200,00' },
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' }
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        // ================================================================
+        // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
+        // ================================================================
+        { procedureCode: '04.09.01.038-3', standardValue: 200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 200,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        { procedureCode: '04.09.07.025-4', standardValue: 800.00, secondaryValue: 400.00, description: 'FÍSTULA VESICO-VAGINAL - Principal: R$ 800 | Sequencial: R$ 400' },
+        { procedureCode: '04.09.02.007-9', standardValue: 250.00, secondaryValue: 200.00, description: 'MEATOTOMIA SIMPLES - Principal: R$ 250 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.009-0', standardValue: 250.00, description: 'CISTOSTOMIA - R$ 250,00' }
       ],
       multipleRules: [
         { codes: ['04.09.01.023-5', '04.09.01.017-0'], totalValue: 1100.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00' },
@@ -4132,27 +4227,35 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       doctorName: 'WALTER COLONELLO FILHO',
       rules: [
         { procedureCode: '04.09.01.023-5', standardValue: 1000.00, description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00' },
-        { procedureCode: '04.09.01.059-6', standardValue: 900.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00' },
-        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00' },
-        { procedureCode: '04.09.01.017-0', standardValue: 250.00, description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00' },
+        { procedureCode: '04.09.01.059-6', standardValue: 900.00, secondaryValue: 200.00, description: 'URETEROLITOTRIPSIA - Principal: R$ 900 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, secondaryValue: 200.00, description: 'LITOTRIPSIA - Principal: R$ 1.000 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.017-0', standardValue: 250.00, secondaryValue: 100.00, description: 'CATETER DUPLO J - Principal: R$ 250 | Sequencial: R$ 100' },
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
-        { procedureCode: '04.09.04.021-5', standardValue: 300.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00' },
+        { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
         { procedureCode: '04.09.05.008-3', standardValue: 250.00, description: 'POSTECTOMIA - R$ 250,00' },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
         { procedureCode: '04.09.04.012-6', standardValue: 450.00, description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00' },
-        { procedureCode: '04.09.01.006-5', standardValue: 600.00, description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00' },
+        { procedureCode: '04.09.01.006-5', standardValue: 600.00, secondaryValue: 375.00, description: 'CISTOLITOTOMIA - Principal: R$ 600 | Sequencial: R$ 375' },
         { procedureCode: '04.09.05.007-5', standardValue: 500.00, description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00' },
         { procedureCode: 'RESSECÇÃO_CISTOS', standardValue: 250.00, description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00' },
         { procedureCode: '04.09.04.016-9', standardValue: 500.00, description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00' },
-        { procedureCode: '04.09.01.032-4', standardValue: 700.00, description: 'PIELOPLASTIA - R$ 700,00' },
+        { procedureCode: '04.09.01.032-4', standardValue: 700.00, secondaryValue: 200.00, description: 'PIELOPLASTIA - Principal: R$ 700 | Sequencial: R$ 200' },
         { procedureCode: '04.09.01.021-9', standardValue: 1200.00, description: 'NEFRECTOMIA TOTAL - R$ 1.200,00' },
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' }
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        // ================================================================
+        // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
+        // ================================================================
+        { procedureCode: '04.09.01.038-3', standardValue: 200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 200,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        { procedureCode: '04.09.07.025-4', standardValue: 800.00, secondaryValue: 400.00, description: 'FÍSTULA VESICO-VAGINAL - Principal: R$ 800 | Sequencial: R$ 400' },
+        { procedureCode: '04.09.02.007-9', standardValue: 250.00, secondaryValue: 200.00, description: 'MEATOTOMIA SIMPLES - Principal: R$ 250 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.009-0', standardValue: 250.00, description: 'CISTOSTOMIA - R$ 250,00' }
       ],
       multipleRules: [
         { codes: ['04.09.01.023-5', '04.09.01.017-0'], totalValue: 1100.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO CATETER DUPLO J - R$ 1.100,00' },
@@ -5479,29 +5582,35 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       doctorName: 'CYRO CEZAR DE OLIVEIRA',
       rules: [
         { procedureCode: '04.09.01.023-5', standardValue: 1000.00, description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00' },
-        { procedureCode: '04.09.01.059-6', standardValue: 900.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00' },
-        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00' },
-        { procedureCode: '04.09.01.017-0', standardValue: 250.00, description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00' },
+        { procedureCode: '04.09.01.059-6', standardValue: 900.00, secondaryValue: 200.00, description: 'URETEROLITOTRIPSIA - Principal: R$ 900 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, secondaryValue: 200.00, description: 'LITOTRIPSIA - Principal: R$ 1.000 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.017-0', standardValue: 250.00, secondaryValue: 100.00, description: 'CATETER DUPLO J - Principal: R$ 250 | Sequencial: R$ 100' },
         { procedureCode: '04.09.01.038-3', standardValue: 200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 200,00' },
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
-        { procedureCode: '04.09.04.021-5', standardValue: 300.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00' },
+        { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
         { procedureCode: '04.09.05.008-3', standardValue: 250.00, description: 'POSTECTOMIA - R$ 250,00' },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
         { procedureCode: '04.09.04.012-6', standardValue: 450.00, description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00' },
-        { procedureCode: '04.09.01.006-5', standardValue: 600.00, description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00' },
+        { procedureCode: '04.09.01.006-5', standardValue: 600.00, secondaryValue: 375.00, description: 'CISTOLITOTOMIA - Principal: R$ 600 | Sequencial: R$ 375' },
         { procedureCode: '04.09.05.007-5', standardValue: 500.00, description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00' },
         { procedureCode: 'RESSECÇÃO_CISTOS', standardValue: 250.00, description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00' },
         { procedureCode: '04.09.04.016-9', standardValue: 500.00, description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00' },
-        { procedureCode: '04.09.01.032-4', standardValue: 700.00, description: 'PIELOPLASTIA - R$ 700,00' },
+        { procedureCode: '04.09.01.032-4', standardValue: 700.00, secondaryValue: 200.00, description: 'PIELOPLASTIA - Principal: R$ 700 | Sequencial: R$ 200' },
         { procedureCode: '04.09.01.021-9', standardValue: 1200.00, description: 'NEFRECTOMIA TOTAL - R$ 1.200,00' },
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
         { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
-        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' }
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        // ================================================================
+        // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
+        // ================================================================
+        { procedureCode: '04.09.07.025-4', standardValue: 800.00, secondaryValue: 400.00, description: 'FÍSTULA VESICO-VAGINAL - Principal: R$ 800 | Sequencial: R$ 400' },
+        { procedureCode: '04.09.02.007-9', standardValue: 250.00, secondaryValue: 200.00, description: 'MEATOTOMIA SIMPLES - Principal: R$ 250 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.009-0', standardValue: 250.00, description: 'CISTOSTOMIA - R$ 250,00' }
       ],
       multipleRules: [
         { codes: ['04.09.01.023-5', '04.09.01.017-0'], totalValue: 1100.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
@@ -5528,27 +5637,35 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       doctorName: 'FERNANDO FOGLIATTO',
       rules: [
         { procedureCode: '04.09.01.023-5', standardValue: 1000.00, description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00' },
-        { procedureCode: '04.09.01.059-6', standardValue: 900.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00' },
-        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00' },
-        { procedureCode: '04.09.01.017-0', standardValue: 250.00, description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00' },
+        { procedureCode: '04.09.01.059-6', standardValue: 900.00, secondaryValue: 200.00, description: 'URETEROLITOTRIPSIA - Principal: R$ 900 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, secondaryValue: 200.00, description: 'LITOTRIPSIA - Principal: R$ 1.000 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.017-0', standardValue: 250.00, secondaryValue: 100.00, description: 'CATETER DUPLO J - Principal: R$ 250 | Sequencial: R$ 100' },
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
-        { procedureCode: '04.09.04.021-5', standardValue: 300.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00' },
+        { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
         { procedureCode: '04.09.05.008-3', standardValue: 250.00, description: 'POSTECTOMIA - R$ 250,00' },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
         { procedureCode: '04.09.04.012-6', standardValue: 450.00, description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00' },
-        { procedureCode: '04.09.01.006-5', standardValue: 600.00, description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00' },
+        { procedureCode: '04.09.01.006-5', standardValue: 600.00, secondaryValue: 375.00, description: 'CISTOLITOTOMIA - Principal: R$ 600 | Sequencial: R$ 375' },
         { procedureCode: '04.09.05.007-5', standardValue: 500.00, description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00' },
         { procedureCode: 'RESSECÇÃO_CISTOS', standardValue: 250.00, description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00' },
         { procedureCode: '04.09.04.016-9', standardValue: 500.00, description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00' },
-        { procedureCode: '04.09.01.032-4', standardValue: 700.00, description: 'PIELOPLASTIA - R$ 700,00' },
+        { procedureCode: '04.09.01.032-4', standardValue: 700.00, secondaryValue: 200.00, description: 'PIELOPLASTIA - Principal: R$ 700 | Sequencial: R$ 200' },
         { procedureCode: '04.09.01.021-9', standardValue: 1200.00, description: 'NEFRECTOMIA TOTAL - R$ 1.200,00' },
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' }
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        // ================================================================
+        // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
+        // ================================================================
+        { procedureCode: '04.09.01.038-3', standardValue: 200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 200,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        { procedureCode: '04.09.07.025-4', standardValue: 800.00, secondaryValue: 400.00, description: 'FÍSTULA VESICO-VAGINAL - Principal: R$ 800 | Sequencial: R$ 400' },
+        { procedureCode: '04.09.02.007-9', standardValue: 250.00, secondaryValue: 200.00, description: 'MEATOTOMIA SIMPLES - Principal: R$ 250 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.009-0', standardValue: 250.00, description: 'CISTOSTOMIA - R$ 250,00' }
       ],
       multipleRules: [
         { codes: ['04.09.01.023-5', '04.09.01.017-0'], totalValue: 1100.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
@@ -5575,22 +5692,22 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       doctorName: 'GUSTAVO BONO YOSHIKAWA',
       rules: [
         { procedureCode: '04.09.01.023-5', standardValue: 1000.00, description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00' },
-        { procedureCode: '04.09.01.059-6', standardValue: 900.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00' },
-        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00' },
-        { procedureCode: '04.09.01.017-0', standardValue: 250.00, description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00' },
+        { procedureCode: '04.09.01.059-6', standardValue: 900.00, secondaryValue: 200.00, description: 'URETEROLITOTRIPSIA - Principal: R$ 900 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, secondaryValue: 200.00, description: 'LITOTRIPSIA - Principal: R$ 1.000 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.017-0', standardValue: 250.00, secondaryValue: 100.00, description: 'CATETER DUPLO J - Principal: R$ 250 | Sequencial: R$ 100' },
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
-        { procedureCode: '04.09.04.021-5', standardValue: 300.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00' },
+        { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
         { procedureCode: '04.09.05.008-3', standardValue: 250.00, description: 'POSTECTOMIA - R$ 250,00' },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
         { procedureCode: '04.09.04.012-6', standardValue: 450.00, description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00' },
-        { procedureCode: '04.09.01.006-5', standardValue: 600.00, description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00' },
+        { procedureCode: '04.09.01.006-5', standardValue: 600.00, secondaryValue: 375.00, description: 'CISTOLITOTOMIA - Principal: R$ 600 | Sequencial: R$ 375' },
         { procedureCode: '04.09.05.007-5', standardValue: 500.00, description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00' },
         { procedureCode: 'RESSECÇÃO_CISTOS', standardValue: 250.00, description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00' },
         { procedureCode: '04.09.04.016-9', standardValue: 500.00, description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00' },
-        { procedureCode: '04.09.01.032-4', standardValue: 700.00, description: 'PIELOPLASTIA - R$ 700,00' },
+        { procedureCode: '04.09.01.032-4', standardValue: 700.00, secondaryValue: 200.00, description: 'PIELOPLASTIA - Principal: R$ 700 | Sequencial: R$ 200' },
         { procedureCode: '04.09.01.021-9', standardValue: 1200.00, description: 'NEFRECTOMIA TOTAL - R$ 1.200,00' },
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
@@ -5601,7 +5718,14 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         // ================================================================
         { procedureCode: '04.09.02.013-3', standardValue: 1000.00, description: 'URETROPLASTIA AUTÓGENA - R$ 1.000,00' },
         { procedureCode: '04.09.02.015-0', standardValue: 0, description: 'URETRORRAFIA (valor definido em regras de múltiplos)' },
-        { procedureCode: '04.09.02.007-9', standardValue: 0, description: 'MEATOTOMIA SIMPLES (valor definido em regras de múltiplos)' }
+        { procedureCode: '04.09.02.007-9', standardValue: 250.00, secondaryValue: 200.00, description: 'MEATOTOMIA SIMPLES - Principal: R$ 250 | Sequencial: R$ 200' },
+        // ================================================================
+        // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
+        // ================================================================
+        { procedureCode: '04.09.01.038-3', standardValue: 200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 200,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        { procedureCode: '04.09.07.025-4', standardValue: 800.00, secondaryValue: 400.00, description: 'FÍSTULA VESICO-VAGINAL - Principal: R$ 800 | Sequencial: R$ 400' },
+        { procedureCode: '04.09.01.009-0', standardValue: 250.00, description: 'CISTOSTOMIA - R$ 250,00' }
       ],
       multipleRules: [
         { codes: ['04.09.01.023-5', '04.09.01.017-0'], totalValue: 1100.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
@@ -5635,27 +5759,35 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       doctorName: 'MATHIAS BURIN GROHE',
       rules: [
         { procedureCode: '04.09.01.023-5', standardValue: 1000.00, description: 'NEFROLITOTOMIA PERCUTÂNEA - R$ 1.000,00' },
-        { procedureCode: '04.09.01.059-6', standardValue: 900.00, description: 'URETEROLITOTRIPSIA TRANSURETEROSCÓPICA (SEMIRRÍGIDA) - R$ 900,00' },
-        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, description: 'LITOTRIPSIA (FLEXÍVEL) - R$ 1.000,00' },
-        { procedureCode: '04.09.01.017-0', standardValue: 250.00, description: 'INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 250,00' },
+        { procedureCode: '04.09.01.059-6', standardValue: 900.00, secondaryValue: 200.00, description: 'URETEROLITOTRIPSIA - Principal: R$ 900 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.018-9', standardValue: 1000.00, secondaryValue: 200.00, description: 'LITOTRIPSIA - Principal: R$ 1.000 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.017-0', standardValue: 250.00, secondaryValue: 100.00, description: 'CATETER DUPLO J - Principal: R$ 250 | Sequencial: R$ 100' },
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
-        { procedureCode: '04.09.04.021-5', standardValue: 300.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00' },
+        { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
         { procedureCode: '04.09.05.008-3', standardValue: 250.00, description: 'POSTECTOMIA - R$ 250,00' },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
         { procedureCode: '04.09.04.012-6', standardValue: 450.00, description: 'ORQUIDOPEXIA BILATERAL - R$ 450,00' },
-        { procedureCode: '04.09.01.006-5', standardValue: 600.00, description: 'CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA - R$ 600,00' },
+        { procedureCode: '04.09.01.006-5', standardValue: 600.00, secondaryValue: 375.00, description: 'CISTOLITOTOMIA - Principal: R$ 600 | Sequencial: R$ 375' },
         { procedureCode: '04.09.05.007-5', standardValue: 500.00, description: 'PLÁSTICA TOTAL DO PÊNIS (INCLUI PEYRONIE) - R$ 500,00' },
         { procedureCode: 'RESSECÇÃO_CISTOS', standardValue: 250.00, description: 'RESSECÇÃO DE CISTOS/CAUTERIZAÇÕES - R$ 250,00' },
         { procedureCode: '04.09.04.016-9', standardValue: 500.00, description: 'ORQUIECTOMIA UNILATERAL - R$ 500,00' },
-        { procedureCode: '04.09.01.032-4', standardValue: 700.00, description: 'PIELOPLASTIA - R$ 700,00' },
+        { procedureCode: '04.09.01.032-4', standardValue: 700.00, secondaryValue: 200.00, description: 'PIELOPLASTIA - Principal: R$ 700 | Sequencial: R$ 200' },
         { procedureCode: '04.09.01.021-9', standardValue: 1200.00, description: 'NEFRECTOMIA TOTAL - R$ 1.200,00' },
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' }
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        // ================================================================
+        // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
+        // ================================================================
+        { procedureCode: '04.09.01.038-3', standardValue: 200.00, description: 'RESSECÇÃO ENDOSCÓPICA DE LESÃO VESICAL - R$ 200,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        { procedureCode: '04.09.07.025-4', standardValue: 800.00, secondaryValue: 400.00, description: 'FÍSTULA VESICO-VAGINAL - Principal: R$ 800 | Sequencial: R$ 400' },
+        { procedureCode: '04.09.02.007-9', standardValue: 250.00, secondaryValue: 200.00, description: 'MEATOTOMIA SIMPLES - Principal: R$ 250 | Sequencial: R$ 200' },
+        { procedureCode: '04.09.01.009-0', standardValue: 250.00, description: 'CISTOSTOMIA - R$ 250,00' }
       ],
       multipleRules: [
         { codes: ['04.09.01.023-5', '04.09.01.017-0'], totalValue: 1100.00, description: 'NEFROLITOTOMIA PERCUTÂNEA + INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J - R$ 1.100,00' },
