@@ -1769,6 +1769,16 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.08.06.047-6',
         standardValue: 400.00,
         description: 'TENOPLASTIA OU ENXERTO DE TENDÃO UNICO - R$ 400,00'
+      },
+      
+      // ================================================================
+      // 🆕 PROCEDIMENTOS ADICIONAIS - ORTOPEDIA
+      // Data: 25/11/2025
+      // ================================================================
+      {
+        procedureCode: '04.08.06.031-0',
+        standardValue: 250.00,
+        description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
       }
     ]
   },
@@ -1917,14 +1927,15 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // ================================================================
       // 🦴 PROCEDIMENTOS ORTOPÉDICOS - CIRURGIA DE JOELHO
       // Especialidade: Ortopedia
-      // Data: 19/11/2025
+      // Última atualização: 25/11/2025
       // Total: 5 procedimentos
       // ================================================================
       rules: [
         {
           procedureCode: '04.08.05.089-6',
           standardValue: 750.00,
-          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL - R$ 750,00'
+          secondaryValue: 300.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL - Principal: R$ 750,00 | Sequencial: R$ 300,00'
         },
         {
           procedureCode: '04.08.05.088-8',
@@ -2459,16 +2470,19 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         
         // ================================================================
         // CIRURGIAS OVARIANAS E TUBÁRIAS
+        // Atualizado: 25/11/2025 - Adicionados valores sequenciais
         // ================================================================
         {
           procedureCode: '04.09.06.021-6',
-          standardValue: 500.00,
-          description: 'OOFORECTOMIA / OOFOROPLASTIA - R$ 500,00'
+          standardValue: 700.00,
+          secondaryValue: 525.00,
+          description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | Sequencial: R$ 525,00'
         },
         {
           procedureCode: '04.09.06.023-2',
           standardValue: 250.00,
-          description: 'SALPINGECTOMIA UNI / BILATERAL - R$ 250,00'
+          secondaryValue: 187.50,
+          description: 'SALPINGECTOMIA UNI / BILATERAL - Principal: R$ 250,00 | Sequencial: R$ 187,50'
         },
         {
           procedureCode: '04.09.06.018-6',
@@ -2520,8 +2534,9 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         },
         {
           procedureCode: '04.09.07.003-3',
-          standardValue: 250.00,
-          description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - R$ 250,00'
+          standardValue: 300.00,
+          secondaryValue: 225.00,
+          description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - Principal: R$ 300,00 | Sequencial: R$ 225,00'
         },
         {
           procedureCode: '04.09.06.019-4',
@@ -2532,6 +2547,16 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.09.07.014-9',
           standardValue: 250.00,
           description: 'EXÉRESE DE CISTO VAGINAL - R$ 250,00'
+        },
+        
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ADICIONAIS - GINECOLOGIA
+        // Data: 25/11/2025
+        // ================================================================
+        {
+          procedureCode: '04.01.02.010-0',
+          standardValue: 150.00,
+          description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO CELULAR SUBCUTÂNEO - R$ 150,00'
         },
         
         // ================================================================
@@ -2967,14 +2992,15 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // ================================================================
       // 🦴 PROCEDIMENTOS ORTOPÉDICOS - CIRURGIA DE JOELHO
       // Especialidade: Ortopedia
-      // Data: 19/11/2025
+      // Última atualização: 25/11/2025
       // Total: 5 procedimentos
       // ================================================================
       rules: [
         {
           procedureCode: '04.08.05.089-6',
           standardValue: 750.00,
-          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL - R$ 750,00'
+          secondaryValue: 300.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL - Principal: R$ 750,00 | Sequencial: R$ 300,00'
         },
         {
           procedureCode: '04.08.05.088-8',
@@ -6235,11 +6261,13 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         // ================================================================
         // 🦴 PROCEDIMENTOS ORTOPÉDICOS - CIRURGIA DE JOELHO
         // Especialidade: Ortopedia (Joelho)
+        // Última atualização: 25/11/2025
         // ================================================================
         {
           procedureCode: '04.08.05.089-6',
           standardValue: 750.00,
-          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL - R$ 750,00'
+          secondaryValue: 300.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL - Principal: R$ 750,00 | Sequencial: R$ 300,00'
         },
         {
           procedureCode: '04.08.05.088-8',
@@ -6456,7 +6484,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     // DR. JULIO DE CASTRO NETO - ORTOPEDIA
     // Hospital: Municipal Juarez Barreto de Macedo
     // Especialidade: Ortopedia - Cirurgia de Joelho
-    // Data: 19/11/2025
+    // Última atualização: 25/11/2025
     // ================================================================
     'JULIO DE CASTRO NETO': {
       doctorName: 'JULIO DE CASTRO NETO',
@@ -6465,7 +6493,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.08.05.089-6',
           standardValue: 750.00,
-          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL - R$ 750,00'
+          secondaryValue: 300.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL - Principal: R$ 750,00 | Sequencial: R$ 300,00'
         },
         {
           procedureCode: '04.08.05.088-8',
@@ -7281,7 +7310,8 @@ const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
           <div className="space-y-2">
             <div className="text-sm font-medium text-gray-700">Detalhamento por Procedimento:</div>
             {paymentCalculation.procedures.map((proc, index) => (
-              <div key={index} className={`bg-white rounded-lg p-2 border ${
+
+<div key={index} className={`bg-white rounded-lg p-2 border ${
                 proc.isSpecialRule ? 'border-orange-200 bg-orange-50/30' : 'border-gray-200'
               }`}>
                 <div className="flex items-center justify-between">
