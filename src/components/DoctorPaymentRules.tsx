@@ -6669,18 +6669,20 @@ export function calculateDoctorPayment(
   if (filteredProcedures.length === 0) {
     // Verificar se tem regra de valor fixo (fallback)
     if (rule.fixedPaymentRule) {
-      // Aplicar valor fixo ao primeiro procedimento
-      const calculatedProcedures = procedures.map((proc, index) => ({
+      // ✅ CORREÇÃO: Aplicar valor fixo a CADA procedimento (não apenas ao primeiro)
+      // Se o médico não tem regras individuais (rules: []), o fixedPaymentRule
+      // é um "valor por procedimento", não um "pagamento fixo mensal"
+      const calculatedProcedures = procedures.map((proc) => ({
         ...proc,
-        calculatedPayment: index === 0 ? rule.fixedPaymentRule!.amount : 0,
+        calculatedPayment: rule.fixedPaymentRule!.amount,
         paymentRule: rule.fixedPaymentRule!.description,
         isSpecialRule: true
       }));
 
       return {
         procedures: calculatedProcedures,
-        totalPayment: rule.fixedPaymentRule.amount,
-        appliedRule: rule.fixedPaymentRule.description
+        totalPayment: procedures.length * rule.fixedPaymentRule.amount,
+        appliedRule: `${rule.fixedPaymentRule.description} (${procedures.length} × R$ ${rule.fixedPaymentRule.amount.toFixed(2)})`
       };
     }
     

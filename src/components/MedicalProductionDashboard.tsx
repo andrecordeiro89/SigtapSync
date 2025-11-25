@@ -2829,17 +2829,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 </div>
                                 <span className="text-xl font-black text-green-700">
                                   {formatCurrency((() => {
-                                    // ✅ CORREÇÃO: Verificar se médico tem pagamento FIXO primeiro
+                                    // ✅ CORREÇÃO: Calcular pagamento somando por paciente
+                                    // A função calculateDoctorPayment agora lida corretamente com:
+                                    // 1. Regras individuais (rules) com valores específicos por procedimento
+                                    // 2. fixedPaymentRule como valor por procedimento (quando rules: [])
+                                    // 3. fixedPaymentRule como valor padrão (quando há rules específicas)
                                     const hospitalId = doctor.hospitals?.[0]?.hospital_id;
                                     
-                                    // 🔥 PRIORIDADE 1: Verificar regra de VALOR FIXO (independente de pacientes)
-                                    const fixedPaymentCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
-                                    if (fixedPaymentCalc.hasFixedRule) {
-                                      // ✅ PAGAMENTO FIXO: Retornar valor fixo UMA VEZ (não soma por paciente)
-                                      return fixedPaymentCalc.calculatedPayment;
-                                    }
-                                    
-                                    // Se não tem pagamento fixo, calcular normalmente somando por paciente
                                     const doctorTotalPayment = doctor.patients.reduce((sum, patient) => {
                                       const proceduresWithPayment = patient.procedures
                                         .filter(filterCalculableProcedures)
