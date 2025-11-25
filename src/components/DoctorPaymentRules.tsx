@@ -506,7 +506,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.09.02.017-6',
         standardValue: 250.00,
-        description: 'URETROTOMIA INTERNA - R$ 250,00'
+        secondaryValue: 200.00,
+        description: 'URETROTOMIA INTERNA - Principal: R$ 250,00 | Sequencial: R$ 200,00'
       }
     ],
     // ================================================================
@@ -767,6 +768,31 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.01.02.009-6',
         standardValue: 250.00,
         description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00'
+      },
+      
+      // ================================================================
+      // 🆕 PROCEDIMENTOS ADICIONAIS - CIRURGIA GERAL
+      // Data: 25/11/2025
+      // ================================================================
+      {
+        procedureCode: '04.07.02.022-5',
+        standardValue: 450.00,
+        description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00'
+      },
+      {
+        procedureCode: '04.08.06.031-0',
+        standardValue: 250.00,
+        description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
+      },
+      {
+        procedureCode: '04.01.02.005-3',
+        standardValue: 150.00,
+        description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00'
+      },
+      {
+        procedureCode: '04.07.02.021-7',
+        standardValue: 450.00,
+        description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00'
       }
     ],
     
@@ -1115,6 +1141,31 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.01.02.009-6',
         standardValue: 250.00,
         description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00'
+      },
+      
+      // ================================================================
+      // 🆕 PROCEDIMENTOS ADICIONAIS - CIRURGIA GERAL
+      // Data: 25/11/2025
+      // ================================================================
+      {
+        procedureCode: '04.07.02.022-5',
+        standardValue: 450.00,
+        description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00'
+      },
+      {
+        procedureCode: '04.08.06.031-0',
+        standardValue: 250.00,
+        description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
+      },
+      {
+        procedureCode: '04.01.02.005-3',
+        standardValue: 150.00,
+        description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00'
+      },
+      {
+        procedureCode: '04.07.02.021-7',
+        standardValue: 450.00,
+        description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00'
       }
     ],
     
@@ -1350,7 +1401,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     rules: [
       // ================================================================
       // 🏥 PROCEDIMENTOS PRINCIPAIS - GINECOLOGIA E OBSTETRÍCIA
-      // Última atualização: 27/10/2025
+      // Última atualização: 25/11/2025
       // ================================================================
       {
         procedureCode: '04.09.06.013-5',
@@ -1370,7 +1421,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.09.06.021-6',
         standardValue: 700.00,
-        description: 'OOFORECTOMIA / OOFOROPLASTIA - R$ 700,00'
+        secondaryValue: 525.00,
+        description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | Sequencial: R$ 525,00'
       },
       {
         procedureCode: '04.09.06.018-6',
@@ -1420,7 +1472,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.09.07.003-3',
         standardValue: 300.00,
-        description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - R$ 300,00'
+        secondaryValue: 225.00,
+        description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - Principal: R$ 300,00 | Sequencial: R$ 225,00'
       },
       {
         procedureCode: '04.09.06.019-4',
@@ -1435,7 +1488,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       
       // ================================================================
       // 🔧 PROCEDIMENTOS ADICIONAIS - SOMAM AO PROCEDIMENTO PRINCIPAL
-      // Última atualização: 27/10/2025
+      // Última atualização: 25/11/2025
       // ================================================================
       {
         procedureCode: '04.09.06.022-4',
@@ -1456,6 +1509,22 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.08.06.020-4',
         standardValue: 100.00,
         description: 'REINSERÇÃO MUSCULAR (CORREÇÃO DE DIÁSTESE DE RETO ABDOMINAL - ADICIONAL DO PROCEDIMENTO PRINCIPAL) - R$ 100,00'
+      },
+      
+      // ================================================================
+      // 🆕 PROCEDIMENTOS ADICIONAIS - GINECOLOGIA
+      // Data: 25/11/2025
+      // ================================================================
+      {
+        procedureCode: '04.09.06.023-2',
+        standardValue: 250.00,
+        secondaryValue: 187.50,
+        description: 'SALPINGECTOMIA UNI / BILATERAL - Principal: R$ 250,00 | Sequencial: R$ 187,50'
+      },
+      {
+        procedureCode: '04.01.02.010-0',
+        standardValue: 150.00,
+        description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO CELULAR SUBCUTÂNEO - R$ 150,00'
       }
     ],
     // Regras para múltiplos procedimentos específicos
@@ -1483,7 +1552,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     rules: [
       // ================================================================
       // 🏥 PROCEDIMENTOS PRINCIPAIS - GINECOLOGIA E OBSTETRÍCIA
-      // Última atualização: 27/10/2025
+      // Última atualização: 25/11/2025
       // Mesmas regras da MAIRA RECHI CASSAPULA
       // ================================================================
       {
@@ -1504,7 +1573,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.09.06.021-6',
         standardValue: 700.00,
-        description: 'OOFORECTOMIA / OOFOROPLASTIA - R$ 700,00'
+        secondaryValue: 525.00,
+        description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | Sequencial: R$ 525,00'
       },
       {
         procedureCode: '04.09.06.018-6',
@@ -1554,7 +1624,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.09.07.003-3',
         standardValue: 300.00,
-        description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - R$ 300,00'
+        secondaryValue: 225.00,
+        description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - Principal: R$ 300,00 | Sequencial: R$ 225,00'
       },
       {
         procedureCode: '04.09.06.019-4',
@@ -1569,7 +1640,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       
       // ================================================================
       // 🔧 PROCEDIMENTOS ADICIONAIS - SOMAM AO PROCEDIMENTO PRINCIPAL
-      // Última atualização: 27/10/2025
+      // Última atualização: 25/11/2025
       // ================================================================
       {
         procedureCode: '04.09.06.022-4',
@@ -1590,6 +1661,22 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.08.06.020-4',
         standardValue: 100.00,
         description: 'REINSERÇÃO MUSCULAR (CORREÇÃO DE DIÁSTESE DE RETO ABDOMINAL - ADICIONAL DO PROCEDIMENTO PRINCIPAL) - R$ 100,00'
+      },
+      
+      // ================================================================
+      // 🆕 PROCEDIMENTOS ADICIONAIS - GINECOLOGIA
+      // Data: 25/11/2025
+      // ================================================================
+      {
+        procedureCode: '04.09.06.023-2',
+        standardValue: 250.00,
+        secondaryValue: 187.50,
+        description: 'SALPINGECTOMIA UNI / BILATERAL - Principal: R$ 250,00 | Sequencial: R$ 187,50'
+      },
+      {
+        procedureCode: '04.01.02.010-0',
+        standardValue: 150.00,
+        description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO CELULAR SUBCUTÂNEO - R$ 150,00'
       }
     ],
     // Regras para múltiplos procedimentos específicos
@@ -1766,7 +1853,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' }
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, secondaryValue: 200.00, description: 'URETROTOMIA INTERNA - Principal: R$ 250,00 | Sequencial: R$ 200,00' }
       ],
       // ================================================================
       // 🔗 REGRAS DE MÚLTIPLOS PROCEDIMENTOS
@@ -2062,6 +2149,31 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.01.02.009-6',
           standardValue: 250.00,
           description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00'
+        },
+        
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ADICIONAIS - CIRURGIA GERAL
+        // Data: 25/11/2025
+        // ================================================================
+        {
+          procedureCode: '04.07.02.022-5',
+          standardValue: 450.00,
+          description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.031-0',
+          standardValue: 250.00,
+          description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
+        },
+        {
+          procedureCode: '04.01.02.005-3',
+          standardValue: 150.00,
+          description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00'
+        },
+        {
+          procedureCode: '04.07.02.021-7',
+          standardValue: 450.00,
+          description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00'
         }
       ],
       
@@ -2675,7 +2787,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.02.017-6',
           standardValue: 250.00,
-          description: 'URETROTOMIA INTERNA - R$ 250,00'
+          secondaryValue: 200.00,
+          description: 'URETROTOMIA INTERNA - Principal: R$ 250,00 | Sequencial: R$ 200,00'
         }
       ],
       // ================================================================
@@ -3013,7 +3126,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.02.017-6',
           standardValue: 250.00,
-          description: 'URETROTOMIA INTERNA - R$ 250,00'
+          secondaryValue: 200.00,
+          description: 'URETROTOMIA INTERNA - Principal: R$ 250,00 | Sequencial: R$ 200,00'
         },
         {
           procedureCode: '04.09.04.023-1',
@@ -3357,7 +3471,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.02.017-6',
           standardValue: 250.00,
-          description: 'URETROTOMIA INTERNA - R$ 250,00'
+          secondaryValue: 200.00,
+          description: 'URETROTOMIA INTERNA - Principal: R$ 250,00 | Sequencial: R$ 200,00'
         },
         // ================================================================
         // 🆕 PROCEDIMENTO FÍSTULA VESICO-VAGINAL - ADICIONADO EM 21/11/2025
@@ -3696,6 +3811,30 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.01.02.009-6',
           standardValue: 250.00,
           description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00'
+        },
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ADICIONAIS - CIRURGIA GERAL
+        // Data: 25/11/2025
+        // ================================================================
+        {
+          procedureCode: '04.07.02.022-5',
+          standardValue: 450.00,
+          description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.031-0',
+          standardValue: 250.00,
+          description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
+        },
+        {
+          procedureCode: '04.01.02.005-3',
+          standardValue: 150.00,
+          description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00'
+        },
+        {
+          procedureCode: '04.07.02.021-7',
+          standardValue: 450.00,
+          description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00'
         }
       ],
       multipleRules: [
@@ -3760,7 +3899,15 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.01.02.007-0', standardValue: 250.00, description: 'EXÉRESE DE CISTO DERMOIDE - R$ 250,00' },
         { procedureCode: '04.01.02.010-0', standardValue: 250.00, description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 250,00' },
         { procedureCode: '04.01.02.008-8', standardValue: 250.00, description: 'EXÉRESE DE LIPOMA - R$ 250,00' },
-        { procedureCode: '04.01.02.009-6', standardValue: 250.00, description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00' }
+        { procedureCode: '04.01.02.009-6', standardValue: 250.00, description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00' },
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ADICIONAIS - CIRURGIA GERAL
+        // Data: 25/11/2025
+        // ================================================================
+        { procedureCode: '04.07.02.022-5', standardValue: 450.00, description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00' },
+        { procedureCode: '04.08.06.031-0', standardValue: 250.00, description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        { procedureCode: '04.07.02.021-7', standardValue: 450.00, description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00' }
       ],
       multipleRules: [
         { codes: ['04.07.03.002-6', '04.07.04.018-8'], totalValue: 1200.00, description: 'COLECISTECTOMIA + LIBERAÇÃO DE ADERÊNCIAS - R$ 1.200,00' },
@@ -3824,7 +3971,15 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.01.02.007-0', standardValue: 250.00, description: 'EXÉRESE DE CISTO DERMOIDE - R$ 250,00' },
         { procedureCode: '04.01.02.010-0', standardValue: 250.00, description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 250,00' },
         { procedureCode: '04.01.02.008-8', standardValue: 250.00, description: 'EXÉRESE DE LIPOMA - R$ 250,00' },
-        { procedureCode: '04.01.02.009-6', standardValue: 250.00, description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00' }
+        { procedureCode: '04.01.02.009-6', standardValue: 250.00, description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00' },
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ADICIONAIS - CIRURGIA GERAL
+        // Data: 25/11/2025
+        // ================================================================
+        { procedureCode: '04.07.02.022-5', standardValue: 450.00, description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00' },
+        { procedureCode: '04.08.06.031-0', standardValue: 250.00, description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        { procedureCode: '04.07.02.021-7', standardValue: 450.00, description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00' }
       ],
       multipleRules: [
         { codes: ['04.07.03.002-6', '04.07.04.018-8'], totalValue: 1200.00, description: 'COLECISTECTOMIA + LIBERAÇÃO DE ADERÊNCIAS - R$ 1.200,00' },
@@ -3888,7 +4043,15 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.01.02.007-0', standardValue: 250.00, description: 'EXÉRESE DE CISTO DERMOIDE - R$ 250,00' },
         { procedureCode: '04.01.02.010-0', standardValue: 250.00, description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 250,00' },
         { procedureCode: '04.01.02.008-8', standardValue: 250.00, description: 'EXÉRESE DE LIPOMA - R$ 250,00' },
-        { procedureCode: '04.01.02.009-6', standardValue: 250.00, description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00' }
+        { procedureCode: '04.01.02.009-6', standardValue: 250.00, description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00' },
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ADICIONAIS - CIRURGIA GERAL
+        // Data: 25/11/2025
+        // ================================================================
+        { procedureCode: '04.07.02.022-5', standardValue: 450.00, description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00' },
+        { procedureCode: '04.08.06.031-0', standardValue: 250.00, description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        { procedureCode: '04.07.02.021-7', standardValue: 450.00, description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00' }
       ],
       multipleRules: [
         { codes: ['04.07.03.002-6', '04.07.04.018-8'], totalValue: 1200.00, description: 'COLECISTECTOMIA + LIBERAÇÃO DE ADERÊNCIAS - R$ 1.200,00' },
@@ -3952,7 +4115,15 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.01.02.007-0', standardValue: 250.00, description: 'EXÉRESE DE CISTO DERMOIDE - R$ 250,00' },
         { procedureCode: '04.01.02.010-0', standardValue: 250.00, description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO SUBCUTÂNEO - R$ 250,00' },
         { procedureCode: '04.01.02.008-8', standardValue: 250.00, description: 'EXÉRESE DE LIPOMA - R$ 250,00' },
-        { procedureCode: '04.01.02.009-6', standardValue: 250.00, description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00' }
+        { procedureCode: '04.01.02.009-6', standardValue: 250.00, description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00' },
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ADICIONAIS - CIRURGIA GERAL
+        // Data: 25/11/2025
+        // ================================================================
+        { procedureCode: '04.07.02.022-5', standardValue: 450.00, description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00' },
+        { procedureCode: '04.08.06.031-0', standardValue: 250.00, description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00' },
+        { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
+        { procedureCode: '04.07.02.021-7', standardValue: 450.00, description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00' }
       ],
       multipleRules: [
         { codes: ['04.07.03.002-6', '04.07.04.018-8'], totalValue: 1200.00, description: 'COLECISTECTOMIA + LIBERAÇÃO DE ADERÊNCIAS - R$ 1.200,00' },
@@ -4027,7 +4198,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, secondaryValue: 200.00, description: 'URETROTOMIA INTERNA - Principal: R$ 250,00 | Sequencial: R$ 200,00' },
         // ================================================================
         // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
         // ================================================================
@@ -4082,7 +4253,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, secondaryValue: 200.00, description: 'URETROTOMIA INTERNA - Principal: R$ 250,00 | Sequencial: R$ 200,00' },
         // ================================================================
         // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
         // ================================================================
@@ -4137,7 +4308,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, secondaryValue: 200.00, description: 'URETROTOMIA INTERNA - Principal: R$ 250,00 | Sequencial: R$ 200,00' },
         // ================================================================
         // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
         // ================================================================
@@ -4192,7 +4363,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, secondaryValue: 200.00, description: 'URETROTOMIA INTERNA - Principal: R$ 250,00 | Sequencial: R$ 200,00' },
         // ================================================================
         // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
         // ================================================================
@@ -4247,7 +4418,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
         { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
         { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-        { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+        { procedureCode: '04.09.02.017-6', standardValue: 250.00, secondaryValue: 200.00, description: 'URETROTOMIA INTERNA - Principal: R$ 250,00 | Sequencial: R$ 200,00' },
         // ================================================================
         // 🆕 NOVOS PROCEDIMENTOS - 24/11/2025
         // ================================================================
@@ -4594,6 +4765,31 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.01.02.009-6',
           standardValue: 250.00,
           description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00'
+        },
+        
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ADICIONAIS - CIRURGIA GERAL
+        // Data: 25/11/2025
+        // ================================================================
+        {
+          procedureCode: '04.07.02.022-5',
+          standardValue: 450.00,
+          description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.031-0',
+          standardValue: 250.00,
+          description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
+        },
+        {
+          procedureCode: '04.01.02.005-3',
+          standardValue: 150.00,
+          description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00'
+        },
+        {
+          procedureCode: '04.07.02.021-7',
+          standardValue: 450.00,
+          description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00'
         }
       ],
       
@@ -4939,6 +5135,31 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.01.02.009-6',
           standardValue: 250.00,
           description: 'EXÉRESE DE CISTO PILONIDAL - R$ 250,00'
+        },
+        
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ADICIONAIS - CIRURGIA GERAL
+        // Data: 25/11/2025
+        // ================================================================
+        {
+          procedureCode: '04.07.02.022-5',
+          standardValue: 450.00,
+          description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.031-0',
+          standardValue: 250.00,
+          description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00'
+        },
+        {
+          procedureCode: '04.01.02.005-3',
+          standardValue: 150.00,
+          description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00'
+        },
+        {
+          procedureCode: '04.07.02.021-7',
+          standardValue: 450.00,
+          description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00'
         }
       ],
       
@@ -5201,7 +5422,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.06.021-6',
           standardValue: 700.00,
-          description: 'OOFORECTOMIA / OOFOROPLASTIA - R$ 700,00'
+          secondaryValue: 525.00,
+          description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | Sequencial: R$ 525,00'
         },
         {
           procedureCode: '04.09.06.018-6',
@@ -5251,7 +5473,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.07.003-3',
           standardValue: 300.00,
-          description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - R$ 300,00'
+          secondaryValue: 225.00,
+          description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - Principal: R$ 300,00 | Sequencial: R$ 225,00'
         },
         {
           procedureCode: '04.09.06.019-4',
@@ -5286,6 +5509,27 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.08.06.020-4',
           standardValue: 100.00,
           description: 'REINSERÇÃO MUSCULAR (CORREÇÃO DE DIÁSTESE DE RETO ABDOMINAL - ADICIONAL DO PROCEDIMENTO PRINCIPAL) - R$ 100,00'
+        },
+        
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ADICIONAIS - GINECOLOGIA
+        // Data: 25/11/2025
+        // ================================================================
+        {
+          procedureCode: '04.09.06.023-2',
+          standardValue: 250.00,
+          secondaryValue: 187.50,
+          description: 'SALPINGECTOMIA UNI / BILATERAL - Principal: R$ 250,00 | Sequencial: R$ 187,50'
+        },
+        {
+          procedureCode: '04.01.02.010-0',
+          standardValue: 150.00,
+          description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO CELULAR SUBCUTÂNEO - R$ 150,00'
+        },
+        {
+          procedureCode: '04.09.06.010-0',
+          standardValue: 600.00,
+          description: 'HISTERECTOMIA (POR VIA VAGINAL) - R$ 600,00'
         }
       ],
       multipleRules: [
@@ -5333,7 +5577,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.06.021-6',
           standardValue: 700.00,
-          description: 'OOFORECTOMIA / OOFOROPLASTIA - R$ 700,00'
+          secondaryValue: 525.00,
+          description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | Sequencial: R$ 525,00'
         },
         {
           procedureCode: '04.09.06.018-6',
@@ -5383,7 +5628,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.07.003-3',
           standardValue: 300.00,
-          description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - R$ 300,00'
+          secondaryValue: 225.00,
+          description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - Principal: R$ 300,00 | Sequencial: R$ 225,00'
         },
         {
           procedureCode: '04.09.06.019-4',
@@ -5418,6 +5664,27 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.08.06.020-4',
           standardValue: 100.00,
           description: 'REINSERÇÃO MUSCULAR (CORREÇÃO DE DIÁSTESE DE RETO ABDOMINAL - ADICIONAL DO PROCEDIMENTO PRINCIPAL) - R$ 100,00'
+        },
+        
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ADICIONAIS - GINECOLOGIA
+        // Data: 25/11/2025
+        // ================================================================
+        {
+          procedureCode: '04.09.06.023-2',
+          standardValue: 250.00,
+          secondaryValue: 187.50,
+          description: 'SALPINGECTOMIA UNI / BILATERAL - Principal: R$ 250,00 | Sequencial: R$ 187,50'
+        },
+        {
+          procedureCode: '04.01.02.010-0',
+          standardValue: 150.00,
+          description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO CELULAR SUBCUTÂNEO - R$ 150,00'
+        },
+        {
+          procedureCode: '04.09.06.010-0',
+          standardValue: 600.00,
+          description: 'HISTERECTOMIA (POR VIA VAGINAL) - R$ 600,00'
         }
       ],
       multipleRules: [
@@ -5465,7 +5732,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.06.021-6',
           standardValue: 700.00,
-          description: 'OOFORECTOMIA / OOFOROPLASTIA - R$ 700,00'
+          secondaryValue: 525.00,
+          description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | Sequencial: R$ 525,00'
         },
         {
           procedureCode: '04.09.06.018-6',
@@ -5515,7 +5783,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.07.003-3',
           standardValue: 300.00,
-          description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - R$ 300,00'
+          secondaryValue: 225.00,
+          description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - Principal: R$ 300,00 | Sequencial: R$ 225,00'
         },
         {
           procedureCode: '04.09.06.019-4',
@@ -5550,6 +5819,27 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.08.06.020-4',
           standardValue: 100.00,
           description: 'REINSERÇÃO MUSCULAR (CORREÇÃO DE DIÁSTESE DE RETO ABDOMINAL - ADICIONAL DO PROCEDIMENTO PRINCIPAL) - R$ 100,00'
+        },
+        
+        // ================================================================
+        // 🆕 PROCEDIMENTOS ADICIONAIS - GINECOLOGIA
+        // Data: 25/11/2025
+        // ================================================================
+        {
+          procedureCode: '04.09.06.023-2',
+          standardValue: 250.00,
+          secondaryValue: 187.50,
+          description: 'SALPINGECTOMIA UNI / BILATERAL - Principal: R$ 250,00 | Sequencial: R$ 187,50'
+        },
+        {
+          procedureCode: '04.01.02.010-0',
+          standardValue: 150.00,
+          description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO CELULAR SUBCUTÂNEO - R$ 150,00'
+        },
+        {
+          procedureCode: '04.09.06.010-0',
+          standardValue: 600.00,
+          description: 'HISTERECTOMIA (POR VIA VAGINAL) - R$ 600,00'
         }
       ],
       multipleRules: [
