@@ -695,32 +695,43 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       },
       
       // ================================================================
-      // 🏥 HÉRNIAS COMO PROCEDIMENTO PRINCIPAL - NOVOS VALORES
+      // 🏥 HÉRNIAS - VALORES PRINCIPAL E SEQUENCIAL
+      // Atualizado: 26/11/2025
       // ================================================================
       {
         procedureCode: '04.07.04.010-2',
         standardValue: 700.00,
-        description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00'
+        secondaryValue: 300.00,
+        description: 'HERNIOPLASTIA INGUINAL / CRURAL UNILATERAL - Principal: R$ 700 | Sequencial: R$ 300'
       },
       {
         procedureCode: '04.07.04.009-9',
         standardValue: 700.00,
-        description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00'
+        secondaryValue: 300.00,
+        description: 'HERNIOPLASTIA INGUINAL BILATERAL - Principal: R$ 700 | Sequencial: R$ 300'
       },
       {
         procedureCode: '04.07.04.006-4',
         standardValue: 800.00,
-        description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00'
+        secondaryValue: 300.00,
+        description: 'HERNIOPLASTIA EPIGÁSTRICA - Principal: R$ 800 | Sequencial: R$ 300'
       },
       {
         procedureCode: '04.07.04.012-9',
         standardValue: 450.00,
-        description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00'
+        secondaryValue: 300.00,
+        description: 'HERNIOPLASTIA UMBILICAL - Principal: R$ 450 | Sequencial: R$ 300'
       },
       {
         procedureCode: '04.07.04.008-0',
         standardValue: 600.00,
-        description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00'
+        secondaryValue: 300.00,
+        description: 'HERNIOPLASTIA INCISIONAL/VENTRAL - Principal: R$ 600 | Sequencial: R$ 300'
+      },
+      {
+        procedureCode: '04.07.04.011-0',
+        standardValue: 600.00,
+        description: 'HERNIOPLASTIA RECIDIVANTE - R$ 600,00'
       },
       
       // ================================================================
@@ -792,7 +803,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.07.02.021-7',
         standardValue: 450.00,
-        description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00'
+        secondaryValue: 100.00,
+        description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - Principal: R$ 450 | Sequencial: R$ 100'
       }
     ],
     
@@ -1029,7 +1041,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // ================================================================
       // 🏥 PROCEDIMENTO PRINCIPAL - COLECISTECTOMIA BASE
       // Mesmas regras da FABIANE GREGORIO BATISTELA
-      // Última atualização: 27/10/2025
+      // Última atualização: 26/11/2025
       // ================================================================
       {
         procedureCode: '04.07.03.002-6',
@@ -1068,32 +1080,43 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       },
       
       // ================================================================
-      // 🏥 HÉRNIAS COMO PROCEDIMENTO PRINCIPAL - NOVOS VALORES
+      // 🏥 HÉRNIAS - VALORES PRINCIPAL E SEQUENCIAL
+      // Atualizado: 26/11/2025
       // ================================================================
       {
         procedureCode: '04.07.04.010-2',
         standardValue: 700.00,
-        description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00'
+        secondaryValue: 300.00,
+        description: 'HERNIOPLASTIA INGUINAL / CRURAL UNILATERAL - Principal: R$ 700 | Sequencial: R$ 300'
       },
       {
         procedureCode: '04.07.04.009-9',
         standardValue: 700.00,
-        description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00'
+        secondaryValue: 300.00,
+        description: 'HERNIOPLASTIA INGUINAL BILATERAL - Principal: R$ 700 | Sequencial: R$ 300'
       },
       {
         procedureCode: '04.07.04.006-4',
         standardValue: 800.00,
-        description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00'
+        secondaryValue: 300.00,
+        description: 'HERNIOPLASTIA EPIGÁSTRICA - Principal: R$ 800 | Sequencial: R$ 300'
       },
       {
         procedureCode: '04.07.04.012-9',
         standardValue: 450.00,
-        description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00'
+        secondaryValue: 300.00,
+        description: 'HERNIOPLASTIA UMBILICAL - Principal: R$ 450 | Sequencial: R$ 300'
       },
       {
         procedureCode: '04.07.04.008-0',
         standardValue: 600.00,
-        description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00'
+        secondaryValue: 300.00,
+        description: 'HERNIOPLASTIA INCISIONAL/VENTRAL - Principal: R$ 600 | Sequencial: R$ 300'
+      },
+      {
+        procedureCode: '04.07.04.011-0',
+        standardValue: 600.00,
+        description: 'HERNIOPLASTIA RECIDIVANTE - R$ 600,00'
       },
       
       // ================================================================
@@ -1165,7 +1188,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.07.02.021-7',
         standardValue: 450.00,
-        description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00'
+        secondaryValue: 100.00,
+        description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - Principal: R$ 450 | Sequencial: R$ 100'
       }
     ],
     
@@ -2048,7 +2072,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         // ================================================================
         // 🏥 PROCEDIMENTO PRINCIPAL - COLECISTECTOMIA BASE
         // Mesmas regras da FABIANE GREGORIO BATISTELA
-        // Última atualização: 27/10/2025
+        // Última atualização: 26/11/2025
         // ================================================================
         {
           procedureCode: '04.07.03.002-6',
@@ -2087,32 +2111,43 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         },
         
         // ================================================================
-        // 🏥 HÉRNIAS COMO PROCEDIMENTO PRINCIPAL - NOVOS VALORES
+        // 🏥 HÉRNIAS - VALORES PRINCIPAL E SEQUENCIAL
+        // Atualizado: 26/11/2025
         // ================================================================
         {
           procedureCode: '04.07.04.010-2',
           standardValue: 700.00,
-          description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA INGUINAL / CRURAL UNILATERAL - Principal: R$ 700 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.009-9',
           standardValue: 700.00,
-          description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA INGUINAL BILATERAL - Principal: R$ 700 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.006-4',
           standardValue: 800.00,
-          description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA EPIGÁSTRICA - Principal: R$ 800 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.012-9',
           standardValue: 450.00,
-          description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA UMBILICAL - Principal: R$ 450 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.008-0',
           standardValue: 600.00,
-          description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA INCISIONAL/VENTRAL - Principal: R$ 600 | Sequencial: R$ 300'
+        },
+        {
+          procedureCode: '04.07.04.011-0',
+          standardValue: 600.00,
+          description: 'HERNIOPLASTIA RECIDIVANTE - R$ 600,00'
         },
         
         // ================================================================
@@ -2184,7 +2219,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.07.02.021-7',
           standardValue: 450.00,
-          description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00'
+          secondaryValue: 100.00,
+          description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - Principal: R$ 450 | Sequencial: R$ 100'
         }
       ],
       
@@ -3781,27 +3817,37 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.07.04.010-2',
           standardValue: 700.00,
-          description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA INGUINAL / CRURAL UNILATERAL - Principal: R$ 700 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.009-9',
           standardValue: 700.00,
-          description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA INGUINAL BILATERAL - Principal: R$ 700 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.006-4',
           standardValue: 800.00,
-          description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA EPIGÁSTRICA - Principal: R$ 800 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.012-9',
           standardValue: 450.00,
-          description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA UMBILICAL - Principal: R$ 450 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.008-0',
           standardValue: 600.00,
-          description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA INCISIONAL/VENTRAL - Principal: R$ 600 | Sequencial: R$ 300'
+        },
+        {
+          procedureCode: '04.07.04.011-0',
+          standardValue: 600.00,
+          description: 'HERNIOPLASTIA RECIDIVANTE - R$ 600,00'
         },
         {
           procedureCode: '04.07.02.027-6',
@@ -3860,7 +3906,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.07.02.021-7',
           standardValue: 450.00,
-          description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00'
+          secondaryValue: 100.00,
+          description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - Principal: R$ 450 | Sequencial: R$ 100'
         }
       ],
       multipleRules: [
@@ -3914,11 +3961,12 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.07.03.014-0', standardValue: 300.00, description: 'HEPATORRAFIA - R$ 300,00' },
         { procedureCode: '04.07.03.006-9', standardValue: 250.00, description: 'COLEDOCOTOMIA - R$ 250,00' },
         { procedureCode: '04.07.03.005-0', standardValue: 200.00, description: 'COLEDOCOPLASTIA - R$ 200,00' },
-        { procedureCode: '04.07.04.010-2', standardValue: 700.00, description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00' },
-        { procedureCode: '04.07.04.009-9', standardValue: 700.00, description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00' },
-        { procedureCode: '04.07.04.006-4', standardValue: 800.00, description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00' },
-        { procedureCode: '04.07.04.012-9', standardValue: 450.00, description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00' },
-        { procedureCode: '04.07.04.008-0', standardValue: 600.00, description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00' },
+        { procedureCode: '04.07.04.010-2', standardValue: 700.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA INGUINAL / CRURAL UNILATERAL - Principal: R$ 700 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.009-9', standardValue: 700.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA INGUINAL BILATERAL - Principal: R$ 700 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.006-4', standardValue: 800.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA EPIGÁSTRICA - Principal: R$ 800 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.012-9', standardValue: 450.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA UMBILICAL - Principal: R$ 450 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.008-0', standardValue: 600.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA INCISIONAL/VENTRAL - Principal: R$ 600 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.011-0', standardValue: 600.00, description: 'HERNIOPLASTIA RECIDIVANTE - R$ 600,00' },
         { procedureCode: '04.07.02.027-6', standardValue: 450.00, description: 'FISTULECTOMIA/FISTULOTOMIA ANAL - R$ 450,00' },
         { procedureCode: '04.07.02.028-4', standardValue: 450.00, description: 'HEMORROIDECTOMIA - R$ 450,00' },
         { procedureCode: '04.07.02.031-4', standardValue: 450.00, description: 'TRATAMENTO CIRÚRGICO DE FISSURA ANAL - R$ 450,00' },
@@ -3933,7 +3981,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.07.02.022-5', standardValue: 450.00, description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00' },
         { procedureCode: '04.08.06.031-0', standardValue: 250.00, description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00' },
         { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
-        { procedureCode: '04.07.02.021-7', standardValue: 450.00, description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00' }
+        { procedureCode: '04.07.02.021-7', standardValue: 450.00, secondaryValue: 100.00, description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - Principal: R$ 450 | Sequencial: R$ 100' }
       ],
       multipleRules: [
         { codes: ['04.07.03.002-6', '04.07.04.018-8'], totalValue: 1200.00, description: 'COLECISTECTOMIA + LIBERAÇÃO DE ADERÊNCIAS - R$ 1.200,00' },
@@ -3986,11 +4034,12 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.07.03.014-0', standardValue: 300.00, description: 'HEPATORRAFIA - R$ 300,00' },
         { procedureCode: '04.07.03.006-9', standardValue: 250.00, description: 'COLEDOCOTOMIA - R$ 250,00' },
         { procedureCode: '04.07.03.005-0', standardValue: 200.00, description: 'COLEDOCOPLASTIA - R$ 200,00' },
-        { procedureCode: '04.07.04.010-2', standardValue: 700.00, description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00' },
-        { procedureCode: '04.07.04.009-9', standardValue: 700.00, description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00' },
-        { procedureCode: '04.07.04.006-4', standardValue: 800.00, description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00' },
-        { procedureCode: '04.07.04.012-9', standardValue: 450.00, description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00' },
-        { procedureCode: '04.07.04.008-0', standardValue: 600.00, description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00' },
+        { procedureCode: '04.07.04.010-2', standardValue: 700.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA INGUINAL / CRURAL UNILATERAL - Principal: R$ 700 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.009-9', standardValue: 700.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA INGUINAL BILATERAL - Principal: R$ 700 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.006-4', standardValue: 800.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA EPIGÁSTRICA - Principal: R$ 800 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.012-9', standardValue: 450.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA UMBILICAL - Principal: R$ 450 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.008-0', standardValue: 600.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA INCISIONAL/VENTRAL - Principal: R$ 600 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.011-0', standardValue: 600.00, description: 'HERNIOPLASTIA RECIDIVANTE - R$ 600,00' },
         { procedureCode: '04.07.02.027-6', standardValue: 450.00, description: 'FISTULECTOMIA/FISTULOTOMIA ANAL - R$ 450,00' },
         { procedureCode: '04.07.02.028-4', standardValue: 450.00, description: 'HEMORROIDECTOMIA - R$ 450,00' },
         { procedureCode: '04.07.02.031-4', standardValue: 450.00, description: 'TRATAMENTO CIRÚRGICO DE FISSURA ANAL - R$ 450,00' },
@@ -4005,7 +4054,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.07.02.022-5', standardValue: 450.00, description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00' },
         { procedureCode: '04.08.06.031-0', standardValue: 250.00, description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00' },
         { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
-        { procedureCode: '04.07.02.021-7', standardValue: 450.00, description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00' }
+        { procedureCode: '04.07.02.021-7', standardValue: 450.00, secondaryValue: 100.00, description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - Principal: R$ 450 | Sequencial: R$ 100' }
       ],
       multipleRules: [
         { codes: ['04.07.03.002-6', '04.07.04.018-8'], totalValue: 1200.00, description: 'COLECISTECTOMIA + LIBERAÇÃO DE ADERÊNCIAS - R$ 1.200,00' },
@@ -4058,11 +4107,12 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.07.03.014-0', standardValue: 300.00, description: 'HEPATORRAFIA - R$ 300,00' },
         { procedureCode: '04.07.03.006-9', standardValue: 250.00, description: 'COLEDOCOTOMIA - R$ 250,00' },
         { procedureCode: '04.07.03.005-0', standardValue: 200.00, description: 'COLEDOCOPLASTIA - R$ 200,00' },
-        { procedureCode: '04.07.04.010-2', standardValue: 700.00, description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00' },
-        { procedureCode: '04.07.04.009-9', standardValue: 700.00, description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00' },
-        { procedureCode: '04.07.04.006-4', standardValue: 800.00, description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00' },
-        { procedureCode: '04.07.04.012-9', standardValue: 450.00, description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00' },
-        { procedureCode: '04.07.04.008-0', standardValue: 600.00, description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00' },
+        { procedureCode: '04.07.04.010-2', standardValue: 700.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA INGUINAL / CRURAL UNILATERAL - Principal: R$ 700 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.009-9', standardValue: 700.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA INGUINAL BILATERAL - Principal: R$ 700 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.006-4', standardValue: 800.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA EPIGÁSTRICA - Principal: R$ 800 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.012-9', standardValue: 450.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA UMBILICAL - Principal: R$ 450 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.008-0', standardValue: 600.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA INCISIONAL/VENTRAL - Principal: R$ 600 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.011-0', standardValue: 600.00, description: 'HERNIOPLASTIA RECIDIVANTE - R$ 600,00' },
         { procedureCode: '04.07.02.027-6', standardValue: 450.00, description: 'FISTULECTOMIA/FISTULOTOMIA ANAL - R$ 450,00' },
         { procedureCode: '04.07.02.028-4', standardValue: 450.00, description: 'HEMORROIDECTOMIA - R$ 450,00' },
         { procedureCode: '04.07.02.031-4', standardValue: 450.00, description: 'TRATAMENTO CIRÚRGICO DE FISSURA ANAL - R$ 450,00' },
@@ -4077,7 +4127,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.07.02.022-5', standardValue: 450.00, description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00' },
         { procedureCode: '04.08.06.031-0', standardValue: 250.00, description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00' },
         { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
-        { procedureCode: '04.07.02.021-7', standardValue: 450.00, description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00' }
+        { procedureCode: '04.07.02.021-7', standardValue: 450.00, secondaryValue: 100.00, description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - Principal: R$ 450 | Sequencial: R$ 100' }
       ],
       multipleRules: [
         { codes: ['04.07.03.002-6', '04.07.04.018-8'], totalValue: 1200.00, description: 'COLECISTECTOMIA + LIBERAÇÃO DE ADERÊNCIAS - R$ 1.200,00' },
@@ -4130,11 +4180,12 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.07.03.014-0', standardValue: 300.00, description: 'HEPATORRAFIA - R$ 300,00' },
         { procedureCode: '04.07.03.006-9', standardValue: 250.00, description: 'COLEDOCOTOMIA - R$ 250,00' },
         { procedureCode: '04.07.03.005-0', standardValue: 200.00, description: 'COLEDOCOPLASTIA - R$ 200,00' },
-        { procedureCode: '04.07.04.010-2', standardValue: 700.00, description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00' },
-        { procedureCode: '04.07.04.009-9', standardValue: 700.00, description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00' },
-        { procedureCode: '04.07.04.006-4', standardValue: 800.00, description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00' },
-        { procedureCode: '04.07.04.012-9', standardValue: 450.00, description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00' },
-        { procedureCode: '04.07.04.008-0', standardValue: 600.00, description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00' },
+        { procedureCode: '04.07.04.010-2', standardValue: 700.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA INGUINAL / CRURAL UNILATERAL - Principal: R$ 700 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.009-9', standardValue: 700.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA INGUINAL BILATERAL - Principal: R$ 700 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.006-4', standardValue: 800.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA EPIGÁSTRICA - Principal: R$ 800 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.012-9', standardValue: 450.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA UMBILICAL - Principal: R$ 450 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.008-0', standardValue: 600.00, secondaryValue: 300.00, description: 'HERNIOPLASTIA INCISIONAL/VENTRAL - Principal: R$ 600 | Sequencial: R$ 300' },
+        { procedureCode: '04.07.04.011-0', standardValue: 600.00, description: 'HERNIOPLASTIA RECIDIVANTE - R$ 600,00' },
         { procedureCode: '04.07.02.027-6', standardValue: 450.00, description: 'FISTULECTOMIA/FISTULOTOMIA ANAL - R$ 450,00' },
         { procedureCode: '04.07.02.028-4', standardValue: 450.00, description: 'HEMORROIDECTOMIA - R$ 450,00' },
         { procedureCode: '04.07.02.031-4', standardValue: 450.00, description: 'TRATAMENTO CIRÚRGICO DE FISSURA ANAL - R$ 450,00' },
@@ -4149,7 +4200,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.07.02.022-5', standardValue: 450.00, description: 'EXCISÃO DE LESÃO / TUMOR ANU-RETAL - R$ 450,00' },
         { procedureCode: '04.08.06.031-0', standardValue: 250.00, description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00' },
         { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA DE LESÃO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO - R$ 150,00' },
-        { procedureCode: '04.07.02.021-7', standardValue: 450.00, description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00' }
+        { procedureCode: '04.07.02.021-7', standardValue: 450.00, secondaryValue: 100.00, description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - Principal: R$ 450 | Sequencial: R$ 100' }
       ],
       multipleRules: [
         { codes: ['04.07.03.002-6', '04.07.04.018-8'], totalValue: 1200.00, description: 'COLECISTECTOMIA + LIBERAÇÃO DE ADERÊNCIAS - R$ 1.200,00' },
@@ -4681,7 +4732,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         // ================================================================
         // 🏥 PROCEDIMENTO PRINCIPAL - COLECISTECTOMIA BASE
         // Mesmas regras do Dr. JOAO VICTOR RODRIGUES
-        // Última atualização: 19/11/2025
+        // Última atualização: 26/11/2025
         // ================================================================
         {
           procedureCode: '04.07.03.002-6',
@@ -4720,32 +4771,43 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         },
         
         // ================================================================
-        // 🏥 HÉRNIAS COMO PROCEDIMENTO PRINCIPAL
+        // 🏥 HÉRNIAS - VALORES PRINCIPAL E SEQUENCIAL
+        // Atualizado: 26/11/2025
         // ================================================================
         {
           procedureCode: '04.07.04.010-2',
           standardValue: 700.00,
-          description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA INGUINAL / CRURAL UNILATERAL - Principal: R$ 700 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.009-9',
           standardValue: 700.00,
-          description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA INGUINAL BILATERAL - Principal: R$ 700 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.006-4',
           standardValue: 800.00,
-          description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA EPIGÁSTRICA - Principal: R$ 800 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.012-9',
           standardValue: 450.00,
-          description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA UMBILICAL - Principal: R$ 450 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.008-0',
           standardValue: 600.00,
-          description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA INCISIONAL/VENTRAL - Principal: R$ 600 | Sequencial: R$ 300'
+        },
+        {
+          procedureCode: '04.07.04.011-0',
+          standardValue: 600.00,
+          description: 'HERNIOPLASTIA RECIDIVANTE - R$ 600,00'
         },
         
         // ================================================================
@@ -4815,7 +4877,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.07.02.021-7',
           standardValue: 450.00,
-          description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00'
+          secondaryValue: 100.00,
+          description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - Principal: R$ 450 | Sequencial: R$ 100'
         }
       ],
       
@@ -5051,7 +5114,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         // ================================================================
         // 🏥 PROCEDIMENTO PRINCIPAL - COLECISTECTOMIA BASE
         // Mesmas regras do Dr. JOAO VICTOR RODRIGUES
-        // Última atualização: 19/11/2025
+        // Última atualização: 26/11/2025
         // ================================================================
         {
           procedureCode: '04.07.03.002-6',
@@ -5090,32 +5153,43 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         },
         
         // ================================================================
-        // 🏥 HÉRNIAS COMO PROCEDIMENTO PRINCIPAL
+        // 🏥 HÉRNIAS - VALORES PRINCIPAL E SEQUENCIAL
+        // Atualizado: 26/11/2025
         // ================================================================
         {
           procedureCode: '04.07.04.010-2',
           standardValue: 700.00,
-          description: 'HERNIOPLASTIA INGUINAL UNILATERAL (PRINCIPAL) - R$ 700,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA INGUINAL / CRURAL UNILATERAL - Principal: R$ 700 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.009-9',
           standardValue: 700.00,
-          description: 'HERNIOPLASTIA INGUINAL BILATERAL (PRINCIPAL) - R$ 700,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA INGUINAL BILATERAL - Principal: R$ 700 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.006-4',
           standardValue: 800.00,
-          description: 'HERNIOPLASTIA EPIGÁSTRICA (PRINCIPAL) - R$ 800,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA EPIGÁSTRICA - Principal: R$ 800 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.012-9',
           standardValue: 450.00,
-          description: 'HERNIOPLASTIA UMBILICAL (PRINCIPAL) - R$ 450,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA UMBILICAL - Principal: R$ 450 | Sequencial: R$ 300'
         },
         {
           procedureCode: '04.07.04.008-0',
           standardValue: 600.00,
-          description: 'HERNIOPLASTIA INCISIONAL/VENTRAL (PRINCIPAL) - R$ 600,00'
+          secondaryValue: 300.00,
+          description: 'HERNIOPLASTIA INCISIONAL/VENTRAL - Principal: R$ 600 | Sequencial: R$ 300'
+        },
+        {
+          procedureCode: '04.07.04.011-0',
+          standardValue: 600.00,
+          description: 'HERNIOPLASTIA RECIDIVANTE - R$ 600,00'
         },
         
         // ================================================================
@@ -5185,7 +5259,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.07.02.021-7',
           standardValue: 450.00,
-          description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - R$ 450,00'
+          secondaryValue: 100.00,
+          description: 'ESFINCTEROTOMIA INTERNA E TRATAMENTO DE FISSURA ANAL - Principal: R$ 450 | Sequencial: R$ 100'
         }
       ],
       
