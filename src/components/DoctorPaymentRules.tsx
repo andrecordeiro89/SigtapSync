@@ -7038,17 +7038,78 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     'RAFAEL LUCENA BASTOS': {
       doctorName: 'RAFAEL LUCENA BASTOS',
       // ================================================================
-      // 💰 REGRA ESPECIAL: VALOR FIXO POR PACIENTE/PROCEDIMENTO
-      // Independente do tipo de procedimento realizado, o médico
-      // recebe R$ 450,00 por cada paciente atendido (procedimento realizado).
-      // NÃO há regras específicas por tipo de procedimento.
-      // Data: 19/11/2025
+      // ✋ PROCEDIMENTOS DE CIRURGIA DA MÃO E PUNHO
+      // Especialidade: Ortopedia (Mão e Punho)
+      // Valor padrão: R$ 450,00 por procedimento
+      // Última atualização: 27/11/2025
       // ================================================================
-      fixedPaymentRule: {
-        amount: 450.00,
-        description: 'Valor fixo por paciente atendido/procedimento realizado: R$ 450,00 (independente do tipo de procedimento)'
-      },
-      rules: [] // Sem regras individuais, usa valor fixo por procedimento
+      rules: [
+        {
+          procedureCode: '04.03.02.012-3',
+          standardValue: 450.00,
+          description: 'TRATAMENTO CIRURGICO DE SINDROME COMPRESSIVA EM TUNEL OSTEO FIBROSO AO NIVEL DO CARPO - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.02.032-6',
+          standardValue: 450.00,
+          description: 'TRATAMENTO CIRÚRGICO DE DEDO EM GATILHO - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.044-1',
+          standardValue: 450.00,
+          description: 'TENÓLISE - R$ 450,00'
+        },
+        {
+          procedureCode: '04.03.02.005-0',
+          standardValue: 450.00,
+          description: 'MICRONEUROLISE DE NERVO PERIFERICO - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.02.055-5',
+          standardValue: 450.00,
+          description: 'TRATAMENTO CIRÚRGICO DE PSEUDARTROSE / RETARDO DE CONSOLIDAÇÃO / PERDA ÓSSEA DA MÃO - R$ 450,00'
+        },
+        {
+          procedureCode: '04.03.02.013-1',
+          standardValue: 450.00,
+          description: 'TRATAMENTO MICROCIRÚRGICO DE TUMOR DE NERVO PERIFÉRICO / NEUROMA - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.031-0',
+          standardValue: 450.00,
+          description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.02.061-0',
+          standardValue: 450.00,
+          description: 'TRATAMENTO CIRÚRGICO DE ROTURA / DESINSERÇÃO / ARRANCAMENTO CAPSULOTENO-LIGAMENTAR NA MÃO - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.02.034-2',
+          standardValue: 450.00,
+          description: 'TRATAMENTO CIRÚRGICO DE FRATURA / LESÃO FISARIA DAS FALANGES DA MÃO (COM FIXAÇÃO) - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.048-4',
+          standardValue: 450.00,
+          description: 'TENORRAFIA ÚNICA EM TÚNEL OSTEO-FIBROSO - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.02.014-8',
+          standardValue: 450.00,
+          description: 'RECONSTRUÇÃO DE POLIA TENDINOSA DOS DEDOS DA MÃO - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.033-6',
+          standardValue: 450.00,
+          description: 'RETIRADA DE CORPO ESTRANHO INTRA-ÓSSEO - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.02.030-0',
+          standardValue: 450.00,
+          description: 'TENOSINOVECTOMIA EM MEMBRO SUPERIOR - R$ 450,00'
+        }
+      ]
     },
 
     'BRUNO ROBERTO KAJIMOTO DELLAROSA': {

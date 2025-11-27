@@ -4152,13 +4152,95 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                       </div>
                                     ) : null}
                                     
-                                    {paginatedPatients.map((patient) => {
-                                      const patientKey = `${doctor.doctor_info.cns}-${patient.patient_info.cns}`;
-                                      const isPatientExpanded = expandedPatients.has(patientKey);
-                                
-                                return (
+                                    {/* 🚀 PRÉ-CALCULAR VALORES DOS PACIENTES PARA ESTABILIDADE */}
+                                    {(() => {
+                                      // ✅ Calcular valores para evitar recálculo durante expansão
+                                      const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                      
+                                      const enrichedPatients = paginatedPatients.map(patient => {
+                                        // ✅ CORREÇÃO: Incluir aih_id para evitar duplicatas em pacientes recorrentes
+                                        const patientKey = `${doctor.doctor_info.cns}-${patient.aih_id || patient.patient_info.cns}`;
+                                        
+                                        // Calcular AIH Seca (estável)
+                                        const baseAih = typeof (patient as any).total_value_reais === 'number'
+                                          ? (patient as any).total_value_reais
+                                          : sumProceduresBaseReais(patient.procedures as any);
+                                        
+                                        // Calcular Incremento (estável)
+                                        const careCharacter = (patient as any)?.aih_info?.care_character;
+                                        const doctorCovered = isDoctorCoveredForOperaParana(
+                                          doctor.doctor_info.name,
+                                          hospitalId
+                                        );
+                                        const increment = doctorCovered
+                                          ? computeIncrementForProcedures(
+                                              patient.procedures as any,
+                                              careCharacter,
+                                              doctor.doctor_info.name,
+                                              hospitalId
+                                            )
+                                          : 0;
+                                        
+                                        // Calcular Repasse Médico (estável)
+                                        const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
+                                        const hasIndividualRules = hasIndividualPaymentRules(
+                                          doctor.doctor_info.name,
+                                          hospitalId
+                                        );
+                                        const isMonthlyFixed = isFixedMonthlyPayment(
+                                          doctor.doctor_info.name,
+                                          hospitalId
+                                        );
+                                        
+                                        let totalPayment = 0;
+                                        let showRepasseCard = false;
+                                        
+                                        if (fixedCalc.hasFixedRule && !hasIndividualRules) {
+                                          showRepasseCard = false;
+                                        } else if (isMonthlyFixed) {
+                                          showRepasseCard = false;
+                                        } else {
+                                          const proceduresWithPayment = patient.procedures
+                                            .filter(filterCalculableProcedures)
+                                            .map((proc: any) => ({
+                                              procedure_code: proc.procedure_code,
+                                              procedure_description: proc.procedure_description,
+                                              value_reais: proc.value_reais || 0,
+                                            }));
+                                          
+                                          const paymentResult = calculateDoctorPayment(
+                                            doctor.doctor_info.name,
+                                            proceduresWithPayment,
+                                            hospitalId
+                                          );
+                                          
+                                          totalPayment = paymentResult.totalPayment || 0;
+                                          showRepasseCard = totalPayment > 0;
+                                        }
+                                        
+                                        return {
+                                          ...patient,
+                                          _enriched: {
+                                            patientKey,
+                                            baseAih,
+                                            increment,
+                                            hasIncrement: increment > 0,
+                                            withIncrement: baseAih + increment,
+                                            totalPayment,
+                                            showRepasseCard
+                                          }
+                                        };
+                                      });
+                                      
+                                      return (
+                                        <>
+                                          {enrichedPatients.map((patient) => {
+                                            const patientKey = patient._enriched.patientKey;
+                                            const isPatientExpanded = expandedPatients.has(patientKey);
+                                    
+                                    return (
                                   <div key={patientKey} className="p-3 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
-                                    <Collapsible>
+                                    <Collapsible open={isPatientExpanded}>
                                       <CollapsibleTrigger asChild>
                                         {/* 👤 CARD DO PACIENTE - DESIGN LIMPO E OBJETIVO */}
                                         <div 
@@ -4320,59 +4402,50 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           </div>
 
                                           {/* SEÇÃO DE VALORES - DESTAQUE ESPECIAL */}
-                                          {(() => {
-                                            const baseAih = typeof (patient as any).total_value_reais === 'number'
-                                              ? (patient as any).total_value_reais
-                                              : sumProceduresBaseReais(patient.procedures as any);
-                                            const careCharacter = (patient as any)?.aih_info?.care_character;
-                                            const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
-                                            const increment = doctorCovered ? computeIncrementForProcedures(patient.procedures as any, careCharacter, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id) : 0;
-                                            const hasIncrement = increment > 0;
-                                            const withIncrement = baseAih + increment;
-                                            const medicalValue = (patient.procedures || [])
-                                              .filter((proc: any) => (proc.procedure_code || '').toString().trim().startsWith('04'))
-                                              .reduce((sum: number, proc: any) => sum + (proc.value_reais || 0), 0);
-                                            const medicalCount = (patient.procedures || [])
-                                              .filter((proc: any) => (proc.procedure_code || '').toString().trim().startsWith('04')).length;
-                                            
-                                            return (
-                                              <div className="mt-3 pt-3 border-t-2 border-gray-200 space-y-2">
-                                                {/* AIH SECA - CAMPO MAIS IMPORTANTE */}
-                                                <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-3 border-2 border-emerald-200">
+                                          {/* ✅ USAR VALORES PRÉ-CALCULADOS (MEMOIZADOS) */}
+                                          <div className="mt-3 pt-3 border-t-2 border-gray-200 space-y-2">
+                                            {/* AIH SECA - CAMPO MAIS IMPORTANTE */}
+                                            <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-3 border-2 border-emerald-200">
+                                              <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                  <DollarSign className="h-4 w-4 text-emerald-600" />
+                                                  <span className="text-xs font-bold text-emerald-900 uppercase tracking-wide">AIH Seca</span>
+                                                </div>
+                                                <span className="text-lg font-black text-emerald-700">
+                                                  {formatCurrency(patient._enriched.baseAih)}
+                                                </span>
+                                              </div>
+                                            </div>
+
+                                            {/* INCREMENTO - SE HOUVER */}
+                                            {patient._enriched.hasIncrement && (
+                                              <>
+                                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border-2 border-blue-200">
                                                   <div className="flex items-center justify-between">
                                                     <div className="flex items-center gap-2">
-                                                      <DollarSign className="h-4 w-4 text-emerald-600" />
-                                                      <span className="text-xs font-bold text-emerald-900 uppercase tracking-wide">AIH Seca</span>
+                                                      <span className="text-lg">📈</span>
+                                                      <span className="text-xs font-bold text-blue-900 uppercase tracking-wide">Incremento</span>
                                                     </div>
-                                                    <span className="text-lg font-black text-emerald-700">{formatCurrency(baseAih)}</span>
+                                                    <span className="text-lg font-black text-blue-700">
+                                                      {formatCurrency(patient._enriched.increment)}
+                                                    </span>
                                                   </div>
                                                 </div>
 
-                                                {/* INCREMENTO - SE HOUVER */}
-                                                {hasIncrement && (
-                                                  <>
-                                                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border-2 border-blue-200">
-                                                      <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2">
-                                                          <span className="text-lg">📈</span>
-                                                          <span className="text-xs font-bold text-blue-900 uppercase tracking-wide">Incremento</span>
-                                                        </div>
-                                                        <span className="text-lg font-black text-blue-700">{formatCurrency(increment)}</span>
-                                                      </div>
+                                                {/* AIH C/ INCREMENTO - TOTAL FINAL */}
+                                                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border-2 border-purple-300">
+                                                  <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                      <CheckCircle className="h-4 w-4 text-purple-600" />
+                                                      <span className="text-xs font-bold text-purple-900 uppercase tracking-wide">AIH c/ Incremento</span>
                                                     </div>
-
-                                                    {/* AIH C/ INCREMENTO - TOTAL FINAL */}
-                                                    <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border-2 border-purple-300">
-                                                      <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2">
-                                                          <CheckCircle className="h-4 w-4 text-purple-600" />
-                                                          <span className="text-xs font-bold text-purple-900 uppercase tracking-wide">AIH c/ Incremento</span>
-                                                        </div>
-                                                        <span className="text-lg font-black text-purple-700">{formatCurrency(withIncrement)}</span>
-                                                      </div>
-                                                    </div>
-                                                  </>
-                                                )}
+                                                    <span className="text-lg font-black text-purple-700">
+                                                      {formatCurrency(patient._enriched.withIncrement)}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </>
+                                            )}
 
                                                 {/* PROCEDIMENTOS MÉDICOS (04) - OCULTO CONFORME SOLICITAÇÃO */}
                                                 {/* {medicalCount > 0 && (
@@ -4389,71 +4462,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   </div>
                                                 )} */}
 
-                                                {/* 💰 VALOR DE REPASSE PARA O MÉDICO */}
-                                                {(() => {
-                                                  // 🚫 REGRA: Não mostrar para médicos com Valor Fixo (não faz sentido por paciente)
-                                                  const hospitalId = doctor.hospitals?.[0]?.hospital_id;
-                                                  const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
-                                                  const hasIndividualRules = hasIndividualPaymentRules(doctor.doctor_info.name, hospitalId);
-                                                  
-                                                  // Se tem Valor Fixo E não tem regras individuais = não mostrar card
-                                                  // (Valor Fixo = um único pagamento independente de nº de pacientes)
-                                                  if (fixedCalc.hasFixedRule && !hasIndividualRules) {
-                                                    return null;
-                                                  }
-                                                  
-                                                  // ✅ IMPORTANTE: Filtrar procedimentos de anestesista antes de calcular
-                                                  // Evita duplicação de valores com procedimentos 04.xxx de anestesistas
-                                                  const proceduresWithPayment = patient.procedures
-                                                    .filter(filterCalculableProcedures) // 🚫 Remove anestesistas 04.xxx (exceto cesarianas)
-                                                    .map((proc: any) => ({
-                                                      procedure_code: proc.procedure_code,
-                                                      procedure_description: proc.procedure_description,
-                                                      value_reais: proc.value_reais || 0,
-                                                    }));
-
-                                                  const paymentResult = calculateDoctorPayment(
-                                                    doctor.doctor_info.name,
-                                                    proceduresWithPayment,
-                                                    hospitalId
-                                                  );
-
-                                                  const totalPayment = paymentResult.totalPayment || 0;
-                                                  
-                                                  // 🔍 VERIFICAÇÃO: Não mostrar se for FIXO MENSAL
-                                                  // FIXO MENSAL: R$ 47.000,00 fixo independente de pacientes
-                                                  // FIXO POR PACIENTE: R$ 450,00 por paciente (deve mostrar)
-                                                  const isMonthlyFixed = isFixedMonthlyPayment(
-                                                    doctor.doctor_info.name,
-                                                    hospitalId
-                                                  );
-                                                  
-                                                  if (isMonthlyFixed) {
-                                                    // ❌ NÃO MOSTRAR para médicos com FIXO MENSAL
-                                                    // O valor fixo mensal já está no card do médico (Pagamento Médico)
-                                                    // Exemplos: THADEU TIESSI SUZUKI (R$ 47k), ORLANDO PAPI (R$ 60k)
-                                                    return null;
-                                                  }
-                                                  
-                                                  // ✅ Só mostra se houver valor de repasse E não for fixo mensal
-                                                  if (totalPayment > 0) {
-                                                    return (
-                                                      <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg p-3 border-2 border-teal-300">
-                                                        <div className="flex items-center justify-between">
-                                                          <div className="flex items-center gap-2">
-                                                            <Stethoscope className="h-4 w-4 text-teal-600" />
-                                                            <span className="text-xs font-bold text-teal-900 uppercase tracking-wide">Repasse Médico</span>
-                                                          </div>
-                                                          <span className="text-lg font-black text-teal-700">{formatCurrency(totalPayment)}</span>
-                                                        </div>
-                                                      </div>
-                                                    );
-                                                  }
-                                                  return null;
-                                                })()}
+                                            {/* 💰 VALOR DE REPASSE PARA O MÉDICO */}
+                                            {/* ✅ USAR VALOR PRÉ-CALCULADO (MEMOIZADO) */}
+                                            {patient._enriched.showRepasseCard && (
+                                              <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg p-3 border-2 border-teal-300">
+                                                <div className="flex items-center justify-between">
+                                                  <div className="flex items-center gap-2">
+                                                    <Stethoscope className="h-4 w-4 text-teal-600" />
+                                                    <span className="text-xs font-bold text-teal-900 uppercase tracking-wide">Repasse Médico</span>
+                                                  </div>
+                                                  <span className="text-lg font-black text-teal-700">
+                                                    {formatCurrency(patient._enriched.totalPayment)}
+                                                  </span>
+                                                </div>
                                               </div>
-                                            );
-                                          })()}
+                                            )}
+                                          </div>
                                         </div>
                                       </CollapsibleTrigger>
 
@@ -4754,7 +4778,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                             </>
                           );
                         })()}
-                      </div>
+                      </>
+                    );
+                  })()}
+                            </div>
                           </div>
                         </div>
                       </CollapsibleContent>
