@@ -218,9 +218,22 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
       .reduce((procSum, proc) => procSum + (proc.value_reais || 0), 0), 0
   );
   
+  // 🎯 CALCULAR INCREMENTO OPERA PARANÁ (acréscimo ao valor base das AIHs)
+  const hospitalId = doctorData.hospitals?.[0]?.hospital_id;
+  const doctorCovered = isDoctorCoveredForOperaParana(doctorData.doctor_info.name, hospitalId);
+  
+  const operaParanaIncrement = doctorCovered 
+    ? patientsForStats.reduce((acc, patient) => 
+        acc + computeIncrementForProcedures(
+          patient.procedures as any, 
+          (patient as any)?.aih_info?.care_character, 
+          doctorData.doctor_info.name, 
+          hospitalId
+        ), 0)
+    : 0;
+  
   // 🎯 CALCULAR SOMA DOS VALORES DO DETALHAMENTO POR PROCEDIMENTO (POR PACIENTE)
   // 🆕 VERIFICAR TIPO DE REGRA: VALOR FIXO → PERCENTUAL → INDIVIDUAL
-  const hospitalId = doctorData.hospitals?.[0]?.hospital_id;
   
   // 🔥 1. PRIORIDADE MÁXIMA: Verificar regra de VALOR FIXO primeiro
   const fixedPaymentCalculation = calculateFixedPayment(doctorData.doctor_info.name, hospitalId);
@@ -276,7 +289,9 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
     medicalProceduresValue,
     medicalProceduresCount,
     calculatedPaymentValue, // 🆕 Valor calculado baseado nas regras
-    anesthetistProcedures04Count // 🆕 Quantidade de procedimentos de anestesistas iniciados em '04'
+    anesthetistProcedures04Count, // 🆕 Quantidade de procedimentos de anestesistas iniciados em '04'
+    operaParanaIncrement, // 🆕 Incremento Opera Paraná (acréscimo ao valor das AIHs)
+    totalValueWithOperaParana: totalValue + operaParanaIncrement // 🆕 Valor total das AIHs + incremento
   };
 };
 
@@ -1533,6 +1548,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     };
   }, [filteredDoctors]);
   
+  // 🚀 OTIMIZAÇÃO CRÍTICA: CACHE DE STATS POR MÉDICO
+  // Calcula doctorStats UMA VEZ por médico e reutiliza em todos os contextos
+  // Evita recálculos redundantes (5x por médico → 1x por médico)
+  const doctorStatsCache = React.useMemo(() => {
+    const cache = new Map<string, ReturnType<typeof calculateDoctorStats>>();
+    
+    for (const doctor of filteredDoctors) {
+      const key = getDoctorCardKey(doctor);
+      const stats = calculateDoctorStats(doctor);
+      cache.set(key, stats);
+    }
+    
+    console.log(`⚡ [CACHE] Stats calculados para ${cache.size} médicos (otimização: 5x → 1x por médico)`);
+    return cache;
+  }, [filteredDoctors]);
+
   // 🧮 TOTAIS AGREGADOS PARA O CABEÇALHO (SIGTAP, Incrementos, Total)
   const aggregatedOperaParanaTotals = React.useMemo(() => {
     try {
@@ -1540,24 +1571,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       let totalIncrement = 0;
 
       for (const doctor of filteredDoctors) {
-        // Base SIGTAP: somatório do valor total das AIHs por médico (patient.total_value_reais)
-        const baseForDoctor = doctor.patients.reduce((sum, p) => sum + (p.total_value_reais || 0), 0);
-        totalBaseSigtap += baseForDoctor;
-
-        // Incremento Opera Paraná: mesma regra da tabela do card do médico
-        const hospitalId = doctor.hospitals?.[0]?.hospital_id;
-        const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, hospitalId);
-        if (!doctorCovered) continue;
-        const incrementForDoctor = (doctor.patients || []).reduce((acc, p) => (
-          acc + computeIncrementForProcedures(
-            p.procedures as any,
-            (p as any)?.aih_info?.care_character,
-            doctor.doctor_info.name,
-            hospitalId
-          )
-        ), 0);
-        totalIncrement += incrementForDoctor;
+        // ✅ PERFORMANCE: Usar cache de stats (evita recálculo)
+        const key = getDoctorCardKey(doctor);
+        const stats = doctorStatsCache.get(key);
+        
+        if (!stats) continue;
+        
+        // Base SIGTAP: valor total das AIHs
+        totalBaseSigtap += stats.totalValue;
+        
+        // Incremento Opera Paraná: valor pré-calculado
+        totalIncrement += stats.operaParanaIncrement;
       }
+
+      console.log(`📊 [TOTAIS AGREGADOS] Base SIGTAP: R$ ${totalBaseSigtap.toFixed(2)} | Incremento: R$ ${totalIncrement.toFixed(2)} | Total: R$ ${(totalBaseSigtap + totalIncrement).toFixed(2)}`);
 
       return {
         totalBaseSigtap,
@@ -1567,7 +1594,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     } catch {
       return { totalBaseSigtap: 0, totalIncrement: 0, totalWithIncrement: 0 };
     }
-  }, [filteredDoctors]);
+  }, [filteredDoctors, doctorStatsCache]);
 
   // 🧮 NOVO KPI: Soma dos Pagamentos Médicos (por médico) para comparação
   // ✅ CORREÇÃO: Somar repasses individuais de cada paciente (igual aos cards individuais)
@@ -1577,11 +1604,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       console.log('🔍 [TOTAL PAGAMENTOS] Calculando agregado para', filteredDoctors.length, 'médicos');
       
       for (const doctor of filteredDoctors) {
-        const hospitalId = doctor.hospitals?.[0]?.hospital_id;
-        const doctorStats = calculateDoctorStats(doctor);
+        // ✅ PERFORMANCE: Usar cache de stats (evita recálculo)
+        const key = getDoctorCardKey(doctor);
+        const stats = doctorStatsCache.get(key);
+        
+        if (!stats) continue;
         
         // ✅ USAR O MESMO CÁLCULO DOS CARDS INDIVIDUAIS
-        const doctorPayment = doctorStats.calculatedPaymentValue;
+        const doctorPayment = stats.calculatedPaymentValue;
         
         console.log(`💰 [TOTAL] ${doctor.doctor_info.name}: R$ ${doctorPayment.toFixed(2)}`);
         
@@ -1594,7 +1624,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       console.error('Erro ao calcular pagamentos médicos agregados:', error);
       return 0;
     }
-  }, [filteredDoctors]);
+  }, [filteredDoctors, doctorStatsCache]);
 
   // ✅ ATUALIZAR ESTATÍSTICAS NO COMPONENTE PAI (BASEADO NOS MÉDICOS FILTRADOS)
   useEffect(() => {
@@ -2553,10 +2583,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               (() => {
                 // Preparar dados dos médicos ordenados
                 const sortedDoctors = filteredDoctors
-                  .map((doctor) => ({
-                    ...doctor,
-                    totalValue: calculateDoctorStats(doctor).totalValue
-                  }))
+                  .map((doctor) => {
+                    // ✅ PERFORMANCE: Usar cache de stats (evita recálculo)
+                    const key = getDoctorCardKey(doctor);
+                    const stats = doctorStatsCache.get(key);
+                    return {
+                      ...doctor,
+                      totalValue: stats?.totalValue || 0
+                    };
+                  })
                   .sort((a, b) => b.totalValue - a.totalValue);
                 
                 // Calcular paginação
@@ -2610,21 +2645,28 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
                     {/* Lista de médicos paginada */}
                     {paginatedDoctors.map((doctor, index) => {
-                const doctorStats = calculateDoctorStats(doctor);
-                const cardKey = getDoctorCardKey(doctor);
-                const isExpanded = expandedDoctors.has(cardKey);
-                
-                // ✅ FUNÇÃO PARA MEDALHAS
-                const getRankingMedal = (position: number) => {
-                  switch (position) {
-                    case 0: return '🥇';
-                    case 1: return '🥈';
-                    case 2: return '🥉';
-                    default: return null;
-                  }
-                };
-                
-                return (
+                      // ✅ PERFORMANCE: Usar cache de stats (evita recálculo em cada render)
+                      const cardKey = getDoctorCardKey(doctor);
+                      const doctorStats = doctorStatsCache.get(cardKey);
+                      const isExpanded = expandedDoctors.has(cardKey);
+                      
+                      // Se stats não existe no cache, pular este médico (não deve acontecer)
+                      if (!doctorStats) {
+                        console.warn(`⚠️ Stats não encontrados no cache para: ${doctor.doctor_info.name}`);
+                        return null;
+                      }
+                      
+                      // ✅ FUNÇÃO PARA MEDALHAS
+                      const getRankingMedal = (position: number) => {
+                        switch (position) {
+                          case 0: return '🥇';
+                          case 1: return '🥈';
+                          case 2: return '🥉';
+                          default: return null;
+                        }
+                      };
+                      
+                      return (
                   <Card key={cardKey} className="mb-4 border border-slate-200 bg-white hover:shadow-md transition-all duration-300">
                     <Collapsible>
                       <CollapsibleTrigger asChild>
@@ -2795,12 +2837,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 <div className="flex items-center justify-between">
                                   <span className="text-xs font-bold text-blue-900 uppercase tracking-wide">Incremento</span>
                                   <span className="text-base font-black text-blue-700">{(() => {
-                                    const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
-                                    if (!doctorCovered) return '-';
-                                    const increment = (doctor.patients || []).reduce((acc, p) => (
-                                      acc + computeIncrementForProcedures(p.procedures as any, (p as any)?.aih_info?.care_character, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id)
-                                    ), 0);
-                                    return increment > 0 ? formatCurrency(increment) : '-';
+                                    // ✅ BEST PRACTICE: Usar valor pré-calculado de calculateDoctorStats
+                                    const increment = doctorStats.operaParanaIncrement || 0;
+                                    
+                                    if (increment === 0) return '-';
+                                    
+                                    // 🔍 LOG para verificação
+                                    console.log(`📈 [CARD INCREMENTO] ${doctor.doctor_info.name}: R$ ${increment.toFixed(2)}`);
+                                    
+                                    return formatCurrency(increment);
                                   })()}</span>
                                 </div>
                               </div>
@@ -2808,13 +2853,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 <div className="flex items-center justify-between">
                                   <span className="text-xs font-bold text-purple-900 uppercase tracking-wide">c/ Opera Paraná</span>
                                   <span className="text-base font-black text-purple-700">{(() => {
-                                    const baseTotal = doctorStats.totalValue || 0;
-                                    const doctorCovered = isDoctorCoveredForOperaParana(doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id);
-                                    if (!doctorCovered) return '-';
-                                    const increment = (doctor.patients || []).reduce((acc, p) => (
-                                      acc + computeIncrementForProcedures(p.procedures as any, (p as any)?.aih_info?.care_character, doctor.doctor_info.name, doctor.hospitals?.[0]?.hospital_id)
-                                    ), 0);
-                                    return increment > 0 ? formatCurrency(baseTotal + increment) : '-';
+                                    // ✅ BEST PRACTICE: Usar valor pré-calculado de calculateDoctorStats
+                                    const totalWithIncrement = doctorStats.totalValueWithOperaParana || doctorStats.totalValue || 0;
+                                    const increment = doctorStats.operaParanaIncrement || 0;
+                                    
+                                    if (increment === 0) return '-';
+                                    
+                                    // 🔍 LOG para verificação
+                                    console.log(`🎯 [CARD OPERA PARANÁ] ${doctor.doctor_info.name}: R$ ${totalWithIncrement.toFixed(2)} (Base: ${doctorStats.totalValue.toFixed(2)} + Incremento: ${increment.toFixed(2)})`);
+                                    
+                                    return formatCurrency(totalWithIncrement);
                                   })()}</span>
                                   </div>
                                 </div>
@@ -2829,34 +2877,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 </div>
                                 <span className="text-xl font-black text-green-700">
                                   {formatCurrency((() => {
-                                    // ✅ CORREÇÃO: Calcular pagamento somando por paciente
-                                    // A função calculateDoctorPayment agora lida corretamente com:
-                                    // 1. Regras individuais (rules) com valores específicos por procedimento
-                                    // 2. fixedPaymentRule como valor por procedimento (quando rules: [])
-                                    // 3. fixedPaymentRule como valor padrão (quando há rules específicas)
-                                    const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                    // ✅ BEST PRACTICE: Usar valor pré-calculado de calculateDoctorStats
+                                    // Evita recálculo no render e garante consistência
+                                    // doctorStats.calculatedPaymentValue já contempla:
+                                    // 1. TODOS os pacientes do médico
+                                    // 2. Hierarquia correta: Fixo → Percentual → Individual
+                                    // 3. Exclusão de anestesistas 04.xxx
+                                    // 4. Aplicação das regras de pagamento específicas
                                     
-                                    const doctorTotalPayment = doctor.patients.reduce((sum, patient) => {
-                                      const proceduresWithPayment = patient.procedures
-                                        .filter(filterCalculableProcedures)
-                                        .map((proc: any) => ({
-                                          procedure_code: proc.procedure_code,
-                                          procedure_description: proc.procedure_description,
-                                          value_reais: proc.value_reais || 0,
-                                        }));
-
-                                      if (proceduresWithPayment.length > 0) {
-                                        const paymentResult = calculateDoctorPayment(
-                                          doctor.doctor_info.name,
-                                          proceduresWithPayment,
-                                          hospitalId
-                                        );
-                                        return sum + (paymentResult.totalPayment || 0);
-                                      }
-                                      return sum;
-                                    }, 0);
+                                    const paymentValue = doctorStats.calculatedPaymentValue || doctorStats.medicalProceduresValue || 0;
                                     
-                                    return doctorTotalPayment > 0 ? doctorTotalPayment : (doctorStats.calculatedPaymentValue || doctorStats.medicalProceduresValue);
+                                    // 🔍 LOG para verificação
+                                    if (paymentValue > 0) {
+                                      console.log(`💰 [CARD] ${doctor.doctor_info.name}: R$ ${paymentValue.toFixed(2)} (fonte: doctorStats)`);
+                                    }
+                                    
+                                    return paymentValue;
                                   })())}
                                 </span>
                               </div>
@@ -4344,6 +4380,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
                                                 {/* 💰 VALOR DE REPASSE PARA O MÉDICO */}
                                                 {(() => {
+                                                  // 🚫 REGRA: Não mostrar para médicos com Valor Fixo (não faz sentido por paciente)
+                                                  const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                                  const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
+                                                  const hasIndividualRules = hasIndividualPaymentRules(doctor.doctor_info.name, hospitalId);
+                                                  
+                                                  // Se tem Valor Fixo E não tem regras individuais = não mostrar card
+                                                  // (Valor Fixo = um único pagamento independente de nº de pacientes)
+                                                  if (fixedCalc.hasFixedRule && !hasIndividualRules) {
+                                                    return null;
+                                                  }
+                                                  
                                                   // ✅ IMPORTANTE: Filtrar procedimentos de anestesista antes de calcular
                                                   // Evita duplicação de valores com procedimentos 04.xxx de anestesistas
                                                   const proceduresWithPayment = patient.procedures
@@ -4357,7 +4404,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   const paymentResult = calculateDoctorPayment(
                                                     doctor.doctor_info.name,
                                                     proceduresWithPayment,
-                                                    doctor.hospitals?.[0]?.hospital_id
+                                                    hospitalId
                                                   );
 
                                                   const totalPayment = paymentResult.totalPayment || 0;
