@@ -46,6 +46,8 @@ export interface DoctorPaymentRule {
     description?: string;
     // 🆕 Valor diferente para procedimento secundário (2º, 3º, etc.)
     secondaryValue?: number;
+    // 🆕 Valor diferente para procedimento terciário (3º, 4º, etc.)
+    tertiaryValue?: number;
   }[];
   multipleRule?: {
     codes: string[];
@@ -395,7 +397,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // ================================================================
       // 🔬 PROCEDIMENTOS INDIVIDUAIS - DR. GUILHERME AUGUSTO STORER
       // Especialidade: Urologia
-      // Última atualização: 27/10/2025
+      // Última atualização: 27/11/2025
       // Mesmas regras do Dr. HELIO SHINDY KISSINA
       // ================================================================
       {
@@ -433,7 +435,13 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         standardValue: 300.00,
         description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00'
       },
-      { procedureCode: '04.09.05.008-3', standardValue: 250.00, secondaryValue: 187.50, description: 'POSTECTOMIA - Principal: R$ 250,00 | Sequencial: R$ 187,50' },
+      { 
+        procedureCode: '04.09.05.008-3', 
+        standardValue: 250.00, 
+        secondaryValue: 187.50,
+        tertiaryValue: 150.00,
+        description: 'POSTECTOMIA - Principal: R$ 250,00 | 2º: R$ 187,50 | 3º+: R$ 150,00' 
+      },
       {
         procedureCode: '04.09.04.024-0',
         standardValue: 450.00,
@@ -1441,7 +1449,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     rules: [
       // ================================================================
       // 🏥 PROCEDIMENTOS PRINCIPAIS - GINECOLOGIA E OBSTETRÍCIA
-      // Última atualização: 25/11/2025
+      // Última atualização: 27/11/2025
       // ================================================================
       {
         procedureCode: '04.09.06.013-5',
@@ -1462,7 +1470,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.09.06.021-6',
         standardValue: 700.00,
         secondaryValue: 525.00,
-        description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | Sequencial: R$ 525,00'
+        tertiaryValue: 420.00,
+        description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | 2º: R$ 525,00 | 3º+: R$ 420,00'
       },
       {
         procedureCode: '04.09.06.018-6',
@@ -1472,7 +1481,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.09.07.027-0',
         standardValue: 450.00,
-        description: 'TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL - R$ 450,00'
+        secondaryValue: 250.00,
+        description: 'TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL - Principal: R$ 450,00 | 2º: R$ 250,00'
       },
       {
         procedureCode: '04.09.07.006-8',
@@ -1482,7 +1492,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.09.07.005-0',
         standardValue: 600.00,
-        description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR - R$ 600,00'
+        secondaryValue: 450.00,
+        description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR - Principal: R$ 600,00 | 2º: R$ 450,00'
       },
       {
         procedureCode: '04.09.06.004-6',
@@ -1592,7 +1603,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     rules: [
       // ================================================================
       // 🏥 PROCEDIMENTOS PRINCIPAIS - GINECOLOGIA E OBSTETRÍCIA
-      // Última atualização: 25/11/2025
+      // Última atualização: 27/11/2025
       // Mesmas regras da MAIRA RECHI CASSAPULA
       // ================================================================
       {
@@ -1614,7 +1625,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         procedureCode: '04.09.06.021-6',
         standardValue: 700.00,
         secondaryValue: 525.00,
-        description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | Sequencial: R$ 525,00'
+        tertiaryValue: 420.00,
+        description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | 2º: R$ 525,00 | 3º+: R$ 420,00'
       },
       {
         procedureCode: '04.09.06.018-6',
@@ -1624,7 +1636,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.09.07.027-0',
         standardValue: 450.00,
-        description: 'TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL - R$ 450,00'
+        secondaryValue: 250.00,
+        description: 'TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL - Principal: R$ 450,00 | 2º: R$ 250,00'
       },
       {
         procedureCode: '04.09.07.006-8',
@@ -1634,7 +1647,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       {
         procedureCode: '04.09.07.005-0',
         standardValue: 600.00,
-        description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR - R$ 600,00'
+        secondaryValue: 450.00,
+        description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR - Principal: R$ 600,00 | 2º: R$ 450,00'
       },
       {
         procedureCode: '04.09.06.004-6',
@@ -1878,7 +1892,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // ================================================================
       // 🔬 PROCEDIMENTOS INDIVIDUAIS - UROLOGIA
       // Baseado em: Dr. GUILHERME AUGUSTO STORER
-      // Última atualização: 21/11/2025
+      // Última atualização: 27/11/2025
       // Total: 22 procedimentos
       // ================================================================
       rules: [
@@ -1889,7 +1903,13 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
         { procedureCode: '04.09.04.021-5', standardValue: 300.00, description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00' },
-        { procedureCode: '04.09.05.008-3', standardValue: 250.00, secondaryValue: 187.50, description: 'POSTECTOMIA - Principal: R$ 250,00 | Sequencial: R$ 187,50' },
+        { 
+          procedureCode: '04.09.05.008-3', 
+          standardValue: 250.00, 
+          secondaryValue: 187.50,
+          tertiaryValue: 150.00,
+          description: 'POSTECTOMIA - Principal: R$ 250,00 | 2º: R$ 187,50 | 3º+: R$ 150,00' 
+        },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
@@ -2074,12 +2094,17 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     'PEDRO HENRIQUE RODRIGUES': {
       doctorName: 'PEDRO HENRIQUE RODRIGUES',
       // 🩺 CIRURGIA VASCULAR - VARIZES E TROMBECTOMIA
-      // Última atualização: 26/11/2025
+      // Última atualização: 27/11/2025
       rules: [
         {
           procedureCode: '04.06.02.057-4',
           standardValue: 900.00,
           description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 900,00'
+        },
+        {
+          procedureCode: '04.06.02.056-6',
+          standardValue: 900.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 900,00'
         },
         {
           procedureCode: '04.06.02.059-0',
@@ -2092,6 +2117,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           codes: ['04.06.02.057-4', '04.06.02.059-0'],
           totalValue: 1100.00,
           description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) + TROMBECTOMIA DO SISTEMA VENOSO - R$ 1.100,00'
+        },
+        {
+          codes: ['04.06.02.056-6', '04.06.02.059-0'],
+          totalValue: 1100.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) + TROMBECTOMIA DO SISTEMA VENOSO - R$ 1.100,00'
         }
       ]
     },
@@ -2808,7 +2838,13 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           standardValue: 300.00,
           description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - R$ 300,00'
         },
-        { procedureCode: '04.09.05.008-3', standardValue: 250.00, secondaryValue: 187.50, description: 'POSTECTOMIA - Principal: R$ 250,00 | Sequencial: R$ 187,50' },
+        { 
+          procedureCode: '04.09.05.008-3', 
+          standardValue: 250.00, 
+          secondaryValue: 187.50,
+          tertiaryValue: 150.00,
+          description: 'POSTECTOMIA - Principal: R$ 250,00 | 2º: R$ 187,50 | 3º+: R$ 150,00' 
+        },
         {
           procedureCode: '04.09.04.024-0',
           standardValue: 450.00,
@@ -3100,12 +3136,17 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     'PEDRO HENRIQUE RODRIGUES': {
       doctorName: 'PEDRO HENRIQUE RODRIGUES',
       // 🩺 CIRURGIA VASCULAR - VARIZES E TROMBECTOMIA
-      // Última atualização: 26/11/2025
+      // Última atualização: 27/11/2025
       rules: [
         {
           procedureCode: '04.06.02.057-4',
           standardValue: 900.00,
           description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 900,00'
+        },
+        {
+          procedureCode: '04.06.02.056-6',
+          standardValue: 900.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 900,00'
         },
         {
           procedureCode: '04.06.02.059-0',
@@ -3118,8 +3159,58 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           codes: ['04.06.02.057-4', '04.06.02.059-0'],
           totalValue: 1100.00,
           description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) + TROMBECTOMIA DO SISTEMA VENOSO - R$ 1.100,00'
+        },
+        {
+          codes: ['04.06.02.056-6', '04.06.02.059-0'],
+          totalValue: 1100.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) + TROMBECTOMIA DO SISTEMA VENOSO - R$ 1.100,00'
         }
       ]
+    },
+
+    // ================================================================
+    // DR. LUIZ FRANCISCONI NETO - OTORRINOLARINGOLOGIA
+    // Hospital: Municipal Santa Alice (Cascavel)
+    // Especialidade: Otorrinolaringologia
+    // Baseado em: Dr. HUMBERTO MOREIRA DA SILVA (Torao Tokuda)
+    // Data: 27/11/2025
+    // ================================================================
+    'LUIZ FRANCISCONI NETO': {
+      doctorName: 'LUIZ FRANCISCONI NETO',
+      // 🩺 PROCEDIMENTOS DE OTORRINOLARINGOLOGIA
+      // Mesmas regras do Dr. HUMBERTO MOREIRA DA SILVA
+      rules: [
+        {
+          procedureCode: '04.04.01.048-2',
+          standardValue: 650.00,
+          description: 'Valor padrão R$ 650,00'
+        },
+        {
+          procedureCode: '04.04.01.041-5',
+          standardValue: 650.00,
+          description: 'Valor padrão R$ 650,00'
+        },
+        {
+          procedureCode: '04.04.01.002-4',
+          standardValue: 650.00,
+          description: 'Valor padrão R$ 650,00'
+        },
+        {
+          procedureCode: '04.04.01.001-6',
+          standardValue: 650.00,
+          description: 'Valor padrão R$ 650,00'
+        },
+        {
+          procedureCode: '04.04.01.003-2',
+          standardValue: 650.00,
+          description: 'Valor padrão R$ 650,00'
+        }
+      ],
+      multipleRule: {
+        codes: ['04.04.01.048-2', '04.04.01.041-5', '04.04.01.002-4', '04.04.01.001-6', '04.04.01.003-2'],
+        totalValue: 800.00,
+        description: 'Dois ou mais procedimentos: R$ 800,00 TOTAL'
+      }
     }
   },
 
@@ -3134,7 +3225,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // 🔬 REGRAS UROLÓGICAS - DR. THIAGO TIESSI SUZUKI
       // Especialidade: Urologia
       // Baseado em: Dr. GUILHERME AUGUSTO STORER (Torao Tokuda)
-      // Última atualização: 24/11/2025
+      // Última atualização: 27/11/2025
       // ================================================================
       rules: [
         // ================================================================
@@ -3179,7 +3270,13 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           secondaryValue: 225.00,
           description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - Principal: R$ 300,00 | Sequencial: R$ 225,00'
         },
-        { procedureCode: '04.09.05.008-3', standardValue: 250.00, secondaryValue: 187.50, description: 'POSTECTOMIA - Principal: R$ 250,00 | Sequencial: R$ 187,50' },
+        { 
+          procedureCode: '04.09.05.008-3', 
+          standardValue: 250.00, 
+          secondaryValue: 187.50,
+          tertiaryValue: 150.00,
+          description: 'POSTECTOMIA - Principal: R$ 250,00 | 2º: R$ 187,50 | 3º+: R$ 150,00' 
+        },
         {
           procedureCode: '04.09.04.024-0',
           standardValue: 450.00,
@@ -3455,7 +3552,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
       // 🔬 PROCEDIMENTOS INDIVIDUAIS - DR. VITOR BRANDANI GARBELINI
       // Especialidade: Urologia
       // Baseado em: Dr. GUILHERME AUGUSTO STORER / Dr. HELIO SHINDY KISSINA
-      // Última atualização: 24/11/2025
+      // Última atualização: 27/11/2025
       // ================================================================
       rules: [
         {
@@ -3509,7 +3606,13 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           secondaryValue: 225.00,
           description: 'TRATAMENTO CIRÚRGICO DE HIDROCELE - Principal: R$ 300,00 | Sequencial: R$ 225,00'
         },
-        { procedureCode: '04.09.05.008-3', standardValue: 250.00, secondaryValue: 187.50, description: 'POSTECTOMIA - Principal: R$ 250,00 | Sequencial: R$ 187,50' },
+        { 
+          procedureCode: '04.09.05.008-3', 
+          standardValue: 250.00, 
+          secondaryValue: 187.50,
+          tertiaryValue: 150.00,
+          description: 'POSTECTOMIA - Principal: R$ 250,00 | 2º: R$ 187,50 | 3º+: R$ 150,00' 
+        },
         {
           procedureCode: '04.09.04.024-0',
           standardValue: 450.00,
@@ -3745,12 +3848,17 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
     'PEDRO HENRIQUE RODRIGUES': {
       doctorName: 'PEDRO HENRIQUE RODRIGUES',
       // 🩺 CIRURGIA VASCULAR - VARIZES E TROMBECTOMIA
-      // Última atualização: 26/11/2025
+      // Última atualização: 27/11/2025
       rules: [
         {
           procedureCode: '04.06.02.057-4',
           standardValue: 900.00,
           description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 900,00'
+        },
+        {
+          procedureCode: '04.06.02.056-6',
+          standardValue: 900.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) - R$ 900,00'
         },
         {
           procedureCode: '04.06.02.059-0',
@@ -3763,6 +3871,11 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           codes: ['04.06.02.057-4', '04.06.02.059-0'],
           totalValue: 1100.00,
           description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) + TROMBECTOMIA DO SISTEMA VENOSO - R$ 1.100,00'
+        },
+        {
+          codes: ['04.06.02.056-6', '04.06.02.059-0'],
+          totalValue: 1100.00,
+          description: 'TRATAMENTO CIRÚRGICO DE VARIZES (BILATERAL) + TROMBECTOMIA DO SISTEMA VENOSO - R$ 1.100,00'
         }
       ]
     },
@@ -5639,7 +5752,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         // ================================================================
         // 🏥 PROCEDIMENTOS PRINCIPAIS - GINECOLOGIA E OBSTETRÍCIA
         // Mesmas regras da Dra. DJAVANI BLUM
-        // Última atualização: 19/11/2025
+        // Última atualização: 27/11/2025
         // ================================================================
         {
           procedureCode: '04.09.06.013-5',
@@ -5660,7 +5773,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.09.06.021-6',
           standardValue: 700.00,
           secondaryValue: 525.00,
-          description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | Sequencial: R$ 525,00'
+          tertiaryValue: 420.00,
+          description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | 2º: R$ 525,00 | 3º+: R$ 420,00'
         },
         {
           procedureCode: '04.09.06.018-6',
@@ -5670,7 +5784,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.07.027-0',
           standardValue: 450.00,
-          description: 'TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL - R$ 450,00'
+          secondaryValue: 250.00,
+          description: 'TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL - Principal: R$ 450,00 | 2º: R$ 250,00'
         },
         {
           procedureCode: '04.09.07.006-8',
@@ -5680,7 +5795,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.07.005-0',
           standardValue: 600.00,
-          description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR - R$ 600,00'
+          secondaryValue: 450.00,
+          description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR - Principal: R$ 600,00 | 2º: R$ 450,00'
         },
         {
           procedureCode: '04.09.06.004-6',
@@ -5794,7 +5910,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         // ================================================================
         // 🏥 PROCEDIMENTOS PRINCIPAIS - GINECOLOGIA E OBSTETRÍCIA
         // Mesmas regras da Dra. DJAVANI BLUM
-        // Última atualização: 19/11/2025
+        // Última atualização: 27/11/2025
         // ================================================================
         {
           procedureCode: '04.09.06.013-5',
@@ -5815,7 +5931,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.09.06.021-6',
           standardValue: 700.00,
           secondaryValue: 525.00,
-          description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | Sequencial: R$ 525,00'
+          tertiaryValue: 420.00,
+          description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | 2º: R$ 525,00 | 3º+: R$ 420,00'
         },
         {
           procedureCode: '04.09.06.018-6',
@@ -5825,7 +5942,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.07.027-0',
           standardValue: 450.00,
-          description: 'TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL - R$ 450,00'
+          secondaryValue: 250.00,
+          description: 'TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL - Principal: R$ 450,00 | 2º: R$ 250,00'
         },
         {
           procedureCode: '04.09.07.006-8',
@@ -5835,7 +5953,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.07.005-0',
           standardValue: 600.00,
-          description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR - R$ 600,00'
+          secondaryValue: 450.00,
+          description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR - Principal: R$ 600,00 | 2º: R$ 450,00'
         },
         {
           procedureCode: '04.09.06.004-6',
@@ -5949,7 +6068,7 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         // ================================================================
         // 🏥 PROCEDIMENTOS PRINCIPAIS - GINECOLOGIA E OBSTETRÍCIA
         // Mesmas regras da Dra. DJAVANI BLUM
-        // Última atualização: 19/11/2025
+        // Última atualização: 27/11/2025
         // ================================================================
         {
           procedureCode: '04.09.06.013-5',
@@ -5970,7 +6089,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.09.06.021-6',
           standardValue: 700.00,
           secondaryValue: 525.00,
-          description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | Sequencial: R$ 525,00'
+          tertiaryValue: 420.00,
+          description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | 2º: R$ 525,00 | 3º+: R$ 420,00'
         },
         {
           procedureCode: '04.09.06.018-6',
@@ -5980,7 +6100,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.07.027-0',
           standardValue: 450.00,
-          description: 'TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL - R$ 450,00'
+          secondaryValue: 250.00,
+          description: 'TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL - Principal: R$ 450,00 | 2º: R$ 250,00'
         },
         {
           procedureCode: '04.09.07.006-8',
@@ -5990,7 +6111,8 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         {
           procedureCode: '04.09.07.005-0',
           standardValue: 600.00,
-          description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR - R$ 600,00'
+          secondaryValue: 450.00,
+          description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR - Principal: R$ 600,00 | 2º: R$ 450,00'
         },
         {
           procedureCode: '04.09.06.004-6',
@@ -6116,7 +6238,13 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
         { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
-        { procedureCode: '04.09.05.008-3', standardValue: 250.00, secondaryValue: 187.50, description: 'POSTECTOMIA - Principal: R$ 250,00 | Sequencial: R$ 187,50' },
+        { 
+          procedureCode: '04.09.05.008-3', 
+          standardValue: 250.00, 
+          secondaryValue: 187.50,
+          tertiaryValue: 150.00,
+          description: 'POSTECTOMIA - Principal: R$ 250,00 | 2º: R$ 187,50 | 3º+: R$ 150,00' 
+        },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
@@ -6170,7 +6298,13 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
         { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
-        { procedureCode: '04.09.05.008-3', standardValue: 250.00, secondaryValue: 187.50, description: 'POSTECTOMIA - Principal: R$ 250,00 | Sequencial: R$ 187,50' },
+        { 
+          procedureCode: '04.09.05.008-3', 
+          standardValue: 250.00, 
+          secondaryValue: 187.50,
+          tertiaryValue: 150.00,
+          description: 'POSTECTOMIA - Principal: R$ 250,00 | 2º: R$ 187,50 | 3º+: R$ 150,00' 
+        },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
@@ -6752,7 +6886,13 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
         { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
-        { procedureCode: '04.09.05.008-3', standardValue: 250.00, secondaryValue: 187.50, description: 'POSTECTOMIA - Principal: R$ 250,00 | Sequencial: R$ 187,50' },
+        { 
+          procedureCode: '04.09.05.008-3', 
+          standardValue: 250.00, 
+          secondaryValue: 187.50,
+          tertiaryValue: 150.00,
+          description: 'POSTECTOMIA - Principal: R$ 250,00 | 2º: R$ 187,50 | 3º+: R$ 150,00' 
+        },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
@@ -6819,7 +6959,13 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
         { procedureCode: '04.09.03.004-0', standardValue: 1000.00, description: 'RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA - R$ 1.000,00' },
         { procedureCode: '04.09.03.002-3', standardValue: 1000.00, description: 'PROSTATECTOMIA SUPRAPÚBICA - R$ 1.000,00' },
         { procedureCode: '04.09.04.021-5', standardValue: 300.00, secondaryValue: 225.00, description: 'HIDROCELE - Principal: R$ 300 | Sequencial: R$ 225' },
-        { procedureCode: '04.09.05.008-3', standardValue: 250.00, secondaryValue: 187.50, description: 'POSTECTOMIA - Principal: R$ 250,00 | Sequencial: R$ 187,50' },
+        { 
+          procedureCode: '04.09.05.008-3', 
+          standardValue: 250.00, 
+          secondaryValue: 187.50,
+          tertiaryValue: 150.00,
+          description: 'POSTECTOMIA - Principal: R$ 250,00 | 2º: R$ 187,50 | 3º+: R$ 150,00' 
+        },
         { procedureCode: '04.09.04.024-0', standardValue: 450.00, description: 'VASECTOMIA - R$ 450,00' },
         { procedureCode: '04.09.04.023-1', standardValue: 250.00, description: 'TRATAMENTO CIRÚRGICO DE VARICOCELE - R$ 250,00' },
         { procedureCode: '04.09.04.013-4', standardValue: 400.00, description: 'ORQUIDOPEXIA UNILATERAL - R$ 400,00' },
@@ -7108,6 +7254,37 @@ const DOCTOR_PAYMENT_RULES_BY_HOSPITAL: Record<string, Record<string, DoctorPaym
           procedureCode: '04.08.02.030-0',
           standardValue: 450.00,
           description: 'TENOSINOVECTOMIA EM MEMBRO SUPERIOR - R$ 450,00'
+        },
+        // 🆕 NOVOS PROCEDIMENTOS ADICIONADOS EM 27/11/2025
+        {
+          procedureCode: '04.08.05.008-0',
+          standardValue: 450.00,
+          description: 'FASCIOTOMIA DE MEMBROS INFERIORES - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.007-7',
+          standardValue: 450.00,
+          description: 'ARTROPLASTIA DE RESSECÇÃO DE PEQUENAS ARTICULAÇÕES - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.035-2',
+          standardValue: 450.00,
+          description: 'RETIRADA DE FIO OU PINO INTRA-ÓSSEO - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.005-0',
+          standardValue: 450.00,
+          description: 'ARTRODESE DE PEQUENAS ARTICULAÇÕES - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.042-5',
+          standardValue: 450.00,
+          description: 'REVISÃO CIRÚRGICA DE COTO DE AMPUTAÇÃO DOS DEDOS - R$ 450,00'
+        },
+        {
+          procedureCode: '04.08.06.021-2',
+          standardValue: 450.00,
+          description: 'RESSECÇÃO DE CISTO SINOVIAL - R$ 450,00'
         }
       ]
     },
@@ -9361,27 +9538,38 @@ export function calculateDoctorPayment(
   } else {
     // Aplicar regras individuais
     calculatedProcedures = filteredProcedures
-      .map(proc => {
+      .map((proc, indexInFiltered) => {
         const standardRule = rule.rules.find(r => r.procedureCode === proc.procedure_code);
         if (!standardRule) {
           // Ignorar procedimentos que só possuem regra em combinação múltipla
           return null as unknown as (ProcedurePaymentInfo & { calculatedPayment: number; paymentRule: string; isSpecialRule: boolean });
         }
         
-        // 🆕 VERIFICAR SE PROCEDIMENTO TEM VALOR DIFERENTE PARA SECUNDÁRIO
-        // Encontrar a posição REAL do procedimento na lista ORIGINAL (não filtrada)
-        const originalIndex = procedures.findIndex(p => 
-          p.procedure_code === proc.procedure_code && 
-          p.value_reais === proc.value_reais
-        );
-        const isPrincipal = originalIndex === 0; // Primeiro procedimento na AIH é principal (verde)
+        // 🆕 VERIFICAR SE PROCEDIMENTO TEM VALOR DIFERENTE PARA SECUNDÁRIO/TERCIÁRIO
+        // ✅ CORREÇÃO: Usar a posição na lista FILTRADA (apenas procedimentos COM regras)
+        // Não usar a lista original, pois pode incluir procedimentos sem regras (anestesia, etc.)
+        const sequencePosition = indexInFiltered + 1; // 1-based (1º, 2º, 3º...)
+        const isPrincipal = sequencePosition === 1; // Primeiro procedimento com regra
+        const isSecondary = sequencePosition === 2; // Segundo procedimento com regra
+        const isTertiary = sequencePosition >= 3; // Terceiro ou posterior com regra
+        
         const hasSecondaryValue = standardRule.secondaryValue !== undefined;
+        const hasTertiaryValue = (standardRule as any).tertiaryValue !== undefined;
         
         let calculatedValue = standardRule.standardValue;
         let ruleDescription = standardRule.description || `R$ ${standardRule.standardValue.toFixed(2)}`;
         
-        if (hasSecondaryValue && !isPrincipal) {
-          // Se não é o primeiro e tem valor secundário, usar o valor secundário
+        // 🎯 LÓGICA DE 3 NÍVEIS
+        if (isTertiary && hasTertiaryValue) {
+          // 3º, 4º, 5º... → tertiaryValue
+          calculatedValue = (standardRule as any).tertiaryValue!;
+          ruleDescription = standardRule.description || `R$ ${(standardRule as any).tertiaryValue!.toFixed(2)} (3º+)`;
+        } else if (isSecondary && hasSecondaryValue) {
+          // 2º → secondaryValue
+          calculatedValue = standardRule.secondaryValue!;
+          ruleDescription = standardRule.description || `R$ ${standardRule.secondaryValue!.toFixed(2)} (2º)`;
+        } else if (!isPrincipal && hasSecondaryValue && !hasTertiaryValue) {
+          // Se tem secondaryValue mas não tem tertiaryValue, usar secondaryValue para todos os não-principais
           calculatedValue = standardRule.secondaryValue!;
           ruleDescription = standardRule.description || `R$ ${standardRule.secondaryValue!.toFixed(2)} (Secundário)`;
         }
