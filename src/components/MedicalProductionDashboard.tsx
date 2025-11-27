@@ -46,7 +46,7 @@ import { DoctorsHierarchyV2Service } from '../services/doctorsHierarchyV2';
 import { DoctorsCrudService } from '../services/doctorsCrudService';
 import { ProcedureRecordsService, type ProcedureRecord } from '../services/simplifiedProcedureService';
 import { DateRange } from '../types';
-import DoctorPaymentRules, { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayment, hasIndividualPaymentRules } from './DoctorPaymentRules';
+import DoctorPaymentRules, { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayment, hasIndividualPaymentRules, isFixedMonthlyPayment } from './DoctorPaymentRules';
 import ProcedurePatientDiagnostic from './ProcedurePatientDiagnostic';
 import CleuezaDebugComponent from './CleuezaDebugComponent';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
@@ -241,9 +241,20 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   console.log(`🔍 DEBUG MÉDICO: ${doctorData.doctor_info.name} | Hospital ID: ${hospitalId} | Has Fixed Rule: ${fixedPaymentCalculation.hasFixedRule} | Amount: ${fixedPaymentCalculation.calculatedPayment}`);
   
   if (fixedPaymentCalculation.hasFixedRule) {
-    // ✅ REGRA DE VALOR FIXO: Retornar valor fixo UMA VEZ, independente de pacientes
-    calculatedPaymentValue = fixedPaymentCalculation.calculatedPayment;
-    console.log(`💰 ${doctorData.doctor_info.name}: ${fixedPaymentCalculation.appliedRule} - R$ ${fixedPaymentCalculation.calculatedPayment.toFixed(2)} (${patientsForStats.length} pacientes)`);
+    // 🔍 VERIFICAR SE É FIXO MENSAL OU FIXO POR PACIENTE
+    const isMonthlyFixed = isFixedMonthlyPayment(doctorData.doctor_info.name, hospitalId);
+    
+    if (isMonthlyFixed) {
+      // ✅ FIXO MENSAL: Valor fixo UMA VEZ, independente de pacientes
+      // Exemplo: THADEU TIESSI SUZUKI - R$ 47.000,00 fixo mensal
+      calculatedPaymentValue = fixedPaymentCalculation.calculatedPayment;
+      console.log(`💎 ${doctorData.doctor_info.name}: FIXO MENSAL - R$ ${fixedPaymentCalculation.calculatedPayment.toFixed(2)} (${patientsForStats.length} pacientes)`);
+    } else {
+      // ✅ FIXO POR PACIENTE: Multiplicar pelo número de pacientes
+      // Exemplo: RAFAEL LUCENA BASTOS - R$ 450,00 × 31 pacientes = R$ 13.950,00
+      calculatedPaymentValue = fixedPaymentCalculation.calculatedPayment * patientsForStats.length;
+      console.log(`💰 ${doctorData.doctor_info.name}: FIXO POR PACIENTE - R$ ${fixedPaymentCalculation.calculatedPayment.toFixed(2)} × ${patientsForStats.length} pacientes = R$ ${calculatedPaymentValue.toFixed(2)}`);
+    }
   } else {
     // 2. Verificar regra de percentual
     const percentageCalculation = calculatePercentagePayment(doctorData.doctor_info.name, totalValue, hospitalId);
@@ -4409,7 +4420,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
                                                   const totalPayment = paymentResult.totalPayment || 0;
                                                   
-                                                  // Só mostra se houver valor de repasse
+                                                  // 🔍 VERIFICAÇÃO: Não mostrar se for FIXO MENSAL
+                                                  // FIXO MENSAL: R$ 47.000,00 fixo independente de pacientes
+                                                  // FIXO POR PACIENTE: R$ 450,00 por paciente (deve mostrar)
+                                                  const isMonthlyFixed = isFixedMonthlyPayment(
+                                                    doctor.doctor_info.name,
+                                                    hospitalId
+                                                  );
+                                                  
+                                                  if (isMonthlyFixed) {
+                                                    // ❌ NÃO MOSTRAR para médicos com FIXO MENSAL
+                                                    // O valor fixo mensal já está no card do médico (Pagamento Médico)
+                                                    // Exemplos: THADEU TIESSI SUZUKI (R$ 47k), ORLANDO PAPI (R$ 60k)
+                                                    return null;
+                                                  }
+                                                  
+                                                  // ✅ Só mostra se houver valor de repasse E não for fixo mensal
                                                   if (totalPayment > 0) {
                                                     return (
                                                       <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg p-3 border-2 border-teal-300">

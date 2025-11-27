@@ -9098,20 +9098,24 @@ export function calculateDoctorPayment(
   if (filteredProcedures.length === 0) {
     // Verificar se tem regra de valor fixo (fallback)
     if (rule.fixedPaymentRule) {
-      // ✅ CORREÇÃO: Aplicar valor fixo a CADA procedimento (não apenas ao primeiro)
-      // Se o médico não tem regras individuais (rules: []), o fixedPaymentRule
-      // é um "valor por procedimento", não um "pagamento fixo mensal"
-      const calculatedProcedures = procedures.map((proc) => ({
+      // ✅ CORREÇÃO: Valor fixo é POR PACIENTE, não por procedimento
+      // Independente de quantos procedimentos o paciente tem, o valor é UMA VEZ
+      // Exemplo: Paciente com 3 procedimentos → R$ 450,00 (não R$ 1.350,00)
+      
+      // Marcar apenas o primeiro procedimento como calculado (visual)
+      const calculatedProcedures = procedures.map((proc, index) => ({
         ...proc,
-        calculatedPayment: rule.fixedPaymentRule!.amount,
-        paymentRule: rule.fixedPaymentRule!.description,
+        calculatedPayment: index === 0 ? rule.fixedPaymentRule!.amount : 0,
+        paymentRule: index === 0 
+          ? `${rule.fixedPaymentRule!.description} (valor único por paciente)`
+          : 'Incluído no valor fixo do paciente',
         isSpecialRule: true
       }));
 
       return {
         procedures: calculatedProcedures,
-        totalPayment: procedures.length * rule.fixedPaymentRule.amount,
-        appliedRule: `${rule.fixedPaymentRule.description} (${procedures.length} × R$ ${rule.fixedPaymentRule.amount.toFixed(2)})`
+        totalPayment: rule.fixedPaymentRule.amount, // ✅ UMA VEZ POR PACIENTE
+        appliedRule: `${rule.fixedPaymentRule.description} (R$ ${rule.fixedPaymentRule.amount.toFixed(2)} por paciente)`
       };
     }
     
@@ -9456,6 +9460,47 @@ export function hasIndividualPaymentRules(doctorName: string, hospitalId?: strin
   const hospitalRules = DOCTOR_PAYMENT_RULES_BY_HOSPITAL[hospitalKey];
   const rule = hospitalRules?.[doctorName.toUpperCase()];
   return !!(rule?.rules && rule.rules.length > 0);
+}
+
+/**
+ * 🔍 VERIFICAR SE É FIXO MENSAL (não deve mostrar repasse por paciente)
+ * vs FIXO POR PACIENTE (deve mostrar repasse por paciente)
+ * 
+ * LÓGICA:
+ * - FIXO MENSAL: fixedPaymentRule + rules: [] (sem regras individuais)
+ *   Exemplo: Dr. THADEU TIESSI SUZUKI - R$ 47.000,00 fixo mensal
+ * 
+ * - FIXO POR PACIENTE: fixedPaymentRule + rules: [...] (com regras individuais)
+ *   Exemplo: Dr. JOAO ROBERTO SEIDEL - R$ 450,00 por paciente (fallback)
+ * 
+ * @param doctorName - Nome do médico
+ * @param hospitalId - ID do hospital (opcional)
+ * @returns true se é FIXO MENSAL, false caso contrário
+ */
+export function isFixedMonthlyPayment(
+  doctorName: string,
+  hospitalId?: string
+): boolean {
+  const hospitalKey = detectHospitalFromContext(doctorName, hospitalId);
+  const hospitalRules = DOCTOR_PAYMENT_RULES_BY_HOSPITAL[hospitalKey];
+  const rule = hospitalRules?.[doctorName.toUpperCase()];
+  
+  if (!rule?.fixedPaymentRule) {
+    return false; // Não tem regra fixa
+  }
+  
+  const fixedAmount = rule.fixedPaymentRule.amount;
+  const description = rule.fixedPaymentRule.description.toLowerCase();
+  
+  // 🎯 LÓGICA DE DIFERENCIAÇÃO:
+  // 1. Se descrição contém "mensal" → FIXO MENSAL
+  // 2. Se valor > 10.000 → FIXO MENSAL (valores altos como R$ 47.000)
+  // 3. Caso contrário → FIXO POR PACIENTE (valores baixos como R$ 450)
+  
+  const isMensalByDescription = description.includes('mensal');
+  const isMensalByAmount = fixedAmount > 10000;
+  
+  return isMensalByDescription || isMensalByAmount;
 }
 
 /**
