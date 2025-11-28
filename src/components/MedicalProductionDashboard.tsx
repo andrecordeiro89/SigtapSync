@@ -3232,27 +3232,25 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             totalRepasse += repasseValue; // ✅ Somar ao total
                                           }
                                           
-                                          // 🚫 FILTRO: Remover pacientes com repasse R$ 0,00
-                                          // ✅ Mostrar apenas pacientes com repasse > 0
-                                          if (repasseValue > 0) {
-                                            patientsWithPayment++; // 📊 Contar pacientes incluídos
-                                            tableData.push([
-                                              medicalRecord,
-                                              name,
-                                              codes04Display,
-                                              dischargeLabel,
-                                              careCharacterDisplay,
-                                              doctorName,
-                                              hospitalName,
-                                              formatCurrency(repasseValue)
-                                            ]);
-                                          }
+                                          // ✅ CORREÇÃO: INCLUIR TODOS OS PACIENTES (mesmo com R$ 0,00)
+                                          // Garante consistência com o valor do card "PAGAMENTO MÉDICO"
+                                          patientsWithPayment++; // 📊 Contar todos os pacientes
+                                          tableData.push([
+                                            medicalRecord,
+                                            name,
+                                            codes04Display,
+                                            dischargeLabel,
+                                            careCharacterDisplay,
+                                            doctorName,
+                                            hospitalName,
+                                            formatCurrency(repasseValue) // Pode ser R$ 0,00
+                                          ]);
                                          });
                                          
-                                        // 📊 LOG: Resultado do filtro de pacientes com repasse
-                                        console.log(`📊 [RELATÓRIO SIMPLIFICADO] Pacientes processados: ${totalPatientsProcessed}`);
-                                        console.log(`✅ [RELATÓRIO SIMPLIFICADO] Pacientes com repasse > R$ 0,00: ${patientsWithPayment}`);
-                                        console.log(`🚫 [RELATÓRIO SIMPLIFICADO] Pacientes filtrados (repasse R$ 0,00): ${totalPatientsProcessed - patientsWithPayment}`);
+                                        // 📊 LOG: Resultado da inclusão de pacientes
+                                        console.log(`📊 [RELATÓRIO SIMPLIFICADO] Total de pacientes incluídos: ${patientsWithPayment}`);
+                                        console.log(`✅ [RELATÓRIO SIMPLIFICADO] TODOS os pacientes foram incluídos (incluindo R$ 0,00)`);
+                                        console.log(`💰 [RELATÓRIO SIMPLIFICADO] Valor total de repasse: R$ ${totalRepasse.toFixed(2)}`);
                                          
                                         // ✅ ORDENAÇÃO: Por Data de Alta (mais recente primeiro)
                                         tableData.sort((a, b) => {
