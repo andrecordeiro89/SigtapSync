@@ -3214,8 +3214,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             : '-';
                                           
                                           // ✅ NOVO: Calcular valor de repasse (mesma lógica do card)
+                                          // ⚠️ CORREÇÃO: Usar MESMO filtro do card (apenas códigos 04.xxx)
                                           const proceduresWithPayment = p.procedures
-                                            .filter(filterCalculableProcedures) // Remove anestesistas 04.xxx (exceto cesarianas)
+                                            .filter((proc: any) => 
+                                              isMedicalProcedure(proc.procedure_code) && 
+                                              shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+                                            )
                                             .map((proc: any) => ({
                                               procedure_code: proc.procedure_code,
                                               procedure_description: proc.procedure_description,
