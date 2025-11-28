@@ -164,7 +164,7 @@ const UROLOGIA_FRG_RULES: Omit<DoctorPaymentRule, 'doctorName'> = {
     { procedureCode: '04.09.01.020-0', standardValue: 1000.00, description: 'NEFRECTOMIA PARCIAL - R$ 1.000,00' },
     { procedureCode: '04.09.01.022-7', standardValue: 900.00, description: 'NEFROLITOTOMIA (ANATRÓFICA) - R$ 900,00' },
     { procedureCode: '04.09.01.029-4', standardValue: 400.00, description: 'NEFROSTOMIA PERCUTÂNEA - R$ 400,00' },
-    { procedureCode: '04.09.02.017-6', standardValue: 250.00, description: 'URETROTOMIA INTERNA - R$ 250,00' },
+    { procedureCode: '04.09.02.017-6', standardValue: 250.00, secondaryValue: 200.00, description: 'URETROTOMIA INTERNA - Principal: R$ 250 | Seq: R$ 200' },
     { procedureCode: '04.01.02.005-3', standardValue: 150.00, description: 'EXCISÃO E SUTURA LESÃO NA PELE C/ PLÁSTICA - R$ 150,00' },
     { procedureCode: '04.09.07.025-4', standardValue: 800.00, secondaryValue: 400.00, description: 'FÍSTULA VESICO-VAGINAL - Principal: R$ 800 | Seq: R$ 400' },
     { procedureCode: '04.09.02.007-9', standardValue: 250.00, secondaryValue: 200.00, description: 'MEATOTOMIA SIMPLES - Principal: R$ 250 | Seq: R$ 200' },
