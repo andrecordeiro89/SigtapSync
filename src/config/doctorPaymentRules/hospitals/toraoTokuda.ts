@@ -198,7 +198,8 @@ export const TORAO_TOKUDA_RULES: HospitalRules = {
       {
         procedureCode: '04.09.02.017-6',
         standardValue: 250.00,
-        description: 'URETROTOMIA INTERNA - R$ 250,00'
+        secondaryValue: 200.00,
+        description: 'URETROTOMIA INTERNA - Principal: R$ 250,00 | Sequencial: R$ 200,00'
       }
     ],
     // ================================================================
