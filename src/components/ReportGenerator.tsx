@@ -14,7 +14,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
 import { DoctorPatientService, type DoctorWithPatients } from '@/services/doctorPatientService';
-import { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayment } from './DoctorPaymentRules';
+import { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayment } from '../config/doctorPaymentRules';
 import { ptBR } from 'date-fns/locale';
 import { ProcedureRecordsService } from '@/services/simplifiedProcedureService';
 import { isMedicalProcedure } from '@/config/susCalculationRules';

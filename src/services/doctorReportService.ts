@@ -5,7 +5,7 @@ import {
   calculatePercentagePayment,
   calculateFixedPayment,
   type ProcedurePaymentInfo,
-} from '../components/DoctorPaymentRules'
+} from '../config/doctorPaymentRules'
 
 export interface ReportFilters {
   hospitalIds?: string[]
