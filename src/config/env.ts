@@ -4,6 +4,9 @@ export const ENV_CONFIG = {
   // ===== SUPABASE =====
   SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || '',
   SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+  // ===== SUPABASE (FONTE SIH REMOTA) =====
+  SIH_SUPABASE_URL: import.meta.env.VITE_SIH_SUPABASE_URL || '',
+  SIH_SUPABASE_ANON_KEY: import.meta.env.VITE_SIH_SUPABASE_ANON_KEY || '',
   
   // ===== API KEYS =====
   GEMINI_API_KEY: import.meta.env.VITE_GEMINI_API_KEY || '',
@@ -12,6 +15,7 @@ export const ENV_CONFIG = {
   APP_NAME: import.meta.env.VITE_APP_NAME || 'SIGTAP Sync',
   APP_VERSION: import.meta.env.VITE_APP_VERSION || '3.0.0',
   APP_ENVIRONMENT: import.meta.env.VITE_APP_ENVIRONMENT || 'development',
+  USE_SIH_SOURCE: import.meta.env.VITE_USE_SIH_SOURCE === 'true',
   
   // ===== DESENVOLVIMENTO =====
   IS_DEVELOPMENT: import.meta.env.DEV,
@@ -77,6 +81,16 @@ export const validateConfig = (): {
     errors.push('❌ VITE_SUPABASE_ANON_KEY não está configurada no arquivo .env');
   } else {
     supabaseEnabled = true;
+  }
+
+  // ===== VERIFICAR SUPABASE SIH REMOTO (OPCIONAL) =====
+  if (ENV_CONFIG.USE_SIH_SOURCE) {
+    if (!ENV_CONFIG.SIH_SUPABASE_URL) {
+      warnings.push('⚠️ VITE_SIH_SUPABASE_URL não configurada - Fonte SIH remota desativada');
+    }
+    if (!ENV_CONFIG.SIH_SUPABASE_ANON_KEY) {
+      warnings.push('⚠️ VITE_SIH_SUPABASE_ANON_KEY não configurada - Fonte SIH remota desativada');
+    }
   }
   
   // ===== VERIFICAR GEMINI (OPCIONAL) =====

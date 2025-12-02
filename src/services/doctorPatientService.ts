@@ -1,4 +1,6 @@
 import { supabase } from '../lib/supabase';
+import { ENV_CONFIG } from '../config/env';
+import { resolveCommonProcedureName } from '../utils/commonProcedureName';
 
 // ================================================================
 // 🩺 SERVIÇO DE ASSOCIAÇÃO MÉDICO-PACIENTE
@@ -21,6 +23,7 @@ export interface DoctorHospital {
   role?: string;
   department?: string;
   is_active: boolean;
+  is_primary_hospital?: boolean;
 }
 
 export interface PatientWithProcedures {
@@ -113,9 +116,21 @@ export class DoctorPatientService {
     hospitalIds?: string[];
     competencia?: string; // ✅ NOVO: Usar competência em vez de datas
     filterPgtAdm?: 'all' | 'sim' | 'não'; // ✅ NOVO: Filtro Pgt. Administrativo
+    useSihSource?: boolean;
   }): Promise<DoctorWithPatients[]> {
     try {
       console.log('📥 [TABELAS - OTIMIZADO] Carregando dados em paralelo...', options);
+
+      // 🔄 NOVO: Alternar para fonte SIH remota quando habilitado
+      if (ENV_CONFIG.USE_SIH_SOURCE || options?.useSihSource) {
+        const { SihApiAdapter } = await import('./sihApiAdapter')
+        const result = await SihApiAdapter.getDoctorsWithPatients({
+          hospitalIds: options?.hospitalIds,
+          competencia: options?.competencia
+        })
+        console.log(`✅ [SIH REMOTO] Fonte alternada. Médicos carregados: ${result?.length || 0}`)
+        return result || []
+      }
       const startTime = performance.now();
 
       // 🚀 OTIMIZAÇÃO #1: PREPARAR QUERIES EM PARALELO
@@ -350,7 +365,7 @@ export class DoctorPatientService {
         
         // ✅ SEMPRE criar nova entrada (uma por AIH)
         // Não verificar se paciente já existe, pois podem haver múltiplas AIHs do mesmo paciente
-        const patient = {
+        const patient: PatientWithProcedures = {
           patient_id: patientId,
           aih_id: aihId, // ✅ Incluir aih_id para rastreamento
           patient_info: {
@@ -430,7 +445,6 @@ export class DoctorPatientService {
         patient.approved_procedures = (patient as any).calculable_procedures.filter((pp: any) => pp.approved).length;
         // 🆕 Resolver Nome Comum com base nos códigos do paciente
         try {
-          const { resolveCommonProcedureName } = await import('../utils/commonProcedureName');
           const codes = patient.procedures.map((pp: any) => pp.procedure_code).filter(Boolean);
           const doctorSpecialty = (doctor.doctor_info?.specialty || '').trim() || undefined;
           patient.common_name = resolveCommonProcedureName(codes, doctorSpecialty, patient.procedures);
@@ -568,8 +582,8 @@ export class DoctorPatientService {
       try {
         const allPatientIds = Array.from(patientsMap.keys());
         if (allPatientIds.length > 0) {
-          const { getProceduresByPatientIds } = await import('./simplifiedProcedureService');
-          const procResult = await getProceduresByPatientIds(allPatientIds);
+          const { ProcedureRecordsService } = await import('./simplifiedProcedureService');
+          const procResult = await ProcedureRecordsService.getProceduresByPatientIds(allPatientIds);
           if (procResult.success) {
             // Distribuir procedimentos para cada paciente e enriquecer
             for (const [pid, procs] of procResult.proceduresByPatientId.entries()) {
@@ -619,9 +633,8 @@ export class DoctorPatientService {
         // 🆕 Garantir Nome Comum após ordenação (se ainda não definido)
         if (!patient.common_name) {
           const codes = patient.procedures.map(pp => pp.procedure_code).filter(Boolean);
-          const doctorSpecialty = (doctor.doctor_info?.specialty || '').trim() || undefined;
+          const doctorSpecialty = (doctorData?.specialty || '').trim() || undefined;
           try {
-            const { resolveCommonProcedureName } = require('../utils/commonProcedureName');
             patient.common_name = resolveCommonProcedureName(codes, doctorSpecialty, patient.procedures);
           } catch {}
         }

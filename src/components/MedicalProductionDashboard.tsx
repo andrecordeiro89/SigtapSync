@@ -63,6 +63,7 @@ import AihDatesBadges from './AihDatesBadges';
 import { isDoctorCoveredForOperaParana, computeIncrementForProcedures, hasAnyExcludedCodeInProcedures } from '../config/operaParana';
 import { sumProceduresBaseReais } from '@/utils/valueHelpers';
 import { exportAllPatientsExcel } from '../services/exportService'
+import { ENV_CONFIG } from '../config/env'
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -542,7 +543,8 @@ interface MedicalProductionDashboardProps {
     patientsWithMultipleAIHs?: number;
     totalMultipleAIHs?: number;
     totalAIHs?: number;
-    uniquePatients?: number; // Pacientes únicos
+    uniquePatients?: number;
+    multipleAIHsDetails?: any[];
   }) => void;
   selectedHospitals?: string[]; // Filtro de hospital
   searchTerm?: string; // Busca de médicos
@@ -584,6 +586,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [reportModalOpen, setReportModalOpen] = useState<boolean>(false);
   // ✅ COMPETÊNCIA VEM DO PROP (não precisa de estado local)
   const [availableCompetencias, setAvailableCompetencias] = useState<string[]>([]);
+  const [useSihSource, setUseSihSource] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem('useSihSource')
+      if (v === 'true') return true
+      if (v === 'false') return false
+    } catch {}
+    return ENV_CONFIG.USE_SIH_SOURCE || false
+  })
+  useEffect(() => {
+    try { localStorage.setItem('useSihSource', useSihSource ? 'true' : 'false') } catch {}
+  }, [useSihSource])
+  const remoteConfigured = Boolean(ENV_CONFIG.SIH_SUPABASE_URL && ENV_CONFIG.SIH_SUPABASE_ANON_KEY)
 
   // 🆕 FUNÇÃO PARA DETERMINAR HOSPITAL CORRETO BASEADO NO CONTEXTO
   const getDoctorContextualHospitalId = (doctor: DoctorWithPatients): string | undefined => {
@@ -1131,7 +1145,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           const doctorsWithPatients = await DoctorPatientService.getDoctorsWithPatientsFromProceduresView({
             hospitalIds: selectedHospitalIds,
             competencia: competenciaFilter, // ✅ Passar undefined se não houver filtro
-            filterPgtAdm: pgtAdmFilter
+            filterPgtAdm: pgtAdmFilter,
+            useSihSource
           });
           // Usar diretamente a fonte das tabelas, garantindo pacientes e procedimentos
           mergedDoctors = doctorsWithPatients;
@@ -1183,7 +1198,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     };
 
     loadDoctorsData();
-  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, refreshTick, selectedCompetencia, filterPgtAdm]);
+  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, refreshTick, selectedCompetencia, filterPgtAdm, useSihSource]);
 
   // 🆕 CARREGAR COMPETÊNCIAS DISPONÍVEIS
   useEffect(() => {
@@ -1853,6 +1868,27 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 </div>
               </div>
                 <div className="flex items-center gap-2">
+                  {useSihSource && (
+                    remoteConfigured ? (
+                      <Badge 
+                        variant="outline" 
+                        className="bg-blue-50 text-blue-700 border-blue-200 px-2.5 py-0.5 text-xs font-semibold"
+                      >
+                        Fonte: SIH Remoto
+                      </Badge>
+                    ) : (
+                      <Badge 
+                        variant="outline" 
+                        className="bg-red-50 text-red-700 border-red-200 px-2.5 py-0.5 text-xs font-semibold"
+                      >
+                        ⚠️ Fonte SIH remota desativada ou não configurada
+                      </Badge>
+                    )
+                  )}
+                  <div className="flex items-center gap-2 mr-2">
+                    <span className="text-xs text-gray-600">Fonte SIH</span>
+                    <Switch checked={useSihSource} onCheckedChange={setUseSihSource} />
+                  </div>
                   <Button 
                     variant="outline" 
                     size="sm" 
