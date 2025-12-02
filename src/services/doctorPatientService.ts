@@ -122,7 +122,8 @@ export class DoctorPatientService {
       console.log('📥 [TABELAS - OTIMIZADO] Carregando dados em paralelo...', options);
 
       // 🔄 NOVO: Alternar para fonte SIH remota quando habilitado
-      if (ENV_CONFIG.USE_SIH_SOURCE || options?.useSihSource) {
+      const useRemote = typeof options?.useSihSource === 'boolean' ? Boolean(options?.useSihSource) : ENV_CONFIG.USE_SIH_SOURCE
+      if (useRemote) {
         const { SihApiAdapter } = await import('./sihApiAdapter')
         const result = await SihApiAdapter.getDoctorsWithPatients({
           hospitalIds: options?.hospitalIds,
