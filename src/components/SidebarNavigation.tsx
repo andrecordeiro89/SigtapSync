@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Home, Upload, Search, FileUp, FileText, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe, ChevronRight, GitCompare } from 'lucide-react';
+import { Home, Upload, Search, FileUp, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe, ChevronRight, GitCompare } from 'lucide-react';
 import ProfileEditModal from './ProfileEditModal';
 import {
   Sidebar,
@@ -62,22 +62,14 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
   const allTabs = [
     {
       id: 'dashboard',
-      label: 'Dashboard',
+      label: 'Inicial',
       icon: Home,
       description: 'Visão geral do sistema',
       requiresAdmin: false,
       order: 1,
       color: 'from-blue-500 to-indigo-600'
     },
-    {
-      id: 'sigtap',
-      label: 'SIGTAP',
-      icon: Upload,
-      description: 'Importação da tabela - Apenas diretoria/admin',
-      requiresAdmin: true,
-      order: 2,
-      color: 'from-purple-500 to-violet-600'
-    },
+    
     {
       id: 'sigtap-viewer',
       label: 'Consulta SIGTAP',
@@ -96,15 +88,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       order: 4,
       color: 'from-orange-500 to-red-600'
     },
-    {
-      id: 'hospital-discharges',
-      label: 'Altas Hospitalares',
-      icon: FileText,
-      description: 'Importação de altas do sistema hospitalar',
-      requiresAdmin: false,
-      order: 5,
-      color: 'from-teal-500 to-cyan-600'
-    },
+    
     // {
     //   id: 'sisaih01',
     //   label: 'SISAIH01',
@@ -114,15 +98,7 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
     //   order: 6,
     //   color: 'from-indigo-500 to-purple-600'
     // },
-    {
-      id: 'aih-sync',
-      label: 'Sync',
-      icon: GitCompare,
-      description: 'Sincronização e reconciliação de AIHs',
-      requiresAdmin: false,
-      order: 7,
-      color: 'from-purple-500 to-pink-600'
-    },
+    
     {
       id: 'patients',
       label: 'Pacientes',

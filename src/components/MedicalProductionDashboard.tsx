@@ -4352,18 +4352,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             </div>
                                           </div>
 
-                                          {/* GRID DE INFORMAÇÕES - 2 COLUNAS */}
-                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 mb-3">
-                                            {/* Coluna 1 */}
+                                          {/* GRID PROFISSIONAL: Agrupado por contexto */}
+                                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-3">
+                                            {/* Identificação */}
                                             <div className="space-y-2">
-                                              <div className="flex items-baseline gap-2">
-                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Prontuário:</span>
-                                                <span className="text-xs font-medium text-gray-900">{patient.patient_info.medical_record || '-'}</span>
-                                              </div>
-                                              <div className="flex items-baseline gap-2">
-                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">CNS:</span>
-                                                <span className="text-xs font-mono font-medium text-gray-900">{patient.patient_info.cns}</span>
-                                              </div>
+                                              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide underline decoration-slate-300 underline-offset-2">Identificação</div>
                                               <div className="flex items-baseline gap-2">
                                                 <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Nº AIH:</span>
                                                 <span className="text-xs font-mono font-medium text-gray-900">{patient.aih_info.aih_number || '-'}</span>
@@ -4380,34 +4373,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   })()}
                                                 </span>
                                               </div>
-                                              {/* ✅ NOVO: Pagamento Administrativo (Informativo) */}
-                                              <div className="flex items-baseline gap-2">
-                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Pgt. Administrativo:</span>
-                                                {(() => {
-                                                  const pgtAdm = (patient as any)?.aih_info?.pgt_adm || 'não';
-                                                  return pgtAdm === 'sim' ? (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-green-100 text-green-800 border border-green-300">
-                                                      <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                                                      Sim
-                                                    </span>
-                                                  ) : (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-600 border border-gray-300">
-                                                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                                                      Não
-                                                    </span>
-                                                  );
-                                                })()}
-                                              </div>
-                                              {(patient.aih_info as any).main_cid && (
+                                              {patient.patient_info.medical_record && (
                                                 <div className="flex items-baseline gap-2">
-                                                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">CID Principal:</span>
-                                                  <span className="text-xs font-medium text-gray-900">{(patient.aih_info as any).main_cid}</span>
+                                                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Prontuário:</span>
+                                                  <span className="text-xs font-medium text-gray-900">{patient.patient_info.medical_record}</span>
                                                 </div>
                                               )}
                                             </div>
 
-                                            {/* Coluna 2 */}
+                                            {/* Internação */}
                                             <div className="space-y-2">
+                                              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide underline decoration-slate-300 underline-offset-2">Internação</div>
                                               <div className="flex items-baseline gap-2">
                                                 <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Admissão:</span>
                                                 <span className="text-xs font-medium text-gray-900">
@@ -4428,12 +4404,29 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   })() : '-'}
                                                 </span>
                                               </div>
-                                              <div className="flex items-baseline gap-2">
-                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Gênero:</span>
-                                                <span className="text-xs font-medium text-gray-900">
-                                                  {patient.patient_info.gender === 'M' ? 'Masculino' : patient.patient_info.gender === 'F' ? 'Feminino' : '-'}
-                                                </span>
-                                              </div>
+                                              {(patient.aih_info as any).dias_perm !== undefined && (
+                                                <div className="flex items-baseline gap-2">
+                                                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Permanência:</span>
+                                                  <span className="text-xs font-medium text-gray-900">{String((patient.aih_info as any).dias_perm)} dias</span>
+                                                </div>
+                                              )}
+                                            </div>
+
+                                            {/* Clínico/Demografia */}
+                                            <div className="space-y-2">
+                                              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide underline decoration-slate-300 underline-offset-2">Clínico</div>
+                                              {(patient.aih_info as any).main_cid && (
+                                                <div className="flex items-baseline gap-2">
+                                                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">CID Principal:</span>
+                                                  <span className="text-xs font-medium text-gray-900">{(patient.aih_info as any).main_cid}</span>
+                                                </div>
+                                              )}
+                                              {(patient.aih_info as any).specialty && (
+                                                <div className="flex items-baseline gap-2">
+                                                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Especialidade:</span>
+                                                  <span className="text-xs font-medium text-gray-900">{(patient.aih_info as any).specialty}</span>
+                                                </div>
+                                              )}
                                               <div className="flex items-baseline gap-2">
                                                 <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Nascimento:</span>
                                                 <span className="text-xs font-medium text-gray-900">
@@ -4444,10 +4437,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   })() : '-'}
                                                 </span>
                                               </div>
-                                              {(patient.aih_info as any).specialty && (
+                                              {typeof patient.patient_info.age === 'number' && (
                                                 <div className="flex items-baseline gap-2">
-                                                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Especialidade:</span>
-                                                  <span className="text-xs font-medium text-gray-900">{(patient.aih_info as any).specialty}</span>
+                                                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Idade:</span>
+                                                  <span className="text-xs font-medium text-gray-900">{patient.patient_info.age}</span>
                                                 </div>
                                               )}
                                             </div>
@@ -4722,11 +4715,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                         </div>
                                                       )}
                                                       
-                                                      {/* DATA */}
                                                       {procedure.procedure_date && (
                                                         <div>
                                                           <span className="text-slate-500 font-medium uppercase tracking-wide">Data:</span>
                                                           <span className="ml-2 text-slate-900 font-medium">{parseISODateToLocal(procedure.procedure_date)}</span>
+                                                        </div>
+                                                      )}
+                                                      {typeof (procedure as any).quantity !== 'undefined' && (
+                                                        <div>
+                                                          <span className="text-slate-500 font-medium uppercase tracking-wide">Qtd. atos:</span>
+                                                          <span className="ml-2 text-slate-900 font-medium">{formatNumber((procedure as any).quantity)}</span>
+                                                        </div>
+                                                      )}
+                                                      {procedure.cid_primary && (
+                                                        <div>
+                                                          <span className="text-slate-500 font-medium uppercase tracking-wide">CID:</span>
+                                                          <span className="ml-2 text-slate-900 font-medium">{procedure.cid_primary}</span>
                                                         </div>
                                                       )}
                                                       
@@ -4753,17 +4757,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           <span className="ml-2 text-slate-900">{procedure.complexity}</span>
                                                         </div>
                                                       )}
-                                                      
-                                                      {/* INSTRUMENTO DE REGISTRO 🆕 */}
-                                                      <div>
-                                                        <span className="text-slate-500 font-medium uppercase tracking-wide">Instrumento:</span>
-                                                        <Badge
-                                                          variant="outline"
-                                                          className="ml-2 text-[10px] bg-blue-50 text-blue-700 border-blue-200"
-                                                        >
-                                                          {procedure.registration_instrument || '-'}
-                                                        </Badge>
-                                                      </div>
                                                     </div>
                                                   </div>
                                                 </div>

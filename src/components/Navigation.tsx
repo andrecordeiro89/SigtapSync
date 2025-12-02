@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Home, Upload, Search, FileUp, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe } from 'lucide-react';
+import { Home, Search, FileUp, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe } from 'lucide-react';
 import ProfileEditModal from './ProfileEditModal';
 
 interface NavigationProps {
@@ -13,7 +13,7 @@ interface NavigationProps {
 }
 
 const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
-  const { user, signOut, isDeveloper, isAdmin, isDirector, isCoordinator, isAuditor, isTI, hasFullAccess, canAccessAllHospitals, getCurrentHospital, hasPermission } = useAuth();
+  const { user, signOut, isAdmin, isDirector, isCoordinator, isAuditor, isTI, hasFullAccess, canAccessAllHospitals, getCurrentHospital, hasPermission } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
@@ -21,19 +21,11 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
   const allTabs = [
     {
       id: 'dashboard',
-      label: 'Dashboard',
+      label: 'Inicial',
       icon: Home,
       description: 'Visão geral do sistema',
       requiresAdmin: false,
       order: 1
-    },
-    {
-      id: 'sigtap',
-      label: 'SIGTAP',
-      icon: Upload,
-      description: 'Importação da tabela - Apenas diretoria/admin',
-      requiresAdmin: true,
-      order: 2
     },
     {
       id: 'sigtap-viewer',
@@ -43,22 +35,8 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       requiresAdmin: false,
       order: 3
     },
-    {
-      id: 'aih-multipage-tester',
-      label: 'AIH Avançado',
-      icon: FileUp,
-      description: 'Upload e processamento oficial de AIHs',
-      requiresAdmin: false,
-      order: 4
-    },
-    {
-      id: 'hospital-discharges',
-      label: 'Altas Hospitalares',
-      icon: FileText,
-      description: 'Importação de altas do sistema hospitalar',
-      requiresAdmin: false,
-      order: 5
-    },
+    
+    
     {
       id: 'patients',
       label: 'Pacientes',
@@ -76,24 +54,8 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       requiresExecutive: true, // Novo flag para acesso executivo
       order: 7
     },
-    {
-      id: 'medical-staff',
-      label: 'Corpo Médico',
-      icon: Users, // Temporariamente Users, depois trocar para Stethoscope
-      description: 'Gestão e análise do corpo clínico médico',
-      requiresAdmin: true,
-      requiresExecutive: true, // Mesmo nível de acesso do dashboard executivo
-      order: 8
-    },
-    {
-      id: 'audit-dashboard',
-      label: 'Auditoria AIH',
-      icon: Shield,
-      description: 'Auditoria e rastreamento de AIH por analista',
-      requiresAdmin: false,
-      requiresAuditor: true, // Novo flag para auditoria
-      order: 9
-    },
+    
+    
     {
       id: 'aih-upload',
       label: 'Upload AIH (Teste)',
@@ -109,21 +71,15 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
     const hasAdminAccess = canAccessAllHospitals();
     const isDeveloper = user?.role === 'developer' || user?.role === 'ti';
     const hasExecutiveAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('generate_reports');
-    const hasAuditAccess = isAuditor() || isAdmin() || isDirector() || isTI() || hasPermission('audit_access');
     
     return allTabs
       .filter(tab => {
         // Se não requer admin, todos podem ver
-        if (!tab.requiresAdmin && !tab.requiresAuditor && !tab.requiresDeveloper && !tab.requiresExecutive) return true;
+        if (!tab.requiresAdmin && !tab.requiresDeveloper && !tab.requiresExecutive) return true;
         
         // Se requer developer, só developer/ti podem ver
         if (tab.requiresDeveloper) {
           return isDeveloper;
-        }
-        
-        // Se requer acesso de auditoria
-        if (tab.requiresAuditor) {
-          return hasAuditAccess;
         }
         
         // Se requer acesso executivo, verificar permissões específicas
@@ -253,8 +209,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
   }
 
   const roleConfig = getRoleConfig();
-  const accessLevel = getAccessLevelBadge();
-  const currentHospital = getCurrentHospital();
+  
 
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm">
@@ -263,14 +218,17 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
           {/* Logo e Nome - Otimizado para Largura Total */}
           <div className="logo-container flex items-center flex-shrink-0">
             <Building2 className="logo-icon h-8 w-8 text-blue-600" />
-            <div className="ml-2">
-              <div className="text-base font-bold text-gray-900 leading-tight">
-                SIGTAP
-              </div>
-              <div className="text-sm font-medium text-blue-600 leading-tight">
-                Sync
-              </div>
+          <div className="ml-2">
+            <div className="text-base font-bold text-gray-900 leading-tight">
+              SIGTAP
             </div>
+            <div className="text-sm font-medium text-blue-600 leading-tight">
+              Sync
+            </div>
+            <div className="text-xs font-medium text-gray-500 leading-tight">
+              Repasses Médicos
+            </div>
+          </div>
             {canAccessAllHospitals() && (
               <Badge variant="outline" className="admin-badge ml-2 bg-purple-50 text-purple-700 border-purple-200 text-xs px-2 py-1">
                 <Globe className="h-3 w-3 mr-1" />

@@ -37,15 +37,20 @@ export const SihApiAdapter = {
     // 2) Carregar RD (AIHs)
     let rdQuery = supabaseSih
       .from('sih_rd')
-      .select('n_aih, cnes, dt_inter, dt_saida, diag_princ, espec, mes_cmpt, complex, nasc, idade, val_tot, car_int')
+      .select('n_aih, cnes, dt_inter, dt_saida, diag_princ, espec, mes_cmpt, complex, nasc, idade, dias_perm, val_tot, car_int')
 
     if (cnesList && cnesList.length > 0) rdQuery = rdQuery.in('cnes', cnesList)
+    let compNormalized: string | undefined
     if (options.competencia && options.competencia.trim()) {
       const comp = options.competencia.trim()
       if (/^\d{6}$/.test(comp)) {
         rdQuery = rdQuery.eq('mes_cmpt', Number(comp))
+        compNormalized = comp
       } else if (/^\d{4}-\d{2}(-\d{2})?$/.test(comp)) {
         rdQuery = rdQuery.eq('competencia', comp)
+        // Converter YYYY-MM para YYYYMM para filtrar SP.sp_mm com chave canônica
+        const m = comp.match(/^(\d{4})-(\d{2})/)
+        if (m) compNormalized = `${m[1]}${m[2]}`
       }
     }
 
@@ -61,10 +66,14 @@ export const SihApiAdapter = {
     const spChunks = chunk(aihNumbers, 80)
     const spResults: any[] = []
     for (const ch of spChunks) {
-      const { data: spData, error: spError } = await supabaseSih
+      let spQuery = supabaseSih
         .from('sih_sp')
-        .select('sp_naih, sp_atoprof, sp_qt_proc, sp_valato, sp_pf_doc, sp_pf_cbo, sp_cidpri, sp_complex')
+        .select('sp_naih, sp_atoprof, sp_qt_proc, sp_qtd_ato, sp_valato, sp_pf_doc, sp_pf_cbo, sp_cidpri, sp_complex, sp_mm')
         .in('sp_naih', ch)
+      if (compNormalized && /^\d{6}$/.test(compNormalized)) {
+        spQuery = spQuery.eq('sp_mm', compNormalized)
+      }
+      const { data: spData, error: spError } = await spQuery
       if (spError) logger.warn('Erro chunk sih_sp', spError)
       if (spData && spData.length > 0) spResults.push(...spData)
     }
@@ -127,6 +136,7 @@ export const SihApiAdapter = {
         const code = formatSigtapCode(rawCode)
         const csvDesc = remoteDescMap.get(code) || remoteDescMap.get(code.replace(/\D/g, '')) || localCsvMap.get(code) || localCsvMap.get(code.replace(/\D/g, ''))
         const valueCents = Math.round(Number(p.sp_valato || 0) * 100)
+        const quantity = Number(p.sp_qtd_ato ?? p.sp_qt_proc ?? 1) || 1
         return {
           procedure_id: `${aih}-${code}-${idx}`,
           procedure_code: code,
@@ -134,6 +144,8 @@ export const SihApiAdapter = {
           procedure_date: String(rd.dt_inter || ''),
           value_reais: valueCents / 100,
           value_cents: valueCents,
+          quantity,
+          cid_primary: String(p.sp_cidpri || ''),
           approved: undefined,
           approval_status: undefined,
           sequence: idx + 1,
@@ -162,7 +174,8 @@ export const SihApiAdapter = {
           cns: '',
           birth_date: String(rd.nasc || ''),
           gender: '',
-          medical_record: '-'
+          medical_record: '-',
+          age: Number(rd.idade || 0)
         },
         aih_info: {
           admission_date: String(rd.dt_inter || ''),
@@ -171,7 +184,10 @@ export const SihApiAdapter = {
           care_character: String(rd.car_int || ''),
           hospital_id: hosp?.id,
           competencia: String(rd.mes_cmpt || ''),
-          pgt_adm: undefined
+          pgt_adm: undefined,
+          main_cid: String(rd.diag_princ || ''),
+          specialty: String(rd.espec || ''),
+          dias_perm: Number(rd.dias_perm || 0)
         },
         total_value_reais: Number(rd.val_tot || 0),
         procedures,

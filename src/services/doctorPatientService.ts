@@ -35,6 +35,7 @@ export interface PatientWithProcedures {
     birth_date: string;
     gender: string;
     medical_record: string;
+    age?: number;
   };
   aih_info: {
     admission_date: string;
@@ -44,6 +45,9 @@ export interface PatientWithProcedures {
     hospital_id?: string;
     competencia?: string; // ✅ NOVO: Competência da AIH
     pgt_adm?: 'sim' | 'não'; // ✅ NOVO: Pagamento Administrativo
+    main_cid?: string;
+    specialty?: string;
+    dias_perm?: number;
   };
   // 🆕 Nome Comum de procedimentos (rótulo amigável): ex. "A+A"
   common_name?: string | null;
@@ -97,6 +101,8 @@ export interface ProcedureDetail {
   cbo?: string;
   participation?: string;
   registration_instrument?: string; // ✅ SIGTAP: Instrumento de Registro
+  quantity?: number;
+  cid_primary?: string;
 }
 
 export interface DoctorSearchFilters {

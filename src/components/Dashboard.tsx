@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
-import { AlertCircle, CheckCircle, Clock, Users, Building2, FileText, Activity, ShieldCheck, BookOpen, ArrowRight, Database, Search, Upload, Save, Eye, CalendarDays } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Users, Building2, FileText, Activity, ShieldCheck, BookOpen, ArrowRight, Database, Search, Upload, Save, Eye, CalendarDays, Stethoscope, DollarSign } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSupabaseAIH } from '../hooks/useSupabase';
 import { supabase } from '../lib/supabase';
@@ -27,6 +27,124 @@ interface DashboardStats {
 }
 
 const Dashboard = () => {
+  return (
+    <div className="min-h-svh relative overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100">
+      <div className="absolute -top-32 -left-24 h-[420px] w-[420px] rounded-full bg-blue-200/40 blur-3xl" />
+      <div className="absolute -bottom-40 -right-24 h-[520px] w-[520px] rounded-full bg-indigo-200/40 blur-3xl" />
+      <main className="relative z-10 px-6 md:px-12 py-10 md:py-16">
+        <section className="max-w-7xl mx-auto">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex items-center justify-center w-16 h-16 md:w-20 md:h-20 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl shadow-lg">
+              <Building2 className="h-8 w-8 md:h-10 md:w-10 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900">SIGTAP Sync</h1>
+              <p className="text-lg md:text-2xl font-semibold text-blue-700">Repasses Médicos</p>
+            </div>
+          </div>
+          <p className="text-base md:text-lg text-slate-700 max-w-3xl">Visão 360º dos profissionais hospitalares: do código SIGTAP ao repasse médico, com validações, hierarquia médico → paciente → procedimento e indicadores executivos.</p>
+        </section>
+        <section className="max-w-7xl mx-auto mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="p-6 md:p-8 rounded-2xl bg-white/70 backdrop-blur border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <Search className="h-6 w-6 text-blue-600" />
+              <h3 className="text-xl md:text-2xl font-bold text-slate-900">Tabela SIGTAP</h3>
+            </div>
+            <p className="text-slate-700">Códigos normalizados e versões ativadas fundamentam os procedimentos e garantem consistência técnica em todo o fluxo.</p>
+          </div>
+          <div className="p-6 md:p-8 rounded-2xl bg-white/70 backdrop-blur border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <Database className="h-6 w-6 text-indigo-600" />
+              <h3 className="text-xl md:text-2xl font-bold text-slate-900">Matches AIH ↔ SIGTAP</h3>
+            </div>
+            <p className="text-slate-700">Validações de sexo, idade, CID, CBO e habilitação calculam valores de referência e consolidam o vínculo entre internação e procedimento.</p>
+          </div>
+          <div className="p-6 md:p-8 rounded-2xl bg-white/70 backdrop-blur border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <Stethoscope className="h-6 w-6 text-purple-600" />
+              <h3 className="text-xl md:text-2xl font-bold text-slate-900">Hierarquia Completa</h3>
+            </div>
+            <p className="text-slate-700">Médico → Paciente → Procedimento, com competência, caráter de atendimento e valores por ato: a base dos repasses médicos.</p>
+          </div>
+          <div className="p-6 md:p-8 rounded-2xl bg-white/70 backdrop-blur border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <DollarSign className="h-6 w-6 text-emerald-600" />
+              <h3 className="text-xl md:text-2xl font-bold text-slate-900">Repasses e Analytics</h3>
+            </div>
+            <p className="text-slate-700">Valores SIGTAP, incrementos (Opera Paraná) e pagamentos médicos compondo indicadores executivos e operacionais de alta fidelidade.</p>
+          </div>
+        </section>
+        <section className="max-w-7xl mx-auto mt-10">
+          <div className="p-6 md:p-8 rounded-2xl bg-white/60 backdrop-blur border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <BookOpen className="h-6 w-6 text-slate-700" />
+              <h3 className="text-lg md:text-xl font-bold text-slate-900">Fonte SIH Remota</h3>
+            </div>
+            <p className="text-slate-700">Em ambientes DATASUS, preservamos códigos, valores e metadados; o nome do paciente pode ser ocultado sem comprometer a análise financeira e produtiva.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+  return (
+    <div className="min-h-svh p-8 md:p-12 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <Card className="w-full max-w-5xl shadow-lg border border-slate-200/80 bg-white/90 backdrop-blur-sm">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl shadow-md">
+                <BookOpen className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl font-black text-gray-900">Inicial</CardTitle>
+                <CardDescription className="text-sm">Sistema de Repasses Médicos • Visão 360º dos profissionais hospitalares</CardDescription>
+              </div>
+            </div>
+            <Badge className="bg-blue-100 text-blue-700 border-blue-200">SIGTAP Sync</Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6 text-sm text-gray-700">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl border border-slate-200 bg-gradient-to-br from-blue-50 to-white">
+              <div className="flex items-center gap-3 mb-2">
+                <Search className="h-5 w-5 text-blue-600" />
+                <div className="font-semibold text-gray-900">Tabela SIGTAP</div>
+              </div>
+              <p>Códigos normalizados e versões ativadas fundamentam os procedimentos. A base oficial é o ponto de partida para toda a jornada.</p>
+            </div>
+            <div className="p-4 rounded-xl border border-slate-200 bg-gradient-to-br from-indigo-50 to-white">
+              <div className="flex items-center gap-3 mb-2">
+                <Database className="h-5 w-5 text-indigo-600" />
+                <div className="font-semibold text-gray-900">Matches AIH ↔ SIGTAP</div>
+              </div>
+              <p>Validações de sexo, idade, CID, CBO e habilitação calculam valores de referência e consolidam o vínculo entre a AIH e o procedimento.</p>
+            </div>
+            <div className="p-4 rounded-xl border border-slate-200 bg-gradient-to-br from-purple-50 to-white">
+              <div className="flex items-center gap-3 mb-2">
+                <Stethoscope className="h-5 w-5 text-purple-600" />
+                <div className="font-semibold text-gray-900">Hierarquia Médico → Paciente → Procedimento</div>
+              </div>
+              <p>Organização completa por competência, caráter de atendimento e valores de cada ato, formando a base dos repasses médicos.</p>
+            </div>
+            <div className="p-4 rounded-xl border border-slate-200 bg-gradient-to-br from-emerald-50 to-white">
+              <div className="flex items-center gap-3 mb-2">
+                <DollarSign className="h-5 w-5 text-emerald-600" />
+                <div className="font-semibold text-gray-900">Repasses e Analytics</div>
+              </div>
+              <p>Valores SIGTAP, incrementos específicos (como Opera Paraná) e pagamentos médicos compõem indicadores executivos e operacionais.</p>
+            </div>
+          </div>
+          <div className="p-4 rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white">
+            <div className="flex items-center gap-3 mb-2">
+              <Activity className="h-5 w-5 text-slate-700" />
+              <div className="font-semibold text-gray-900">Fonte SIH Remota</div>
+            </div>
+            <p>Para ambientes com DATASUS, mantemos códigos, valores e metadados. O nome do paciente pode ser ocultado, preservando a análise financeira e produtiva.</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
   const { user, getCurrentHospital, canAccessAllHospitals } = useAuth();
   const { getUserAuditLogs, getHospitalAIHs } = useSupabaseAIH();
   
@@ -523,6 +641,44 @@ const Dashboard = () => {
 
   return (
     <div className="p-4 space-y-4">
+      <Card className="border-l-4 border-l-blue-600">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <BookOpen className="h-5 w-5 text-blue-600" />
+            Inicial
+          </CardTitle>
+          <CardDescription className="text-sm">Visão 360º — Repasses Médicos</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0 text-sm text-gray-700 space-y-2">
+          <p>
+            O sistema parte da tabela SIGTAP (versões importadas e ativadas), usando os códigos
+            normalizados para identificar cada procedimento.
+          </p>
+          <p>
+            As AIHs são reconciliadas com a SIGTAP por meio de validações (sexo, idade, CID, CBO e
+            habilitação), calculando automaticamente os valores de referência e gerando o
+            <strong className="font-semibold"> match</strong> entre AIH ↔ Procedimento.
+          </p>
+          <p>
+            A visualização hierárquica organiza dados em <strong className="font-semibold">Médico → Paciente → Procedimento</strong>,
+            incluindo competência, caráter de atendimento e valores por ato, formando a base dos
+            repasses médicos.
+          </p>
+          <p>
+            Para <strong className="font-semibold">Repasses e Analytics</strong>, consolidamos valores base SIGTAP, incrementos
+            específicos (como Opera Paraná), pagamentos médicos e indicadores operacionais,
+            compondo uma visão executiva e operacional completa.
+          </p>
+          <p>
+            Com a fonte remota do SIH (DATASUS), preservamos códigos, valores e metadados — o nome
+            do paciente pode ser ocultado, mantendo a análise financeira e produtiva intacta.
+          </p>
+          <p>
+            Toda a jornada é auditada e segura, garantindo rastreabilidade e confiabilidade para
+            decisões de gestão hospitalar.
+          </p>
+        </CardContent>
+      </Card>
       {/* Header com informações do usuário - Versão compacta */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-4 text-white">
         <div className="flex items-center justify-between">
