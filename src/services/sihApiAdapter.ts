@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabase'
 import { supabaseSih } from '../lib/sihSupabase'
 import { ENV_CONFIG, logger } from '../config/env'
+import { formatSigtapCode } from '../utils/formatters'
+import { getSigtapLocalMap } from '../utils/sigtapLocal'
 import type { DoctorWithPatients, ProcedureDetail } from './doctorPatientService'
 
 type LoadOptions = {
@@ -76,14 +78,10 @@ export const SihApiAdapter = {
     if (localHospErr) logger.warn('Erro ao mapear hospitais locais', localHospErr)
     const hospByCnes = new Map((localHosp || []).map(h => [String(h.cnes), h]))
 
-    // 5) SIGTAP: carregar descrições/instrumentos para códigos únicos
-    const procCodes = Array.from(new Set(spResults.map(p => String(p.sp_atoprof)).filter(Boolean)))
-    const { data: sigtap, error: sigErr } = await supabase
-      .from('sigtap_procedures')
-      .select('code, description, registration_instrument')
-      .in('code', procCodes)
-    if (sigErr) logger.warn('Erro ao buscar SIGTAP', sigErr)
-    const sigByCode = new Map((sigtap || []).map(s => [String(s.code), s]))
+    // 5) SIGTAP: usar exclusivamente CSV local quando Fonte SIH está ativa
+    const procCodesRaw = Array.from(new Set(spResults.map(p => String(p.sp_atoprof)).filter(Boolean)))
+    const procCodes = procCodesRaw.map(formatSigtapCode)
+    const localCsvMap = await getSigtapLocalMap()
 
     // 6) Agrupar por médico (CNS do profissional do SP)
     const spByAih = new Map<string, any[]>()
@@ -116,13 +114,14 @@ export const SihApiAdapter = {
 
       // Construir procedimentos detalhados
       const procedures: ProcedureDetail[] = procs.map((p, idx) => {
-        const code = String(p.sp_atoprof || '')
-        const sig = sigByCode.get(code)
+        const rawCode = String(p.sp_atoprof || '')
+        const code = formatSigtapCode(rawCode)
+        const csvDesc = localCsvMap.get(code) || localCsvMap.get(code.replace(/\D/g, ''))
         const valueCents = Math.round(Number(p.sp_valato || 0) * 100)
         return {
           procedure_id: `${aih}-${code}-${idx}`,
           procedure_code: code,
-          procedure_description: sig?.description || 'Descrição não disponível',
+          procedure_description: csvDesc || '',
           procedure_date: String(rd.dt_inter || ''),
           value_reais: valueCents / 100,
           value_cents: valueCents,
@@ -131,12 +130,18 @@ export const SihApiAdapter = {
           sequence: idx + 1,
           aih_id: undefined,
           match_confidence: undefined,
-          sigtap_description: sig?.description,
+          sigtap_description: csvDesc,
           complexity: String(p.sp_complex || ''),
           professional_name: doctorByCns.get(String(p.sp_pf_doc))?.name || undefined,
           cbo: String(p.sp_pf_cbo || ''),
           participation: 'Responsável',
-          registration_instrument: sig?.registration_instrument || '-'
+          registration_instrument: '-',
+          sigtap_procedures: {
+            code,
+            description: csvDesc || '',
+            value_hosp_total: valueCents,
+            complexity: String(p.sp_complex || '')
+          } as any
         }
       })
 

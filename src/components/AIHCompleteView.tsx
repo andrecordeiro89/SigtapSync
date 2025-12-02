@@ -23,6 +23,9 @@ import {
 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { AIHComplete, ProcedureAIH } from '../types';
+import { formatSigtapCode } from '../utils/formatters';
+import { getSigtapLocalMap, resolveSigtapDescriptionFromCsv } from '../utils/sigtapLocal';
+import { isSihSourceActive } from '../utils/sihSource';
 
 interface AIHCompleteViewProps {
   aihCompleta: AIHComplete;
@@ -32,7 +35,63 @@ interface AIHCompleteViewProps {
 
 const AIHCompleteView = ({ aihCompleta, onUpdateAIH, onEditProcedure }: AIHCompleteViewProps) => {
   const [expandedProcedures, setExpandedProcedures] = useState<Set<number>>(new Set());
+  const [sigtapMap, setSigtapMap] = useState<Map<string, string> | null>(null);
+  const [csvDescMap, setCsvDescMap] = useState<Map<string, string>>(new Map());
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    let mounted = true;
+    try {
+      if (isSihSourceActive()) {
+        getSigtapLocalMap()
+          .then((map) => { if (mounted) setSigtapMap(map); })
+          .catch(() => setSigtapMap(new Map()));
+      }
+    } catch {}
+    return () => { mounted = false; };
+  }, []);
+
+  React.useEffect(() => {
+    const tryLoad = () => {
+      if (!sigtapMap && isSihSourceActive()) {
+        getSigtapLocalMap()
+          .then((map) => setSigtapMap(map))
+          .catch(() => setSigtapMap(new Map()))
+      }
+    }
+    tryLoad()
+    const onCustom = () => tryLoad()
+    window.addEventListener('sihsourcechange', onCustom as any)
+    return () => window.removeEventListener('sihsourcechange', onCustom as any)
+  }, [sigtapMap])
+
+  React.useEffect(() => {
+    const run = async () => {
+      if (!isSihSourceActive()) { setCsvDescMap(new Map()); return }
+      const missing: string[] = []
+      for (const p of aihCompleta.procedimentos) {
+        const code = formatSigtapCode(p.procedimento)
+        const digits = code.replace(/\D/g, '')
+        const exists = (sigtapMap?.get(code) || sigtapMap?.get(digits) || csvDescMap.get(code) || csvDescMap.get(digits))
+        if (!exists) missing.push(code)
+      }
+      if (missing.length === 0) return
+      for (const code of missing) {
+        try {
+          const desc = await resolveSigtapDescriptionFromCsv(code)
+          if (desc) {
+            setCsvDescMap(prev => {
+              const m = new Map(prev)
+              m.set(code, desc)
+              m.set(code.replace(/\D/g, ''), desc)
+              return m
+            })
+          }
+        } catch {}
+      }
+    }
+    run()
+  }, [aihCompleta.procedimentos, sigtapMap])
 
   const toggleProcedureExpansion = (sequencia: number) => {
     const newExpanded = new Set(expandedProcedures);
@@ -292,17 +351,34 @@ const AIHCompleteView = ({ aihCompleta, onUpdateAIH, onEditProcedure }: AIHCompl
                       <TableCell className="font-medium">{procedure.sequencia}</TableCell>
                       
                       <TableCell className="font-mono text-sm">
-                        {procedure.procedimento}
+                        {formatSigtapCode(procedure.procedimento)}
                       </TableCell>
                       
                       <TableCell>
                         <div>
                           <p className="font-medium">
-                            {procedure.descricao || `Procedimento ${procedure.procedimento}`}
+                            {(() => {
+                              const isUnavailable = (s?: string) => {
+                                const v = (s || '').trim().toLowerCase();
+                                return v === 'descrição não disponível' || v === 'descricao nao disponivel';
+                              };
+                              const formatted = formatSigtapCode(procedure.procedimento);
+                              const sigtapDesc = procedure.sigtapProcedure?.description || (procedure as any)?.sigtap_procedures?.description;
+                              const csvDesc = (() => {
+                                if (!isSihSourceActive()) return undefined;
+                                const key = formatted;
+                                const digits = formatted.replace(/\D/g, '');
+                                return (sigtapMap?.get(key) || sigtapMap?.get(digits) || csvDescMap.get(key) || csvDescMap.get(digits));
+                              })();
+                              if (sigtapDesc && !isUnavailable(sigtapDesc)) return sigtapDesc;
+                              if (csvDesc && !isUnavailable(csvDesc)) return csvDesc as string;
+                              if (procedure.descricao && !isUnavailable(procedure.descricao)) return procedure.descricao;
+                              return `Procedimento ${formatted}`;
+                            })()}
                           </p>
-                          {procedure.sigtapProcedure && (
+                          {(procedure.sigtapProcedure || (procedure as any)?.sigtap_procedures) && (
                             <p className="text-sm text-gray-500 truncate max-w-xs">
-                              {procedure.sigtapProcedure.description}
+                              {procedure.sigtapProcedure?.description || (procedure as any)?.sigtap_procedures?.description}
                             </p>
                           )}
                         </div>
@@ -392,25 +468,41 @@ const AIHCompleteView = ({ aihCompleta, onUpdateAIH, onEditProcedure }: AIHCompl
                               </div>
                               
                               {/* Detalhes SIGTAP */}
-                              {procedure.sigtapProcedure && (
-                                <div className="space-y-2">
-                                  <h5 className="font-medium text-sm text-gray-600">Dados SIGTAP</h5>
-                                  <div className="bg-white p-3 rounded border text-sm space-y-1">
-                                    <p><span className="font-medium">Código:</span> {procedure.sigtapProcedure.code}</p>
-                                    <p><span className="font-medium">Descrição:</span> {procedure.sigtapProcedure.description}</p>
-                                    <p><span className="font-medium">Complexidade:</span> {procedure.sigtapProcedure.complexity}</p>
-                                    <p><span className="font-medium">Modalidade:</span> {procedure.sigtapProcedure.modality}</p>
-                                    
-                                    <div className="pt-2 border-t">
-                                      <p className="font-medium text-green-700">Valores Detalhados:</p>
-                                      <p>• Ambulatorial: {formatCurrency(procedure.sigtapProcedure.valueAmb)}</p>
-                                      <p>• Hospitalar: {formatCurrency(procedure.sigtapProcedure.valueHosp)}</p>
-                                      <p>• Profissional: {formatCurrency(procedure.sigtapProcedure.valueProf)}</p>
-                                      <p className="font-semibold">• Total: {formatCurrency(procedure.sigtapProcedure.valueHospTotal)}</p>
+                              {(() => {
+                                const sigtap: any = procedure.sigtapProcedure || (procedure as any)?.sigtap_procedures;
+                                if (!sigtap) return null;
+                                const totalCents = (procedure as any)?.sigtap_procedures?.value_hosp_total;
+                                return (
+                                  <div className="space-y-2">
+                                    <h5 className="font-medium text-sm text-gray-600">Dados SIGTAP</h5>
+                                    <div className="bg-white p-3 rounded border text-sm space-y-1">
+                                      <p><span className="font-medium">Código:</span> {sigtap?.code}</p>
+                                      <p><span className="font-medium">Descrição:</span> {sigtap?.description}</p>
+                                      {sigtap?.complexity ? (
+                                        <p><span className="font-medium">Complexidade:</span> {sigtap.complexity}</p>
+                                      ) : null}
+                                      {sigtap?.modality ? (
+                                        <p><span className="font-medium">Modalidade:</span> {sigtap.modality}</p>
+                                      ) : null}
+                                      <div className="pt-2 border-t">
+                                        <p className="font-medium text-green-700">Valores Detalhados:</p>
+                                        {typeof sigtap?.valueAmb === 'number' ? (
+                                          <p>• Ambulatorial: {formatCurrency(sigtap.valueAmb)}</p>
+                                        ) : null}
+                                        {typeof sigtap?.valueHosp === 'number' ? (
+                                          <p>• Hospitalar: {formatCurrency(sigtap.valueHosp)}</p>
+                                        ) : null}
+                                        {typeof sigtap?.valueProf === 'number' ? (
+                                          <p>• Profissional: {formatCurrency(sigtap.valueProf)}</p>
+                                        ) : null}
+                                        {typeof totalCents === 'number' ? (
+                                          <p className="font-semibold">• Total: {formatCurrency((totalCents || 0) / 100)}</p>
+                                        ) : null}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              )}
+                                );
+                              })()}
                             </div>
                           </div>
                         </TableCell>
@@ -428,3 +520,4 @@ const AIHCompleteView = ({ aihCompleta, onUpdateAIH, onEditProcedure }: AIHCompl
 };
 
 export default AIHCompleteView; 
+  

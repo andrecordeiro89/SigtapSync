@@ -16,6 +16,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collap
 import { Alert, AlertDescription } from './ui/alert';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
+import { getSigtapLocalMap, resolveSigtapDescriptionFromCsv } from '@/utils/sigtapLocal';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Users,
@@ -586,16 +587,28 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [reportModalOpen, setReportModalOpen] = useState<boolean>(false);
   // ✅ COMPETÊNCIA VEM DO PROP (não precisa de estado local)
   const [availableCompetencias, setAvailableCompetencias] = useState<string[]>([]);
-  const [useSihSource, setUseSihSource] = useState<boolean>(() => {
-    try {
-      const v = localStorage.getItem('useSihSource')
-      if (v === 'true') return true
-      if (v === 'false') return false
-    } catch {}
-    return ENV_CONFIG.USE_SIH_SOURCE || false
-  })
+  const [useSihSource, setUseSihSource] = useState<boolean>(false)
+  const [sigtapMap, setSigtapMap] = useState<Map<string, string> | null>(null)
   useEffect(() => {
-    try { localStorage.setItem('useSihSource', useSihSource ? 'true' : 'false') } catch {}
+    try { localStorage.setItem('useSihSource', 'false') } catch {}
+  }, [])
+  useEffect(() => {
+    try { 
+      localStorage.setItem('useSihSource', useSihSource ? 'true' : 'false') 
+      window.dispatchEvent(new CustomEvent('sihsourcechange', { detail: { useSihSource } }))
+    } catch {}
+  }, [useSihSource])
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      if (!useSihSource) { setSigtapMap(null); return }
+      try {
+        const map = await getSigtapLocalMap()
+        if (mounted) setSigtapMap(map)
+      } catch { if (mounted) setSigtapMap(new Map()) }
+    }
+    load()
+    return () => { mounted = false }
   }, [useSihSource])
   const remoteConfigured = Boolean(ENV_CONFIG.SIH_SUPABASE_URL && ENV_CONFIG.SIH_SUPABASE_ANON_KEY)
 
@@ -4681,7 +4694,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     {/* DESCRIÇÃO */}
                                                     <div className="mb-3">
                                                       <p className="text-sm text-slate-700 leading-relaxed">
-                                                        {procedure.procedure_description || 'Descrição não disponível'}
+                                                        {(() => {
+                                                          const current = String(procedure.procedure_description || '').trim()
+                                                          const hasCurrent = current && current.toLowerCase() !== 'descrição não disponível'
+                                                          if (!useSihSource) return hasCurrent ? current : 'Descrição não disponível'
+                                                          const code = String(procedure.procedure_code || '')
+                                                          const digits = code.replace(/\D/g, '')
+                                                          const formatted = `${digits.slice(0,2)}.${digits.slice(2,4)}.${digits.slice(4,6)}.${digits.slice(6,9)}-${digits.slice(9)}`
+                                                          const csv = sigtapMap?.get(formatted) || sigtapMap?.get(digits)
+                                                          return csv || (hasCurrent ? current : 'Descrição não disponível')
+                                                        })()}
                                                       </p>
                                                     </div>
                                                     

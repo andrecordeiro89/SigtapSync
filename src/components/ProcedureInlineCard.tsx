@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +17,9 @@ import { useToast } from '@/components/ui/use-toast';
 import { getAnesthetistProcedureType } from '@/utils/anesthetistLogic';
 import { getProcedureIncrementMeta } from '@/config/operaParana';
 import { resolveCommonProcedureName } from '@/utils/commonProcedureName';
+import { formatSigtapCode } from '@/utils/formatters';
+import { getSigtapLocalMap, resolveSigtapDescriptionFromCsv } from '@/utils/sigtapLocal';
+import { isSihSourceActive } from '@/utils/sihSource';
 
 interface ProcedureData {
   id: string;
@@ -62,6 +65,49 @@ const ProcedureInlineCard = ({
 }: ProcedureInlineCardProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [sigtapMap, setSigtapMap] = useState<Map<string, string> | null>(null);
+  const [csvDesc, setCsvDesc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    if (isSihSourceActive()) {
+      getSigtapLocalMap()
+        .then((map) => { if (mounted) setSigtapMap(map); })
+        .catch(() => setSigtapMap(new Map()));
+    }
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    const tryLoad = () => {
+      if (!sigtapMap && isSihSourceActive()) {
+        getSigtapLocalMap()
+          .then((map) => setSigtapMap(map))
+          .catch(() => setSigtapMap(new Map()))
+      }
+    }
+    tryLoad()
+    const onCustom = () => tryLoad()
+    window.addEventListener('sihsourcechange', onCustom as any)
+    return () => window.removeEventListener('sihsourcechange', onCustom as any)
+  }, [sigtapMap, procedure.procedure_code])
+
+  useEffect(() => {
+    const run = async () => {
+      if (!isSihSourceActive()) { setCsvDesc(null); return }
+      const formatted = formatSigtapCode(procedure.procedure_code)
+      if (sigtapMap) {
+        const digits = formatted.replace(/\D/g, '')
+        const direct = sigtapMap.get(formatted) || sigtapMap.get(digits)
+        if (direct) { setCsvDesc(direct); return }
+      }
+      try {
+        const direct = await resolveSigtapDescriptionFromCsv(formatted)
+        setCsvDesc(direct || null)
+      } catch { setCsvDesc(null) }
+    }
+    run()
+  }, [procedure.procedure_code, sigtapMap])
 
   const handleAction = async (action: () => Promise<void>, actionName: string) => {
     if (isLoading) return;
@@ -142,7 +188,7 @@ const ProcedureInlineCard = ({
     try { return (procedure.procedure_code || '').trim().startsWith('04'); } catch { return false; }
   })();
 
-  // 🎯 CORREÇÃO DIRETA: Priorizar procedure_description do banco de dados
+  // 🎯 CORREÇÃO DIRETA: Priorizar descrição SIGTAP e filtrar textos genéricos
   const procedureDescription = (() => {
     console.log('🔍 ProcedureInlineCard - Dados recebidos:', {
       procedure_description: procedure.procedure_description,
@@ -151,31 +197,37 @@ const ProcedureInlineCard = ({
       procedure_code: procedure.procedure_code
     });
 
-    // 1. PRIORIDADE MÁXIMA: procedure_description do banco (desde que não seja fallback)
+    const isUnavailable = (s?: string) => {
+      const v = (s || '').trim().toLowerCase();
+      return v === 'descrição não disponível' || v === 'descricao nao disponivel';
+    };
+    const formattedCode = formatSigtapCode(procedure.procedure_code);
+
+    if (isSihSourceActive() && csvDesc && !isUnavailable(csvDesc)) {
+      return csvDesc
+    }
+
+    // 2. Descrição armazenada no banco (desde que não seja "Descrição não disponível" ou fallback)
     if (procedure.procedure_description && 
         procedure.procedure_description.trim() !== '' &&
+        !isUnavailable(procedure.procedure_description) &&
         !procedure.procedure_description.startsWith('Procedimento:') &&
         !procedure.procedure_description.startsWith('Procedimento ')) {
       console.log('✅ Usando procedure_description:', procedure.procedure_description);
       return procedure.procedure_description;
     }
-    
-    // 2. SIGTAP como segunda opção
-    if (procedure.sigtap_procedures?.description) {
-      console.log('✅ Usando SIGTAP description:', procedure.sigtap_procedures.description);
-      return procedure.sigtap_procedures.description;
-    }
-    
+
     // 3. displayName como terceira opção (se não for fallback)
     if (procedure.displayName && 
+        !isUnavailable(procedure.displayName) &&
         !procedure.displayName.startsWith('Procedimento:') &&
         !procedure.displayName.startsWith('Procedimento ')) {
       console.log('✅ Usando displayName:', procedure.displayName);
       return procedure.displayName;
     }
-    
+
     // 4. Fallback final
-    const fallback = `Procedimento ${procedure.procedure_code}`;
+    const fallback = `Procedimento ${formattedCode}`;
     console.log('⚠️ Usando fallback:', fallback);
     return fallback;
   })();
@@ -232,7 +284,7 @@ const ProcedureInlineCard = ({
                 <div className="flex-1 min-w-0 pr-3">
                   <div className="flex items-start space-x-3">
                     <span className="font-mono text-sm font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-md border border-blue-200 shrink-0">
-                      {procedure.procedure_code}
+                      {formatSigtapCode(procedure.procedure_code)}
                     </span>
                     <p className="text-sm font-medium text-gray-900 leading-relaxed flex-1 min-w-0">
                       {procedureDescription}

@@ -2133,53 +2133,64 @@ export class DoctorPatientService {
 
     try {
       // ✅ BUSCAR INSTRUMENTO DE REGISTRO PARA TODOS OS PROCEDIMENTOS
+      const { formatSigtapCode } = await import('../utils/formatters');
+      const { isSihSourceActive } = await import('../utils/sihSource')
       const allProcedureCodes = procedures
         .filter(p => p.procedure_code)
-        .map(p => p.procedure_code);
+        .map(p => formatSigtapCode(p.procedure_code));
 
       if (allProcedureCodes.length === 0) return procedures;
 
-      console.log(`🔍 Buscando dados SIGTAP (descrição + instrumento) para ${allProcedureCodes.length} procedimentos...`);
-
-      // ✅ BUSCAR NA TABELA CORRETA: sigtap_procedures
-      const { data: sigtapData, error: sigtapError } = await supabase
-        .from('sigtap_procedures')
-        .select('code, description, registration_instrument')
-        .in('code', allProcedureCodes);
-
-      if (sigtapError) {
-        console.error('❌ Erro ao buscar dados do SIGTAP:', sigtapError.message);
-        return procedures;
-      }
-
-      if (sigtapData && sigtapData.length > 0) {
-        const dataMap = new Map(sigtapData.map(item => [
-          item.code, 
-          { 
-            description: item.description, 
-            registration_instrument: item.registration_instrument 
-          }
-        ]));
-        
-        console.log(`✅ Encontrados ${sigtapData.length} procedimentos no SIGTAP`);
-        console.log(`📋 Exemplo de instrumento: ${sigtapData[0]?.registration_instrument || 'N/A'}`);
-
+      // 🔀 Lógica condicional pelo toggle Fonte SIH
+      if (isSihSourceActive()) {
+        const { getSigtapLocalMap } = await import('../utils/sigtapLocal')
+        const localCsvMap = await getSigtapLocalMap()
         return procedures.map(proc => {
-          const sigtapInfo = dataMap.get(proc.procedure_code);
+          const formattedCode = formatSigtapCode(proc.procedure_code)
+          const csvDesc = localCsvMap.get(formattedCode) || localCsvMap.get(formattedCode.replace(/\D/g, ''))
           return {
             ...proc,
-            // Só sobrescreve descrição se estiver vazia
-            procedure_description: proc.procedure_description && proc.procedure_description !== 'Descrição não disponível'
+            procedure_code: formattedCode,
+            procedure_description: csvDesc || (proc.procedure_description && proc.procedure_description !== 'Descrição não disponível'
               ? proc.procedure_description
-              : sigtapInfo?.description || `Procedimento ${proc.procedure_code}`,
-            // ✅ SEMPRE busca instrumento de registro do SIGTAP
-            registration_instrument: sigtapInfo?.registration_instrument || '-'
-          };
-        });
+              : `Procedimento ${formattedCode}`),
+            registration_instrument: '-'
+          }
+        })
+      } else {
+        console.log(`🔍 Buscando dados SIGTAP (descrição + instrumento) para ${allProcedureCodes.length} procedimentos...`)
+        const { data: sigtapData, error: sigtapError } = await supabase
+          .from('sigtap_procedures')
+          .select('code, description, registration_instrument')
+          .in('code', allProcedureCodes)
+        if (sigtapError) {
+          console.error('❌ Erro ao buscar dados do SIGTAP:', sigtapError.message)
+          return procedures
+        }
+        if (sigtapData && sigtapData.length > 0) {
+          const dataMap = new Map(sigtapData.map(item => [
+            item.code,
+            {
+              description: item.description,
+              registration_instrument: item.registration_instrument
+            }
+          ]))
+          return procedures.map(proc => {
+            const formattedCode = formatSigtapCode(proc.procedure_code)
+            const sigtapInfo = dataMap.get(formattedCode)
+            return {
+              ...proc,
+              procedure_code: formattedCode,
+              procedure_description: sigtapInfo?.description || (proc.procedure_description && proc.procedure_description !== 'Descrição não disponível'
+                ? proc.procedure_description
+                : `Procedimento ${formattedCode}`),
+              registration_instrument: sigtapInfo?.registration_instrument || '-'
+            }
+          })
+        }
+        console.warn('⚠️ Nenhum procedimento encontrado no SIGTAP')
+        return procedures
       }
-
-      console.warn('⚠️ Nenhum procedimento encontrado no SIGTAP');
-      return procedures;
     } catch (error) {
       console.error('❌ Erro ao enriquecer procedimentos com SIGTAP:', error);
       return procedures;
