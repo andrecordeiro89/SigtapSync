@@ -4457,7 +4457,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   <span className="text-xs font-bold text-emerald-900 uppercase tracking-wide">AIH Seca</span>
                                                 </div>
                                                 <span className="text-lg font-black text-emerald-700">
-                                                  {formatCurrency(patient._enriched.baseAih)}
+                                                  {formatCurrency(patient.total_value_reais)}
                                                 </span>
                                               </div>
                                             </div>
@@ -4658,14 +4658,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                           );
                                                         }
                                                         if (anesthetistInfo.isAnesthetist && !anesthetistInfo.shouldCalculate) {
+                                                          const base = procedure.value_reais || 0;
                                                           return (
                                                             <div className="text-right">
-                                                              <div className="text-xs font-bold text-red-600">
-                                                                🚫 Sem valor
+                                                              <div className="text-base font-bold text-slate-900">
+                                                                {formatCurrency(base)}
                                                               </div>
-                                                              <div className="text-[9px] text-red-500">
-                                                                {anesthetistInfo.message.split(':')[0]}
-                                                              </div>
+                                                              <div className="text-[10px] text-slate-500">visualização</div>
                                                             </div>
                                                           );
                                                         } else {
