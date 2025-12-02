@@ -78,10 +78,19 @@ export const SihApiAdapter = {
     if (localHospErr) logger.warn('Erro ao mapear hospitais locais', localHospErr)
     const hospByCnes = new Map((localHosp || []).map(h => [String(h.cnes), h]))
 
-    // 5) SIGTAP: usar exclusivamente CSV local quando Fonte SIH está ativa
     const procCodesRaw = Array.from(new Set(spResults.map(p => String(p.sp_atoprof)).filter(Boolean)))
     const procCodes = procCodesRaw.map(formatSigtapCode)
     const localCsvMap = await getSigtapLocalMap()
+    let remoteDescMap = new Map<string, string>()
+    if (supabaseSih) {
+      const { data: remoteProcRows } = await supabaseSih
+        .from('sigtap_procedimentos')
+        .select('code, description')
+        .in('code', procCodes)
+      if (remoteProcRows && remoteProcRows.length > 0) {
+        remoteDescMap = new Map(remoteProcRows.map(r => [String(r.code), String(r.description)]))
+      }
+    }
 
     // 6) Agrupar por médico (CNS do profissional do SP)
     const spByAih = new Map<string, any[]>()
@@ -116,7 +125,7 @@ export const SihApiAdapter = {
       const procedures: ProcedureDetail[] = procs.map((p, idx) => {
         const rawCode = String(p.sp_atoprof || '')
         const code = formatSigtapCode(rawCode)
-        const csvDesc = localCsvMap.get(code) || localCsvMap.get(code.replace(/\D/g, ''))
+        const csvDesc = remoteDescMap.get(code) || remoteDescMap.get(code.replace(/\D/g, '')) || localCsvMap.get(code) || localCsvMap.get(code.replace(/\D/g, ''))
         const valueCents = Math.round(Number(p.sp_valato || 0) * 100)
         return {
           procedure_id: `${aih}-${code}-${idx}`,
