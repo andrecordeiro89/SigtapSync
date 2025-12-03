@@ -1547,34 +1547,29 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   
   // ✅ NOVO: Calcular pacientes com múltiplas AIHs (igual PatientManagement)
   const multipleAIHsStats = React.useMemo(() => {
+    const aihNumbers = new Set<string>();
     const patientAIHCount = new Map<string, number>();
-    const patientDetails = new Map<string, any>(); // 🆕 Armazenar detalhes do paciente
-    const patientAIHsList = new Map<string, any[]>(); // 🆕 Armazenar lista de AIHs por paciente
-    let totalAIHs = 0;
+    const patientDetails = new Map<string, any>();
+    const patientAIHsList = new Map<string, any[]>();
     
-    // Contar AIHs por paciente e coletar detalhes
     filteredDoctors.forEach(doctor => {
       doctor.patients.forEach(patient => {
-        if (patient.patient_id) {
-          totalAIHs++;
-          const currentCount = patientAIHCount.get(patient.patient_id) || 0;
-          patientAIHCount.set(patient.patient_id, currentCount + 1);
-          
-          // 🆕 Armazenar lista de AIHs por paciente
-          if (!patientAIHsList.has(patient.patient_id)) {
-            patientAIHsList.set(patient.patient_id, []);
-          }
-          patientAIHsList.get(patient.patient_id)!.push({
-            aih_number: patient.aih_info?.aih_number || 'Não informado',
+        const aihNum = String(patient.aih_info?.aih_number || '').trim();
+        if (aihNum) aihNumbers.add(aihNum);
+        const pid = patient.patient_id || undefined;
+        if (pid) {
+          const current = patientAIHCount.get(pid) || 0;
+          patientAIHCount.set(pid, current + 1);
+          if (!patientAIHsList.has(pid)) patientAIHsList.set(pid, []);
+          patientAIHsList.get(pid)!.push({
+            aih_number: aihNum || 'Não informado',
             admission_date: patient.aih_info?.admission_date,
             discharge_date: patient.aih_info?.discharge_date,
             competencia: patient.aih_info?.competencia
           });
-          
-          // 🆕 Armazenar detalhes do paciente (✅ CORREÇÃO: usar patient_info)
-          if (!patientDetails.has(patient.patient_id)) {
-            patientDetails.set(patient.patient_id, {
-              patient_id: patient.patient_id,
+          if (!patientDetails.has(pid)) {
+            patientDetails.set(pid, {
+              patient_id: pid,
               patient_name: patient.patient_info?.name || 'Nome não informado',
               patient_cns: patient.patient_info?.cns || 'Não informado',
               hospital_name: doctor.hospitals?.[0]?.hospital_name || 'Hospital não informado'
@@ -1583,33 +1578,26 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         }
       });
     });
-    
-    // Identificar pacientes com múltiplas AIHs (> 1)
+
     const patientsWithMultiple = new Map<string, number>();
     patientAIHCount.forEach((count, patientId) => {
-      if (count > 1) {
-        patientsWithMultiple.set(patientId, count);
-      }
+      if (count > 1) patientsWithMultiple.set(patientId, count);
     });
-    
-    // Calcular total de AIHs de pacientes com múltiplas internações
     const totalMultipleAIHs = Array.from(patientsWithMultiple.values()).reduce((sum, count) => sum + count, 0);
-    
-    // 🆕 Criar array com detalhes dos pacientes com múltiplas AIHs
     const multipleAIHsDetails = Array.from(patientsWithMultiple.entries())
       .map(([patientId, count]) => ({
         ...patientDetails.get(patientId),
         aih_count: count,
-        aihs: patientAIHsList.get(patientId) || [] // 🆕 Incluir lista de AIHs
+        aihs: patientAIHsList.get(patientId) || []
       }))
-      .sort((a, b) => b.aih_count - a.aih_count); // Ordenar por quantidade de AIHs (maior primeiro)
-    
+      .sort((a, b) => b.aih_count - a.aih_count);
+
     return {
-      totalAIHs,
+      totalAIHs: aihNumbers.size,
       patientsWithMultipleAIHs: patientsWithMultiple.size,
       totalMultipleAIHs,
-      aihsWithoutPatients: 0, // Não temos AIHs órfãs nesta view
-      multipleAIHsDetails // 🆕 Array com detalhes dos pacientes
+      aihsWithoutPatients: 0,
+      multipleAIHsDetails
     };
   }, [filteredDoctors]);
   

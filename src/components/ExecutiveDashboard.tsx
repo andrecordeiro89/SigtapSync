@@ -1075,20 +1075,12 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg px-4 py-2 border-2 border-blue-200">
-                    <div className="text-xs font-bold text-blue-700 uppercase tracking-wide">
-                      AIHs
+                  <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl px-6 py-3 border-2 border-blue-700 shadow-md">
+                    <div className="text-xs font-bold text-white/90 uppercase tracking-wide">
+                      AIHs (Registros Únicos)
                     </div>
-                    <div className="text-lg font-black text-blue-900">
-                      {medicalProductionStats ? medicalProductionStats.totalPatients : '...'}
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg px-4 py-2 border-2 border-emerald-200">
-                    <div className="text-xs font-bold text-emerald-700 uppercase tracking-wide">
-                      Pacientes
-                    </div>
-                    <div className="text-lg font-black text-emerald-900">
-                      {medicalProductionStats ? (medicalProductionStats.uniquePatients || 0) : '...'}
+                    <div className="text-2xl font-black text-white">
+                      {medicalProductionStats ? (medicalProductionStats.totalAIHs || 0) : '...'}
                     </div>
                   </div>
                 </div>
