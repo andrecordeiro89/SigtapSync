@@ -172,6 +172,33 @@ const isZeroCns = (cns?: string): boolean => {
   return /^0+$/.test(s);
 };
 
+// Mapas para exibição
+const ESPECIALIDADE_MAP: Record<string, string> = {
+  '01': 'Cirúrgica',
+  '02': 'Obstétrica',
+  '03': 'Clínica Médica',
+  '07': 'Pediatria'
+};
+const CARACTER_MAP: Record<string, string> = {
+  '01': 'Urgência',
+  '02': 'Eletivo'
+};
+const formatEspecialidade = (raw?: string | number): string => {
+  const code = String(raw ?? '').trim().padStart(2, '0');
+  return ESPECIALIDADE_MAP[code] || (code ? code : '-');
+};
+const formatCareCharacterLabel = (raw?: string | number): string => {
+  const code = String(raw ?? '').trim().padStart(2, '0');
+  return CARACTER_MAP[code] || (code ? code : '-');
+};
+
+const careBadgeClass = (raw?: string | number): string => {
+  const label = formatCareCharacterLabel(raw);
+  return label === 'Urgência'
+    ? 'bg-red-50 text-red-700 border-red-200'
+    : 'bg-blue-50 text-blue-700 border-blue-200';
+};
+
 const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
   // ✅ SIMPLIFICADO: Usar TODOS os pacientes (sem filtro de data)
   let patientsForStats = doctorData.patients;
@@ -1235,7 +1262,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     loadDoctorsData();
   }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, refreshTick, selectedCompetencia, filterPgtAdm, useSihSource]);
 
-  // 🆕 CARREGAR COMPETÊNCIAS DISPONÍVEIS
+  // 🆕 CARREGAR COMPETÊNCIAS DISPONÍVEIS (apenas das AIHs carregadas atualmente)
   useEffect(() => {
     if (doctors.length > 0) {
       const competencias = new Set<string>();
@@ -2648,19 +2675,31 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 <Users className="h-12 w-12 mx-auto text-gray-300 mb-4" />
                 <div className="text-lg font-medium text-gray-600">
                   {(() => {
-                    const needsSelection = useSihSource && (
+                    const needsHospital = useSihSource && (
                       !selectedHospitals || selectedHospitals.length === 0 || selectedHospitals.includes('all')
                     );
-                    if (needsSelection) return 'Nenhum dado carregado';
+                    if (needsHospital) return 'Selecione o hospital para começar';
+                    const compSelected = selectedCompetencia && selectedCompetencia !== 'all' && selectedCompetencia.trim() !== '';
+                    if (useSihSource && compSelected && availableCompetencias?.length && !availableCompetencias.includes(selectedCompetencia)) {
+                      return 'Competência sem dados para o hospital selecionado';
+                    }
                     return searchTerm ? 'Nenhum médico responsável encontrado' : 'Nenhum médico responsável cadastrado';
                   })()}
                 </div>
                 <div className="text-sm text-gray-500">
                   {(() => {
-                    const needsSelection = useSihSource && (
+                    const needsHospital = useSihSource && (
                       !selectedHospitals || selectedHospitals.length === 0 || selectedHospitals.includes('all')
                     );
-                    if (needsSelection) return 'Selecione o hospital e a competência para visualizar os dados';
+                    if (needsHospital) return 'Selecione o hospital e depois a competência para visualizar os dados';
+                    const compSelected = selectedCompetencia && selectedCompetencia !== 'all' && selectedCompetencia.trim() !== '';
+                    if (useSihSource && compSelected && availableCompetencias?.length && !availableCompetencias.includes(selectedCompetencia)) {
+                      const list = availableCompetencias.map(c => {
+                        const m = c.match(/^(\d{4})(\d{2})$/);
+                        return m ? `${m[2]}/${m[1]}` : c;
+                      }).join(', ');
+                      return `Competências disponíveis: ${list}`;
+                    }
                     return searchTerm ? 'Tente alterar os filtros de busca' : 'Processe algumas AIHs com médicos responsáveis para ver os dados';
                   })()}
                 </div>
@@ -4429,6 +4468,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                   })() : '-'}
                                                 </span>
                                               </div>
+                                              <div className="flex items-baseline gap-2">
+                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Caráter:</span>
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] border ${careBadgeClass((patient.aih_info as any).care_character)}`}>
+                                                  {formatCareCharacterLabel((patient.aih_info as any).care_character)}
+                                                </span>
+                                              </div>
                                               {(patient.aih_info as any).dias_perm !== undefined && (
                                                 <div className="flex items-baseline gap-2">
                                                   <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Permanência:</span>
@@ -4449,7 +4494,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               {(patient.aih_info as any).specialty && (
                                                 <div className="flex items-baseline gap-2">
                                                   <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Especialidade:</span>
-                                                  <span className="text-xs font-medium text-gray-900">{(patient.aih_info as any).specialty}</span>
+                                                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] bg-violet-50 text-violet-700 border border-violet-200">
+                                                    {formatEspecialidade((patient.aih_info as any).specialty)}
+                                                  </span>
                                                 </div>
                                               )}
                                               <div className="flex items-baseline gap-2">
