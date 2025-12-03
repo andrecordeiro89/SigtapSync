@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { getSigtapLocalMap, resolveSigtapDescriptionFromCsv } from '@/utils/sigtapLocal';
 import { useAuth } from '../contexts/AuthContext';
-import {
+import { 
   Users,
   ChevronDown,
   ChevronRight,
@@ -58,6 +58,7 @@ import {
   getAnesthetistProcedureType,
   filterCalculableProcedures 
 } from '../utils/anesthetistLogic';
+import { calculateHonPayments } from '../config/doctorPaymentRules/importers/honCsv'
 import ReportGenerator from './ReportGenerator';
 import PatientAihInfoBadges from './PatientAihInfoBadges';
 import AihDatesBadges from './AihDatesBadges';
@@ -318,12 +319,16 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
           .map(proc => ({
             procedure_code: proc.procedure_code,
             procedure_description: proc.procedure_description,
-            value_reais: proc.value_reais || 0
+            value_reais: proc.value_reais || 0,
+            cbo: (proc as any).cbo
           }));
         
         // Se há procedimentos médicos para este paciente, calcular o valor baseado nas regras
         if (patientMedicalProcedures.length > 0) {
-          const paymentCalculation = calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures, hospitalId);
+        const isGeneralSurgery = /cirurg/i.test(doctorData.doctor_info.specialty || '') && /geral/i.test(doctorData.doctor_info.specialty || '')
+        const paymentCalculation = (ENV_CONFIG.USE_SIH_SOURCE && isGeneralSurgery)
+          ? calculateHonPayments(patientMedicalProcedures)
+          : calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures, hospitalId);
           // Somar os valores calculados individuais (detalhamento por procedimento)
           const patientCalculatedSum = paymentCalculation.procedures.reduce((sum, proc) => sum + proc.calculatedPayment, 0);
           return totalSum + patientCalculatedSum;
@@ -1412,13 +1417,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     // Contar pacientes com pagamento = 0
     (doctor.patients || []).forEach((patient) => {
-      const proceduresWithPayment = patient.procedures
-        .filter(filterCalculableProcedures)
-        .map((proc: any) => ({
-          procedure_code: proc.procedure_code,
-          procedure_description: proc.procedure_description,
-          value_reais: proc.value_reais || 0,
-        }));
+        const proceduresWithPayment = patient.procedures
+          .filter(filterCalculableProcedures)
+          .map((proc: any) => ({
+            procedure_code: proc.procedure_code,
+            procedure_description: proc.procedure_description,
+            value_reais: proc.value_reais || 0,
+            cbo: proc.cbo,
+          }));
       
       if (proceduresWithPayment.length > 0) {
         const paymentResult = calculateDoctorPayment(
@@ -3337,15 +3343,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               procedure_code: proc.procedure_code,
                                               procedure_description: proc.procedure_description,
                                               value_reais: proc.value_reais || 0,
+                                              cbo: proc.cbo,
                                             }));
                                           
                                           let repasseValue = 0;
                                           if (proceduresWithPayment.length > 0) {
-                                            const paymentResult = calculateDoctorPayment(
-                                              doctorName,
-                                              proceduresWithPayment,
-                                              hospitalId
-                                            );
+                                          const isGenSurg = /cirurg/i.test(doctorName) || (/cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || ''))
+                                          const paymentResult = (ENV_CONFIG.USE_SIH_SOURCE && isGenSurg)
+                                            ? calculateHonPayments(proceduresWithPayment)
+                                            : calculateDoctorPayment(
+                                                doctorName,
+                                                proceduresWithPayment,
+                                                hospitalId
+                                              );
                                             repasseValue = paymentResult.totalPayment || 0;
                                             totalRepasse += repasseValue; // ✅ Somar ao total
                                           }
@@ -4273,9 +4283,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                       // ✅ Calcular valores para evitar recálculo durante expansão
                                       const hospitalId = doctor.hospitals?.[0]?.hospital_id;
                                       
-                                      const enrichedPatients = paginatedPatients.map(patient => {
-                                        // ✅ CORREÇÃO: Incluir aih_id para evitar duplicatas em pacientes recorrentes
-                                        const patientKey = `${doctor.doctor_info.cns}-${patient.aih_id || patient.patient_info.cns}`;
+                                      const enrichedPatients = paginatedPatients.map((patient, idx) => {
+                                        // ✅ CORREÇÃO: Chave estável e única por AIH/paciente
+                                        const keySuffix = (
+                                          patient.aih_id ||
+                                          (patient as any)?.aih_info?.aih_number ||
+                                          `${patient.patient_info.cns || 'NO_CNS'}-${(patient as any)?.aih_info?.admission_date || 'NO_DATE'}-${idx}`
+                                        );
+                                        const patientKey = `${doctor.doctor_info.cns}-${keySuffix}`;
                                         
                                         // Calcular AIH Seca (estável)
                                         const baseAih = typeof (patient as any).total_value_reais === 'number'
@@ -4324,11 +4339,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               value_reais: proc.value_reais || 0,
                                             }));
                                           
-                                          const paymentResult = calculateDoctorPayment(
-                                            doctor.doctor_info.name,
-                                            proceduresWithPayment,
-                                            hospitalId
-                                          );
+                                          const isGenSurg2 = /cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || '')
+                                          const paymentResult = (ENV_CONFIG.USE_SIH_SOURCE && isGenSurg2)
+                                            ? calculateHonPayments(proceduresWithPayment)
+                                            : calculateDoctorPayment(
+                                                doctor.doctor_info.name,
+                                                proceduresWithPayment,
+                                                hospitalId
+                                              );
                                           
                                           totalPayment = paymentResult.totalPayment || 0;
                                           showRepasseCard = totalPayment > 0;
@@ -4581,18 +4599,32 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
                                             {/* 💰 VALOR DE REPASSE PARA O MÉDICO */}
                                             {/* ✅ USAR VALOR PRÉ-CALCULADO (MEMOIZADO) */}
-                                            {patient._enriched.showRepasseCard && (
-                                              <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg p-3 border-2 border-teal-300">
+                                            {useSihSource && remoteConfigured ? (
+                                              <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-3 border-2 border-blue-300">
                                                 <div className="flex items-center justify-between">
                                                   <div className="flex items-center gap-2">
-                                                    <Stethoscope className="h-4 w-4 text-teal-600" />
-                                                    <span className="text-xs font-bold text-teal-900 uppercase tracking-wide">Repasse Médico</span>
+                                                    <Stethoscope className="h-4 w-4 text-blue-600" />
+                                                    <span className="text-xs font-bold text-blue-900 uppercase tracking-wide">Valor Calculado</span>
                                                   </div>
-                                                  <span className="text-lg font-black text-teal-700">
+                                                  <span className="text-lg font-black text-blue-700">
                                                     {formatCurrency(patient._enriched.totalPayment)}
                                                   </span>
                                                 </div>
                                               </div>
+                                            ) : (
+                                              patient._enriched.showRepasseCard && (
+                                                <div className="bg-gradient-to-r from-teal-50 to-cyan-50 rounded-lg p-3 border-2 border-teal-300">
+                                                  <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                      <Stethoscope className="h-4 w-4 text-teal-600" />
+                                                      <span className="text-xs font-bold text-teal-900 uppercase tracking-wide">Repasse Médico</span>
+                                                    </div>
+                                                    <span className="text-lg font-black text-teal-700">
+                                                      {formatCurrency(patient._enriched.totalPayment)}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              )
                                             )}
                                           </div>
                                         </div>
@@ -4850,10 +4882,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 .map(proc => ({
                                                   procedure_code: proc.procedure_code,
                                                   procedure_description: proc.procedure_description,
-                                                  value_reais: proc.value_reais || 0
+                                                  value_reais: proc.value_reais || 0,
+                                                  cbo: proc.cbo
                                                 }))}
                                               hospitalId={getDoctorContextualHospitalId(doctor)}
                                               className="mt-5"
+                                              useCsvHon={ENV_CONFIG.USE_SIH_SOURCE && /cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || '')}
                                             />
                                           )}
                                         </div>

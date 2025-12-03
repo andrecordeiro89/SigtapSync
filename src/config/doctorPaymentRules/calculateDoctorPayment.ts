@@ -19,6 +19,7 @@ import {
   initializeRulesCache,
   formatCurrency
 } from './utils';
+import { getHonValuesForCode, calculateHonByPosition } from './importers/honCsv'
 
 import { TORAO_TOKUDA_RULES } from './hospitals/toraoTokuda';
 import { HOSPITAL_18_DEZEMBRO_RULES } from './hospitals/hospital18Dezembro';
@@ -81,6 +82,35 @@ export function calculateDoctorPayment(
   console.log(`   📋 Médicos disponíveis neste hospital:`, Object.keys(hospitalRules || {}));
   console.log(`   ✅ Regras encontradas: ${rule ? 'SIM' : 'NÃO'}`);
 
+  if (hospitalKey === 'TORAO_TOKUDA_APUCARANA' && doctorNameUpper === 'JOAO VICTOR RODRIGUES') {
+    let totalPayment = 0
+    let pos = 0
+    const paidCodes = new Set<string>()
+    const processed = procedures.map((p) => {
+      const hon = getHonValuesForCode(p.procedure_code)
+      const isExcluded = p.cbo === '000000' || p.cbo === '225151'
+      const codeNorm = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code
+      const isDuplicate = paidCodes.has(codeNorm)
+      const idx = (isExcluded || isDuplicate) ? -1 : pos
+      if (!(isExcluded || isDuplicate)) pos++
+      const base = hon ? calculateHonByPosition(idx, hon) : 0
+      const pay = (isExcluded || isDuplicate) ? 0 : base
+      if (!isExcluded && !isDuplicate && hon) paidCodes.add(codeNorm)
+      totalPayment += pay
+      return {
+        ...p,
+        calculatedPayment: pay,
+        paymentRule: isDuplicate ? 'Duplicado (não pago)' : (hon ? `CSV HON (pos ${idx+1})` : 'Sem regra HON para código'),
+        isSpecialRule: true
+      }
+    })
+    return {
+      procedures: processed,
+      totalPayment,
+      appliedRule: 'CSV HON1..HON5 (Cirurgia Geral)'
+    }
+  }
+
   if (!rule) {
     console.log(`   ⚠️ Nenhuma regra definida para ${doctorName}`);
     return {
@@ -127,9 +157,22 @@ export function calculateDoctorPayment(
   // REGRA 2: ONLY MAIN PROCEDURE (Apenas procedimento de maior valor)
   // ================================================================
   if (rule.onlyMainProcedureRule?.enabled && ruledProcedures.length > 1) {
-    const mainProcedure = ruledProcedures.reduce((max, p) => 
+    const eligible = ruledProcedures.filter(p => p.cbo !== '000000')
+    if (eligible.length === 0) {
+      return {
+        procedures: procedures.map(p => ({
+          ...p,
+          calculatedPayment: 0,
+          paymentRule: 'Procedimento principal hospitalar (sem repasse)',
+          isSpecialRule: true
+        })),
+        totalPayment: 0,
+        appliedRule: rule.onlyMainProcedureRule.description
+      }
+    }
+    const mainProcedure = eligible.reduce((max, p) => 
       p.value_reais > max.value_reais ? p : max
-    );
+    , eligible[0]);
     
     const mainRule = rule.rules?.find(r => {
       const code = mainProcedure.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || mainProcedure.procedure_code;
@@ -143,7 +186,7 @@ export function calculateDoctorPayment(
     return {
       procedures: procedures.map(p => ({
         ...p,
-        calculatedPayment: p === mainProcedure ? payment : 0,
+        calculatedPayment: (p === mainProcedure) ? payment : 0,
         paymentRule: p === mainProcedure 
           ? `Procedimento principal (${rule.onlyMainProcedureRule?.description})`
           : 'Procedimento secundário (não pago)',
@@ -173,14 +216,15 @@ export function calculateDoctorPayment(
         console.log(`   🔗 Aplicando REGRA MÚLTIPLA: ${formatCurrency(multiRule.totalValue)}`);
         console.log(`      Procedimentos: ${multiCodes.join(', ')}`);
         
+        const firstEligibleIdx = procedures.findIndex(pp => pp.cbo !== '000000')
         return {
           procedures: procedures.map((p, idx) => ({
             ...p,
-            calculatedPayment: idx === 0 ? multiRule.totalValue : 0,
-            paymentRule: idx === 0 ? multiRule.description : `Incluído na regra múltipla`,
+            calculatedPayment: idx === firstEligibleIdx ? multiRule.totalValue : 0,
+            paymentRule: idx === firstEligibleIdx ? multiRule.description : `Incluído na regra múltipla`,
             isSpecialRule: true
           })),
-          totalPayment: multiRule.totalValue,
+          totalPayment: firstEligibleIdx >= 0 ? multiRule.totalValue : 0,
           appliedRule: multiRule.description
         };
       }
@@ -197,24 +241,26 @@ export function calculateDoctorPayment(
     if (JSON.stringify(procedureCodes) === JSON.stringify(multiCodes)) {
       console.log(`   🔗 Aplicando REGRA MÚLTIPLA (legado): ${formatCurrency(rule.multipleRule.totalValue)}`);
       
+      const firstEligibleIdx2 = procedures.findIndex(pp => pp.cbo !== '000000')
       return {
         procedures: procedures.map((p, idx) => ({
           ...p,
-          calculatedPayment: idx === 0 ? rule.multipleRule!.totalValue : 0,
-          paymentRule: idx === 0 ? rule.multipleRule!.description : `Incluído na regra múltipla`,
+          calculatedPayment: idx === firstEligibleIdx2 ? rule.multipleRule!.totalValue : 0,
+          paymentRule: idx === firstEligibleIdx2 ? rule.multipleRule!.description : `Incluído na regra múltipla`,
           isSpecialRule: true
         })),
-        totalPayment: rule.multipleRule.totalValue,
+        totalPayment: firstEligibleIdx2 >= 0 ? rule.multipleRule.totalValue : 0,
         appliedRule: rule.multipleRule.description
       };
-    }
+  }
   }
 
   // ================================================================
   // REGRA 4: INDIVIDUAL RULES (Procedimentos individuais)
   // ================================================================
   let totalPayment = 0;
-  const processedProcedures = procedures.map((proc, index) => {
+  let pos = 0;
+  const processedProcedures = procedures.map((proc) => {
     const code = proc.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || proc.procedure_code;
     const individualRule = rule.rules?.find(r => r.procedureCode === code);
 
@@ -230,6 +276,9 @@ export function calculateDoctorPayment(
     // Determinar valor baseado na posição (principal, secundário, terciário)
     let payment = 0;
     let description = '';
+    const isHospital = proc.cbo === '000000';
+    const index = isHospital ? -1 : pos;
+    if (!isHospital) pos++;
 
     if (index === 0) {
       payment = individualRule.standardValue;
@@ -257,6 +306,9 @@ export function calculateDoctorPayment(
       description = `Valor padrão: ${formatCurrency(payment)}`;
     }
 
+    if (isHospital) {
+      payment = 0;
+    }
     totalPayment += payment;
 
     return {

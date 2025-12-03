@@ -25,6 +25,7 @@ import {
   formatCurrency,
   type ProcedurePaymentInfo
 } from '../config/doctorPaymentRules';
+import { calculateHonPayments } from '../config/doctorPaymentRules/importers/honCsv'
 
 // ================================================================
 // INTERFACE DO COMPONENTE
@@ -35,6 +36,7 @@ interface DoctorPaymentRulesProps {
   procedures: ProcedurePaymentInfo[];
   hospitalId?: string;
   className?: string;
+  useCsvHon?: boolean;
 }
 
 // ================================================================
@@ -45,7 +47,8 @@ export const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
   doctorName,
   procedures,
   hospitalId,
-  className = ''
+  className = '',
+  useCsvHon = false
 }) => {
   // Verificar se há procedimentos
   if (!procedures || procedures.length === 0) {
@@ -64,7 +67,7 @@ export const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
   // ================================================================
   // CÁLCULO PRINCIPAL
   // ================================================================
-  const result = calculateDoctorPayment(doctorName, procedures, hospitalId);
+  const result = useCsvHon ? calculateHonPayments(procedures) : calculateDoctorPayment(doctorName, procedures, hospitalId);
   
   // Cálculos auxiliares
   const fixedResult = calculateFixedPayment(doctorName, hospitalId);
