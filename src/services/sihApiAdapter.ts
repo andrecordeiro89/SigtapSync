@@ -37,20 +37,29 @@ export const SihApiAdapter = {
     // 2) Carregar RD (AIHs)
     let rdQuery = supabaseSih
       .from('sih_rd')
-      .select('n_aih, cnes, dt_inter, dt_saida, diag_princ, espec, mes_cmpt, complex, nasc, idade, dias_perm, val_tot, car_int')
+      .select('n_aih, cnes, dt_inter, dt_saida, diag_princ, espec, ano_cmpt, mes_cmpt, complex, nasc, idade, dias_perm, val_tot, car_int')
 
     if (cnesList && cnesList.length > 0) rdQuery = rdQuery.in('cnes', cnesList)
-    let compNormalized: string | undefined
+    let compYear: number | undefined
+    let compMonth: number | undefined
     if (options.competencia && options.competencia.trim()) {
-      const comp = options.competencia.trim()
-      if (/^\d{6}$/.test(comp)) {
-        rdQuery = rdQuery.eq('mes_cmpt', Number(comp))
-        compNormalized = comp
-      } else if (/^\d{4}-\d{2}(-\d{2})?$/.test(comp)) {
-        rdQuery = rdQuery.eq('competencia', comp)
-        // Converter YYYY-MM para YYYYMM para filtrar SP.sp_mm com chave canônica
-        const m = comp.match(/^(\d{4})-(\d{2})/)
-        if (m) compNormalized = `${m[1]}${m[2]}`
+      const raw = options.competencia.trim()
+      // Normalizar competência para ano/mês (inteiros)
+      if (/^\d{6}$/.test(raw)) {
+        compYear = parseInt(raw.slice(0, 4), 10)
+        compMonth = parseInt(raw.slice(4, 6), 10)
+      } else {
+        const m = raw.match(/^(\d{4})-(\d{2})/)
+        if (m) {
+          compYear = parseInt(m[1], 10)
+          compMonth = parseInt(m[2], 10)
+        }
+      }
+      if (typeof compMonth === 'number') {
+        rdQuery = rdQuery.eq('mes_cmpt', compMonth)
+      }
+      if (typeof compYear === 'number') {
+        rdQuery = rdQuery.eq('ano_cmpt', compYear)
       }
     }
 
@@ -68,11 +77,10 @@ export const SihApiAdapter = {
     for (const ch of spChunks) {
       let spQuery = supabaseSih
         .from('sih_sp')
-        .select('sp_naih, sp_atoprof, sp_qt_proc, sp_qtd_ato, sp_valato, sp_pf_doc, sp_pf_cbo, sp_cidpri, sp_complex, sp_mm')
+        .select('sp_naih, sp_atoprof, sp_qt_proc, sp_qtd_ato, sp_valato, sp_pf_doc, sp_pf_cbo, sp_cidpri, sp_complex, sp_mm, sp_aa')
         .in('sp_naih', ch)
-      if (compNormalized && /^\d{6}$/.test(compNormalized)) {
-        spQuery = spQuery.eq('sp_mm', compNormalized)
-      }
+      if (typeof compMonth === 'number') spQuery = spQuery.eq('sp_mm', compMonth)
+      if (typeof compYear === 'number') spQuery = spQuery.eq('sp_aa', compYear)
       const { data: spData, error: spError } = await spQuery
       if (spError) logger.warn('Erro chunk sih_sp', spError)
       if (spData && spData.length > 0) spResults.push(...spData)

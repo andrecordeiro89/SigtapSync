@@ -120,15 +120,21 @@ const parseISODateToLocal = (isoString: string | undefined | null): string => {
   return '⚠️ Data inválida';
 };
 
-// Função para formatar competência (YYYY-MM-DD para MM/YYYY)
+// Função para formatar competência (YYYYMM ou YYYY-MM[-DD] para MM/YYYY)
 const formatCompetencia = (competencia: string | undefined): string => {
   if (!competencia) return '—';
   
   try {
-    // Formato esperado: YYYY-MM-DD ou YYYY-MM
-    const match = competencia.match(/^(\d{4})-(\d{2})/);
-    if (match) {
-      const [, year, month] = match;
+    // Suporte oficial DATASUS: YYYYMM
+    const m6 = competencia.match(/^(\d{4})(\d{2})$/);
+    if (m6) {
+      const [, year, month] = m6;
+      return `${month}/${year}`;
+    }
+    // Formato alternativo: YYYY-MM[-DD]
+    const mDash = competencia.match(/^(\d{4})-(\d{2})/);
+    if (mDash) {
+      const [, year, month] = mDash;
       return `${month}/${year}`;
     }
     
@@ -157,6 +163,13 @@ const toUTCDateKey = (d: Date | string | undefined): string | null => {
 const isSameUTCDate = (a?: Date, b?: Date): boolean => {
   if (!a || !b) return false;
   return toUTCDateKey(a) === toUTCDateKey(b);
+};
+
+// Ocultar pagamentos hospitalares: CNS todo zero (mantém alimentação, oculta na UI)
+const isZeroCns = (cns?: string): boolean => {
+  if (!cns) return false;
+  const s = String(cns).trim();
+  return /^0+$/.test(s);
 };
 
 const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
@@ -1098,9 +1111,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   useEffect(() => {
     const loadDoctorsData = async () => {
       if (!user) return;
-      
       try {
         setIsLoading(true);
+        // Guardar estado inicial vazio quando fonte SIH está ativa sem filtros
+        const isRemoteInitial = useSihSource && (
+          !selectedHospitals || selectedHospitals.length === 0 || selectedHospitals.includes('all')
+        );
+        if (isRemoteInitial) {
+          setDoctors([]);
+          setFilteredDoctors([]);
+          setIsLoading(false);
+          return;
+        }
         
         // ✅ DETECTAR MODO DE ACESSO
         const isAdminMode = canAccessAllHospitals() || hasFullAccess() || user.hospital_id === 'ALL';
@@ -1301,6 +1323,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                doctor.doctor_info.specialty?.toLowerCase().includes(searchLower);
       });
     }
+
+    // 🧹 Ocultar card "Dr(a). CNS 000..." (pagamentos hospitalares)
+    filtered = filtered.filter(doctor => !isZeroCns(doctor.doctor_info?.cns));
 
     // 🧑‍🦱 NOVO: FILTRAR POR NOME DO PACIENTE
     if (patientSearchTerm.trim()) {
@@ -2634,10 +2659,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               <div className="text-center py-12">
                 <Users className="h-12 w-12 mx-auto text-gray-300 mb-4" />
                 <div className="text-lg font-medium text-gray-600">
-                  {searchTerm ? 'Nenhum médico responsável encontrado' : 'Nenhum médico responsável cadastrado'}
+                  {(() => {
+                    const needsSelection = useSihSource && (
+                      !selectedHospitals || selectedHospitals.length === 0 || selectedHospitals.includes('all')
+                    );
+                    if (needsSelection) return 'Nenhum dado carregado';
+                    return searchTerm ? 'Nenhum médico responsável encontrado' : 'Nenhum médico responsável cadastrado';
+                  })()}
                 </div>
                 <div className="text-sm text-gray-500">
-                  {searchTerm ? 'Tente alterar os filtros de busca' : 'Processe algumas AIHs com médicos responsáveis para ver os dados'}
+                  {(() => {
+                    const needsSelection = useSihSource && (
+                      !selectedHospitals || selectedHospitals.length === 0 || selectedHospitals.includes('all')
+                    );
+                    if (needsSelection) return 'Selecione o hospital e a competência para visualizar os dados';
+                    return searchTerm ? 'Tente alterar os filtros de busca' : 'Processe algumas AIHs com médicos responsáveis para ver os dados';
+                  })()}
                 </div>
               </div>
             ) : (

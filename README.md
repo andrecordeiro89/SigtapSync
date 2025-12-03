@@ -1,69 +1,77 @@
-# 🏥 **SIGTAP Sync**
-## Sistema de Gestão e Sincronização de Faturamento Hospitalar SUS
+# 🏥 SIGTAP Sync — Sistema de Repasses Médicos
+Plataforma dedicada exclusivamente ao cálculo, análise e gestão de repasses médicos, com visão 360º por médico, paciente (AIH) e procedimento. Unifica SIGTAP e DATASUS (SIH/SIA) via pipeline ETL, fornecendo dados tratados e normalizados para decisões precisas.
 
-[![React](https://img.shields.io/badge/React-18.3.1-blue.svg)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.5.3-blue.svg)](https://www.typescriptlang.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-Enterprise-green.svg)](https://supabase.com/)
-[![Gemini AI](https://img.shields.io/badge/Gemini_AI-Enabled-orange.svg)](https://ai.google.dev/)
-[![Status](https://img.shields.io/badge/Status-Production_Ready-brightgreen.svg)](#)
-[![LGPD](https://img.shields.io/badge/LGPD-Compliant-blue.svg)](#)
+## 🎯 Propósito
+- Calcular repasses médicos com regras claras e auditáveis.
+- Analisar produção por médico/especialidade/hospital com competência mensal.
+- Descomplicar dados legados do DATASUS (SIH/SIA) por padronização e joins consistentes.
+
+## 👥 Usuários-alvo
+- Diretoria e administração (visão executiva de repasses).
+- Coordenação/faturamento (operação e conferência).
+- TI (integrações e observabilidade).
+
+## � Pipeline ETL (Banco Remoto DATASUS)
+- ETL contínuo para SIH/SIA: ingestão, limpeza e normalização.
+- Competência mensal: RD `mes_cmpt (YYYYMM)` e SP `sp_mm (YYYYMM)`.
+- Normalização de códigos: SIGTAP `XX.XX.XX.XXX-X`, CIDs e CBOs.
+- Join de descrições: `sigtap_procedimentos (code, description)` por código formatado.
+- Dados fidedignos para TODOS os arquivos DATASUS (SIH, SIA e afins).
+
+## 🧠 Modelagem de Repasses
+- Hierarquia: Médico → Paciente (AIH) → Procedimentos.
+- AIH Seca: total por internação `val_tot` (SIH_RD).
+- Procedimentos: código, CBO, complexidade, quantidade (`sp_qtd_ato`), valor (`sp_valato`).
+- Descrição de procedimento: join remoto por `code` (fallback CSV local).
+
+## 📐 Lógicas de Cálculo
+- Base SIGTAP por procedimento/AIH.
+- Regras específicas (exemplos):
+  - Incremento Opera Paraná (+150%) quando elegível.
+  - Pagamentos fixos (mensal/por paciente) por médico/hospital.
+  - Percentual sobre total quando previsto.
+  - CBO 225151 (anestesia): valor exibido na UI “apenas visualização”; cálculo segue regras de exclusão (ex.: 04.xxx não calculáveis, exceções como cesariana).
+
+## � Filtros e Navegação
+- Hospital (CNES): filtro em RD e reflexo em SP via `sp_naih`.
+- Competência: `YYYYMM` (SP `sp_mm`) com suporte a `YYYY-MM` em RD; normalizado.
+- Profissionais: visão hierárquica com agrupamento por médico×hospital, busca e paginação.
+
+## 📊 Funcionalidades
+- Visão Executiva de Repasses: KPIs por médico/especialidade/hospital.
+- Hierarquia de Produção: AIH Seca (val_tot) + procedimentos detalhados.
+- Descrição Consolidada: join remoto confiável de SIGTAP.
+- Exportação/Relatórios: séries e ranking via serviço de analytics.
+
+## 🧩 Tecnologias
+- Frontend: React 18, TypeScript, Vite, Tailwind, shadcn/Radix.
+- Dados: Supabase (Postgres, views/RPCs), alternância segura para SIH remoto.
+- Analytics: FastAPI (Python) para ranking/séries por médico.
+- ETL: pipeline DATASUS com padronização de competência e códigos.
+
+## 🔒 Segurança e Conformidade
+- Perfis e acessos por hospital; auditoria de ações.
+- LGPD: minimização de PII (nome do paciente omitido no SIH remoto), tráfego seguro.
+
+## 🚀 Como Usar
+- Ativar fonte remota (SIH): `VITE_SIH_SUPABASE_URL`, `VITE_SIH_SUPABASE_ANON_KEY`, `VITE_USE_SIH_SOURCE=true`.
+- Selecionar hospital (CNES) e competência (YYYYMM).
+- Abrir “Profissionais”: verificar AIH Seca (val_tot) + procedimentos com descrições.
+- Exportar análises executivas quando necessário.
+
+## 🗺️ Roadmap
+- Regras de repasses parametrizáveis por hospital/especialidade.
+- Séries temporais por competência/esp. para decisão executiva.
+- Ampliação de ETL para mais arquivos DATASUS e reconciliações cruzadas.
 
 ---
-
-## 📋 **SUMÁRIO EXECUTIVO**
-
-O **SIGTAP Sync** é uma solução completa para gestão de faturamento hospitalar, desenvolvida especificamente para o Sistema Único de Saúde (SUS) brasileiro. Nossa plataforma combina automação inteligente, inteligência artificial e compliance regulatório para otimizar a eficiência operacional hospitalar.
-
-### **🎯 PROPOSTA DE VALOR**
-
-**Para Diretores Executivos:**
-- 📈 **Melhoria significativa na eficiência** do faturamento
-- 💰 **Redução substancial de erros** de cobrança
-- ⏱️ **Economia de tempo** por analista
-- 🎯 **Retorno positivo** sobre investimento
-
-**Para Equipes Operacionais:**
-- 🤖 **Automatização avançada** dos processos manuais
-- 📊 **Dashboards em tempo real** para tomada de decisão
-- 🔍 **Auditoria completa** para compliance
-- 📱 **Interface moderna** e intuitiva
-
----
-
-## 🚀 **PRINCIPAIS BENEFÍCIOS DE NEGÓCIO**
-
-### **💼 IMPACTO OPERACIONAL**
-- **⚡ Tempo de Faturamento**: Redução significativa no tempo de processamento
-- **🎯 Taxa de Erro**: Diminuição substancial de erros de cobrança
-- **💰 Custo Operacional**: Economia considerável nos custos por AIH
-- **📈 Receita**: Otimização do faturamento hospitalar
-
-### **🎯 VANTAGENS COMPETITIVAS**
-- ✅ **Solução com IA híbrida** para extração de dados
-- ✅ **Matching automático** com scoring inteligente
-- ✅ **Compliance total** com regras SUS e LGPD
-- ✅ **Multi-hospital** com controle de acesso granular
-- ✅ **Auditoria completa** para rastreabilidade
-
----
-
-## 📊 **FUNCIONALIDADES EXECUTIVAS**
-
-### **1. 🎛️ DASHBOARD EXECUTIVO**
-**Central de Inteligência para Diretoria**
-- **KPIs Financeiros:** Receita, ticket médio, crescimento mensal
-- **Métricas Operacionais:** Produtividade, eficiência, qualidade
-- **Análises Comparativas:** Benchmarks entre unidades
-- **Alertas Inteligentes:** Oportunidades e riscos identificados
-
-**Benefícios:**
-- Visibilidade total da operação
+Foco total em repasses médicos: dados confiáveis, regras claras e visão 360º para acelerar a gestão hospitalar.
 - Decisões baseadas em dados
 - Identificação de oportunidades
 - Monitoramento em tempo real
 
-### **2. 🤖 AUTOMAÇÃO INTELIGENTE**
-**Processamento Híbrido com IA**
+### 2) 🤖 Automação Inteligente
+Processamento híbrido com IA e parsers tradicionais
 
 | **Formato** | **Performance** | **Precisão** | **Custo** |
 |-------------|-----------------|--------------|-----------|
@@ -76,8 +84,8 @@ O **SIGTAP Sync** é uma solução completa para gestão de faturamento hospital
 - **IA Gemini:** Processamento de casos complexos
 - **Merge Inteligente:** Combinação dos melhores resultados
 
-### **3. 🎯 MATCHING AUTOMÁTICO**
-**Sistema de Pontuação Inteligente**
+### 3) 🎯 Matching Automático (AIH ↔ SIGTAP)
+Sistema de pontuação e validações clínicas/administrativas
 - **Validação de Gênero:** Compatibilidade de sexo
 - **Validação de Idade:** Faixas etárias permitidas
 - **Compatibilidade CID:** Códigos de diagnóstico válidos
@@ -89,8 +97,19 @@ O **SIGTAP Sync** é uma solução completa para gestão de faturamento hospital
 - **Score Médio:** Revisão manual
 - **Score Baixo:** Rejeição automática
 
-### **4. 🩺 GESTÃO DE CORPO MÉDICO**
-**Analytics Médicos Avançados**
+### 4) 🩺 Corpo Médico
+Analytics avançados por médico/especialidade/hospital
+
+### 5) 🔄 Pipeline ETL — Banco Remoto DATASUS
+- Banco remoto operando como pipeline ETL, recebendo dados limpos e tratados (SIH, SIA, etc.)
+- Padronização de colunas e formatos (competência mensal, códigos SIGTAP normalizados)
+- Consistência entre RD (AIH) e SP (procedimentos), com joins confiáveis para descrições
+- Dados fidedignos para análises e repasses em todos os arquivos do DATASUS
+
+### 6) 🔍 Descomplicando Dados Legados
+- Normalização de códigos (procedimentos, CIDs, CBOs) e versões SIGTAP ativas
+- Extração e reconciliação de registros de difícil manipulação com parsers robustos
+- Alternância segura entre fonte local e remota com filtros consistentes (hospital, competência)
 - **Performance individual** por especialidade
 - **Produtividade** e qualidade por médico
 - **Distribuição** por hospital e departamento
@@ -104,23 +123,23 @@ O **SIGTAP Sync** é uma solução completa para gestão de faturamento hospital
 
 ---
 
-## 🏗️ **ARQUITETURA EMPRESARIAL**
+## 🏗️ Arquitetura
 
-### **🔒 SEGURANÇA E COMPLIANCE**
+### 🔒 Segurança e Compliance
 - **🛡️ Row Level Security (RLS):** Proteção a nível de linha
 - **🔐 Criptografia:** Dados sensíveis protegidos
 - **📋 LGPD Compliant:** Conformidade total
 - **🔍 Auditoria 360°:** Rastreabilidade completa
 - **🚨 Alertas de Segurança:** Monitoramento contínuo
 
-### **📈 PERFORMANCE EMPRESARIAL**
+### 📈 Performance
 - **⚡ Consultas Otimizadas:** Banco de dados eficiente
 - **🔄 Alta Disponibilidade:** Sistema estável
 - **📊 Processamento em Lote:** Grandes volumes
 - **🌐 Multi-tenant:** Isolamento por hospital
 - **📱 Responsivo:** Desktop, tablet, mobile
 
-### **🔧 TECNOLOGIA DE PONTA**
+### 🔧 Tecnologias
 ```
 Frontend Moderno          Backend Robusto           IA & Analytics
 ├── React 18 + TypeScript  ├── Supabase PostgreSQL   ├── Google Gemini AI
@@ -129,9 +148,14 @@ Frontend Moderno          Backend Robusto           IA & Analytics
 └── React Query            └── Triggers Automáticos  └── Relatórios Avançados
 ```
 
+### Integrações
+- Supabase principal (hospitais, pacientes, AIHs, procedimentos, audit logs, views/RPCs)
+- Supabase SIH remoto (sih_rd, sih_sp, sigtap_procedimentos)
+- FastAPI (analytics por médico/especialidade/séries)
+
 ---
 
-## 🎯 **CASOS DE USO EXECUTIVOS**
+## 🎯 Casos de Uso
 
 ### **🏥 HOSPITAL REGIONAL**
 **Desafios Anteriores:**
@@ -161,7 +185,7 @@ Frontend Moderno          Backend Robusto           IA & Analytics
 
 ---
 
-## 📊 **INDICADORES DE PERFORMANCE**
+## 📊 Indicadores de Performance
 
 ### **📈 OPERACIONAIS**
 - **Volume Processado:** Processamento em grande escala
@@ -182,7 +206,7 @@ Frontend Moderno          Backend Robusto           IA & Analytics
 
 ---
 
-## 🛠️ **IMPLEMENTAÇÃO E SUPORTE**
+## 🛠️ Implementação e Suporte
 
 ### **🚀 IMPLANTAÇÃO RÁPIDA**
 - **Semana 1:** Configuração e treinamento
@@ -196,8 +220,10 @@ Frontend Moderno          Backend Robusto           IA & Analytics
 - **Analistas:** Uso diário e casos especiais
 - **TI:** Configuração e manutenção
 
-### **🔧 SUPORTE TÉCNICO**
+### 🔧 SUPORTE TÉCNICO
 - **24/7 Monitoramento:** Disponibilidade garantida
+ - **Atualizações contínuas:** Evolução de regras de repasse e filtros
+ - **Observabilidade:** Logs, métricas e saúde de serviços
 - **Suporte Técnico:** Especialistas dedicados
 - **Atualizações:** Melhorias contínuas
 - **Documentação:** Guias completos
