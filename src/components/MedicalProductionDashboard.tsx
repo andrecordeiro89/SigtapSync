@@ -180,8 +180,8 @@ const ESPECIALIDADE_MAP: Record<string, string> = {
   '07': 'Pediatria'
 };
 const CARACTER_MAP: Record<string, string> = {
-  '01': 'Urgência',
-  '02': 'Eletivo'
+  '01': 'Eletivo',
+  '02': 'Urgência'
 };
 const formatEspecialidade = (raw?: string | number): string => {
   const code = String(raw ?? '').trim().padStart(2, '0');
