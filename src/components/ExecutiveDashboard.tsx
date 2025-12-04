@@ -347,6 +347,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [activeHospitalTab, setActiveHospitalTab] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [dischargeFrom, setDischargeFrom] = useState<string>('');
+  const [dischargeTo, setDischargeTo] = useState<string>('');
   // Removido: consolidado de todos os hospitais — fonte única: tabela AIHs filtrada por hospital
   // const [showReportGenerator, setShowReportGenerator] = useState(false);
   
@@ -1231,7 +1233,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             )}
             
             {/* FILTROS EM GRID - DESIGN MINIMALISTA */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
               {/* BUSCAR MÉDICO */}
               <div className="w-full">
                 <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
@@ -1322,11 +1324,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              {/* FILTRO DE COMPETÊNCIA */}
+              {/* FILTRO DE COMPETÊNCIA DE APROVAÇÃO */}
               <div className="w-full">
                 <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
                   <Calendar className="h-3.5 w-3.5 text-indigo-600" />
-                  Competência
+                  Competência de Aprovação
                 </label>
                 <div className="flex items-center gap-2">
                   <select
@@ -1345,7 +1347,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     <button
                       onClick={() => setSelectedCompetency('all')}
                       className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0"
-                      title="Limpar filtro de competência"
+                      title="Limpar filtro de competência de aprovação"
                     >
                       ✕
                     </button>
@@ -1380,13 +1382,50 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   )}
                 </div>
               </div>
+
+              <div className="w-full">
+                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
+                  <Calendar className="h-3.5 w-3.5 text-blue-600" />
+                  Alta (Início)
+                </label>
+                <input
+                  type="date"
+                  value={dischargeFrom}
+                  onChange={(e) => setDischargeFrom(e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-blue-500 hover:border-gray-300 transition-colors h-10"
+                />
+              </div>
+
+              <div className="w-full">
+                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
+                  <Calendar className="h-3.5 w-3.5 text-blue-600" />
+                  Alta (Fim)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={dischargeTo}
+                    onChange={(e) => setDischargeTo(e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-blue-500 hover:border-gray-300 transition-colors h-10"
+                  />
+                  {(dischargeFrom || dischargeTo) && (
+                    <button
+                      onClick={() => { setDischargeFrom(''); setDischargeTo(''); }}
+                      className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0"
+                      title="Limpar filtro de alta"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* ✅ ABAS DE COMPETÊNCIA REMOVIDAS - Agora usa apenas dropdown */}
             {/* ✅ BARRA DE ABAS DE HOSPITAIS REMOVIDA - Agora usa dropdown acima */}
 
             {/* INDICADORES DE FILTROS ATIVOS - DESIGN MINIMALISTA */}
-            {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all') || selectedCompetency !== 'all' || filterCareCharacter !== 'all') && (
+            {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all') || selectedCompetency !== 'all' || filterCareCharacter !== 'all' || dischargeFrom || dischargeTo) && (
               <div className="flex items-center justify-between pt-4 border-t-2 border-gray-100">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
@@ -1413,13 +1452,19 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   {selectedCompetency !== 'all' && (
                     <Badge variant="outline" className="flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 border-indigo-200 font-medium px-2 py-1">
                       <Calendar className="h-3 w-3" />
-                      {availableCompetencies.find(c => c.value === selectedCompetency)?.label || selectedCompetency}
+                      Comp. Aprovação: {availableCompetencies.find(c => c.value === selectedCompetency)?.label || selectedCompetency}
                     </Badge>
                   )}
                   {filterCareCharacter !== 'all' && (
                     <Badge variant="outline" className="flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border-amber-200 font-medium px-2 py-1">
                       <AlertTriangle className="h-3 w-3" />
                       Caráter: {CareCharacterUtils.formatForDisplay(filterCareCharacter, false)}
+                    </Badge>
+                  )}
+                  {(dischargeFrom || dischargeTo) && (
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-sky-50 text-sky-700 border-sky-200 font-medium px-2 py-1">
+                      <Calendar className="h-3 w-3" />
+                      Alta: {dischargeFrom ? dischargeFrom.split('-').reverse().join('/') : '—'} — {dischargeTo ? dischargeTo.split('-').reverse().join('/') : '—'}
                     </Badge>
                   )}
                   <span className="text-xs text-gray-400 italic">
@@ -1443,6 +1488,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             patientSearchTerm={patientSearchTerm}
             selectedCompetencia={selectedCompetency}
             filterCareCharacter={filterCareCharacter}
+            dischargeDateRange={{ from: dischargeFrom || undefined, to: dischargeTo || undefined }}
           />
           {/* ⚠️ NOTA: onStatsUpdate agora apenas atualiza activeDoctors, não afeta faturamento/AIHs */}
         </TabsContent>

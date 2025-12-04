@@ -597,6 +597,7 @@ interface MedicalProductionDashboardProps {
   patientSearchTerm?: string; // Busca de pacientes
   selectedCompetencia?: string; // ✅ NOVO: Filtro de competência
   filterCareCharacter?: 'all' | '1' | '2';
+  dischargeDateRange?: { from?: string; to?: string };
 }
 
 // ✅ COMPONENTE PRINCIPAL - SIMPLIFICADO
@@ -607,6 +608,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   patientSearchTerm = '',
   selectedCompetencia = 'all',
   filterCareCharacter = 'all'
+  , dischargeDateRange
 }) => {
   const { user, canAccessAllHospitals, hasFullAccess } = useAuth();
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
@@ -844,7 +846,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         { label: 'Hospital: ', value: hospitalName }
       ]
       const line2 = [
-        { label: 'Competência: ', value: compHeader },
+        { label: 'Comp. Aprovação: ', value: compHeader },
         { label: 'Caráter: ', value: careHeader },
         { label: 'Gerado em: ', value: dataGeracao }
       ]
@@ -883,7 +885,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       doc.line(20, yPosition, pageWidth - 20, yPosition)
       const startY = yPosition + 10
       autoTable(doc, {
-        head: [['Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Competência', 'Aprovado', 'Valor de Repasse']],
+        head: [['Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Comp. Aprovação', 'Aprovado', 'Valor de Repasse']],
         body: tableData,
         startY,
         theme: 'striped',
@@ -1469,6 +1471,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             hospitalIds: selectedHospitalIds,
             competencia: competenciaFilter, // ✅ Passar undefined se não houver filtro
             filterCareCharacter: careFilter,
+            dischargeDateRange,
             useSihSource
           });
           // Usar diretamente a fonte das tabelas, garantindo pacientes e procedimentos
@@ -1521,7 +1524,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     };
 
     loadDoctorsData();
-  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, refreshTick, selectedCompetencia, filterCareCharacter, useSihSource]);
+  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, refreshTick, selectedCompetencia, filterCareCharacter, dischargeDateRange?.from, dischargeDateRange?.to, useSihSource]);
 
   // 🆕 CARREGAR COMPETÊNCIAS DISPONÍVEIS (apenas das AIHs carregadas atualmente)
   useEffect(() => {
@@ -3758,7 +3761,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           { label: 'Hospital: ', value: hospitalName }
                                         ];
                                         const line2: Array<{ label: string; value: string; bold?: boolean }> = [
-                                          { label: 'Competência: ', value: compHeader },
+                                          { label: 'Comp. Aprovação: ', value: compHeader },
                                           { label: 'Caráter: ', value: careHeader },
                                           { label: 'Gerado em: ', value: dataGeracao }
                                         ];
@@ -3802,7 +3805,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         const startY = yPosition + 10;
                                         
                                         autoTable(doc, {
-                                          head: [['Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Competência', 'Aprovado', 'Valor de Repasse']],
+                                          head: [['Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Comp. Aprovação', 'Aprovado', 'Valor de Repasse']],
                                           body: tableData,
                                           startY: startY,
                                           theme: 'striped',

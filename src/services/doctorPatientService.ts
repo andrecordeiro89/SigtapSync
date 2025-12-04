@@ -123,18 +123,20 @@ export class DoctorPatientService {
     competencia?: string; // ✅ NOVO: Usar competência em vez de datas
     filterPgtAdm?: 'all' | 'sim' | 'não'; // ✅ Mantido para compatibilidade
     filterCareCharacter?: '1' | '2';
+    dischargeDateRange?: { from?: string; to?: string };
     useSihSource?: boolean;
   }): Promise<DoctorWithPatients[]> {
     try {
       console.log('📥 [TABELAS - OTIMIZADO] Carregando dados em paralelo...', options);
 
       // 🔄 NOVO: Alternar para fonte SIH remota quando habilitado
-      const useRemote = typeof options?.useSihSource === 'boolean' ? Boolean(options?.useSihSource) : ENV_CONFIG.USE_SIH_SOURCE
+      const useRemote = Boolean(options?.useSihSource)
       if (useRemote) {
         const { SihApiAdapter } = await import('./sihApiAdapter')
         const result = await SihApiAdapter.getDoctorsWithPatients({
           hospitalIds: options?.hospitalIds,
-          competencia: options?.competencia
+          competencia: options?.competencia,
+          dischargeDateRange: options?.dischargeDateRange
         })
         console.log(`✅ [SIH REMOTO] Fonte alternada. Médicos carregados: ${result?.length || 0}`)
         return result || []
@@ -183,6 +185,17 @@ export class DoctorPatientService {
       } else {
         console.log('🗓️ [getDoctorsWithPatientsFromProceduresView] Sem filtro de competência (carregando todas)');
       }
+
+      if (options?.dischargeDateRange && (options.dischargeDateRange.from || options.dischargeDateRange.to)) {
+        const from = options.dischargeDateRange.from ? new Date(options.dischargeDateRange.from) : undefined;
+        const to = options.dischargeDateRange.to ? new Date(options.dischargeDateRange.to) : undefined;
+        const startISO = from ? new Date(from.getFullYear(), from.getMonth(), from.getDate()).toISOString() : undefined;
+        const endISO = to ? new Date(to.getFullYear(), to.getMonth(), to.getDate() + 1).toISOString() : undefined;
+        if (startISO) aihsQuery = aihsQuery.gte('discharge_date', startISO);
+        if (endISO) aihsQuery = aihsQuery.lt('discharge_date', endISO);
+        aihsQuery = aihsQuery.not('discharge_date', 'is', null);
+        console.log('📅 [getDoctorsWithPatientsFromProceduresView] Filtro por alta:', { from: options.dischargeDateRange.from, to: options.dischargeDateRange.to });
+      }
       
       // ✅ NOVO: Filtro Pgt. Administrativo
       if (options?.filterPgtAdm && options.filterPgtAdm !== 'all') {
@@ -210,8 +223,9 @@ export class DoctorPatientService {
                                    options.competencia !== null;
       const hasPgtAdmFilter = options?.filterPgtAdm && options.filterPgtAdm !== 'all' && options.filterPgtAdm !== undefined;
       const hasCareFilter = Boolean(options?.filterCareCharacter);
+      const hasDischargeFilter = Boolean(options?.dischargeDateRange && (options.dischargeDateRange.from || options.dischargeDateRange.to));
       
-      const hasFilters = hasHospitalFilter || hasCompetenciaFilter || hasPgtAdmFilter || hasCareFilter;
+      const hasFilters = hasHospitalFilter || hasCompetenciaFilter || hasPgtAdmFilter || hasCareFilter || hasDischargeFilter;
       
       const initialLoadLimit = 500; // ✅ Limite inicial reduzido de 1000 para 500
       
@@ -221,11 +235,13 @@ export class DoctorPatientService {
         hasCompetenciaFilter,
         hasPgtAdmFilter,
         hasCareFilter,
+        hasDischargeFilter,
         hasFilters,
         competencia: options?.competencia,
         hospitalIds: options?.hospitalIds,
         filterPgtAdm: options?.filterPgtAdm,
-        filterCareCharacter: options?.filterCareCharacter
+        filterCareCharacter: options?.filterCareCharacter,
+        dischargeDateRange: options?.dischargeDateRange
       });
       
       // 🚀 PAGINAÇÃO INTELIGENTE: Carregar em chunks quando necessário

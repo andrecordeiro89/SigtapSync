@@ -8,6 +8,7 @@ import type { DoctorWithPatients, ProcedureDetail } from './doctorPatientService
 type LoadOptions = {
   hospitalIds?: string[]
   competencia?: string
+  dischargeDateRange?: { from?: string; to?: string }
 }
 
 const chunk = <T>(arr: T[], size = 80): T[][] => {
@@ -61,6 +62,18 @@ export const SihApiAdapter = {
       if (typeof compYear === 'number') {
         rdQuery = rdQuery.eq('ano_cmpt', compYear)
       }
+    }
+
+    // Filtro por período de alta (dt_saida)
+    if (options.dischargeDateRange && (options.dischargeDateRange.from || options.dischargeDateRange.to)) {
+      const from = options.dischargeDateRange.from || undefined
+      const to = options.dischargeDateRange.to || undefined
+      // Exclusivo em "to": somar +1 dia para incluir o dia inteiro
+      const endExclusive = to ? new Date(to) : undefined
+      if (endExclusive) endExclusive.setDate(endExclusive.getDate() + 1)
+      if (from) rdQuery = rdQuery.gte('dt_saida', from)
+      if (endExclusive) rdQuery = rdQuery.lt('dt_saida', endExclusive.toISOString().slice(0, 10))
+      rdQuery = rdQuery.not('dt_saida', 'is', null)
     }
 
     const { data: rdData, error: rdError } = await rdQuery
