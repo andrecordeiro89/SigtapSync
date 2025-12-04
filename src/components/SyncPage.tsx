@@ -20,6 +20,15 @@ import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+type SyncDetail = {
+  numero_aih: string;
+  prontuario?: string;
+  status: 'sincronizado' | 'pendente' | 'nao_processado';
+  aih_avancado?: any;
+  sisaih01?: any;
+  procedure_description?: string | null;
+};
+
 const SyncPage = () => {
   const { getCurrentHospital, canAccessAllHospitals } = useAuth();
   const userHospitalId = getCurrentHospital();
@@ -32,12 +41,12 @@ const SyncPage = () => {
   const [aihsEncontradas, setAihsEncontradas] = useState<any[]>([]);
   const [etapa1Concluida, setEtapa1Concluida] = useState(false);
   
-  // Estados para filtros Altas Hospitalares (Etapa 2)
-  const [hospitaisAltas, setHospitaisAltas] = useState<Array<{id: string, name: string}>>([]);
-  const [periodosAltas, setPeriodosAltas] = useState<string[]>([]);
-  const [hospitalAltasSelecionado, setHospitalAltasSelecionado] = useState<string>('');
-  const [periodoAltasSelecionado, setPeriodoAltasSelecionado] = useState<string>('');
-  const [altasEncontradas, setAltasEncontradas] = useState<any[]>([]);
+  // Estados para filtros SISAIH01 (Etapa 2)
+  const [hospitaisSISAIH01, setHospitaisSISAIH01] = useState<Array<{id: string, name: string}>>([]);
+  const [competenciasSISAIH01, setCompetenciasSISAIH01] = useState<string[]>([]);
+  const [hospitalSISAIH01Selecionado, setHospitalSISAIH01Selecionado] = useState<string>('');
+  const [competenciaSISAIH01Selecionada, setCompetenciaSISAIH01Selecionada] = useState<string>('');
+  const [sisaih01Encontrados, setSisaih01Encontrados] = useState<any[]>([]);
   const [etapa2Concluida, setEtapa2Concluida] = useState(false);
   
   // Estados para sincronização (Etapa 3)
@@ -45,13 +54,7 @@ const SyncPage = () => {
     sincronizados: number;
     pendentes: number;
     naoProcessados: number;
-    detalhes: Array<{
-      prontuario: string;
-      status: 'sincronizado' | 'pendente' | 'nao_processado';
-      aih_avancado?: any;
-      alta_hospitalar?: any;
-      procedure_description?: string | null;
-    }>;
+    detalhes: SyncDetail[];
   } | null>(null);
   
   const [isLoading, setIsLoading] = useState(false);

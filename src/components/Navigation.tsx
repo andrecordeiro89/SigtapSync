@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Home, Search, FileUp, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe } from 'lucide-react';
+import { Home, Search, FileUp, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe, GitCompare } from 'lucide-react';
 import ProfileEditModal from './ProfileEditModal';
 
 interface NavigationProps {
@@ -26,6 +26,14 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       description: 'Visão geral do sistema',
       requiresAdmin: false,
       order: 1
+    },
+    {
+      id: 'aih-multipage-tester',
+      label: 'AIH Avançado',
+      icon: GitCompare,
+      description: 'Processamento avançado de AIHs (Multi-Page)',
+      requiresAdmin: false,
+      order: 2
     },
     {
       id: 'sigtap-viewer',

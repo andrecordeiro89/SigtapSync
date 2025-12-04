@@ -9,6 +9,7 @@ import ExecutiveDashboard from '../components/ExecutiveDashboard';
 import MedicalStaffDashboard from '../components/MedicalStaffDashboard';
 import ProcedureDebugger from '../components/ProcedureDebugger';
 import SISAIH01Page from '../components/SISAIH01Page';
+import AIHMultiPageTester from '../components/AIHMultiPageTester';
  
  
 import { useIsCompact } from '../hooks/use-compact';
@@ -21,6 +22,8 @@ const Index = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
+      case 'aih-multipage-tester':
+        return <AIHMultiPageTester />;
       case 'aih-upload':
         return <AIHUpload />;
       case 'sigtap':
