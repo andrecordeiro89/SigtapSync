@@ -656,6 +656,262 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     return () => { mounted = false }
   }, [useSihSource])
   const remoteConfigured = Boolean(ENV_CONFIG.SIH_SUPABASE_URL && ENV_CONFIG.SIH_SUPABASE_ANON_KEY)
+  const [simplifiedValidationOpen, setSimplifiedValidationOpen] = useState<boolean>(false)
+  const [simplifiedValidationLoading, setSimplifiedValidationLoading] = useState<boolean>(false)
+  const [simplifiedValidationStats, setSimplifiedValidationStats] = useState<{ total: number; approved: number; notApproved: number; remote: boolean } | null>(null)
+  const approvedSetRef = useRef<Set<string>>(new Set())
+  const [selectedDoctorForReport, setSelectedDoctorForReport] = useState<any>(null)
+
+  const validateSimplifiedReport = async (doctor: any) => {
+    try {
+      approvedSetRef.current = new Set()
+      const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
+      const allAihNumbers = (doctor.patients || [])
+        .map((p: any) => normalizeAih(String(p?.aih_info?.aih_number || '').trim()))
+        .filter((v: string) => !!v)
+      const uniqueAih = Array.from(new Set(allAihNumbers))
+      if (uniqueAih.length === 0) {
+        setSimplifiedValidationStats({ total: 0, approved: 0, notApproved: 0, remote: remoteConfigured })
+        return
+      }
+      if (!remoteConfigured) {
+        setSimplifiedValidationStats({ total: uniqueAih.length, approved: 0, notApproved: uniqueAih.length, remote: false })
+        return
+      }
+      const { supabaseSih } = await import('../lib/sihSupabase')
+      let compYear: number | undefined
+      let compMonth: number | undefined
+      if (selectedCompetencia && selectedCompetencia.trim() && selectedCompetencia !== 'all') {
+        const raw = selectedCompetencia.trim()
+        if (/^\d{6}$/.test(raw)) {
+          compYear = parseInt(raw.slice(0, 4), 10)
+          compMonth = parseInt(raw.slice(4, 6), 10)
+        } else {
+          const mDash = raw.match(/^(\d{4})-(\d{2})/)
+          const mSlash = raw.match(/^(\d{2})\/(\d{4})$/)
+          if (mDash) {
+            compYear = parseInt(mDash[1], 10)
+            compMonth = parseInt(mDash[2], 10)
+          } else if (mSlash) {
+            compMonth = parseInt(mSlash[1], 10)
+            compYear = parseInt(mSlash[2], 10)
+          }
+        }
+      }
+      const chunkSize = 80
+      for (let i = 0; i < uniqueAih.length; i += chunkSize) {
+        const ch = uniqueAih.slice(i, i + chunkSize)
+        let spQuery = supabaseSih
+          .from('sih_sp')
+          .select('sp_naih')
+          .in('sp_naih', ch)
+        if (typeof compMonth === 'number') spQuery = spQuery.eq('sp_mm', compMonth)
+        if (typeof compYear === 'number') spQuery = spQuery.eq('sp_aa', compYear)
+        const { data: spRows } = await spQuery
+        if (spRows && spRows.length > 0) {
+          spRows.forEach((r: any) => {
+            const k = normalizeAih(String(r.sp_naih || '').trim())
+            if (k) approvedSetRef.current.add(k)
+          })
+        }
+      }
+      const approved = approvedSetRef.current.size
+      const notApproved = uniqueAih.filter(a => !approvedSetRef.current.has(a)).length
+      setSimplifiedValidationStats({ total: uniqueAih.length, approved, notApproved, remote: true })
+    } catch {
+      setSimplifiedValidationStats({ total: 0, approved: 0, notApproved: 0, remote: remoteConfigured })
+    }
+  }
+
+  const generateSimplifiedReport = async (doctor: any, approvedOnly: boolean) => {
+    try {
+      let logoBase64 = null as string | null
+      try {
+        const response = await fetch('/CIS Sem fundo.jpg')
+        const blob = await response.blob()
+        logoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.readAsDataURL(blob)
+        })
+      } catch {}
+
+      const doctorName = doctor.doctor_info?.name || ''
+      const hospitalId = doctor.hospitals?.[0]?.hospital_id
+      const hospitalName = doctor.hospitals?.[0]?.hospital_name || 'Hospital não identificado'
+
+      const tableData: Array<Array<string>> = []
+      let totalRepasse = 0
+      let totalPatientsProcessed = 0
+      let patientsWithPayment = 0
+
+      ;(doctor.patients || []).forEach((p: any) => {
+        totalPatientsProcessed++
+        const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
+        const aihNumber = normalizeAih(String(p?.aih_info?.aih_number || '').trim())
+        if (approvedOnly && (!aihNumber || !approvedSetRef.current.has(aihNumber))) return
+
+        const medicalRecord = p.patient_info?.medical_record || '-'
+        const name = p.patient_info?.name || 'Paciente'
+        const mainProc = (p.procedures || [])
+          .reduce((max: any, proc: any) => {
+            const v = typeof proc.value_reais === 'number' ? proc.value_reais : 0
+            const mv = typeof (max && max.value_reais) === 'number' ? max.value_reais : -1
+            return v > mv ? proc : max
+          }, null as any)
+        const mainProcDesc = ((mainProc?.procedure_description || mainProc?.sigtap_description || '') as string).trim()
+        const proceduresDisplay = mainProcDesc || 'Sem procedimento principal'
+        const dischargeISO = p?.aih_info?.discharge_date || ''
+        const dischargeLabel = parseISODateToLocal(dischargeISO)
+        const competenciaLabel = formatCompetencia(p?.aih_info?.competencia)
+        const approvedLabel = approvedSetRef.current.has(aihNumber) ? 'Sim' : 'Não'
+        const proceduresWithPayment = p.procedures
+          .filter((proc: any) => 
+            isMedicalProcedure(proc.procedure_code) && 
+            shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+          )
+          .map((proc: any) => ({
+            procedure_code: proc.procedure_code,
+            procedure_description: proc.procedure_description,
+            value_reais: proc.value_reais || 0,
+            cbo: proc.cbo,
+          }))
+        let repasseValue = 0
+        if (proceduresWithPayment.length > 0) {
+          const isGenSurg = /cirurg/i.test(doctorName) || (/cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || ''))
+          const paymentResult = (ENV_CONFIG.USE_SIH_SOURCE && isGenSurg)
+            ? calculateHonPayments(proceduresWithPayment)
+            : calculateDoctorPayment(
+                doctorName,
+                proceduresWithPayment,
+                hospitalId
+              )
+          repasseValue = paymentResult.totalPayment || 0
+          totalRepasse += repasseValue
+        }
+        patientsWithPayment++
+        tableData.push([
+          medicalRecord,
+          aihNumber || '-',
+          name,
+          proceduresDisplay,
+          dischargeLabel,
+          competenciaLabel,
+          approvedLabel,
+          formatCurrency(repasseValue)
+        ])
+      })
+
+      tableData.sort((a, b) => {
+        const dateA = a[4] as string
+        const dateB = b[4] as string
+        if (!dateA && !dateB) return 0
+        if (!dateA) return 1
+        if (!dateB) return -1
+        const partsA = dateA.split('/')
+        const partsB = dateB.split('/')
+        const da = partsA.length === 3 ? new Date(parseInt(partsA[2]), parseInt(partsA[1]) - 1, parseInt(partsA[0])) : new Date(0)
+        const db = partsB.length === 3 ? new Date(parseInt(partsB[2]), parseInt(partsB[1]) - 1, parseInt(partsB[0])) : new Date(0)
+        return db.getTime() - da.getTime()
+      })
+
+      const doc = new jsPDF('landscape')
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      let yPosition = 20
+      if (logoBase64) {
+        const logoWidth = 40
+        const logoHeight = 20
+        const logoX = 20
+        const logoY = 8
+        doc.addImage(logoBase64, 'JPEG', logoX, logoY, logoWidth, logoHeight)
+        yPosition = logoY + logoHeight + 10
+      }
+      doc.setFontSize(16)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(0, 51, 102)
+      doc.text('RELATÓRIO DE PACIENTES - MÉDICO', pageWidth / 2, yPosition, { align: 'center' })
+      yPosition += 10
+      const careHeader = (filterCareCharacter && filterCareCharacter !== 'all')
+        ? CareCharacterUtils.formatForDisplay(filterCareCharacter, false)
+        : 'TODOS'
+      const compHeader = (selectedCompetencia && selectedCompetencia !== 'all')
+        ? formatCompetencia(selectedCompetencia)
+        : 'TODAS'
+      const dataGeracao = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      const line1 = [
+        { label: 'Médico: ', value: doctorName, bold: true },
+        { label: 'Hospital: ', value: hospitalName }
+      ]
+      const line2 = [
+        { label: 'Competência: ', value: compHeader },
+        { label: 'Caráter: ', value: careHeader },
+        { label: 'Gerado em: ', value: dataGeracao }
+      ]
+      const separator = '  |  '
+      const drawSegments = (segments: Array<{ label: string; value: string; bold?: boolean }>, y: number, fontSize = 10) => {
+        doc.setFontSize(fontSize)
+        doc.setTextColor(60, 60, 60)
+        let totalWidth = 0
+        segments.forEach((seg, idx) => {
+          totalWidth += doc.getTextWidth(seg.label) + doc.getTextWidth(seg.value)
+          if (idx < segments.length - 1) totalWidth += doc.getTextWidth(separator)
+        })
+        let x = (pageWidth / 2) - (totalWidth / 2)
+        segments.forEach((seg, idx) => {
+          doc.setFont('helvetica', 'normal')
+          doc.text(seg.label, x, y)
+          x += doc.getTextWidth(seg.label)
+          doc.setFont('helvetica', seg.bold ? 'bold' : 'normal')
+          doc.text(seg.value, x, y)
+          x += doc.getTextWidth(seg.value)
+          if (idx < segments.length - 1) {
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(100, 100, 100)
+            doc.text(separator, x, y)
+            doc.setTextColor(60, 60, 60)
+            x += doc.getTextWidth(separator)
+          }
+        })
+      }
+      drawSegments(line1, yPosition, 11)
+      yPosition += 6
+      drawSegments(line2, yPosition, 10)
+      yPosition += 8
+      doc.setDrawColor(200, 200, 200)
+      doc.setLineWidth(0.5)
+      doc.line(20, yPosition, pageWidth - 20, yPosition)
+      const startY = yPosition + 10
+      autoTable(doc, {
+        head: [['Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Competência', 'Aprovado', 'Valor de Repasse']],
+        body: tableData,
+        startY,
+        theme: 'striped',
+        tableWidth: 'auto',
+        headStyles: { fillColor: [0, 51, 102], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 2 },
+        bodyStyles: { fontSize: 8, textColor: [50, 50, 50], cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 24, halign: 'center' },
+          1: { cellWidth: 32, halign: 'center' },
+          2: { cellWidth: 42, halign: 'left' },
+          3: { cellWidth: 62, halign: 'left', fontSize: 7 },
+          4: { cellWidth: 22, halign: 'center' },
+          5: { cellWidth: 28, halign: 'center' },
+          6: { cellWidth: 24, halign: 'center' },
+          7: { cellWidth: 32, halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
+        },
+        styles: { overflow: 'linebreak', cellPadding: 2, fontSize: 8 },
+        margin: { left: 15, right: 15 },
+        alternateRowStyles: { fillColor: [245, 245, 245] }
+      })
+      const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`
+      doc.save(fileName)
+      toast.success('Relatório PDF gerado com sucesso!')
+    } catch (err) {
+      console.error('Erro ao exportar Relatório Simplificado (PDF):', err)
+      toast.error('Erro ao gerar relatório PDF')
+    }
+  }
 
   // 🆕 FUNÇÃO PARA DETERMINAR HOSPITAL CORRETO BASEADO NO CONTEXTO
   const getDoctorContextualHospitalId = (doctor: DoctorWithPatients): string | undefined => {
@@ -3237,6 +3493,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                      type="button"
                                      onClick={async (e) => {
                                        e.stopPropagation();
+                                       setSelectedDoctorForReport(doctor);
+                                       setSimplifiedValidationOpen(true);
+                                       setSimplifiedValidationLoading(true);
+                                       await validateSimplifiedReport(doctor);
+                                       setSimplifiedValidationLoading(false);
+                                       return;
                                        try {
                                          // 🖼️ Carregar logo do CIS
                                          let logoBase64 = null;
@@ -3259,11 +3521,83 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                          console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO PDF] Gerando para ${doctorName}`);
                                          console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO PDF] Hospital: ${hospitalName}`);
                                          
-                                         // Preparar dados para a tabela
-                                         const tableData: Array<Array<string>> = [];
-                                         let totalRepasse = 0; // ✅ Calcular total durante o loop
-                                         let totalPatientsProcessed = 0; // 📊 Total de pacientes processados
-                                         let patientsWithPayment = 0; // ✅ Pacientes com repasse > 0
+                                        // Preparar dados para a tabela
+                                        const tableData: Array<Array<string>> = [];
+                                        let totalRepasse = 0; // ✅ Calcular total durante o loop
+                                        let totalPatientsProcessed = 0; // 📊 Total de pacientes processados
+                                        let patientsWithPayment = 0; // ✅ Pacientes com repasse > 0
+                                        
+                                        // 🔍 Aprovação via fonte remota SIH: match por AIH
+                                        let approvedSet = new Set<string>();
+                                        try {
+                                          const allAihNumbers = (doctor.patients || [])
+                                            .map((p: any) => String(p?.aih_info?.aih_number || '').trim())
+                                            .filter((v: string) => !!v);
+                                          const uniqueAih = Array.from(new Set(allAihNumbers));
+                                          if (uniqueAih.length > 0 && ENV_CONFIG.SIH_SUPABASE_URL && ENV_CONFIG.SIH_SUPABASE_ANON_KEY) {
+                                            const { supabaseSih } = await import('../lib/sihSupabase');
+                                            if (supabaseSih) {
+                                              let compYear: number | undefined;
+                                              let compMonth: number | undefined;
+                                              if (selectedCompetencia && selectedCompetencia.trim() && selectedCompetencia !== 'all') {
+                                                const raw = selectedCompetencia.trim();
+                                                if (/^\d{6}$/.test(raw)) {
+                                                  compYear = parseInt(raw.slice(0, 4), 10);
+                                                  compMonth = parseInt(raw.slice(4, 6), 10);
+                                                } else {
+                                                  const m = raw.match(/^(\d{4})-(\d{2})/);
+                                                  if (m) {
+                                                    compYear = parseInt(m[1], 10);
+                                                    compMonth = parseInt(m[2], 10);
+                                                  }
+                                                }
+                                              }
+                                              const chunkSize = 80;
+                                              for (let i = 0; i < uniqueAih.length; i += chunkSize) {
+                                                const ch = uniqueAih.slice(i, i + chunkSize);
+                                                let spQuery = supabaseSih
+                                                  .from('sih_sp')
+                                                  .select('sp_naih')
+                                                  .in('sp_naih', ch);
+                                                if (typeof compMonth === 'number') spQuery = spQuery.eq('sp_mm', compMonth);
+                                                if (typeof compYear === 'number') spQuery = spQuery.eq('sp_aa', compYear);
+                                                const { data: spRows, error: spErr } = await spQuery;
+                                                if (!spErr && spRows && spRows.length > 0) {
+                                                  spRows.forEach((r: any) => {
+                                                    const k = String(r.sp_naih || '').trim();
+                                                    if (k) approvedSet.add(k);
+                                                  });
+                                                }
+                                              }
+                                              // 🔄 Atualizar coluna 'aprovado' na tabela local aihs (SIM/NÃO)
+                                              try {
+                                                if (approvedSet.size > 0) {
+                                                  const approvedList = Array.from(approvedSet);
+                                                  await supabase
+                                                    .from('aihs')
+                                                    .update({ aprovado: 'sim' })
+                                                    .in('aih_number', approvedList);
+                                                  const notApproved = uniqueAih.filter(a => !approvedSet.has(a));
+                                                  if (notApproved.length > 0) {
+                                                    await supabase
+                                                      .from('aihs')
+                                                      .update({ aprovado: 'não' })
+                                                      .in('aih_number', notApproved);
+                                                  }
+                                                } else if (uniqueAih.length > 0) {
+                                                  await supabase
+                                                    .from('aihs')
+                                                    .update({ aprovado: 'não' })
+                                                    .in('aih_number', uniqueAih);
+                                                }
+                                              } catch (updErr) {
+                                                console.warn('⚠️ Falha ao atualizar coluna aprovado nas AIHs locais:', updErr);
+                                              }
+                                            }
+                                          }
+                                        } catch (apprErr) {
+                                          console.warn('⚠️ Falha na verificação de aprovação remota SIH:', apprErr);
+                                        }
                                          
                                          (doctor.patients || []).forEach((p: any) => {
                                            totalPatientsProcessed++;
@@ -3286,51 +3620,23 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           const medicalRecord = p.patient_info?.medical_record || '-';
                                           const name = p.patient_info?.name || 'Paciente';
                                           
-                                          // ✅ NOVO: Filtrar apenas procedimentos com código 04 (procedimentos médicos)
-                                          // 🚫 EXCLUIR: Códigos 04 de anestesista (CBO 225151)
-                                          const procedures04 = (p.procedures || [])
-                                            .filter((proc: any) => {
-                                              const code = proc.procedure_code || '';
-                                              const cbo = proc.cbo || '';
-                                              
-                                              // Verificar se é código 04
-                                              if (!code.toString().trim().startsWith('04')) {
-                                                return false;
-                                              }
-                                              
-                                              // 🚫 EXCLUIR: Se é anestesista (CBO 225151) com código 04, não incluir
-                                              // ✅ EXCEÇÕES: Cesariana e códigos específicos devem ser incluídos
-                                              if (cbo === '225151') {
-                                                // Exceções que devem ser incluídas mesmo sendo anestesista
-                                                const exceptions = [
-                                                  '04.17.01.001-0', // Cesariana
-                                                  '04.17.01.005-2',
-                                                  '04.17.01.006-0'
-                                                ];
-                                                
-                                                // Se não é uma exceção, excluir (é anestesista 04.xxx)
-                                                if (!exceptions.includes(code)) {
-                                                  return false;
-                                                }
-                                              }
-                                              
-                                              return true;
-                                            })
-                                            .map((proc: any) => proc.procedure_code || '')
-                                            .filter((code: string) => code !== '');
-                                          
-                                          const codes04Display = procedures04.length > 0 
-                                            ? procedures04.join(', ') 
-                                            : 'Nenhum código 04';
+                                          const mainProc = (p.procedures || [])
+                                            .reduce((max: any, proc: any) => {
+                                              const v = typeof proc.value_reais === 'number' ? proc.value_reais : 0;
+                                              const mv = typeof (max && max.value_reais) === 'number' ? max.value_reais : -1;
+                                              return v > mv ? proc : max;
+                                            }, null as any);
+                                          const mainProcDesc = ((mainProc?.procedure_description || mainProc?.sigtap_description || '') as string).trim();
+                                          const proceduresDisplay = mainProcDesc || 'Sem procedimento principal';
+                                          const aihNumber = p?.aih_info?.aih_number || '-';
+                                          const competenciaLabel = formatCompetencia(p?.aih_info?.competencia);
+                                          const approvedLabel = approvedSet.has(String(p?.aih_info?.aih_number || '').trim()) ? 'Sim' : 'Não';
                                           
                                           const dischargeISO = p?.aih_info?.discharge_date || '';
                                           const dischargeLabel = parseISODateToLocal(dischargeISO);
                                           
                                           // ✅ NOVO: Caráter de atendimento
                                           const careCharacter = p?.aih_info?.care_character || '';
-                                          const careCharacterDisplay = careCharacter 
-                                            ? CareCharacterUtils.getDescription(careCharacter) || careCharacter
-                                            : '-';
                                           
                                           // ✅ NOVO: Calcular valor de repasse (mesma lógica do card)
                                           // ⚠️ CORREÇÃO: Usar MESMO filtro do card (apenas códigos 04.xxx)
@@ -3365,12 +3671,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           patientsWithPayment++; // 📊 Contar todos os pacientes
                                           tableData.push([
                                             medicalRecord,
+                                            aihNumber,
                                             name,
-                                            codes04Display,
+                                            proceduresDisplay,
                                             dischargeLabel,
-                                            careCharacterDisplay,
-                                            doctorName,
-                                            hospitalName,
+                                            competenciaLabel,
+                                            approvedLabel,
                                             formatCurrency(repasseValue) // Pode ser R$ 0,00
                                           ]);
                                          });
@@ -3382,8 +3688,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                          
                                         // ✅ ORDENAÇÃO: Por Data de Alta (mais recente primeiro)
                                         tableData.sort((a, b) => {
-                                          const dateA = a[3] as string; // Data de Alta está na posição 3
-                                          const dateB = b[3] as string;
+                                          const dateA = a[4] as string; // Data de Alta está na posição 4
+                                          const dateB = b[4] as string;
                                            
                                            // Sem data → final
                                            if (!dateA && !dateB) return 0;
@@ -3432,19 +3738,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         doc.setTextColor(0, 51, 102); // Azul escuro
                                         doc.text('RELATÓRIO DE PACIENTES - MÉDICO', pageWidth / 2, yPosition, { align: 'center' });
                                         
-                                        // Subtítulo com informações do médico
-                                        yPosition += 8;
-                                        doc.setFontSize(11);
-                                        doc.setFont('helvetica', 'normal');
-                                        doc.setTextColor(60, 60, 60);
-                                        doc.text(`Médico: ${doctorName}`, pageWidth / 2, yPosition, { align: 'center' });
-                                        
-                                        yPosition += 6;
-                                        doc.setFontSize(10);
-                                        doc.setTextColor(100, 100, 100);
-                                        doc.text(`Hospital: ${hospitalName}`, pageWidth / 2, yPosition, { align: 'center' });
-                                        
-                                        yPosition += 6;
+                                        // Barra de informações horizontal (premium)
+                                        yPosition += 10;
+                                        const careHeader = (filterCareCharacter && filterCareCharacter !== 'all')
+                                          ? CareCharacterUtils.formatForDisplay(filterCareCharacter, false)
+                                          : 'TODOS';
+                                        const compHeader = (selectedCompetencia && selectedCompetencia !== 'all')
+                                          ? formatCompetencia(selectedCompetencia)
+                                          : 'TODAS';
                                         const dataGeracao = new Date().toLocaleDateString('pt-BR', { 
                                           day: '2-digit', 
                                           month: '2-digit', 
@@ -3452,7 +3753,44 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           hour: '2-digit',
                                           minute: '2-digit'
                                         });
-                                        doc.text(`Gerado em: ${dataGeracao}`, pageWidth / 2, yPosition, { align: 'center' });
+                                        const line1: Array<{ label: string; value: string; bold?: boolean }> = [
+                                          { label: 'Médico: ', value: doctorName, bold: true },
+                                          { label: 'Hospital: ', value: hospitalName }
+                                        ];
+                                        const line2: Array<{ label: string; value: string; bold?: boolean }> = [
+                                          { label: 'Competência: ', value: compHeader },
+                                          { label: 'Caráter: ', value: careHeader },
+                                          { label: 'Gerado em: ', value: dataGeracao }
+                                        ];
+                                        const separator = '  |  ';
+                                        const drawSegments = (segments: Array<{ label: string; value: string; bold?: boolean }>, y: number, fontSize = 10) => {
+                                          doc.setFontSize(fontSize);
+                                          doc.setTextColor(60, 60, 60);
+                                          let totalWidth = 0;
+                                          segments.forEach((seg, idx) => {
+                                            totalWidth += doc.getTextWidth(seg.label) + doc.getTextWidth(seg.value);
+                                            if (idx < segments.length - 1) totalWidth += doc.getTextWidth(separator);
+                                          });
+                                          let x = (pageWidth / 2) - (totalWidth / 2);
+                                          segments.forEach((seg, idx) => {
+                                            doc.setFont('helvetica', 'normal');
+                                            doc.text(seg.label, x, y);
+                                            x += doc.getTextWidth(seg.label);
+                                            doc.setFont('helvetica', seg.bold ? 'bold' : 'normal');
+                                            doc.text(seg.value, x, y);
+                                            x += doc.getTextWidth(seg.value);
+                                            if (idx < segments.length - 1) {
+                                              doc.setFont('helvetica', 'normal');
+                                              doc.setTextColor(100, 100, 100);
+                                              doc.text(separator, x, y);
+                                              doc.setTextColor(60, 60, 60);
+                                              x += doc.getTextWidth(separator);
+                                            }
+                                          });
+                                        };
+                                        drawSegments(line1, yPosition, 11);
+                                        yPosition += 6;
+                                        drawSegments(line2, yPosition, 10);
                                         
                                         // Linha separadora
                                         yPosition += 8;
@@ -3464,7 +3802,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         const startY = yPosition + 10;
                                         
                                         autoTable(doc, {
-                                          head: [['Prontuário', 'Nome do Paciente', 'Procedimentos Realizados', 'Data Alta', 'Caráter de Atendimento', 'Médico', 'Hospital', 'Valor de Repasse']],
+                                          head: [['Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Competência', 'Aprovado', 'Valor de Repasse']],
                                           body: tableData,
                                           startY: startY,
                                           theme: 'striped',
@@ -3474,7 +3812,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             textColor: [255, 255, 255],
                                             fontStyle: 'bold',
                                             fontSize: 9,
-                                            halign: 'center'
+                                            halign: 'center',
+                                            cellPadding: 2
                                           },
                                           bodyStyles: {
                                             fontSize: 8,
@@ -3482,15 +3821,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             cellPadding: 2
                                           },
                                           columnStyles: {
-                                            0: { cellWidth: 24, halign: 'center' }, // Prontuário (aumentado de 18 para 24)
-                                            1: { cellWidth: 42, halign: 'left' },   // Nome do Paciente
-                                            2: { cellWidth: 50, halign: 'left', fontSize: 7 }, // Procedimentos Realizados (ajustado de 52 para 50)
-                                            3: { cellWidth: 20, halign: 'center' }, // Data Alta
-                                            4: { cellWidth: 28, halign: 'left' },   // Caráter (ajustado de 30 para 28)
-                                            5: { cellWidth: 32, halign: 'left' },   // Médico
-                                            6: { cellWidth: 32, halign: 'left' },   // Hospital
-                                            7: { cellWidth: 30, halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }   // Valor de Repasse (verde escuro)
+                                            0: { cellWidth: 24, halign: 'center' }, // Prontuário
+                                            1: { cellWidth: 32, halign: 'center' }, // Nº da AIH
+                                            2: { cellWidth: 42, halign: 'left' },   // Nome do Paciente
+                                            3: { cellWidth: 62, halign: 'left', fontSize: 7 }, // Procedimento Principal
+                                            4: { cellWidth: 22, halign: 'center' }, // Data Alta
+                                            5: { cellWidth: 28, halign: 'center' }, // Competência
+                                            6: { cellWidth: 24, halign: 'center' }, // Aprovado
+                                            7: { cellWidth: 32, halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }   // Valor de Repasse
                                           },
+                                          
                                           styles: {
                                             overflow: 'linebreak',
                                             cellPadding: 2,
@@ -5017,6 +5357,48 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               }}
               onClose={() => setReportModalOpen(false)}
             />
+          </div>
+        </DialogContent>
+  </Dialog>
+
+      <Dialog open={simplifiedValidationOpen} onOpenChange={setSimplifiedValidationOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Validação do Relatório Simplificado</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {simplifiedValidationLoading ? (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Validando AIHs no DATASUS...
+              </div>
+            ) : (
+              <>
+                <div className="text-sm text-gray-700">
+                  <div className="font-semibold">Médico: <span className="text-gray-900">{selectedDoctorForReport?.doctor_info?.name}</span></div>
+                  <div>Hospital: {selectedDoctorForReport?.hospitals?.[0]?.hospital_name || '—'}</div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div className="bg-gray-50 rounded p-2 border">
+                    <div className="text-gray-500">AIHs Locais</div>
+                    <div className="text-lg font-bold text-blue-700">{simplifiedValidationStats?.total ?? 0}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2 border">
+                    <div className="text-gray-500">Aprovadas</div>
+                    <div className="text-lg font-bold text-emerald-700">{simplifiedValidationStats?.approved ?? 0}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded p-2 border">
+                    <div className="text-gray-500">Não Aprovadas</div>
+                    <div className="text-lg font-bold text-red-700">{simplifiedValidationStats?.notApproved ?? 0}</div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <Button variant="outline" onClick={() => setSimplifiedValidationOpen(false)}>Cancelar</Button>
+                  <Button onClick={async () => { setSimplifiedValidationOpen(false); await generateSimplifiedReport(selectedDoctorForReport, false); }}>Gerar Produção (todos)</Button>
+                  <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={async () => { setSimplifiedValidationOpen(false); await generateSimplifiedReport(selectedDoctorForReport, true); }}>Gerar Aprovado (matches)</Button>
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
