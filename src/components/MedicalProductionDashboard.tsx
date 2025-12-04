@@ -672,12 +672,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         .map((p: any) => normalizeAih(String(p?.aih_info?.aih_number || '').trim()))
         .filter((v: string) => !!v)
       const uniqueAih = Array.from(new Set(allAihNumbers))
+      const totalPatients = (doctor.patients || []).length
       if (uniqueAih.length === 0) {
-        setSimplifiedValidationStats({ total: 0, approved: 0, notApproved: 0, remote: remoteConfigured })
+        setSimplifiedValidationStats({ total: totalPatients, approved: 0, notApproved: totalPatients, remote: remoteConfigured })
         return
       }
       if (!remoteConfigured) {
-        setSimplifiedValidationStats({ total: uniqueAih.length, approved: 0, notApproved: uniqueAih.length, remote: false })
+        setSimplifiedValidationStats({ total: totalPatients, approved: 0, notApproved: totalPatients, remote: false })
         return
       }
       const { supabaseSih } = await import('../lib/sihSupabase')
@@ -717,9 +718,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           })
         }
       }
-      const approved = approvedSetRef.current.size
-      const notApproved = uniqueAih.filter(a => !approvedSetRef.current.has(a)).length
-      setSimplifiedValidationStats({ total: uniqueAih.length, approved, notApproved, remote: true })
+      const approved = (doctor.patients || []).reduce((acc: number, p: any) => {
+        const aih = normalizeAih(String(p?.aih_info?.aih_number || '').trim())
+        return acc + (aih && approvedSetRef.current.has(aih) ? 1 : 0)
+      }, 0)
+      const notApproved = Math.max(totalPatients - approved, 0)
+      setSimplifiedValidationStats({ total: totalPatients, approved, notApproved, remote: true })
     } catch {
       setSimplifiedValidationStats({ total: 0, approved: 0, notApproved: 0, remote: remoteConfigured })
     }
@@ -747,6 +751,25 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       let totalPatientsProcessed = 0
       let patientsWithPayment = 0
 
+      // Mapear nomes de pacientes quando fonte remota está ativa (join local AIH→patients)
+      let nameByAih = new Map<string, string>()
+      if (useSihSource) {
+        try {
+          const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
+          let q = supabase
+            .from('aihs')
+            .select('aih_number, patient_id, patients(name)')
+          if (hospitalId) q = q.eq('hospital_id', hospitalId)
+          if (selectedCompetencia && selectedCompetencia !== 'all') q = q.eq('competencia', selectedCompetencia)
+          const { data: rows } = await q
+          ;(rows || []).forEach((r: any) => {
+            const key = normalizeAih(String(r.aih_number || ''))
+            const nm = String(r?.patients?.name || '')
+            if (key && nm) nameByAih.set(key, nm)
+          })
+        } catch {}
+      }
+
       ;(doctor.patients || []).forEach((p: any) => {
         totalPatientsProcessed++
         const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
@@ -754,7 +777,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         if (approvedOnly && (!aihNumber || !approvedSetRef.current.has(aihNumber))) return
 
         const medicalRecord = p.patient_info?.medical_record || '-'
-        const name = p.patient_info?.name || 'Paciente'
+        let name = p.patient_info?.name || ''
+        if (!name || name === 'Nome não disponível' || name === 'Paciente') {
+          const candidate = nameByAih.get(aihNumber)
+          name = candidate || (name || 'Paciente')
+        }
         const mainProc = (p.procedures || [])
           .reduce((max: any, proc: any) => {
             const v = typeof proc.value_reais === 'number' ? proc.value_reais : 0
@@ -906,6 +933,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         margin: { left: 15, right: 15 },
         alternateRowStyles: { fillColor: [245, 245, 245] }
       })
+      const finalY = (doc as any).lastAutoTable?.finalY || startY + 50
+      const footerY = pageHeight - 20
+      doc.setDrawColor(200, 200, 200)
+      doc.setLineWidth(0.5)
+      doc.line(20, footerY - 10, pageWidth - 20, footerY - 10)
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(120, 120, 120)
+      doc.text('CIS - Centro Integrado em Saúde', pageWidth / 2, footerY - 5, { align: 'center' })
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(0, 51, 102)
+      doc.text(`Total de Pacientes: ${tableData.length} | Valor Total de Repasse: ${formatCurrency(totalRepasse)}`, pageWidth / 2, footerY + 5, { align: 'center' })
       const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`
       doc.save(fileName)
       toast.success('Relatório PDF gerado com sucesso!')
@@ -3824,16 +3864,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             cellPadding: 2
                                           },
                                           columnStyles: {
-                                            0: { cellWidth: 24, halign: 'center' }, // Prontuário
-                                            1: { cellWidth: 32, halign: 'center' }, // Nº da AIH
-                                            2: { cellWidth: 42, halign: 'left' },   // Nome do Paciente
-                                            3: { cellWidth: 62, halign: 'left', fontSize: 7 }, // Procedimento Principal
-                                            4: { cellWidth: 22, halign: 'center' }, // Data Alta
-                                            5: { cellWidth: 28, halign: 'center' }, // Competência
-                                            6: { cellWidth: 24, halign: 'center' }, // Aprovado
-                                            7: { cellWidth: 32, halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }   // Valor de Repasse
+                                            0: { cellWidth: 24, halign: 'center' },
+                                            1: { cellWidth: 32, halign: 'center' },
+                                            2: { cellWidth: 42, halign: 'left' },
+                                            3: { cellWidth: 62, halign: 'left', fontSize: 7 },
+                                            4: { cellWidth: 22, halign: 'center' },
+                                            5: { cellWidth: 28, halign: 'center' },
+                                            6: { cellWidth: 24, halign: 'center' },
+                                            7: { cellWidth: 32, halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
                                           },
-                                          
                                           styles: {
                                             overflow: 'linebreak',
                                             cellPadding: 2,
@@ -3844,29 +3883,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             fillColor: [245, 245, 245]
                                           }
                                         });
-                                        
-                                        // ========== RODAPÉ PROFISSIONAL ==========
-                                        const finalY = (doc as any).lastAutoTable.finalY || startY + 50;
+                                        const finalY = (doc as any).lastAutoTable?.finalY || startY + 50;
                                         const footerY = pageHeight - 20;
-                                        
-                                        // Linha separadora do rodapé
                                         doc.setDrawColor(200, 200, 200);
                                         doc.setLineWidth(0.5);
                                         doc.line(20, footerY - 10, pageWidth - 20, footerY - 10);
-                                        
-                                        // Texto do rodapé
                                         doc.setFontSize(8);
                                         doc.setFont('helvetica', 'normal');
                                         doc.setTextColor(120, 120, 120);
                                         doc.text('CIS - Centro Integrado em Saúde', pageWidth / 2, footerY - 5, { align: 'center' });
-                                        
-                                        // Total de pacientes e repasse
                                         doc.setFontSize(9);
                                         doc.setFont('helvetica', 'bold');
                                         doc.setTextColor(0, 51, 102);
-                                        
-                                        doc.text(`Total de Pacientes: ${tableData.length} | Valor Total de Repasse: ${formatCurrency(totalRepasse)}`, 
-                                                 pageWidth / 2, footerY + 5, { align: 'center' });
+                                        doc.text(`Total de Pacientes: ${tableData.length} | Valor Total de Repasse: ${formatCurrency(totalRepasse)}`, pageWidth / 2, footerY + 5, { align: 'center' });
                                         
                                         // Salvar PDF
                                         const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`;
