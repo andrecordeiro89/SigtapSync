@@ -328,7 +328,9 @@ const PatientManagement = () => {
     const originalCompetencia = aihOriginal?.competencia;
     const originalAihNumber = aihOriginal?.aih_number;
     const newCompetencia = competenciaValue[aihId];
-    const newAihNumber = aihNumberValue[aihId]?.trim();
+    let newAihNumber = (aihNumberValue[aihId] || '').trim();
+    const normalizeAih = (s: string) => s.replace(/[^0-9]/g, '');
+    newAihNumber = normalizeAih(newAihNumber);
     
     try {
       // Validações
@@ -2052,14 +2054,14 @@ const PatientManagement = () => {
                                 onClick={() => handleStartEditCompetencia(item.id, item.competencia, item.aih_number)}
                                 disabled={savingCompetencia[item.id]}
                                 className="text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300 hover:bg-blue-50 transition-colors h-8 px-3 flex items-center gap-1.5"
-                                title="Editar competência e Nº AIH"
+                                title={item.aih_number ? "Editar competência e Nº AIH" : "Adicionar Nº AIH"}
                               >
                                 {savingCompetencia[item.id] ? (
                                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
                                 ) : (
                                   <Calendar className="w-4 h-4" />
                                 )}
-                                <span className="hidden md:inline text-xs">Editar</span>
+                                <span className="hidden md:inline text-xs">{item.aih_number ? 'Editar' : 'Adicionar Nº AIH'}</span>
                               </Button>
                               
                               <Button
