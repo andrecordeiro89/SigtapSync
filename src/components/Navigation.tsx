@@ -28,18 +28,18 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       order: 1
     },
     {
-      id: 'aih-multipage-tester',
-      label: 'AIH Avançado',
-      icon: GitCompare,
-      description: 'Processamento avançado de AIHs (Multi-Page)',
-      requiresAdmin: false,
-      order: 2
-    },
-    {
       id: 'sigtap-viewer',
       label: 'Consulta SIGTAP',
       icon: Search,
       description: 'Visualizar procedimentos',
+      requiresAdmin: false,
+      order: 2
+    },
+    {
+      id: 'aih-multipage-tester',
+      label: 'AIH Avançado',
+      icon: GitCompare,
+      description: 'Processamento avançado de AIHs (Multi-Page)',
       requiresAdmin: false,
       order: 3
     },
@@ -51,7 +51,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       icon: Users,
       description: 'Cadastro e gerenciamento',
       requiresAdmin: false,
-      order: 6
+      order: 4
     },
     {
       id: 'executive-dashboard',
@@ -60,7 +60,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       description: 'Central de inteligência e relatórios para diretoria',
       requiresAdmin: true,
       requiresExecutive: true, // Novo flag para acesso executivo
-      order: 7
+      order: 5
     },
     
     

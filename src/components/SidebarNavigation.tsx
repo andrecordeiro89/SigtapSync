@@ -76,16 +76,16 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       icon: Search,
       description: 'Visualizar procedimentos',
       requiresAdmin: false,
-      order: 3,
+      order: 2,
       color: 'from-emerald-500 to-teal-600'
     },
     {
       id: 'aih-multipage-tester',
       label: 'AIH Avançado',
-      icon: FileUp,
+      icon: GitCompare,
       description: 'Upload e processamento oficial de AIHs',
       requiresAdmin: false,
-      order: 4,
+      order: 3,
       color: 'from-orange-500 to-red-600'
     },
     
@@ -105,17 +105,17 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
       icon: Users,
       description: 'Cadastro e gerenciamento',
       requiresAdmin: false,
-      order: 8,
+      order: 4,
       color: 'from-cyan-500 to-blue-600'
     },
     {
       id: 'executive-dashboard',
-      label: 'Analytics',
+      label: 'Dashboard Executivo',
       icon: BarChart4,
       description: 'Central de inteligência e relatórios para diretoria',
       requiresAdmin: true,
       requiresExecutive: true,
-      order: 8,
+      order: 5,
       color: 'from-pink-500 to-purple-600'
     },
     {
