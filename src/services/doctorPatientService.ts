@@ -121,7 +121,8 @@ export class DoctorPatientService {
   static async getDoctorsWithPatientsFromProceduresView(options?: {
     hospitalIds?: string[];
     competencia?: string; // ✅ NOVO: Usar competência em vez de datas
-    filterPgtAdm?: 'all' | 'sim' | 'não'; // ✅ NOVO: Filtro Pgt. Administrativo
+    filterPgtAdm?: 'all' | 'sim' | 'não'; // ✅ Mantido para compatibilidade
+    filterCareCharacter?: '1' | '2';
     useSihSource?: boolean;
   }): Promise<DoctorWithPatients[]> {
     try {
@@ -189,6 +190,14 @@ export class DoctorPatientService {
         console.log('💵 Filtrando por Pgt. Administrativo:', options.filterPgtAdm);
       }
 
+      // ✅ Filtro: Caráter de Atendimento (01/02 → 1/2)
+      if (options?.filterCareCharacter) {
+        const raw = String(options.filterCareCharacter).trim();
+        const normalized = raw === '01' ? '1' : raw === '02' ? '2' : raw;
+        aihsQuery = aihsQuery.eq('care_character', normalized);
+        console.log('⚕️ Filtrando por Caráter de Atendimento:', normalized);
+      }
+
       // ✅ CORREÇÃO: Limitar a 500 AIHs apenas no carregamento inicial (sem filtros)
       // Se há filtros aplicados, carregar todos os dados filtrados
       // IMPORTANTE: Verificar se há QUALQUER filtro ativo (competência, hospital específico, ou pgt_adm)
@@ -200,8 +209,9 @@ export class DoctorPatientService {
                                    options.competencia !== undefined && 
                                    options.competencia !== null;
       const hasPgtAdmFilter = options?.filterPgtAdm && options.filterPgtAdm !== 'all' && options.filterPgtAdm !== undefined;
+      const hasCareFilter = Boolean(options?.filterCareCharacter);
       
-      const hasFilters = hasHospitalFilter || hasCompetenciaFilter || hasPgtAdmFilter;
+      const hasFilters = hasHospitalFilter || hasCompetenciaFilter || hasPgtAdmFilter || hasCareFilter;
       
       const initialLoadLimit = 500; // ✅ Limite inicial reduzido de 1000 para 500
       
@@ -210,10 +220,12 @@ export class DoctorPatientService {
         hasHospitalFilter,
         hasCompetenciaFilter,
         hasPgtAdmFilter,
+        hasCareFilter,
         hasFilters,
         competencia: options?.competencia,
         hospitalIds: options?.hospitalIds,
-        filterPgtAdm: options?.filterPgtAdm
+        filterPgtAdm: options?.filterPgtAdm,
+        filterCareCharacter: options?.filterCareCharacter
       });
       
       // 🚀 PAGINAÇÃO INTELIGENTE: Carregar em chunks quando necessário
@@ -236,6 +248,7 @@ export class DoctorPatientService {
         console.log(`   - Filtro Hospital: ${hasHospitalFilter ? 'SIM' : 'NÃO'}`);
         console.log(`   - Filtro Competência: ${hasCompetenciaFilter ? `SIM (${options?.competencia})` : 'NÃO'}`);
         console.log(`   - Filtro Pgt. Adm: ${hasPgtAdmFilter ? `SIM (${options?.filterPgtAdm})` : 'NÃO'}`);
+        console.log(`   - Filtro Caráter: ${hasCareFilter ? `SIM (${options?.filterCareCharacter})` : 'NÃO'}`);
         
         const chunkSize = 1000; // Supabase limit
         let offset = 0;

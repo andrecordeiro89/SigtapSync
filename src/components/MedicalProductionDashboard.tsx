@@ -596,7 +596,7 @@ interface MedicalProductionDashboardProps {
   searchTerm?: string; // Busca de médicos
   patientSearchTerm?: string; // Busca de pacientes
   selectedCompetencia?: string; // ✅ NOVO: Filtro de competência
-  filterPgtAdm?: 'all' | 'sim' | 'não'; // ✅ NOVO: Filtro Pgt. Administrativo
+  filterCareCharacter?: 'all' | '1' | '2';
 }
 
 // ✅ COMPONENTE PRINCIPAL - SIMPLIFICADO
@@ -606,7 +606,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   searchTerm = '',
   patientSearchTerm = '',
   selectedCompetencia = 'all',
-  filterPgtAdm = 'all'
+  filterCareCharacter = 'all'
 }) => {
   const { user, canAccessAllHospitals, hasFullAccess } = useAuth();
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
@@ -1200,11 +1200,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                      selectedCompetencia !== null) 
                                      ? selectedCompetencia.trim() 
                                      : undefined;
-          const pgtAdmFilter = (filterPgtAdm && filterPgtAdm !== 'all') ? filterPgtAdm : undefined;
+          const careFilter = (filterCareCharacter && filterCareCharacter !== 'all') ? filterCareCharacter : undefined;
           
           console.log('🗓️ [MedicalProductionDashboard] Carregando dados:', {
             competencia: competenciaFilter || 'TODAS',
-            pgtAdm: pgtAdmFilter || 'TODOS',
+            care_character: careFilter || 'TODOS',
             hospitals: selectedHospitalIds || 'TODOS',
             selectedCompetenciaRaw: selectedCompetencia
           });
@@ -1212,7 +1212,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           const doctorsWithPatients = await DoctorPatientService.getDoctorsWithPatientsFromProceduresView({
             hospitalIds: selectedHospitalIds,
             competencia: competenciaFilter, // ✅ Passar undefined se não houver filtro
-            filterPgtAdm: pgtAdmFilter,
+            filterCareCharacter: careFilter,
             useSihSource
           });
           // Usar diretamente a fonte das tabelas, garantindo pacientes e procedimentos
@@ -1265,7 +1265,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     };
 
     loadDoctorsData();
-  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, refreshTick, selectedCompetencia, filterPgtAdm, useSihSource]);
+  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, refreshTick, selectedCompetencia, filterCareCharacter, useSihSource]);
 
   // 🆕 CARREGAR COMPETÊNCIAS DISPONÍVEIS (apenas das AIHs carregadas atualmente)
   useEffect(() => {

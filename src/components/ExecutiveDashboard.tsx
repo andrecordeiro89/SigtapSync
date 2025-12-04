@@ -44,6 +44,7 @@ import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
 import MedicalProductionDashboard from './MedicalProductionDashboard';
 import MedicalStaffDashboard from './MedicalStaffDashboard';
 import ProcedureHierarchyDashboard from './ProcedureHierarchyDashboard';
+import { CareCharacterUtils } from '../config/careCharacterCodes';
 // import ReportGenerator from './ReportGenerator';
 // import ExecutiveDateFilters from './ExecutiveDateFilters';
 
@@ -117,6 +118,14 @@ const parseISODateToLocal = (isoString: string | undefined | null): string => {
   
   // Último recurso: retornar indicador de erro
   return '⚠️ Data inválida';
+};
+
+const getStartOfDay = (date: Date): Date => {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+};
+
+const getStartOfNextDay = (date: Date): Date => {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 };
 
 // Função para formatar competência (YYYY-MM-DD para MM/YYYY)
@@ -328,7 +337,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [selectedHospitals, setSelectedHospitals] = useState<string[]>(['all']);
   const [searchTerm, setSearchTerm] = useState('');
   const [patientSearchTerm, setPatientSearchTerm] = useState(''); // Busca por nome do paciente
-  const [filterPgtAdm, setFilterPgtAdm] = useState<'all' | 'sim' | 'não'>('all'); // ✅ NOVO: Filtro Pgt. Administrativo
+  const [filterCareCharacter, setFilterCareCharacter] = useState<'all' | '1' | '2'>('all');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
   const [selectedCareSpecialty, setSelectedCareSpecialty] = useState<string>('all'); // Mantido temporariamente
   const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
@@ -362,6 +371,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     patientsWithMultipleAIHs?: number;
     totalMultipleAIHs?: number;
     totalAIHs?: number;
+    multipleAIHsDetails?: any[];
   } | null>(null);
   const [showViewsWarning, setShowViewsWarning] = useState(false);
   
@@ -1343,27 +1353,27 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              {/* ✅ NOVO: FILTRO PGT. ADMINISTRATIVO */}
+              {/* ✅ Filtro: Caráter de Atendimento */}
               <div className="w-full">
                 <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
-                  <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
-                  Pgt. Administrativo
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                  Caráter de Atendimento
                 </label>
                 <div className="flex items-center gap-2">
                   <select
-                    value={filterPgtAdm}
-                    onChange={(e) => setFilterPgtAdm(e.target.value as 'all' | 'sim' | 'não')}
+                    value={filterCareCharacter}
+                    onChange={(e) => setFilterCareCharacter(e.target.value as 'all' | '1' | '2')}
                     className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-emerald-500 hover:border-gray-300 transition-colors h-10"
                   >
                     <option value="all">Todos</option>
-                    <option value="sim">Sim</option>
-                    <option value="não">Não</option>
+                    <option value="1">Eletivo</option>
+                    <option value="2">Urgência</option>
                   </select>
-                  {filterPgtAdm !== 'all' && (
+                  {filterCareCharacter !== 'all' && (
                     <button
-                      onClick={() => setFilterPgtAdm('all')}
+                      onClick={() => setFilterCareCharacter('all')}
                       className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0"
-                      title="Limpar filtro pgt. administrativo"
+                      title="Limpar filtro de caráter de atendimento"
                     >
                       ✕
                     </button>
@@ -1376,7 +1386,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {/* ✅ BARRA DE ABAS DE HOSPITAIS REMOVIDA - Agora usa dropdown acima */}
 
             {/* INDICADORES DE FILTROS ATIVOS - DESIGN MINIMALISTA */}
-            {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all') || selectedCompetency !== 'all' || filterPgtAdm !== 'all') && (
+            {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all') || selectedCompetency !== 'all' || filterCareCharacter !== 'all') && (
               <div className="flex items-center justify-between pt-4 border-t-2 border-gray-100">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
@@ -1406,10 +1416,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       {availableCompetencies.find(c => c.value === selectedCompetency)?.label || selectedCompetency}
                     </Badge>
                   )}
-                  {filterPgtAdm !== 'all' && (
-                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-emerald-50 text-emerald-700 border-emerald-200 font-medium px-2 py-1">
-                      <DollarSign className="h-3 w-3" />
-                      Pgt. Adm: {filterPgtAdm === 'sim' ? 'Sim' : 'Não'}
+                  {filterCareCharacter !== 'all' && (
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border-amber-200 font-medium px-2 py-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Caráter: {CareCharacterUtils.formatForDisplay(filterCareCharacter, false)}
                     </Badge>
                   )}
                   <span className="text-xs text-gray-400 italic">
@@ -1432,7 +1442,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             searchTerm={searchTerm}
             patientSearchTerm={patientSearchTerm}
             selectedCompetencia={selectedCompetency}
-            filterPgtAdm={filterPgtAdm}
+            filterCareCharacter={filterCareCharacter}
           />
           {/* ⚠️ NOTA: onStatsUpdate agora apenas atualiza activeDoctors, não afeta faturamento/AIHs */}
         </TabsContent>
