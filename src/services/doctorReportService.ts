@@ -90,22 +90,21 @@ export async function getDoctorPatientReport(
     (c) => (c.doctor_info?.name || '').trim().toUpperCase() === targetName
   )
 
-  // Agregar pacientes por patient_id (podem existir múltiplos cartões por hospital)
+  // Agregar por aih_id para garantir granularidade por AIH (Match por nº AIH)
   const patientMap = new Map<string, typeof doctorCards[number]['patients'][number]>()
   for (const card of doctorCards) {
     for (const p of card.patients || []) {
-      const pid = (p as any).patient_id as string
-      if (!pid) continue
-      if (!patientMap.has(pid)) {
-        patientMap.set(pid, p)
-      } else {
-        // Merge simples de procedimentos se necessário
-        const existing = patientMap.get(pid)!
-        const merged = {
-          ...existing,
-          procedures: [...(existing.procedures || []), ...(p.procedures || [])],
-        }
-        patientMap.set(pid, merged as any)
+      // ✅ CORREÇÃO CRÍTICA: Usar aih_id como chave primária
+      // O usuário especificou: "matches por nº de aihs".
+      // Se usarmos patient_id, mesclamos AIHs diferentes do mesmo paciente, perdendo a rastreabilidade.
+      const uniqueKey = (p as any).aih_id || (p as any).patient_id
+      
+      if (!uniqueKey) continue
+      
+      // Como cada item vindo da V2 já representa uma AIH única com seus procedimentos,
+      // não devemos fazer merge. Se houver colisão de aih_id, é um erro de dados ou duplicata real.
+      if (!patientMap.has(uniqueKey)) {
+        patientMap.set(uniqueKey, p)
       }
     }
   }

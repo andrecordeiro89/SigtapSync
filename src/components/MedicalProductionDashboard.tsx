@@ -792,8 +792,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const proceduresDisplay = mainProcDesc || 'Sem procedimento principal'
         const dischargeISO = p?.aih_info?.discharge_date || ''
         const dischargeLabel = parseISODateToLocal(dischargeISO)
-        const competenciaLabel = formatCompetencia(p?.aih_info?.competencia)
-        const approvedLabel = approvedSetRef.current.has(aihNumber) ? 'Sim' : 'Não'
+        
+        // ✅ CORREÇÃO (CÓDIGO DUPLICADO): Lógica de pendência sincronizada
+        const isApproved = approvedSetRef.current.has(aihNumber);
+        const approvedLabel = isApproved ? 'Sim' : 'Não';
+        // Se não aprovado, Comp. Aprovação deve ficar em branco (aguardando retorno)
+        const competenciaLabel = isApproved ? formatCompetencia(p?.aih_info?.competencia) : '';
+        
         const proceduresWithPayment = p.procedures
           .filter((proc: any) => 
             isMedicalProcedure(proc.procedure_code) && 
@@ -3672,8 +3677,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           const mainProcDesc = ((mainProc?.procedure_description || mainProc?.sigtap_description || '') as string).trim();
                                           const proceduresDisplay = mainProcDesc || 'Sem procedimento principal';
                                           const aihNumber = p?.aih_info?.aih_number || '-';
-                                          const competenciaLabel = formatCompetencia(p?.aih_info?.competencia);
-                                          const approvedLabel = approvedSet.has(String(p?.aih_info?.aih_number || '').trim()) ? 'Sim' : 'Não';
+                                          // ✅ CORREÇÃO: Lógica de pendência sincronizada
+                                          // Se aprovado = SIM, mostra a competência
+                                          // Se aprovado = NÃO, mostra "" (em branco)
+                                          const isApproved = approvedSet.has(String(aihNumber).trim());
+                                          const approvedLabel = isApproved ? 'Sim' : 'Não';
+                                          const competenciaLabel = isApproved ? formatCompetencia(p?.aih_info?.competencia) : '';
                                           
                                           const dischargeISO = p?.aih_info?.discharge_date || '';
                                           const dischargeLabel = parseISODateToLocal(dischargeISO);
