@@ -66,6 +66,7 @@ import { isDoctorCoveredForOperaParana, computeIncrementForProcedures, hasAnyExc
 import { sumProceduresBaseReais } from '@/utils/valueHelpers';
 import { exportAllPatientsExcel } from '../services/exportService'
 import { ENV_CONFIG } from '../config/env'
+import { supabaseSih } from '../lib/sihSupabase'
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -200,9 +201,22 @@ const careBadgeClass = (raw?: string | number): string => {
     : 'bg-blue-50 text-blue-700 border-blue-200';
 };
 
-const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
+const normalizeAihNumber = (s: string | undefined | null): string => {
+  const v = String(s || '').trim()
+  return v.replace(/\D/g, '').replace(/^0+/, '')
+}
+
+const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?: Map<string, string>) => {
   // ✅ SIMPLIFICADO: Usar TODOS os pacientes (sem filtro de data)
   let patientsForStats = doctorData.patients;
+  if (aihAssignmentMap) {
+    const cns = doctorData.doctor_info.cns || 'NO_CNS'
+    patientsForStats = patientsForStats.filter(p => {
+      const key = normalizeAihNumber((p as any)?.aih_info?.aih_number)
+      const assigned = aihAssignmentMap.get(key)
+      return assigned === cns
+    })
+  }
 
   // 🚀 OTIMIZAÇÃO #4: Usar procedimentos pré-filtrados (calculable_procedures)
   const totalProcedures = patientsForStats.reduce((sum, patient) => 
@@ -641,6 +655,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [availableCompetencias, setAvailableCompetencias] = useState<string[]>([]);
   const [useSihSource, setUseSihSource] = useState<boolean>(false)
   const [sigtapMap, setSigtapMap] = useState<Map<string, string> | null>(null)
+  const [discrepancyLoading, setDiscrepancyLoading] = useState<boolean>(false)
+  const [discrepancyTotals, setDiscrepancyTotals] = useState<{
+    cards_sum_reais: number
+    cards_distinct_sum_reais: number
+    remote_val_tot_distinct_reais: number
+    local_sigtap_total_reais: number
+    difference_cards_vs_sigtap: number
+  } | null>(null)
+  const [discrepancyDetails, setDiscrepancyDetails] = useState<Array<{ aih: string; cards: number; sigtap: number; sih?: number; diff: number }>>([])
+  const [discrepancyCounts, setDiscrepancyCounts] = useState<{ missingInLocal: number; missingInCards: number; missingInRemote: number; withoutNumber: number }>({ missingInLocal: 0, missingInCards: 0, missingInRemote: 0, withoutNumber: 0 })
+  const [showDiscrepancyDetails, setShowDiscrepancyDetails] = useState<boolean>(false)
+  const [showDedupList, setShowDedupList] = useState<boolean>(false)
   useEffect(() => {
     try { localStorage.setItem('useSihSource', 'false') } catch {}
   }, [])
@@ -1769,6 +1795,68 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
     setExpandedPatients(newExpanded);
   };
+  
+  const dedupeReport = React.useMemo(() => {
+    try {
+      const perAihPerDoctor = new Map<string, Map<string, { sum: number; name: string; cboSet: Set<string>; isAnesth: boolean }>>()
+      const nameByCns = new Map<string, string>()
+      for (const doctor of filteredDoctors) {
+        const cns = doctor.doctor_info.cns || 'NO_CNS'
+        nameByCns.set(cns, doctor.doctor_info.name || '')
+        for (const p of doctor.patients as any[]) {
+          const aihKey = normalizeAihNumber(p?.aih_info?.aih_number)
+          if (!aihKey) continue
+          let entry = { sum: 0, name: doctor.doctor_info.name || '', cboSet: new Set<string>(), isAnesth: false }
+          for (const proc of (p.procedures || [])) {
+            const belongs = (proc?.professional_name || '') === (doctor.doctor_info.name || '')
+            if (!belongs) continue
+            const val = Number(proc.value_reais || 0)
+            entry.sum += val
+            const cbo = String(proc.cbo || '')
+            if (cbo) entry.cboSet.add(cbo)
+            if (cbo === '225151') entry.isAnesth = true
+          }
+          if (!perAihPerDoctor.has(aihKey)) perAihPerDoctor.set(aihKey, new Map<string, { sum: number; name: string; cboSet: Set<string>; isAnesth: boolean }>())
+          const byDoctor = perAihPerDoctor.get(aihKey)!
+          const prev = byDoctor.get(cns)
+          if (prev) {
+            prev.sum += entry.sum
+            entry.cboSet.forEach(v => prev.cboSet.add(v))
+            prev.isAnesth = prev.isAnesth || entry.isAnesth
+          } else {
+            byDoctor.set(cns, entry)
+          }
+        }
+      }
+      const assignment = new Map<string, string>()
+      const dedupList: Array<{ aih: string; cns: string; cbo?: string; doctorName?: string; value: number }> = []
+      for (const [aihKey, byDoctor] of perAihPerDoctor.entries()) {
+        const entries = Array.from(byDoctor.entries())
+        const hasNonAnesth = entries.some(([_, info]) => !info.isAnesth && info.sum > 0)
+        let candidates = entries
+        if (hasNonAnesth) candidates = entries.filter(([_, info]) => !info.isAnesth)
+        let bestCns: string | null = null
+        let bestVal = -1
+        for (const [cns, info] of candidates) {
+          if (info.sum > bestVal) { bestVal = info.sum; bestCns = cns }
+        }
+        if (bestCns) {
+          assignment.set(aihKey, bestCns)
+          for (const [cns, info] of entries) {
+            if (cns !== bestCns && info.sum > 0) {
+              const cbo = Array.from(info.cboSet.values())[0]
+              dedupList.push({ aih: aihKey, cns, cbo, doctorName: nameByCns.get(cns) || '', value: info.sum })
+            }
+          }
+        }
+      }
+      const dedupCns = Array.from(new Set(dedupList.map(x => x.cns).filter(Boolean)))
+      const dedupCbos = Array.from(new Set(dedupList.map(x => x.cbo).filter(Boolean)))
+      return { assignmentMap: assignment, dedupList, dedupCns, dedupCbos }
+    } catch {
+      return { assignmentMap: new Map<string, string>(), dedupList: [], dedupCns: [], dedupCbos: [] }
+    }
+  }, [filteredDoctors])
 
   // ✅ CALCULAR ESTATÍSTICAS GLOBAIS AVANÇADAS
   const globalStats = React.useMemo(() => {
@@ -1799,7 +1887,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     // Calcular total de procedimentos de anestesistas iniciados em '04' (excluindo cesarianas)
     const totalAnesthetistProcedures04 = doctors.reduce((total, doctor) => {
-      const doctorStats = calculateDoctorStats(doctor);
+      const doctorStats = calculateDoctorStats(doctor, dedupeReport.assignmentMap);
       return total + doctorStats.anesthetistProcedures04Count;
     }, 0);
     
@@ -1951,7 +2039,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     for (const doctor of filteredDoctors) {
       const key = getDoctorCardKey(doctor);
-      let stats = calculateDoctorStats(doctor);
+      let stats = calculateDoctorStats(doctor, dedupeReport.assignmentMap);
       // ✅ Regra especial: quando a fonte SIH remota está ativa e a especialidade é Anestesiologia,
       // zerar os cards financeiros para evitar dupla contagem (pagamento por AIH é tratado separadamente)
       try {
@@ -1973,7 +2061,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     console.log(`⚡ [CACHE] Stats calculados para ${cache.size} médicos (otimização: 5x → 1x por médico)`);
     return cache;
-  }, [filteredDoctors]);
+  }, [filteredDoctors, dedupeReport.assignmentMap]);
 
   // 🧮 TOTAIS AGREGADOS PARA O CABEÇALHO (SIGTAP, Incrementos, Total)
   const aggregatedOperaParanaTotals = React.useMemo(() => {
@@ -2081,6 +2169,113 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       return 'Hospital';
     }
   }, [selectedHospitals, availableHospitals]);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        setDiscrepancyLoading(true)
+        const hospitalId = (selectedHospitals && !selectedHospitals.includes('all')) ? selectedHospitals[0] : ''
+        const hospital = availableHospitals.find(h => h.id === hospitalId)
+        const hospitalNameOnly = hospital ? hospital.name : ''
+        let month: number | undefined
+        let year: number | undefined
+        if (selectedCompetencia && selectedCompetencia !== 'all') {
+          const raw = selectedCompetencia.trim()
+          if (/^\d{6}$/.test(raw)) {
+            year = parseInt(raw.slice(0, 4), 10)
+            month = parseInt(raw.slice(4, 6), 10)
+          } else {
+            const mDash = raw.match(/^(\d{4})-(\d{2})/)
+            const mSlash = raw.match(/^(\d{2})\/(\d{4})$/)
+            if (mDash) { year = parseInt(mDash[1], 10); month = parseInt(mDash[2], 10) }
+            else if (mSlash) { month = parseInt(mSlash[1], 10); year = parseInt(mSlash[2], 10) }
+          }
+        }
+        const cardsPatients = filteredDoctors.flatMap(d => d.patients || [])
+        const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
+        const cardsSum = cardsPatients.reduce((sum, p: any) => sum + Number(p.total_value_reais || 0), 0)
+        const distinctMap = new Map<string, number>()
+        let withoutNumber = 0
+        for (const p of cardsPatients) {
+          const k = normalizeAih(String((p as any)?.aih_info?.aih_number || ''))
+          const v = Number((p as any).total_value_reais || 0)
+          if (k) {
+            if (!distinctMap.has(k)) distinctMap.set(k, v)
+          } else {
+            withoutNumber++
+          }
+        }
+        const cardsDistinct = Array.from(distinctMap.values()).reduce((a, b) => a + b, 0)
+        const cardsAssigned = filteredDoctors.reduce((sum, d) => {
+          const key = getDoctorCardKey(d)
+          const stats = doctorStatsCache.get(key)
+          return sum + (stats ? Number(stats.totalValue || 0) : 0)
+        }, 0)
+        let remoteDistinct = 0
+        const remoteMap = new Map<string, number>()
+        if (useSihSource && remoteConfigured && hospital?.cnes && month) {
+          const { data: rdRows } = await supabaseSih
+            .from('sih_rd')
+            .select('n_aih,val_tot')
+            .eq('cnes', hospital.cnes)
+            .eq('mes_cmpt', month)
+            .eq('ano_cmpt', year || new Date().getFullYear())
+          const seen = new Set<string>()
+          for (const r of rdRows || []) {
+            const key = normalizeAih(String((r as any).n_aih || ''))
+            if (!seen.has(key)) { seen.add(key); const val = Number((r as any).val_tot || 0); remoteDistinct += val; if (key) remoteMap.set(key, val) }
+          }
+        }
+        let localSigtap = 0
+        const localMap = new Map<string, number>()
+        if (hospitalId) {
+          let q = supabase
+            .from('aihs')
+            .select('aih_number,calculated_total_value,competencia')
+            .eq('hospital_id', hospitalId)
+          if (selectedCompetencia && selectedCompetencia !== 'all') q = q.eq('competencia', selectedCompetencia)
+          const { data: localRows } = await q
+          for (const a of localRows || []) {
+            const k = normalizeAih(String((a as any).aih_number || ''))
+            const v = Number((a as any).calculated_total_value || 0) / 100
+            if (k) localMap.set(k, v)
+            localSigtap += v
+          }
+        }
+        const difference = cardsDistinct - (useSihSource && remoteConfigured ? remoteDistinct : localSigtap)
+        const unionKeys = new Set<string>([...distinctMap.keys(), ...localMap.keys(), ...remoteMap.keys()])
+        const details: Array<{ aih: string; cards: number; sigtap: number; sih?: number; diff: number }> = []
+        let missingInLocal = 0
+        let missingInCards = 0
+        let missingInRemote = 0
+        for (const k of unionKeys) {
+          const cardsVal = distinctMap.get(k) || 0
+          const sigtapVal = localMap.get(k) || 0
+          const sihVal = remoteMap.get(k)
+          if (!localMap.has(k)) missingInLocal++
+          if (!distinctMap.has(k)) missingInCards++
+          if (useSihSource && remoteConfigured && !remoteMap.has(k)) missingInRemote++
+          details.push({ aih: k, cards: cardsVal, sigtap: sigtapVal, sih: sihVal, diff: cardsVal - sigtapVal })
+        }
+        details.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+        setDiscrepancyTotals({
+          cards_sum_reais: cardsAssigned,
+          cards_distinct_sum_reais: cardsDistinct,
+          remote_val_tot_distinct_reais: remoteDistinct,
+          local_sigtap_total_reais: localSigtap,
+          difference_cards_vs_sigtap: difference
+        })
+        setDiscrepancyDetails(details)
+        setDiscrepancyCounts({ missingInLocal, missingInCards, missingInRemote, withoutNumber })
+      } catch {
+        setDiscrepancyTotals(null)
+        setDiscrepancyDetails([])
+      } finally {
+        setDiscrepancyLoading(false)
+      }
+    }
+    run()
+  }, [filteredDoctors, selectedHospitals, availableHospitals, selectedCompetencia, useSihSource])
 
   if (isLoading) {
     return (
@@ -2296,17 +2491,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
             {/* TOTAIS AGREGADOS - CARDS COM GRADIENTES */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
-              {/* Valor Total SIGTAP */}
+              {/* Valor Total (Remote/Local) */}
               <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-lg p-4 border-2 border-slate-200">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">
-                      Valor Total SIGTAP
-            </div>
+                      {useSihSource && remoteConfigured ? 'Valor Total (Remoto)' : 'Valor Total SIGTAP'}
+                    </div>
                     <div className="text-2xl font-black text-slate-900">
                       {formatCurrency(aggregatedOperaParanaTotals.totalBaseSigtap)}
-            </div>
-            </div>
+                    </div>
+                  </div>
                   <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-full">
                     <Database className="h-5 w-5 text-slate-600" />
             </div>
@@ -2362,8 +2557,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                     <DollarSign className="h-5 w-5 text-green-600" />
                   </div>
                 </div>
+                </div>
               </div>
-            </div>
+
+            
 
             {/* BOTÕES DE RELATÓRIO - LINHA COMPACTA À ESQUERDA */}
             <div className="mb-4">
