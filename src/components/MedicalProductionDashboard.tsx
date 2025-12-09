@@ -209,7 +209,12 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients) => {
     sum + ((patient as any).calculable_procedures?.length || patient.procedures.filter(filterCalculableProcedures).length), 0);
   
   // ✅ CORREÇÃO: USAR patient.total_value_reais QUE VEM DO calculated_total_value DA AIH
-  const totalValue = patientsForStats.reduce((sum, patient) => sum + patient.total_value_reais, 0);
+  const totalValue = patientsForStats.reduce((sum, patient) => {
+    const base = typeof (patient as any).total_value_reais === 'number'
+      ? (patient as any).total_value_reais
+      : sumProceduresBaseReais((patient as any).procedures as any);
+    return sum + (base || 0);
+  }, 0);
   const totalAIHs = patientsForStats.length;
   const avgTicket = totalAIHs > 0 ? totalValue / totalAIHs : 0;
   
