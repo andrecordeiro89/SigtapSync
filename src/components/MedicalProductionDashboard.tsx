@@ -2349,9 +2349,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               </div>
             </div>
 
-            {/* BOTÕES DE RELATÓRIO - GRID HORIZONTAL */}
+            {/* BOTÕES DE RELATÓRIO - LINHA COMPACTA À ESQUERDA */}
             <div className="mb-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div className="flex flex-wrap gap-2 justify-start items-center">
                 <Button
                   variant="default"
                   size="sm"
@@ -3350,7 +3350,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
                           {/* BOTÕES DE AÇÃO - GRID HORIZONTAL */}
                           <div className="mt-4 pt-3 border-t border-gray-100">
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                            <div className="flex flex-wrap gap-2 justify-start items-center">
                                   <Button
                                     type="button"
                                     onClick={(e) => {
@@ -3546,7 +3546,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         toast.error('Erro ao gerar relatório do médico');
                                       }
                                     }}
-                                    className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
+                                    className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-3 rounded-md text-sm w-auto min-w-[200px]"
                                   >
                                     <FileSpreadsheet className="h-4 w-4" />
                                     Relatório Pacientes
@@ -3930,7 +3930,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                          toast.error('Erro ao gerar relatório PDF');
                                        }
                                      }}
-                                     className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
+                                     className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-3 rounded-md text-sm w-auto min-w-[200px]"
                                    >
                                     <FileSpreadsheet className="h-4 w-4" />
                                     Relatório Pacientes Simplificado
@@ -4240,7 +4240,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         toast.error('Erro ao gerar protocolo de atendimento');
                                       }
                                     }}
-                                    className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
+                                    className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-3 rounded-md text-sm w-auto min-w-[200px]"
                                   >
                                    <FileText className="h-4 w-4" />
                                    Protocolo de Atendimento Aprovado
@@ -4550,7 +4550,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         toast.error('Erro ao gerar protocolo de atendimento atual');
                                       }
                                     }}
-                                    className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-4 rounded-md text-sm"
+                                    className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-300 h-9 px-3 rounded-md text-sm w-auto min-w-[200px]"
                                   >
                                     <FileText className="h-4 w-4" />
                                     Protocolo Atendimento Atual
