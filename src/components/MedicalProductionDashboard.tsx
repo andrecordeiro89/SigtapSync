@@ -1950,8 +1950,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       // ✅ Regra especial: quando a fonte SIH remota está ativa e a especialidade é Anestesiologia,
       // zerar os cards financeiros para evitar dupla contagem (pagamento por AIH é tratado separadamente)
       try {
-        const isAnesth = /anestesiolog/i.test(doctor.doctor_info.specialty || '');
-        if (useSihSource && isAnesth) {
+        const spec = doctor.doctor_info.specialty || '';
+        const isAnesth = /anestesiolog/i.test(spec);
+        const isPhysio = /fisioterap/i.test(spec);
+        if (useSihSource && (isAnesth || isPhysio)) {
           stats = {
             ...stats,
             totalValue: 0,
