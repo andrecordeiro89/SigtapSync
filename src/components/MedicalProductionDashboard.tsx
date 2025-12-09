@@ -1976,18 +1976,27 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       let totalBaseSigtap = 0;
       let totalIncrement = 0;
 
+      // ✅ CORREÇÃO: Base SIGTAP deve somar AIHs únicas (não por médico)
+      // Deduplificar por (hospital_id, aih_number) para evitar dupla contagem
+      const uniqueAihKeys = new Set<string>();
+
       for (const doctor of filteredDoctors) {
-        // ✅ PERFORMANCE: Usar cache de stats (evita recálculo)
-        const key = getDoctorCardKey(doctor);
-        const stats = doctorStatsCache.get(key);
-        
-        if (!stats) continue;
-        
-        // Base SIGTAP: valor total das AIHs
-        totalBaseSigtap += stats.totalValue;
-        
-        // Incremento Opera Paraná: valor pré-calculado
-        totalIncrement += stats.operaParanaIncrement;
+        // Usar pacientes carregados para cada médico
+        const patients = doctor.patients || [];
+        for (const patient of patients as any[]) {
+          const hospId = (patient?.aih_info?.hospital_id) || (doctor.hospitals?.[0]?.hospital_id) || '';
+          const aihNumRaw = String(patient?.aih_info?.aih_number || '').trim();
+          const dis = String(patient?.aih_info?.discharge_date || '');
+          const aihKey = `${hospId}::${aihNumRaw || `NOAIH:${patient?.aih_id || patient?.patient_id || ''}:${dis}`}`;
+          if (!uniqueAihKeys.has(aihKey)) {
+            uniqueAihKeys.add(aihKey);
+            totalBaseSigtap += Number(patient?.total_value_reais || 0);
+          }
+        }
+
+        // Incremento segue usando valor pré-calculado por médico (mantém comportamento atual)
+        const stats = doctorStatsCache.get(getDoctorCardKey(doctor));
+        if (stats) totalIncrement += stats.operaParanaIncrement || 0;
       }
 
       console.log(`📊 [TOTAIS AGREGADOS] Base SIGTAP: R$ ${totalBaseSigtap.toFixed(2)} | Incremento: R$ ${totalIncrement.toFixed(2)} | Total: R$ ${(totalBaseSigtap + totalIncrement).toFixed(2)}`);
