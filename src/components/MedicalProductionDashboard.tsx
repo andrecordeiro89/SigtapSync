@@ -917,7 +917,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       doc.line(20, yPosition, pageWidth - 20, yPosition)
       const startY = yPosition + 10
       autoTable(doc, {
-        head: [['Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Comp. Aprovação', 'Aprovado', 'Valor de Repasse']],
+        head: [['Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Comp. Aprovação', 'Homologado (SIH)', 'Valor de Repasse']],
         body: tableData,
         startY,
         theme: 'striped',
@@ -1946,7 +1946,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     for (const doctor of filteredDoctors) {
       const key = getDoctorCardKey(doctor);
-      const stats = calculateDoctorStats(doctor);
+      let stats = calculateDoctorStats(doctor);
+      // ✅ Regra especial: quando a fonte SIH remota está ativa e a especialidade é Anestesiologia,
+      // zerar os cards financeiros para evitar dupla contagem (pagamento por AIH é tratado separadamente)
+      try {
+        const isAnesth = /anestesiolog/i.test(doctor.doctor_info.specialty || '');
+        if (useSihSource && isAnesth) {
+          stats = {
+            ...stats,
+            totalValue: 0,
+            operaParanaIncrement: 0,
+            totalValueWithOperaParana: 0,
+            calculatedPaymentValue: 0,
+          };
+        }
+      } catch {}
       cache.set(key, stats);
     }
     
@@ -2575,7 +2589,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       toast.error('Erro ao gerar relatório geral');
                     }
                   }}
-                  className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+                  className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white justify-self-start w-auto min-w-[220px]"
                   title="Gerar relatório geral de pacientes"
                 >
                   <FileSpreadsheet className="h-4 w-4" />
@@ -2733,7 +2747,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       toast.error('Erro ao gerar relatório de conferência');
                     }
                   }}
-                  className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white"
+                  className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white justify-self-start w-auto min-w-[220px]"
                   title="Gerar relatório de conferência de pacientes (uma linha por paciente com valores consolidados)"
                 >
                   <FileSpreadsheet className="h-4 w-4" />
@@ -2954,7 +2968,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       toast.error('Erro ao gerar relatório simplificado');
                     }
                   }}
-                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white justify-self-start w-auto min-w-[220px]"
                   title="Gerar relatório simplificado de pacientes"
                 >
                   <FileSpreadsheet className="h-4 w-4" />
@@ -3854,7 +3868,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         const startY = yPosition + 10;
                                         
                                         autoTable(doc, {
-                                          head: [['Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Comp. Aprovação', 'Aprovado', 'Valor de Repasse']],
+                                          head: [['Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Comp. Aprovação', 'Homologado (SIH)', 'Valor de Repasse']],
                                           body: tableData,
                                           startY: startY,
                                           theme: 'striped',
@@ -5425,18 +5439,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                     <div className="text-lg font-bold text-blue-700">{simplifiedValidationStats?.total ?? 0}</div>
                   </div>
                   <div className="bg-gray-50 rounded p-2 border">
-                    <div className="text-gray-500">Aprovadas</div>
+                    <div className="text-gray-500">Homologadas (SIH)</div>
                     <div className="text-lg font-bold text-emerald-700">{simplifiedValidationStats?.approved ?? 0}</div>
                   </div>
                   <div className="bg-gray-50 rounded p-2 border">
-                    <div className="text-gray-500">Não Aprovadas</div>
+                    <div className="text-gray-500">Não Homologadas</div>
                     <div className="text-lg font-bold text-red-700">{simplifiedValidationStats?.notApproved ?? 0}</div>
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-2">
                   <Button variant="outline" onClick={() => setSimplifiedValidationOpen(false)}>Cancelar</Button>
                   <Button onClick={async () => { setSimplifiedValidationOpen(false); await generateSimplifiedReport(selectedDoctorForReport, false); }}>Gerar Produção (todos)</Button>
-                  <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={async () => { setSimplifiedValidationOpen(false); await generateSimplifiedReport(selectedDoctorForReport, true); }}>Gerar Aprovado (matches)</Button>
+                  <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={async () => { setSimplifiedValidationOpen(false); await generateSimplifiedReport(selectedDoctorForReport, true); }}>Gerar Homologadas (SIH)</Button>
                 </div>
               </>
             )}
