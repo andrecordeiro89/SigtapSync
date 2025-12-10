@@ -67,6 +67,7 @@ import { sumProceduresBaseReais } from '@/utils/valueHelpers';
 import { exportAllPatientsExcel } from '../services/exportService'
 import { ENV_CONFIG } from '../config/env'
 import { supabaseSih } from '../lib/sihSupabase'
+import { dedupPatientsByAIH, normalizeAih, summarizeDedup } from '../utils/dedupTest'
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -154,6 +155,33 @@ const formatCompetencia = (competencia: string | undefined): string => {
   }
 };
 
+// Helper: obter competência segura (MM/YYYY) com fallback para alta ou filtro selecionado
+const getSafeCompetenciaLabel = (p: any, selectedCompetencia?: string, isApproved?: boolean): string => {
+  if (!isApproved) return ''
+  const raw = p?.aih_info?.competencia as string | undefined
+  const formatted = formatCompetencia(raw)
+  // Extrair ano do formatted MM/YYYY
+  const yr = (() => {
+    const m = String(formatted || '').match(/^(\d{2})\/(\d{4})$/)
+    return m ? parseInt(m[2], 10) : NaN
+  })()
+  // Se ano inválido ou claramente errado (e.g., 2001), usar fallback
+  if (!yr || isNaN(yr) || yr < 2015 || yr > 2100) {
+    // Fallback 1: usar alta SUS
+    const dischargeISO = p?.aih_info?.discharge_date || ''
+    const dLabel = parseISODateToLocal(dischargeISO) // DD/MM/YYYY
+    if (dLabel && /\d{2}\/\d{2}\/\d{4}/.test(dLabel)) {
+      const parts = dLabel.split('/')
+      return `${parts[1]}/${parts[2]}`
+    }
+    // Fallback 2: usar filtro selecionado
+    if (selectedCompetencia && selectedCompetencia !== 'all') {
+      return formatCompetencia(selectedCompetencia)
+    }
+  }
+  return formatted
+}
+
 // Helper para comparar datas por dia (UTC) e gerar chave YYYY-MM-DD
 const toUTCDateKey = (d: Date | string | undefined): string | null => {
   try {
@@ -229,8 +257,15 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?:
       : sumProceduresBaseReais((patient as any).procedures as any);
     return sum + (base || 0);
   }, 0);
-  const totalAIHs = patientsForStats.length;
-  const avgTicket = totalAIHs > 0 ? totalValue / totalAIHs : 0;
+  const totalAIHsAll = (() => {
+    const set = new Set<string>();
+    for (const p of doctorData.patients) {
+      const k = normalizeAihNumber((p as any)?.aih_info?.aih_number);
+      if (k) set.add(k);
+    }
+    return set.size;
+  })();
+  const avgTicket = totalAIHsAll > 0 ? totalValue / totalAIHsAll : 0;
   
   // 🔍 LOG PARA VERIFICAÇÃO DA CORREÇÃO
   if (doctorData.patients.length > 0) {
@@ -361,7 +396,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?:
   return {
     totalProcedures,
     totalValue,
-    totalAIHs,
+    totalAIHs: totalAIHsAll,
     avgTicket,
     approvalRate,
     medicalProceduresValue,
@@ -694,6 +729,220 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [simplifiedValidationStats, setSimplifiedValidationStats] = useState<{ total: number; approved: number; notApproved: number; remote: boolean } | null>(null)
   const approvedSetRef = useRef<Set<string>>(new Set())
   const [selectedDoctorForReport, setSelectedDoctorForReport] = useState<any>(null)
+  const [sihRemoteTotals, setSihRemoteTotals] = useState<{ totalValue: number; totalAIHs: number; source: string } | null>(null)
+  const generateGeneralPatientsReport = async () => {
+    try {
+      const rows: Array<Array<string | number>> = []
+      const header = [
+        '#',
+        'Prontuário',
+        'Nome do Paciente',
+        'Nº AIH',
+        'Código Procedimento',
+        'Descrição Procedimento',
+        'Data Procedimento',
+        'Data Alta (SUS)',
+        'Especialidade de Atendimento',
+        'Caráter de Atendimento',
+        'Médico',
+        'Hospital',
+        'Pgt. Administrativo',
+        'Valor Procedimento',
+        'AIH Seca',
+        'Incremento',
+        'AIH c/ Incremento'
+      ]
+      let idx = 1
+      let totalAIHsFound = 0
+      let excludedByDateFilter = 0
+      let aihsWithoutNumber = 0
+      const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
+      filteredDoctors.forEach((card: any) => {
+        const doctorName = card.doctor_info?.name || ''
+        const hospitalName = card.hospitals?.[0]?.hospital_name || ''
+        ;(card.patients || []).forEach((p: any) => {
+          totalAIHsFound++
+          const patientId = p.patient_id
+          const name = p.patient_info?.name || 'Paciente'
+          const medicalRecord = p.patient_info?.medical_record || '-'
+          const aihRaw = normalizeAih(String(p?.aih_info?.aih_number || '').trim())
+          const aih = aihRaw || 'Aguardando geração'
+          if (!aihRaw) aihsWithoutNumber++
+          const careSpec = (p?.aih_info?.specialty || '').toString()
+          const careCharacter = (() => {
+            const raw = (p?.aih_info?.care_character ?? '').toString()
+            try { return CareCharacterUtils.formatForDisplay(raw, false) } catch { return raw }
+          })()
+          const disISO = p?.aih_info?.discharge_date || ''
+          const disLabel = disISO ? parseISODateToLocal(disISO) : ''
+          const procedures = p.procedures || []
+          procedures.forEach((proc: any) => {
+            const procCode = proc.procedure_code || ''
+            const procDesc = proc.procedure_description || proc.sigtap_description || ''
+            const procDate = proc.procedure_date || ''
+            const procDateLabel = procDate ? (() => { const s = String(procDate); const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : parseISODateToLocal(s) })() : ''
+            const procValue = Number(proc.value_reais || 0)
+            const baseAih = Number(p.total_value_reais || 0)
+            const doctorCovered = isDoctorCoveredForOperaParana(doctorName, card.hospitals?.[0]?.hospital_id)
+            const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0
+            const aihWithIncrements = baseAih + increment
+            const pgtAdm = p?.aih_info?.pgt_adm || 'não'
+            rows.push([
+              idx++,
+              medicalRecord,
+              name,
+              aih,
+              procCode,
+              procDesc,
+              procDateLabel,
+              disLabel,
+              formatEspecialidade(careSpec),
+              careCharacter,
+              doctorName,
+              hospitalName,
+              pgtAdm,
+              formatCurrency(procValue),
+              formatCurrency(baseAih),
+              formatCurrency(increment),
+              formatCurrency(aihWithIncrements)
+            ])
+          })
+        })
+      })
+      rows.forEach((row, index) => { row[0] = index + 1 })
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
+      ;(ws as any)['!cols'] = [
+        { wch: 5 }, { wch: 15 }, { wch: 35 }, { wch: 18 }, { wch: 20 }, { wch: 45 }, { wch: 16 }, { wch: 16 }, { wch: 25 }, { wch: 22 }, { wch: 30 }, { wch: 35 }, { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 20 }
+      ]
+      XLSX.utils.book_append_sheet(wb, ws, 'Pacientes')
+      const fileName = `Relatorio_Pacientes_Procedimentos_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      if (aihsWithoutNumber > 0) toast.success(`Relatório geral gerado! ${aihsWithoutNumber} registro(s) sem AIH incluído(s).`)
+      else toast.success('Relatório geral gerado com sucesso!')
+    } catch (e) {
+      console.error('Erro ao exportar Relatório Pacientes:', e)
+      toast.error('Erro ao gerar relatório geral')
+    }
+  }
+
+  const generateConferencePatientsReport = async () => {
+    try {
+      const rows: Array<Array<string | number>> = []
+      const header = ['#','Prontuário','Nome do Paciente','Nº AIH','Data Alta (SUS)','Médico','Hospital','Pgt. Administrativo','AIH Seca','Incremento','AIH c/ Incremento']
+      let idx = 1
+      let totalAIHsFound = 0
+      let aihsWithoutNumber = 0
+      filteredDoctors.forEach((card: any) => {
+        const doctorName = card.doctor_info?.name || ''
+        const hospitalName = card.hospitals?.[0]?.hospital_name || ''
+        ;(card.patients || []).forEach((p: any) => {
+          totalAIHsFound++
+          const name = p.patient_info?.name || 'Paciente'
+          const medicalRecord = p.patient_info?.medical_record || '-'
+          const aihRaw = (p?.aih_info?.aih_number || '').toString().replace(/\D/g, '')
+          const aih = aihRaw || 'Aguardando geração'
+          if (!aihRaw) aihsWithoutNumber++
+          const disISO = p?.aih_info?.discharge_date || ''
+          const disLabel = parseISODateToLocal(disISO)
+          const baseAih = Number(p.total_value_reais || 0)
+          const doctorCovered = isDoctorCoveredForOperaParana(doctorName, card.hospitals?.[0]?.hospital_id)
+          const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0
+          const aihWithIncrements = baseAih + increment
+          const pgtAdm = p?.aih_info?.pgt_adm || 'não'
+          rows.push([idx++, medicalRecord, name, aih, disLabel, doctorName, hospitalName, pgtAdm, formatCurrency(baseAih), formatCurrency(increment), formatCurrency(aihWithIncrements)])
+        })
+      })
+      rows.sort((a, b) => { const da = a[4] as string; const db = b[4] as string; if (!da && !db) return 0; if (!da) return 1; if (!db) return -1; const pa = da.split('/'); const pb = db.split('/'); const dA = pa.length===3? new Date(parseInt(pa[2]),parseInt(pa[1])-1,parseInt(pa[0])): new Date(0); const dB = pb.length===3? new Date(parseInt(pb[2]),parseInt(pb[1])-1,parseInt(pb[0])): new Date(0); return dB.getTime()-dA.getTime() })
+      rows.forEach((row, index) => { row[0] = index + 1 })
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
+      ;(ws as any)['!cols'] = [{ wch: 5 },{ wch: 15 },{ wch: 35 },{ wch: 18 },{ wch: 16 },{ wch: 30 },{ wch: 35 },{ wch: 20 },{ wch: 18 },{ wch: 18 },{ wch: 20 }]
+      XLSX.utils.book_append_sheet(wb, ws, 'AIHs')
+      const fileName = `Relatorio_AIHs_Conferencia_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      if (aihsWithoutNumber > 0) toast.success(`Relatório de conferência gerado! ${aihsWithoutNumber} AIH(s) sem número incluída(s).`)
+      else toast.success('Relatório de conferência gerado com sucesso!')
+    } catch (e) {
+      console.error('Erro ao exportar Relatório Conferência:', e)
+      toast.error('Erro ao gerar relatório de conferência')
+    }
+  }
+
+  const generateSimplifiedPatientsReport = async () => {
+    try {
+      const rows: Array<Array<string | number>> = []
+      const header = ['#','Nome do Paciente','Prontuário','Nº AIH','Data de Admissão','Data de Alta','Médico','Pgt. Administrativo','AIH Seca','Incremento','AIH c/ Incremento']
+      let idx = 1
+      const allPatients: any[] = []
+      const globalSeen = new Set<string>()
+      filteredDoctors.forEach((card: any) => {
+        const doctorName = card.doctor_info?.name || 'Médico não identificado'
+        const doctorPatients = dedupPatientsByAIH(card.patients || [])
+        doctorPatients.forEach((p: any) => {
+          const aih = normalizeAih((p?.aih_info?.aih_number || '').toString())
+          const aihDisplay = aih || 'Aguardando geração'
+          if (aih && globalSeen.has(aih)) return
+          if (aih) globalSeen.add(aih)
+          const name = p.patient_info?.name || 'Paciente'
+          const medicalRecord = p.patient_info?.medical_record || '-'
+          const admissionISO = p?.aih_info?.admission_date || ''
+          const admissionLabel = parseISODateToLocal(admissionISO)
+          const dischargeISO = p?.aih_info?.discharge_date || ''
+          const dischargeLabel = parseISODateToLocal(dischargeISO)
+          const baseAih = Math.round((Number(p.total_value_reais || 0)) * 100) / 100
+          const doctorCovered = isDoctorCoveredForOperaParana(doctorName, card.hospitals?.[0]?.hospital_id)
+          const incrementRaw = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0
+          const increment = Math.round(incrementRaw * 100) / 100
+          const aihWithIncrements = Math.round((baseAih + increment) * 100) / 100
+          const pgtAdm = p?.aih_info?.pgt_adm || 'não'
+          allPatients.push({ name, medicalRecord, aih: aihDisplay, admissionLabel, dischargeLabel, doctorName, pgtAdm, baseAih, increment, aihWithIncrements })
+        })
+      })
+      allPatients.sort((a, b) => {
+        const parseDate = (dateStr: string): Date | null => { if (!dateStr || dateStr === '') return null; const parts = dateStr.split('/'); if (parts.length===3) return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); return null }
+        const dateA = parseDate(a.dischargeLabel)
+        const dateB = parseDate(b.dischargeLabel)
+        if (!dateA && !dateB) return 0; if (!dateA) return 1; if (!dateB) return -1
+        const cmp = dateA.getTime() - dateB.getTime()
+        if (cmp !== 0) return cmp
+        return a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+      })
+      allPatients.forEach((patient) => {
+        rows.push([idx++, patient.name, patient.medicalRecord, patient.aih, patient.admissionLabel, patient.dischargeLabel, patient.doctorName, patient.pgtAdm, formatCurrency(patient.baseAih), formatCurrency(patient.increment), formatCurrency(patient.aihWithIncrements)])
+      })
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
+      ;(ws as any)['!cols'] = [{ wch: 5 },{ wch: 40 },{ wch: 16 },{ wch: 18 },{ wch: 18 },{ wch: 18 },{ wch: 30 },{ wch: 20 },{ wch: 18 },{ wch: 18 },{ wch: 20 }]
+      XLSX.utils.book_append_sheet(wb, ws, 'Pacientes Simplificado')
+      const summary = summarizeDedup(filteredDoctors.flatMap((c:any)=>c.patients||[]), approvedSetRef.current)
+      const summarySheet = XLSX.utils.aoa_to_sheet([
+        ['AIHs Locais (dedup)', 'Homologadas (SIH)', 'Não Homologadas', 'Duplicatas Detectadas'],
+        [summary.aiHsLocais, summary.approved, summary.notApproved, summary.dupCount]
+      ])
+      XLSX.utils.book_append_sheet(wb, summarySheet, 'Dedup-Teste')
+      const fileName = `Relatorio_Pacientes_Simplificado_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      toast.success('Relatório simplificado gerado com sucesso!')
+    } catch (e) {
+      console.error('Erro ao exportar Relatório Simplificado:', e)
+      toast.error('Erro ao gerar relatório simplificado')
+    }
+  }
+
+  useEffect(() => {
+    const handlerGeneral = () => { generateGeneralPatientsReport() }
+    const handlerConference = () => { generateConferencePatientsReport() }
+    const handlerSimplified = () => { generateSimplifiedPatientsReport() }
+    window.addEventListener('mpd:report-general', handlerGeneral)
+    window.addEventListener('mpd:report-conference', handlerConference)
+    window.addEventListener('mpd:report-simplified', handlerSimplified)
+    return () => {
+      window.removeEventListener('mpd:report-general', handlerGeneral)
+      window.removeEventListener('mpd:report-conference', handlerConference)
+      window.removeEventListener('mpd:report-simplified', handlerSimplified)
+    }
+  }, [filteredDoctors])
 
   const validateSimplifiedReport = async (doctor: any) => {
     try {
@@ -703,7 +952,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         .map((p: any) => normalizeAih(String(p?.aih_info?.aih_number || '').trim()))
         .filter((v: string) => !!v)
       const uniqueAih = Array.from(new Set(allAihNumbers))
-      const totalPatients = (doctor.patients || []).length
+      const totalPatients = uniqueAih.length || (doctor.patients || []).length
       if (uniqueAih.length === 0) {
         setSimplifiedValidationStats({ total: totalPatients, approved: 0, notApproved: totalPatients, remote: remoteConfigured })
         return
@@ -801,9 +1050,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         } catch {}
       }
 
-      ;(doctor.patients || []).forEach((p: any) => {
+      const patientsDedup = dedupPatientsByAIH(doctor.patients || [])
+      patientsDedup.forEach((p: any) => {
         totalPatientsProcessed++
-        const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
         const aihNumber = normalizeAih(String(p?.aih_info?.aih_number || '').trim())
         if (approvedOnly && (!aihNumber || !approvedSetRef.current.has(aihNumber))) return
 
@@ -828,7 +1077,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const isApproved = approvedSetRef.current.has(aihNumber);
         const approvedLabel = isApproved ? 'Sim' : 'Não';
         // Se não aprovado, Comp. Aprovação deve ficar em branco (aguardando retorno)
-        const competenciaLabel = isApproved ? formatCompetencia(p?.aih_info?.competencia) : '';
+        const competenciaLabel = getSafeCompetenciaLabel(p, selectedCompetencia, isApproved);
         
         const proceduresWithPayment = p.procedures
           .filter((proc: any) => 
@@ -1020,6 +1269,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   // 🆕 ESTADOS PARA PAGINAÇÃO DE MÉDICOS
   const [currentDoctorPage, setCurrentDoctorPage] = useState<number>(1);
   const DOCTORS_PER_PAGE = 10;
+
+  // 🧮 BUSCAR TOTAIS SIH REMOTOS QUANDO TOGGLE ATIVO
+  useEffect(() => {
+    if (useSihSource && remoteConfigured) {
+      fetchSihRemoteTotals().then(totals => {
+        setSihRemoteTotals(totals);
+      }).catch(error => {
+        console.error('❌ Erro ao buscar totais SIH remotos:', error);
+        setSihRemoteTotals(null);
+      });
+    } else {
+      setSihRemoteTotals(null);
+    }
+  }, [useSihSource, selectedHospitals, selectedCompetencia]);
 
   // ✅ CARREGAR LISTA DE HOSPITAIS DISPONÍVEIS
   const loadAvailableHospitals = async (doctorsData: DoctorWithPatients[]) => {
@@ -1862,10 +2125,33 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const globalStats = React.useMemo(() => {
     const totalDoctors = doctors.length;
     
-    // ✅ CONTAGEM DUPLA: Total de AIHs E Pacientes Únicos
-    const totalAIHs = doctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
+    // ✅ PRIORIDADE: Usar totais SIH remotos quando disponíveis
+    let totalAIHs, totalRevenue, avgTicket;
     
-    // Contar pacientes únicos (pessoas diferentes)
+    if (useSihSource && remoteConfigured && sihRemoteTotals) {
+      // Usar dados SIH remotos para totais principais
+      totalAIHs = sihRemoteTotals.totalAIHs;
+      totalRevenue = sihRemoteTotals.totalValue;
+      avgTicket = totalAIHs > 0 ? totalRevenue / totalAIHs : 0;
+      
+      console.log(`📊 [GLOBAL STATS] Usando SIH remoto: ${totalAIHs} AIHs | R$ ${totalRevenue.toFixed(2)}`);
+    } else {
+      // Usar cálculo local tradicional
+      // ✅ CONTAGEM DUPLA: Total de AIHs E Pacientes Únicos
+      totalAIHs = doctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
+      
+      // Coletar todos os procedimentos (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
+      const allProcedures = doctors.flatMap(doctor => 
+        doctor.patients.flatMap(patient => 
+          patient.procedures.filter(filterCalculableProcedures)
+        )
+      );
+      
+      totalRevenue = allProcedures.reduce((sum, proc) => sum + (proc.value_reais || 0), 0);
+      avgTicket = totalAIHs > 0 ? totalRevenue / totalAIHs : 0;
+    }
+    
+    // Contar pacientes únicos (pessoas diferentes) - sempre local
     const uniquePatientIds = new Set<string>();
     doctors.forEach(doctor => {
       doctor.patients.forEach(patient => {
@@ -1878,7 +2164,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     const totalPatients = totalAIHs; // Mantém compatibilidade (totalPatients = total de AIHs)
     
-    // Coletar todos os procedimentos (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
+    // Coletar todos os procedimentos (🚫 EXCLUINDO ANESTESISTAS 04.xxx) - sempre local
     const allProcedures = doctors.flatMap(doctor => 
       doctor.patients.flatMap(patient => 
         patient.procedures.filter(filterCalculableProcedures)
@@ -1892,10 +2178,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }, 0);
     
     const totalProcedures = allProcedures.length;
-    const totalRevenue = allProcedures.reduce((sum, proc) => sum + (proc.value_reais || 0), 0);
-    const avgTicket = totalPatients > 0 ? totalRevenue / totalPatients : 0;
     
-    // Análise de aprovação
+    // Análise de aprovação - sempre local
     const approvedProcedures = allProcedures.filter(p => p.approval_status === 'approved').length;
     const pendingProcedures = allProcedures.filter(p => p.approval_status === 'pending').length;
     const rejectedProcedures = allProcedures.filter(p => p.approval_status === 'rejected').length;
@@ -1933,16 +2217,37 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       totalAnesthetistProcedures04,
       isDemoData
     };
-  }, [doctors]);
+  }, [doctors, useSihSource, remoteConfigured, sihRemoteTotals]);
   
   // ✅ CALCULAR ESTATÍSTICAS DOS MÉDICOS FILTRADOS
   const filteredStats = React.useMemo(() => {
     const totalDoctors = filteredDoctors.length;
     
-    // ✅ CONTAGEM DUPLA: Total de AIHs E Pacientes Únicos
-    const totalAIHs = filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
+    // ✅ PRIORIDADE: Usar totais SIH remotos quando disponíveis
+    let totalAIHs, totalRevenue;
     
-    // Contar pacientes únicos (pessoas diferentes)
+    if (useSihSource && remoteConfigured && sihRemoteTotals) {
+      // Usar dados SIH remotos para totais principais
+      totalAIHs = sihRemoteTotals.totalAIHs;
+      totalRevenue = sihRemoteTotals.totalValue;
+      
+      console.log(`📊 [FILTERED STATS] Usando SIH remoto: ${totalAIHs} AIHs | R$ ${totalRevenue.toFixed(2)}`);
+    } else {
+      // Usar cálculo local tradicional
+      // ✅ CONTAGEM DUPLA: Total de AIHs E Pacientes Únicos
+      totalAIHs = filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
+      
+      // Coletar todos os procedimentos dos médicos filtrados (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
+      const allProcedures = filteredDoctors.flatMap(doctor => 
+        doctor.patients.flatMap(patient => 
+          patient.procedures.filter(filterCalculableProcedures)
+        )
+      );
+      
+      totalRevenue = allProcedures.reduce((sum, proc) => sum + (proc.value_reais || 0), 0);
+    }
+    
+    // Contar pacientes únicos (pessoas diferentes) - sempre local
     const uniquePatientIds = new Set<string>();
     filteredDoctors.forEach(doctor => {
       doctor.patients.forEach(patient => {
@@ -1955,7 +2260,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     const totalPatients = totalAIHs; // Mantém compatibilidade (totalPatients = total de AIHs)
     
-    // Coletar todos os procedimentos dos médicos filtrados (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
+    // Coletar todos os procedimentos dos médicos filtrados (🚫 EXCLUINDO ANESTESISTAS 04.xxx) - sempre local
     const allProcedures = filteredDoctors.flatMap(doctor => 
       doctor.patients.flatMap(patient => 
         patient.procedures.filter(filterCalculableProcedures)
@@ -1963,7 +2268,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     );
     
     const totalProcedures = allProcedures.length;
-    const totalRevenue = allProcedures.reduce((sum, proc) => sum + (proc.value_reais || 0), 0);
     
     return {
       totalDoctors,
@@ -1973,7 +2277,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       totalProcedures,
       totalRevenue
     };
-  }, [filteredDoctors]);
+  }, [filteredDoctors, useSihSource, remoteConfigured, sihRemoteTotals]);
   
   // ✅ NOVO: Calcular pacientes com múltiplas AIHs (igual PatientManagement)
   const multipleAIHsStats = React.useMemo(() => {
@@ -2063,33 +2367,122 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     return cache;
   }, [filteredDoctors, dedupeReport.assignmentMap]);
 
+  // 🧮 BUSCAR TOTAIS SIH REMOTOS
+  const fetchSihRemoteTotals = React.useCallback(async () => {
+    if (!useSihSource || !remoteConfigured) return null;
+    
+    try {
+      console.log('🔍 Buscando totais SIH remotos...');
+      
+      // Obter filtros atuais
+      const hospitalIds = selectedHospitals?.filter(h => h !== 'all') || [];
+      let compYear: number | undefined;
+      let compMonth: number | undefined;
+      
+      if (selectedCompetencia && selectedCompetencia !== 'all') {
+        const raw = selectedCompetencia.trim();
+        if (/^\d{6}$/.test(raw)) {
+          compYear = parseInt(raw.slice(0, 4), 10);
+          compMonth = parseInt(raw.slice(4, 6), 10);
+        } else {
+          const mDash = raw.match(/^(\d{4})-(\d{2})/);
+          if (mDash) {
+            compYear = parseInt(mDash[1], 10);
+            compMonth = parseInt(mDash[2], 10);
+          }
+        }
+      }
+      
+      // Construir query para sih_rd (resumo por competência/hospital)
+      let query = supabaseSih
+        .from('sih_rd')
+        .select('rd_val_tot, rd_qt_aih, rd_mnem, rd_ano, rd_mes')
+        .not('rd_val_tot', 'is', null)
+        .not('rd_qt_aih', 'is', null);
+      
+      // Aplicar filtros
+      if (hospitalIds.length > 0) {
+        query = query.in('rd_mnem', hospitalIds);
+      }
+      if (typeof compYear === 'number') {
+        query = query.eq('rd_ano', compYear);
+      }
+      if (typeof compMonth === 'number') {
+        query = query.eq('rd_mes', compMonth);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('❌ Erro ao buscar totais SIH remotos:', error);
+        return null;
+      }
+      
+      if (!data || data.length === 0) {
+        console.warn('⚠️ Nenhum dado SIH remoto encontrado');
+        return null;
+      }
+      
+      // Calcular totais agregados
+      const totals = data.reduce((acc, row) => {
+        acc.totalValue += Number(row.rd_val_tot) || 0;
+        acc.totalAIHs += Number(row.rd_qt_aih) || 0;
+        return acc;
+      }, { totalValue: 0, totalAIHs: 0 });
+      
+      console.log(`✅ Totais SIH remotos: R$ ${totals.totalValue.toFixed(2)} | ${totals.totalAIHs} AIHs`);
+      
+      return {
+        totalValue: totals.totalValue,
+        totalAIHs: totals.totalAIHs,
+        source: 'sih_remote'
+      };
+      
+    } catch (error) {
+      console.error('❌ Erro ao buscar totais SIH remotos:', error);
+      return null;
+    }
+  }, [useSihSource, selectedHospitals, selectedCompetencia]);
+
   // 🧮 TOTAIS AGREGADOS PARA O CABEÇALHO (SIGTAP, Incrementos, Total)
   const aggregatedOperaParanaTotals = React.useMemo(() => {
     try {
       let totalBaseSigtap = 0;
       let totalIncrement = 0;
 
-      // ✅ CORREÇÃO: Base SIGTAP deve somar AIHs únicas (não por médico)
-      // Deduplificar por (hospital_id, aih_number) para evitar dupla contagem
-      const uniqueAihKeys = new Set<string>();
-
-      for (const doctor of filteredDoctors) {
-        // Usar pacientes carregados para cada médico
-        const patients = doctor.patients || [];
-        for (const patient of patients as any[]) {
-          const hospId = (patient?.aih_info?.hospital_id) || (doctor.hospitals?.[0]?.hospital_id) || '';
-          const aihNumRaw = String(patient?.aih_info?.aih_number || '').trim();
-          const dis = String(patient?.aih_info?.discharge_date || '');
-          const aihKey = `${hospId}::${aihNumRaw || `NOAIH:${patient?.aih_id || patient?.patient_id || ''}:${dis}`}`;
-          if (!uniqueAihKeys.has(aihKey)) {
-            uniqueAihKeys.add(aihKey);
-            totalBaseSigtap += Number(patient?.total_value_reais || 0);
-          }
+      // ✅ PRIORIDADE: Usar dados SIH remotos quando disponíveis
+      if (useSihSource && remoteConfigured && sihRemoteTotals) {
+        console.log(`📊 [TOTAIS AGREGADOS] Usando dados SIH remotos: R$ ${sihRemoteTotals.totalValue.toFixed(2)} | ${sihRemoteTotals.totalAIHs} AIHs`);
+        totalBaseSigtap = sihRemoteTotals.totalValue;
+        
+        // Incremento ainda usa cálculo local (mantém comportamento atual)
+        for (const doctor of filteredDoctors) {
+          const stats = doctorStatsCache.get(getDoctorCardKey(doctor));
+          if (stats) totalIncrement += stats.operaParanaIncrement || 0;
         }
+      } else {
+        // ✅ CORREÇÃO: Base SIGTAP deve somar AIHs únicas (não por médico)
+        // Deduplificar por (hospital_id, aih_number) para evitar dupla contagem
+        const uniqueAihKeys = new Set<string>();
 
-        // Incremento segue usando valor pré-calculado por médico (mantém comportamento atual)
-        const stats = doctorStatsCache.get(getDoctorCardKey(doctor));
-        if (stats) totalIncrement += stats.operaParanaIncrement || 0;
+        for (const doctor of filteredDoctors) {
+          // Usar pacientes carregados para cada médico
+          const patients = doctor.patients || [];
+          for (const patient of patients as any[]) {
+            const hospId = (patient?.aih_info?.hospital_id) || (doctor.hospitals?.[0]?.hospital_id) || '';
+            const aihNumRaw = String(patient?.aih_info?.aih_number || '').trim();
+            const dis = String(patient?.aih_info?.discharge_date || '');
+            const aihKey = `${hospId}::${aihNumRaw || `NOAIH:${patient?.aih_id || patient?.patient_id || ''}:${dis}`}`;
+            if (!uniqueAihKeys.has(aihKey)) {
+              uniqueAihKeys.add(aihKey);
+              totalBaseSigtap += Number(patient?.total_value_reais || 0);
+            }
+          }
+
+          // Incremento segue usando valor pré-calculado por médico (mantém comportamento atual)
+          const stats = doctorStatsCache.get(getDoctorCardKey(doctor));
+          if (stats) totalIncrement += stats.operaParanaIncrement || 0;
+        }
       }
 
       console.log(`📊 [TOTAIS AGREGADOS] Base SIGTAP: R$ ${totalBaseSigtap.toFixed(2)} | Incremento: R$ ${totalIncrement.toFixed(2)} | Total: R$ ${(totalBaseSigtap + totalIncrement).toFixed(2)}`);
@@ -2102,7 +2495,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     } catch {
       return { totalBaseSigtap: 0, totalIncrement: 0, totalWithIncrement: 0 };
     }
-  }, [filteredDoctors, doctorStatsCache]);
+  }, [filteredDoctors, doctorStatsCache, useSihSource, remoteConfigured, sihRemoteTotals]);
 
   // 🧮 NOVO KPI: Soma dos Pagamentos Médicos (por médico) para comparação
   // ✅ CORREÇÃO: Somar repasses individuais de cada paciente (igual aos cards individuais)
@@ -2501,12 +2894,41 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                     <div className="text-2xl font-black text-slate-900">
                       {formatCurrency(aggregatedOperaParanaTotals.totalBaseSigtap)}
                     </div>
+                    {useSihSource && remoteConfigured && sihRemoteTotals && (
+                      <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                        <span className="inline-block w-2 h-2 bg-blue-500 rounded-full"></span>
+                        Fonte: SIH Remoto
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center justify-center w-10 h-10 bg-slate-100 rounded-full">
                     <Database className="h-5 w-5 text-slate-600" />
             </div>
           </div>
               </div>
+
+              {/* Total AIHs (SIH Remoto quando disponível) */}
+              {useSihSource && remoteConfigured && sihRemoteTotals && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border-2 border-blue-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">
+                        Total AIHs (SIH Remoto)
+                      </div>
+                      <div className="text-2xl font-black text-blue-700">
+                        {formatNumber(sihRemoteTotals.totalAIHs)}
+                      </div>
+                      <div className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                        <span className="inline-block w-2 h-2 bg-blue-500 rounded-full"></span>
+                        Fonte: Banco SIH
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Valor Total Incrementos */}
               <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-4 border-2 border-emerald-200">
@@ -2563,7 +2985,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             
 
             {/* BOTÕES DE RELATÓRIO - LINHA COMPACTA À ESQUERDA */}
-            <div className="mb-4">
+            <div className="mb-4 hidden">
               <div className="flex flex-wrap gap-2 justify-start items-center">
                 <Button
                   variant="default"
@@ -3268,6 +3690,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                     {/* Pagination Controls - Top */}
                     {totalPages > 1 && (
                       <div className="flex items-center justify-between mb-4">
+                        <div className="text-sm text-muted-foreground">
+                          Mostrando {startIndex + 1}-{Math.min(endIndex, totalDoctors)} de {totalDoctors} médicos
+                        </div>
                         <div className="flex items-center space-x-2">
                           <Button
                             variant="outline"
@@ -3277,7 +3702,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           >
                             <ChevronLeft className="h-4 w-4" />
                           </Button>
-                          
                           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                             <Button
                               key={page}
@@ -3288,7 +3712,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                               {page}
                             </Button>
                           ))}
-                          
                           <Button
                             variant="outline"
                             size="sm"
@@ -3297,10 +3720,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           >
                             <ChevronRight className="h-4 w-4" />
                           </Button>
-                        </div>
-                        
-                        <div className="text-sm text-muted-foreground">
-                          Mostrando {startIndex + 1}-{Math.min(endIndex, totalDoctors)} de {totalDoctors} médicos
                         </div>
                       </div>
                     )}
@@ -3441,7 +3860,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 })()}</span>
                               </div>
                               <div className="flex items-baseline gap-2">
-                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Pacientes Atendidos:</span>
+                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">AIHs (relacionadas):</span>
                                 <span className="text-xs font-bold text-indigo-700">{doctorStats.totalAIHs}</span>
                               </div>
                             </div>
@@ -3909,7 +4328,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           // Se aprovado = NÃO, mostra "" (em branco)
                                           const isApproved = approvedSet.has(String(aihNumber).trim());
                                           const approvedLabel = isApproved ? 'Sim' : 'Não';
-                                          const competenciaLabel = isApproved ? formatCompetencia(p?.aih_info?.competencia) : '';
+                                          const competenciaLabel = getSafeCompetenciaLabel(p, selectedCompetencia, isApproved);
                                           
                                           const dischargeISO = p?.aih_info?.discharge_date || '';
                                           const dischargeLabel = parseISODateToLocal(dischargeISO);

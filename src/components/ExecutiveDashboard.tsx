@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import ImportWizard from './ImportWizard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -17,6 +18,7 @@ import {
   Hospital,
   DollarSign,
   FileText,
+  FileSpreadsheet,
   AlertTriangle,
   AlertCircle,
   CheckCircle,
@@ -344,6 +346,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState('doctors');
+  const [importOpen, setImportOpen] = useState(false);
   const [activeHospitalTab, setActiveHospitalTab] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -1008,6 +1011,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   }
 
   return (
+    <>
     <div className="w-full px-6 space-y-6">
       {/* ✅ CABEÇALHO - DESIGN MINIMALISTA */}
       <Card className="shadow-sm border border-slate-200 bg-white">
@@ -1044,25 +1048,25 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
       {/* ✅ ABAS - DESIGN MINIMALISTA */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <div className="bg-white rounded-xl border-2 border-gray-200 p-1.5 shadow-sm">
-          <TabsList className="grid w-full grid-cols-3 bg-transparent gap-1">
+        <div className="inline-block bg-white rounded-xl border-2 border-gray-200 shadow-sm">
+          <TabsList className="inline-flex items-end gap-1 border-b border-gray-200 bg-transparent px-2 pt-2">
             <TabsTrigger 
               value="doctors" 
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all duration-200 font-semibold text-gray-600 hover:bg-gray-50"
+              className="rounded-t-md border border-gray-200 border-b-0 px-4 py-2 transition-all duration-200 font-semibold text-gray-600 bg-white hover:bg-gray-50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:border-transparent"
             >
               <Users className="h-4 w-4 mr-2" />
               Profissionais
             </TabsTrigger>
             <TabsTrigger 
               value="procedures" 
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all duration-200 font-semibold text-gray-600 hover:bg-gray-50"
+              className="rounded-t-md border border-gray-200 border-b-0 px-4 py-2 transition-all duration-200 font-semibold text-gray-600 bg-white hover:bg-gray-50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:border-transparent"
             >
               <TrendingUp className="h-4 w-4 mr-2" />
               Análise de Performance
             </TabsTrigger>
             <TabsTrigger 
               value="medical-staff" 
-              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all duration-200 font-semibold text-gray-600 hover:bg-gray-50"
+              className="rounded-t-md border border-gray-200 border-b-0 px-4 py-2 transition-all duration-200 font-semibold text-gray-600 bg-white hover:bg-gray-50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:border-transparent"
             >
               <Stethoscope className="h-4 w-4 mr-2" />
               Corpo Médico
@@ -1098,7 +1102,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* ✅ NOVO: Alertas de múltiplas AIHs (igual PatientManagement) */}
             {medicalProductionStats && medicalProductionStats.patientsWithMultipleAIHs && medicalProductionStats.patientsWithMultipleAIHs > 0 && (
               <div className="mt-3">
@@ -1206,6 +1210,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {/* Abas de competência removidas conforme solicitação */}
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Botões de relatório reposicionados para o final da seção */}
             {/* ⚠️ AVISO: Views de banco de dados não encontradas */}
             {showViewsWarning && (
               <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-4">
@@ -1233,9 +1238,9 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             )}
             
             {/* FILTROS EM GRID - DESIGN MINIMALISTA */}
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
               {/* BUSCAR MÉDICO */}
-              <div className="w-full">
+              <div>
                 <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
                   <Stethoscope className="h-3.5 w-3.5 text-blue-600" />
                   Buscar Médico
@@ -1261,7 +1266,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               </div>
 
               {/* BUSCAR PACIENTE */}
-              <div className="w-full">
+              <div>
                 <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
                   <User className="h-3.5 w-3.5 text-green-600" />
                   Buscar Paciente
@@ -1287,7 +1292,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               </div>
 
               {/* FILTRO DE HOSPITAL */}
-              <div className="w-full">
+              <div>
                 <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
                   <Building className="h-3.5 w-3.5 text-purple-600" />
                   Hospital
@@ -1325,7 +1330,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               </div>
 
               {/* FILTRO DE COMPETÊNCIA DE APROVAÇÃO */}
-              <div className="w-full">
+              <div>
                 <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
                   <Calendar className="h-3.5 w-3.5 text-indigo-600" />
                   Competência de Aprovação
@@ -1356,7 +1361,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               </div>
 
               {/* ✅ Filtro: Caráter de Atendimento */}
-              <div className="w-full">
+              <div>
                 <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                   Caráter de Atendimento
@@ -1383,7 +1388,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
 
-              <div className="w-full">
+              <div>
                 <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
                   <Calendar className="h-3.5 w-3.5 text-blue-600" />
                   Alta (Início)
@@ -1396,7 +1401,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 />
               </div>
 
-              <div className="w-full">
+              <div>
                 <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
                   <Calendar className="h-3.5 w-3.5 text-blue-600" />
                   Alta (Fim)
@@ -1473,6 +1478,51 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </div>
               </div>
             )}
+
+            <div className="pt-4 border-t border-gray-100">
+              <div className="flex flex-wrap gap-2 items-center">
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white w-auto min-w-[160px]"
+                  onClick={() => window.dispatchEvent(new Event('mpd:report-general'))}
+                  title="Gerar relatório geral de pacientes"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Relatório Geral
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white w-auto min-w-[160px]"
+                  onClick={() => window.dispatchEvent(new Event('mpd:report-conference'))}
+                  title="Gerar relatório de conferência de pacientes"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Conferência
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white w-auto min-w-[160px]"
+                  onClick={() => window.dispatchEvent(new Event('mpd:report-simplified'))}
+                  title="Gerar relatório simplificado de pacientes"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Simplificado
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white w-auto min-w-[160px]"
+                  onClick={() => setImportOpen(true)}
+                  title="Importar CSVs para staging"
+                >
+                  <FileText className="h-4 w-4" />
+                  Importar CSV
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
         )}
@@ -1510,6 +1560,18 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       
       {/* Gerador de Relatórios removido com a aba */}
     </div>
+    {importOpen && (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+        <div className="bg-white rounded shadow-xl w-full max-w-4xl">
+          <div className="flex items-center justify-between border-b p-3">
+            <div className="font-semibold">Import Wizard</div>
+            <button className="px-3 py-1 bg-gray-200 rounded" onClick={() => setImportOpen(false)}>Fechar</button>
+          </div>
+          <ImportWizard />
+        </div>
+      </div>
+    )}
+  </>
   );
 };
 

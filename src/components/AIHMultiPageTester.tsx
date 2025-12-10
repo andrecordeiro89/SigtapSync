@@ -34,6 +34,8 @@ import {
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx'
+import { supabase } from '../lib/supabase'
 import { useToast } from '../hooks/use-toast';
 import { AIHCompleteProcessor } from '../utils/aihCompleteProcessor';
 import { ProcedureMatchingService } from '../services/procedureMatchingService';
@@ -2187,6 +2189,18 @@ const AIHMultiPageTester = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [aihSaved, setAihSaved] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  // Excel/CSV import state
+  const [hospitalIdExcel, setHospitalIdExcel] = useState('');
+  const [excelPatientsRows, setExcelPatientsRows] = useState<Record<string, any>[]>([]);
+  const [excelAihsRows, setExcelAihsRows] = useState<Record<string, any>[]>([]);
+  const [excelProcRows, setExcelProcRows] = useState<Record<string, any>[]>([]);
+  const [excelLoading, setExcelLoading] = useState(false);
+  const [excelResult, setExcelResult] = useState<any>(null);
+  const [safeMode, setSafeMode] = useState(true)
+  const [dryRun, setDryRun] = useState(false)
+  const [importBatchId, setImportBatchId] = useState('')
+  const [hospitalsList, setHospitalsList] = useState<Array<{id: string; name: string; cnes?: string}>>([])
+  const [hospitalsLoading, setHospitalsLoading] = useState(false)
   const { toast } = useToast();
   const { procedures: sigtapProcedures, isLoading: sigtapLoading, totalProcedures } = useSigtapContext();
   const { user } = useAuth();
@@ -2264,6 +2278,66 @@ const AIHMultiPageTester = () => {
       processSelectedFile(file);
     }
   };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setHospitalsLoading(true)
+        const { data } = await supabase.from('hospitals').select('id,name,cnes').order('name')
+        setHospitalsList(data || [])
+      } finally {
+        setHospitalsLoading(false)
+      }
+    })()
+  }, [])
+
+  // Excel/CSV helpers
+  const parseExcelFile = async (file: File, setRows: (rows: Record<string, any>[]) => void) => {
+    const data = await file.arrayBuffer()
+    const wb = XLSX.read(data, { type: 'array' })
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const rows = XLSX.utils.sheet_to_json<Record<string, any>>(ws, { defval: null })
+    setRows(rows)
+  }
+
+  const insertExcelBatch = async (table: string, rows: Record<string, any>[]) => {
+    const size = 500
+    for (let i = 0; i < rows.length; i += size) {
+      const chunk = rows.slice(i, i + size).map(r => ({ ...r, hospital_id: hospitalIdExcel, import_batch_id: importBatchId || null }))
+      const { error } = await supabase.from(table).insert(chunk)
+      if (error) throw error
+    }
+  }
+
+  const handleExcelImport = async () => {
+    if (!hospitalIdExcel) {
+      toast({ title: 'hospital_id obrigatório', description: 'Informe o hospital_id para vincular os dados', variant: 'destructive' })
+      return
+    }
+    setExcelLoading(true)
+    setExcelResult(null)
+    try {
+      if (dryRun) {
+        const { data, error } = await supabase.rpc('merge_staging_to_core_safe', { p_hospital_id: hospitalIdExcel, p_force_update: !safeMode, p_dry_run: true })
+        if (error) throw error
+        setExcelResult(data)
+        toast({ title: 'Validação concluída', description: 'Dry-run executado. Reveja os totais.', })
+        return
+      }
+      if (excelPatientsRows.length) await insertExcelBatch('staging_patients', excelPatientsRows)
+      if (excelAihsRows.length) await insertExcelBatch('staging_aihs', excelAihsRows)
+      if (excelProcRows.length) await insertExcelBatch('staging_procedure_records', excelProcRows)
+      const { data, error } = await supabase.rpc('merge_staging_to_core_safe', { p_hospital_id: hospitalIdExcel, p_force_update: !safeMode, p_dry_run: false })
+      if (error) throw error
+      setExcelResult(data)
+      toast({ title: 'Importação concluída', description: 'Merge realizado com sucesso', })
+    } catch (e: any) {
+      setExcelResult({ error: e.message })
+      toast({ title: 'Erro na importação', description: String(e.message || e), variant: 'destructive' })
+    } finally {
+      setExcelLoading(false)
+    }
+  }
 
   const handleProcessPDF = async () => {
     if (!selectedFile) {
@@ -3054,6 +3128,151 @@ const AIHMultiPageTester = () => {
               </>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Upload Excel/CSV */}
+      <Card className="border-slate-200/60 shadow-md hover:shadow-lg transition-all duration-300">
+        <CardHeader className="bg-gradient-to-r from-indigo-50 to-white border-b border-slate-100">
+          <CardTitle className="flex items-center space-x-3">
+            <div className="p-2 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-lg shadow-sm">
+              <Database className="w-5 h-5 text-indigo-700" />
+            </div>
+            <span className="text-gray-900">Importar Excel/CSV (patients, aihs, procedure_records)</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+            <div>
+              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-1 block">hospital_id</label>
+              <div className="flex items-center gap-2">
+                <select
+                  value={hospitalIdExcel}
+                  onChange={e => setHospitalIdExcel(e.target.value)}
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-indigo-500 h-10"
+                >
+                  <option value="">Selecione o hospital</option>
+                  {hospitalsLoading && <option value="" disabled>Carregando...</option>}
+                  {hospitalsList.map(h => (
+                    <option key={h.id} value={h.id}>
+                      {h.name}{h.cnes ? ` · CNES ${h.cnes}` : ''}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-indigo-500"
+                  placeholder="UUID manual (opcional)"
+                  value={hospitalIdExcel}
+                  onChange={e => setHospitalIdExcel(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={safeMode} onChange={e => setSafeMode(e.target.checked)} id="safe-mode" />
+                  <label htmlFor="safe-mode" className="text-xs text-gray-700">Modo seguro (não sobrescrever AIHs existentes)</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" checked={dryRun} onChange={e => setDryRun(e.target.checked)} id="dry-run" />
+                  <label htmlFor="dry-run" className="text-xs text-gray-700">Dry-run (somente validar)</label>
+                </div>
+                <div>
+                  <input
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-indigo-500"
+                    placeholder="Lote (import_batch_id opcional)"
+                    value={importBatchId}
+                    onChange={e => setImportBatchId(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <Button
+                onClick={handleExcelImport}
+                disabled={excelLoading || !hospitalIdExcel}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              >
+                {excelLoading ? 'Processando...' : 'Enviar e Mesclar'}
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <div className="font-medium">Patients</div>
+              <input type="file" accept=".csv, .xlsx, .xls" onChange={e => e.target.files && parseExcelFile(e.target.files[0], setExcelPatientsRows)} />
+              <div className="text-xs text-gray-600">{excelPatientsRows.length ? `${excelPatientsRows.length} linhas` : 'Nenhum arquivo selecionado'}</div>
+            </div>
+            <div className="space-y-2">
+              <div className="font-medium">AIHs</div>
+              <input type="file" accept=".csv, .xlsx, .xls" onChange={e => e.target.files && parseExcelFile(e.target.files[0], setExcelAihsRows)} />
+              <div className="text-xs text-gray-600">{excelAihsRows.length ? `${excelAihsRows.length} linhas` : 'Nenhum arquivo selecionado'}</div>
+            </div>
+            <div className="space-y-2">
+              <div className="font-medium">Procedures</div>
+              <input type="file" accept=".csv, .xlsx, .xls" onChange={e => e.target.files && parseExcelFile(e.target.files[0], setExcelProcRows)} />
+              <div className="text-xs text-gray-600">{excelProcRows.length ? `${excelProcRows.length} linhas` : 'Nenhum arquivo selecionado'}</div>
+            </div>
+          </div>
+
+          {/* Pré-validação */}
+          <div className="mt-4 space-y-2">
+            {(() => {
+              const aihNumbers = new Map<string, number>()
+              excelAihsRows.forEach(r => {
+                const n = String(r.aih_number || '').trim()
+                if (!n) return
+                aihNumbers.set(n, (aihNumbers.get(n) || 0) + 1)
+              })
+              const duplicates = Array.from(aihNumbers.entries()).filter(([, c]) => c > 1)
+              const aihSet = new Set(Array.from(aihNumbers.keys()))
+              const procMissing = excelProcRows.filter(r => {
+                const n = String(r.aih_number || '').trim()
+                return !n || !aihSet.has(n)
+              })
+              return (
+                <div className="text-xs">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={duplicates.length ? 'destructive' as any : 'secondary'}>
+                      Duplicatas AIH: {duplicates.length}
+                    </Badge>
+                    <Badge variant={procMissing.length ? 'destructive' as any : 'secondary'}>
+                      Procedimentos sem AIH: {procMissing.length}
+                    </Badge>
+                  </div>
+                  {(duplicates.length || procMissing.length) && (
+                    <div className="text-amber-700 mt-1">
+                      Corrija duplicatas de `aih_number` e garanta que todos os procedimentos referenciem uma AIH válida.
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+          </div>
+
+          {excelResult && (
+            <div className="text-sm bg-indigo-50 border border-indigo-200 rounded p-2">
+              {typeof excelResult === 'object' ? JSON.stringify(excelResult) : String(excelResult)}
+            </div>
+          )}
+          {importBatchId && (
+            <div className="flex items-center gap-2 mt-2">
+              <Button
+                variant="outline"
+                className="border-red-300 text-red-700"
+                onClick={async () => {
+                  try {
+                    const { data, error } = await supabase.rpc('rollback_import_batch', { p_hospital_id: hospitalIdExcel, p_import_batch: importBatchId })
+                    if (error) throw error
+                    toast({ title: 'Rollback concluído', description: JSON.stringify(data) })
+                  } catch (e: any) {
+                    toast({ title: 'Erro no rollback', description: String(e.message || e), variant: 'destructive' })
+                  }
+                }}
+              >
+                Desfazer Lote
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
