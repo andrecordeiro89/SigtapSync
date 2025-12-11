@@ -964,33 +964,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       const { supabaseSih } = await import('../lib/sihSupabase')
       let compYear: number | undefined
       let compMonth: number | undefined
-      if (selectedCompetencia && selectedCompetencia.trim() && selectedCompetencia !== 'all') {
-        const raw = selectedCompetencia.trim()
-        if (/^\d{6}$/.test(raw)) {
-          compYear = parseInt(raw.slice(0, 4), 10)
-          compMonth = parseInt(raw.slice(4, 6), 10)
-        } else {
-          const mDash = raw.match(/^(\d{4})-(\d{2})/)
-          const mSlash = raw.match(/^(\d{2})\/(\d{4})$/)
-          if (mDash) {
-            compYear = parseInt(mDash[1], 10)
-            compMonth = parseInt(mDash[2], 10)
-          } else if (mSlash) {
-            compMonth = parseInt(mSlash[1], 10)
-            compYear = parseInt(mSlash[2], 10)
-          }
-        }
-      }
       const chunkSize = 80
       for (let i = 0; i < uniqueAih.length; i += chunkSize) {
         const ch = uniqueAih.slice(i, i + chunkSize)
-        let spQuery = supabaseSih
+        const { data: spRows } = await supabaseSih
           .from('sih_sp')
           .select('sp_naih')
           .in('sp_naih', ch)
-        if (typeof compMonth === 'number') spQuery = spQuery.eq('sp_mm', compMonth)
-        if (typeof compYear === 'number') spQuery = spQuery.eq('sp_aa', compYear)
-        const { data: spRows } = await spQuery
         if (spRows && spRows.length > 0) {
           spRows.forEach((r: any) => {
             const k = normalizeAih(String(r.sp_naih || '').trim())
@@ -998,10 +978,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           })
         }
       }
-      const approved = (doctor.patients || []).reduce((acc: number, p: any) => {
-        const aih = normalizeAih(String(p?.aih_info?.aih_number || '').trim())
-        return acc + (aih && approvedSetRef.current.has(aih) ? 1 : 0)
-      }, 0)
+      const approved = uniqueAih.filter((k: string) => approvedSetRef.current.has(k)).length
       const notApproved = Math.max(totalPatients - approved, 0)
       setSimplifiedValidationStats({ total: totalPatients, approved, notApproved, remote: true })
     } catch {

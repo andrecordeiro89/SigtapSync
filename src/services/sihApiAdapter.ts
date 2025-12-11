@@ -108,6 +108,23 @@ export const SihApiAdapter = {
     if (localHospErr) logger.warn('Erro ao mapear hospitais locais', localHospErr)
     const hospByCnes = new Map((localHosp || []).map(h => [String(h.cnes), h]))
 
+    // 5) Carregar AIHs locais correspondentes para obter CNS responsável e dados de paciente
+    const { data: localAihRows } = await supabase
+      .from('aihs')
+      .select('aih_number, cns_responsavel, hospital_id, patients(name, medical_record)')
+      .in('aih_number', aihNumbers)
+    const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
+    const localRespByAih = new Map<string, string>()
+    const localPatientByAih = new Map<string, { name?: string; medical_record?: string }>()
+    ;(localAihRows || []).forEach((r: any) => {
+      const k = normalizeAih(String(r.aih_number || ''))
+      if (!k) return
+      if (r.cns_responsavel) localRespByAih.set(k, String(r.cns_responsavel))
+      const nm = r?.patients?.name
+      const mr = r?.patients?.medical_record
+      if (nm || mr) localPatientByAih.set(k, { name: nm, medical_record: mr })
+    })
+
     const procCodesRaw = Array.from(new Set(spResults.map(p => String(p.sp_atoprof)).filter(Boolean)))
     const procCodes = procCodesRaw.map(formatSigtapCode)
     const procCodesPlain = procCodes.map(c => c.replace(/\D/g, ''))
@@ -135,22 +152,26 @@ export const SihApiAdapter = {
 
     // Pré-carregar dados de médicos locais por CNS
     const doctorCnsAll = Array.from(new Set(spResults.map(r => String(r.sp_pf_doc)).filter(Boolean)))
+    const localCnsAll = Array.from(new Set(Array.from(localRespByAih.values()).filter(Boolean)))
     const { data: localDoctors } = await supabase
       .from('doctors')
       .select('id,name,cns,crm,specialty')
-      .in('cns', doctorCnsAll)
+      .in('cns', Array.from(new Set([...doctorCnsAll, ...localCnsAll])))
 
     const doctorByCns = new Map((localDoctors || []).map(d => [String(d.cns), d]))
 
     // 7) Montar hierarquia: médico → AIH (como paciente) → procedimentos
     for (const rd of rdData || []) {
       const aih = String(rd.n_aih)
+      const aihKey = normalizeAih(aih)
       const cnes = String(rd.cnes)
       const hosp = hospByCnes.get(cnes)
       const procs = spByAih.get(aih) || []
 
       // Cada AIH pode aparecer para múltiplos médicos (cada profissional do SP)
       const doctorCnsInAih = Array.from(new Set(procs.map(p => String(p.sp_pf_doc)).filter(Boolean)))
+      const localResp = localRespByAih.get(aihKey)
+      if (localResp) doctorCnsInAih.push(localResp)
 
       // Construir procedimentos detalhados
       const procedures: ProcedureDetail[] = procs.map((p, idx) => {
@@ -188,15 +209,16 @@ export const SihApiAdapter = {
         }
       })
 
+      const patientLocalInfo = localPatientByAih.get(aihKey)
       const patientEntry = {
         patient_id: undefined,
         aih_id: undefined,
         patient_info: {
-          name: 'Nome não disponível',
+          name: patientLocalInfo?.name || 'Nome não disponível',
           cns: '',
           birth_date: String(rd.nasc || ''),
           gender: '',
-          medical_record: '-',
+          medical_record: patientLocalInfo?.medical_record || '-',
           age: Number(rd.idade || 0)
         },
         aih_info: {
