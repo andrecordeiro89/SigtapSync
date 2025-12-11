@@ -1214,7 +1214,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       doc.setDrawColor(200, 200, 200)
       doc.setLineWidth(0.5)
       doc.line(20, yPosition, pageWidth - 20, yPosition)
-      const startY = yPosition + 10
+      const metricY = yPosition + 7
+      const patientsCount = tableData.length
+      doc.setFontSize(10)
+      doc.setTextColor(60, 60, 60)
+      doc.text('Pacientes:', 20, metricY)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(0, 51, 102)
+      doc.text(String(patientsCount), 48, metricY)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      doc.text('Valor Total:', pageWidth - 90, metricY)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(0, 102, 0)
+      doc.text(formatCurrency(totalRepasse), pageWidth - 20, metricY, { align: 'right' })
+      const startY = yPosition + 16
       autoTable(doc, {
         head: [['Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Comp. Aprovação', 'Homologado (SIH)', 'Valor de Repasse']],
         body: tableData,
