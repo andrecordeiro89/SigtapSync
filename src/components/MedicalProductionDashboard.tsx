@@ -1062,14 +1062,25 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           const candidate = nameByAih.get(aihNumber)
           name = candidate || (name || 'Paciente')
         }
-        const mainProc = (p.procedures || [])
-          .reduce((max: any, proc: any) => {
+        const procsAll = p.procedures || []
+        const mainCandidates = procsAll.filter((proc: any) => (typeof proc.registration_instrument === 'string' ? proc.registration_instrument.includes('03') : false) && (proc.cbo !== '225151'))
+        let mainProc = mainCandidates.length > 0 ? mainCandidates[0] : null
+        if (!mainProc) {
+          const seqSorted = procsAll.filter((x: any) => x.cbo !== '225151' && typeof x.sequence === 'number').sort((a: any, b: any) => (a.sequence || 9999) - (b.sequence || 9999))
+          mainProc = seqSorted[0] || null
+        }
+        if (!mainProc) {
+          mainProc = procsAll.filter((x: any) => x.cbo !== '225151').reduce((max: any, proc: any) => {
             const v = typeof proc.value_reais === 'number' ? proc.value_reais : 0
             const mv = typeof (max && max.value_reais) === 'number' ? max.value_reais : -1
             return v > mv ? proc : max
           }, null as any)
-        const mainProcDesc = ((mainProc?.procedure_description || mainProc?.sigtap_description || '') as string).trim()
-        const proceduresDisplay = mainProcDesc || 'Sem procedimento principal'
+        }
+        const mainCode = mainProc?.procedure_code || ''
+        const mainCodeDigits = mainCode.replace(/\D/g, '')
+        const descFallback = mainCode && sigtapMap ? ((sigtapMap.get(mainCode) || sigtapMap.get(mainCodeDigits) || '') as string) : ''
+        const mainProcDesc = ((mainProc?.procedure_description || mainProc?.sigtap_description || descFallback || '') as string).trim()
+        const proceduresDisplay = mainProcDesc || (mainCode ? `Procedimento ${mainCode}` : 'Sem procedimento principal')
         const dischargeISO = p?.aih_info?.discharge_date || ''
         const dischargeLabel = parseISODateToLocal(dischargeISO)
         
@@ -4321,7 +4332,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               return v > mv ? proc : max;
                                             }, null as any);
                                           const mainProcDesc = ((mainProc?.procedure_description || mainProc?.sigtap_description || '') as string).trim();
-                                          const proceduresDisplay = mainProcDesc || 'Sem procedimento principal';
+                                          const proceduresDisplay = mainProcDesc || (mainProc?.procedure_code ? `Procedimento ${mainProc.procedure_code}` : 'Sem procedimento principal');
                                           const aihNumber = p?.aih_info?.aih_number || '-';
                                           // ✅ CORREÇÃO: Lógica de pendência sincronizada
                                           // Se aprovado = SIM, mostra a competência

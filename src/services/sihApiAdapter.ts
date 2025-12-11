@@ -110,13 +110,14 @@ export const SihApiAdapter = {
 
     const procCodesRaw = Array.from(new Set(spResults.map(p => String(p.sp_atoprof)).filter(Boolean)))
     const procCodes = procCodesRaw.map(formatSigtapCode)
+    const procCodesPlain = procCodes.map(c => c.replace(/\D/g, ''))
     const localCsvMap = await getSigtapLocalMap()
     let remoteDescMap = new Map<string, string>()
     if (supabaseSih) {
       const { data: remoteProcRows } = await supabaseSih
         .from('sigtap_procedimentos')
         .select('code, description')
-        .in('code', procCodes)
+        .in('code', Array.from(new Set([...procCodes, ...procCodesPlain])))
       if (remoteProcRows && remoteProcRows.length > 0) {
         remoteDescMap = new Map(remoteProcRows.map(r => [String(r.code), String(r.description)]))
       }
