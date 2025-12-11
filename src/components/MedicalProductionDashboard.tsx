@@ -728,6 +728,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [simplifiedValidationLoading, setSimplifiedValidationLoading] = useState<boolean>(false)
   const [simplifiedValidationStats, setSimplifiedValidationStats] = useState<{ total: number; approved: number; notApproved: number; remote: boolean } | null>(null)
   const approvedSetRef = useRef<Set<string>>(new Set())
+  const approvalCompetenciaByAihRef = useRef<Map<string, string>>(new Map())
   const [selectedDoctorForReport, setSelectedDoctorForReport] = useState<any>(null)
   const [sihRemoteTotals, setSihRemoteTotals] = useState<{ totalValue: number; totalAIHs: number; source: string } | null>(null)
   const generateGeneralPatientsReport = async () => {
@@ -947,6 +948,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const validateSimplifiedReport = async (doctor: any) => {
     try {
       approvedSetRef.current = new Set()
+      approvalCompetenciaByAihRef.current = new Map()
       const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
       const allAihNumbers = (doctor.patients || [])
         .map((p: any) => normalizeAih(String(p?.aih_info?.aih_number || '').trim()))
@@ -969,12 +971,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const ch = uniqueAih.slice(i, i + chunkSize)
         const { data: spRows } = await supabaseSih
           .from('sih_sp')
-          .select('sp_naih')
+          .select('sp_naih, sp_mm, sp_aa')
           .in('sp_naih', ch)
         if (spRows && spRows.length > 0) {
           spRows.forEach((r: any) => {
             const k = normalizeAih(String(r.sp_naih || '').trim())
             if (k) approvedSetRef.current.add(k)
+            const mm = String(r.sp_mm || '').padStart(2, '0')
+            const yy = String(r.sp_aa || '').padStart(4, '0')
+            if (yy && mm) approvalCompetenciaByAihRef.current.set(k, `${yy}-${mm}-01`)
           })
         }
       }
@@ -1064,8 +1069,34 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         // ✅ CORREÇÃO (CÓDIGO DUPLICADO): Lógica de pendência sincronizada
         const isApproved = approvedSetRef.current.has(aihNumber);
         const approvedLabel = isApproved ? 'Sim' : 'Não';
-        // Se não aprovado, Comp. Aprovação deve ficar em branco (aguardando retorno)
-        const competenciaLabel = getSafeCompetenciaLabel(p, selectedCompetencia, isApproved);
+        const prodCompISO = (p?.aih_info?.competencia || '') as string
+        const prodCompLabel = formatCompetencia(prodCompISO)
+        const apprCompISO = approvalCompetenciaByAihRef.current.get(aihNumber)
+        const apprCompLabel = apprCompISO ? formatCompetencia(apprCompISO) : ''
+        // Destacar produção em vermelho apenas quando mês de alta ≠ competência selecionada
+        let highlightProd = false
+        if (selectedCompetencia && selectedCompetencia !== 'all') {
+          const mDash = selectedCompetencia.match(/^(\d{4})-(\d{2})/)
+          const m6 = selectedCompetencia.match(/^(\d{4})(\d{2})$/)
+          const selY = mDash ? parseInt(mDash[1], 10) : (m6 ? parseInt(m6[1], 10) : undefined)
+          const selM = mDash ? parseInt(mDash[2], 10) : (m6 ? parseInt(m6[2], 10) : undefined)
+          if (selY && selM && dischargeISO) {
+            const d = new Date(dischargeISO)
+            highlightProd = (d.getUTCFullYear() !== selY) || (d.getUTCMonth() + 1 !== selM)
+          }
+        }
+        const disCompISO = (() => {
+          if (!dischargeISO) return ''
+          const d = new Date(dischargeISO)
+          const yy = String(d.getUTCFullYear()).padStart(4, '0')
+          const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+          return `${yy}-${mm}-01`
+        })()
+        const disCompLabel = formatCompetencia(disCompISO)
+        const leftLabel = highlightProd ? disCompLabel : prodCompLabel
+        const competenciaLabel = isApproved
+          ? (apprCompLabel ? `${highlightProd ? '§' : ''}${leftLabel} | ${apprCompLabel}` : `${highlightProd ? '§' : ''}${leftLabel}`)
+          : ''
         
         const proceduresWithPayment = p.procedures
           .filter((proc: any) => 
@@ -1204,7 +1235,40 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         },
         styles: { overflow: 'linebreak', cellPadding: 2, fontSize: 8 },
         margin: { left: 15, right: 15 },
-        alternateRowStyles: { fillColor: [245, 245, 245] }
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        didParseCell: (data: any) => {
+          if (data.section === 'body' && data.column.index === 5) {
+            const t = (data.cell.text || []).join(' ')
+            ;(data.cell as any).compText = t
+            data.cell.text = ['']
+          }
+        },
+        didDrawCell: (data: any) => {
+          if (data.section === 'body' && data.column.index === 5) {
+            const t: string = (data.cell as any).compText || ''
+            if (!t) return
+            const mark = t.startsWith('§')
+            const txt = mark ? t.slice(1) : t
+            const parts = txt.split(' | ')
+            const x = (data.cell.textPos && typeof data.cell.textPos.x === 'number')
+              ? data.cell.textPos.x
+              : data.cell.x + 2
+            const y = (data.cell.textPos && typeof data.cell.textPos.y === 'number')
+              ? data.cell.textPos.y
+              : data.cell.y + (data.cell.height / 2) + 3
+            if (parts.length === 2) {
+              doc.setTextColor(mark ? 200 : 50, mark ? 0 : 50, mark ? 0 : 50)
+              doc.text(parts[0], x, y)
+              doc.setTextColor(50, 50, 50)
+              const w = doc.getTextWidth(parts[0] + ' ')
+              doc.text('| ' + parts[1], x + w, y)
+            } else {
+              doc.setTextColor(mark ? 200 : 50, mark ? 0 : 50, mark ? 0 : 50)
+              doc.text(txt, x, y)
+            }
+            doc.setTextColor(50, 50, 50)
+          }
+        }
       })
       const finalY = (doc as any).lastAutoTable?.finalY || startY + 50
       const footerY = pageHeight - 20

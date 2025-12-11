@@ -171,7 +171,6 @@ export const SihApiAdapter = {
       // Cada AIH pode aparecer para múltiplos médicos (cada profissional do SP)
       const doctorCnsInAih = Array.from(new Set(procs.map(p => String(p.sp_pf_doc)).filter(Boolean)))
       const localResp = localRespByAih.get(aihKey)
-      if (localResp) doctorCnsInAih.push(localResp)
 
       // Construir procedimentos detalhados
       const procedures: ProcedureDetail[] = procs.map((p, idx) => {
@@ -227,7 +226,12 @@ export const SihApiAdapter = {
           aih_number: aih,
           care_character: String(rd.car_int || ''),
           hospital_id: hosp?.id,
-          competencia: String(rd.mes_cmpt || ''),
+          competencia: (() => {
+            const yy = String(rd.ano_cmpt || '').padStart(4, '0')
+            const mm = String(rd.mes_cmpt || '').padStart(2, '0')
+            return yy && mm ? `${yy}-${mm}-01` : ''
+          })(),
+          cns_responsavel: localResp || undefined,
           pgt_adm: undefined,
           main_cid: String(rd.diag_princ || ''),
           specialty: String(rd.espec || ''),
@@ -240,8 +244,11 @@ export const SihApiAdapter = {
         common_name: null
       }
 
-      // Anexar a AIH ao(s) médico(s) da SP
-      for (const dcns of doctorCnsInAih.length > 0 ? doctorCnsInAih : ['NAO_IDENTIFICADO']) {
+      // Anexar AIH ao médico correto
+      // Regra: se existir responsável local, atribuir exclusivamente a ele;
+      // caso contrário, atribuir aos médicos presentes na SP (ou marcador NAO_IDENTIFICADO)
+      const assignList = localResp ? [localResp] : (doctorCnsInAih.length > 0 ? doctorCnsInAih : ['NAO_IDENTIFICADO'])
+      for (const dcns of assignList) {
         if (!doctorsMap.has(dcns)) {
           const d = doctorByCns.get(dcns)
           doctorsMap.set(dcns, {
