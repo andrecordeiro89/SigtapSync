@@ -92,6 +92,7 @@ interface AIH {
   cns_responsavel?: string; // ✅ CNS do médico responsável
   competencia?: string; // ✅ Competência SUS (YYYY-MM-DD)
   pgt_adm?: 'sim' | 'não'; // ✅ Pagamento Administrativo (padrão: "não")
+  patient_id?: string; // ✅ ID do paciente (quando disponível na view)
   hospitals?: { name: string };
   processed_at?: string;
   processed_by_name?: string;
@@ -125,7 +126,7 @@ interface HospitalStats {
 
 // Interface para dados unificados
 interface UnifiedAIHData extends AIH {
-  patient: Patient | null;
+  patient: AIH['patients'] | null;
   matches: AIH['aih_matches'];
   processed_at_formatted?: string;
   created_by_profile?: {
@@ -496,7 +497,7 @@ const PatientManagement = () => {
           const newList = prev.map((aih, index) => {
             if (aih.id === aihId) {
               matchFound = true;
-              const patientName = (aih.patient || aih.patients)?.name;
+              const patientName = (aih.patients)?.name;
               console.log('🎯 ATUALIZANDO AIH NA UI:', {
                 index,
                 paciente: patientName,

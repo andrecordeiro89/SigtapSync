@@ -4049,6 +4049,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           {/* BOTÕES DE AÇÃO - GRID HORIZONTAL */}
                           <div className="mt-4 pt-3 border-t border-gray-100">
                             <div className="flex flex-wrap gap-2 justify-start items-center">
+                                  
                                   <Button
                                     type="button"
                                     onClick={(e) => {
@@ -4249,6 +4250,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     <FileSpreadsheet className="h-4 w-4" />
                                     Relatório Pacientes
                                   </Button>
+                                  
                                    <Button
                                      type="button"
                                      onClick={async (e) => {
@@ -4633,7 +4635,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     <FileSpreadsheet className="h-4 w-4" />
                                     Relatório Pacientes Simplificado
                                    </Button>
-                                   
+                                   {false && (<>
                                    {/* 📋 PROTOCOLO DE ATENDIMENTO APROVADO */}
                                   <Button
                                     type="button"
@@ -5253,6 +5255,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     <FileText className="h-4 w-4" />
                                     Protocolo Atendimento Atual
                                   </Button>
+                                  </>)}
                             </div>
                           </div>
                         </div>
