@@ -136,7 +136,8 @@ export class DoctorPatientService {
         const result = await SihApiAdapter.getDoctorsWithPatients({
           hospitalIds: options?.hospitalIds,
           competencia: options?.competencia,
-          dischargeDateRange: options?.dischargeDateRange
+          dischargeDateRange: options?.dischargeDateRange,
+          filterCareCharacter: options?.filterCareCharacter
         })
         console.log(`✅ [SIH REMOTO] Fonte alternada. Médicos carregados: ${result?.length || 0}`)
         return result || []

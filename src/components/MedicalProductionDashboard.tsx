@@ -2480,22 +2480,41 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         }
       }
       
+      // Mapear hospitalIds locais → CNES
+      let cnesList: string[] = [];
+      if (hospitalIds.length > 0) {
+        const { data: hospData } = await supabase
+          .from('hospitals')
+          .select('id,cnes')
+          .in('id', hospitalIds);
+        cnesList = (hospData || []).map((h: any) => String(h.cnes)).filter(Boolean);
+      }
+
       // Construir query para sih_rd (resumo por competência/hospital)
       let query = supabaseSih
         .from('sih_rd')
-        .select('rd_val_tot, rd_qt_aih, rd_mnem, rd_ano, rd_mes')
+        .select('rd_val_tot, rd_qt_aih, rd_mnem, rd_ano, rd_mes, cnes, ano_cmpt, mes_cmpt, car_int')
         .not('rd_val_tot', 'is', null)
         .not('rd_qt_aih', 'is', null);
       
       // Aplicar filtros
-      if (hospitalIds.length > 0) {
+      if (cnesList.length > 0) {
+        query = query.in('cnes', cnesList);
+      } else if (hospitalIds.length > 0) {
+        // Fallback
         query = query.in('rd_mnem', hospitalIds);
       }
       if (typeof compYear === 'number') {
-        query = query.eq('rd_ano', compYear);
+        query = query.eq('ano_cmpt', compYear).eq('rd_ano', compYear);
       }
       if (typeof compMonth === 'number') {
-        query = query.eq('rd_mes', compMonth);
+        query = query.eq('mes_cmpt', compMonth).eq('rd_mes', compMonth);
+      }
+      // Filtro por Caráter de Atendimento quando aplicável
+      if (filterCareCharacter && filterCareCharacter !== 'all') {
+        const raw = String(filterCareCharacter).trim();
+        const carIntValue = raw === '1' ? '01' : raw === '2' ? '02' : raw;
+        query = query.eq('car_int', carIntValue);
       }
       
       const { data, error } = await query;
@@ -2512,8 +2531,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       
       // Calcular totais agregados
       const totals = data.reduce((acc, row) => {
-        acc.totalValue += Number(row.rd_val_tot) || 0;
-        acc.totalAIHs += Number(row.rd_qt_aih) || 0;
+        acc.totalValue += Number(row.rd_val_tot ?? row.val_tot) || 0;
+        acc.totalAIHs += Number(row.rd_qt_aih ?? row.qt_aih) || 0;
         return acc;
       }, { totalValue: 0, totalAIHs: 0 });
       

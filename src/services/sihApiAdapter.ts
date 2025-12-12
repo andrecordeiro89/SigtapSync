@@ -9,6 +9,7 @@ type LoadOptions = {
   hospitalIds?: string[]
   competencia?: string
   dischargeDateRange?: { from?: string; to?: string }
+  filterCareCharacter?: '1' | '2' | string
 }
 
 const chunk = <T>(arr: T[], size = 80): T[][] => {
@@ -74,6 +75,13 @@ export const SihApiAdapter = {
       if (from) rdQuery = rdQuery.gte('dt_saida', from)
       if (endExclusive) rdQuery = rdQuery.lt('dt_saida', endExclusive.toISOString().slice(0, 10))
       rdQuery = rdQuery.not('dt_saida', 'is', null)
+    }
+
+    // Filtro por Caráter de Atendimento (car_int) – valores no SIH são '01' e '02'
+    if (options.filterCareCharacter) {
+      const raw = String(options.filterCareCharacter).trim()
+      const carIntValue = raw === '1' ? '01' : raw === '2' ? '02' : raw
+      rdQuery = rdQuery.eq('car_int', carIntValue)
     }
 
     const { data: rdData, error: rdError } = await rdQuery
