@@ -111,16 +111,6 @@ export const computeIncrementForProcedures = (
   const procs = Array.isArray(procedures) ? procedures : [];
   if (procs.length === 0) return 0;
 
-  // NOVA REGRA PORTARIA: Se QUALQUER procedimento excluído estiver presente na AIH,
-  // nenhum procedimento é contemplado com incremento (retornar 0 diretamente)
-  const hasAnyExcludedInAIH = procs.some(p => {
-    const normalized = normalizeSigtapCode((p.procedure_code || '').toString());
-    return OPERA_PARANA_EXCLUDED_CODES.has(normalized);
-  });
-  if (hasAnyExcludedInAIH) {
-    return 0;
-  }
-
   // Regra 1: Eletivo (Opera Paraná 150%)
   if (isElectiveCare(careCharacter)) {
     if (!isDoctorCoveredForOperaParana(doctorName, hospitalId)) return 0;
@@ -158,10 +148,6 @@ export const getProcedureIncrementMeta = (
   hospitalId?: string,
   aihHasExcluded?: boolean
 ): { factor: number; label: string } | null => {
-  // Bloqueio global por AIH: se contiver qualquer procedimento excluído, não exibir incremento
-  if (aihHasExcluded) {
-    return null;
-  }
   // Prioridade: 150% eletivo, quando elegível e médico contemplado (total = 2.5x)
   if (isElectiveCare(careCharacter) && isDoctorCoveredForOperaParana(doctorName, hospitalId) && isOperaParanaEligible(procedureCode || '', '1')) {
     return { factor: 2.5, label: 'Opera Paraná +150%' };
