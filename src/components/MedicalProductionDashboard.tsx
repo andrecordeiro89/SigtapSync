@@ -886,6 +886,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       let idx = 1
       const allPatients: any[] = []
       const globalSeen = new Set<string>()
+      const cnsNameMap = new Map<string, string>(
+        (filteredDoctors || []).map((d: any) => [String(d?.doctor_info?.cns || '').trim(), d?.doctor_info?.name || ''])
+      )
       filteredDoctors.forEach((card: any) => {
         const doctorName = card.doctor_info?.name || 'Médico não identificado'
         const doctorPatients = dedupPatientsByAIH(card.patients || [])
@@ -906,7 +909,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           const increment = Math.round(incrementRaw * 100) / 100
           const aihWithIncrements = Math.round((baseAih + increment) * 100) / 100
           const pgtAdm = p?.aih_info?.pgt_adm || 'não'
-          allPatients.push({ name, medicalRecord, aih: aihDisplay, admissionLabel, dischargeLabel, doctorName, pgtAdm, baseAih, increment, aihWithIncrements })
+          const respCns = String(((p?.aih_info?.cns_responsavel ?? p?.aih_info?.cns_responsible) || '')).trim()
+          const resolvedDoctorName = (respCns && !isZeroCns(respCns)) ? (cnsNameMap.get(respCns) || doctorName) : doctorName
+          allPatients.push({ name, medicalRecord, aih: aihDisplay, admissionLabel, dischargeLabel, doctorName: resolvedDoctorName, pgtAdm, baseAih, increment, aihWithIncrements })
         })
       })
       allPatients.sort((a, b) => {

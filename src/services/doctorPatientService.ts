@@ -487,6 +487,99 @@ export class DoctorPatientService {
         } catch {}
       }
 
+      // 3.1) Incluir Anestesiologistas visíveis na aba, mesmo sem serem responsáveis
+      // Buscar médicos com especialidade contendo "anest"
+      let anesthDoctors: Array<{ id: string; name: string; cns: string; crm: string; specialty: string }> = []
+      try {
+        const { data: anesthDocs } = await supabase
+          .from('doctors')
+          .select('id, name, cns, crm, specialty')
+          .ilike('specialty', '%anest%')
+          .eq('is_active', true)
+        anesthDoctors = anesthDocs || []
+      } catch {}
+
+      const anesthByName = new Map<string, { id: string; name: string; cns: string; crm: string; specialty: string }>(
+        (anesthDoctors || []).map(d => [String(d.name || '').trim(), d])
+      )
+
+      // Mapear procedimentos por AIH para identificar anestesistas atuantes
+      for (const aih of aihs as any[]) {
+        const aihId = aih.id
+        const hospitalId = aih.hospital_id
+        const procs = (aihId && procsByAih.success) ? (procsByAih.proceduresByAihId.get(aihId) || []) : []
+        for (const p of procs) {
+          const cbo = String(p.professional_cbo || p.cbo || '')
+          const profName = String(p.professional_name || '').trim()
+          if (cbo === '225151' && profName && anesthByName.has(profName)) {
+            const docInfo = anesthByName.get(profName)!
+            const key = docInfo.cns || `NAME:${profName}`
+            if (!doctorMap.has(key)) {
+              const hospitalData = hospitalsMap.get(hospitalId)
+              doctorMap.set(key, {
+                key,
+                doctor_info: {
+                  name: docInfo.name,
+                  cns: docInfo.cns || key,
+                  crm: docInfo.crm || '',
+                  specialty: docInfo.specialty || 'Anestesiologia'
+                },
+                hospitals: hospitalId ? [{
+                  hospital_id: hospitalId,
+                  hospital_name: hospitalData?.name || '',
+                  cnes: hospitalData?.cnes,
+                  is_active: true
+                } as any] : [],
+                patients: [],
+                hospitalIds: new Set(hospitalId ? [hospitalId] : [])
+              } as any)
+            } else if (hospitalId) {
+              const d = doctorMap.get(key)! as any
+              d.hospitalIds.add(hospitalId)
+              d.hospitals = Array.from(d.hospitalIds).map((hid: string) => {
+                const hdata = hospitalsMap.get(hid)
+                return {
+                  hospital_id: hid,
+                  hospital_name: hdata?.name || '',
+                  cnes: hdata?.cnes,
+                  is_active: true
+                }
+              })
+            }
+
+            // Adicionar paciente desta AIH ao anestesista (valor financeiro zerado para evitar dupla contagem)
+            const pat = aih.patients as any
+            const entry: PatientWithProcedures = {
+              patient_id: aih.patient_id,
+              aih_id: aih.id,
+              patient_info: {
+                name: pat?.name || 'Paciente',
+                cns: pat?.cns || '',
+                birth_date: pat?.birth_date || '',
+                gender: pat?.gender || '',
+                medical_record: pat?.medical_record || ''
+              },
+              aih_info: {
+                admission_date: aih.admission_date,
+                discharge_date: aih.discharge_date,
+                aih_number: aih.aih_number,
+                care_character: aih.care_character,
+                hospital_id: aih.hospital_id,
+                competencia: aih.competencia,
+                pgt_adm: aih.pgt_adm || 'não'
+              },
+              total_value_reais: 0,
+              procedures: [],
+              total_procedures: 0,
+              approved_procedures: 0
+            }
+            const doc = doctorMap.get(key)! as any
+            const already = (doc.patients as any[]).some((x: any) => x.aih_id === entry.aih_id)
+            if (!already) (doc.patients as any[]).push(entry)
+          }
+        }
+      }
+
       const result = Array.from(doctorMap.values()).map((d: any) => ({
         doctor_info: d.doctor_info,
         hospitals: d.hospitals,
