@@ -1057,13 +1057,15 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               <Users className="h-4 w-4 mr-2" />
               Profissionais
             </TabsTrigger>
-            <TabsTrigger 
-              value="procedures" 
-              className="rounded-t-md border border-gray-200 border-b-0 px-4 py-2 transition-all duration-200 font-semibold text-gray-600 bg-white hover:bg-gray-50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:border-transparent"
-            >
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Análise de Performance
-            </TabsTrigger>
+            {false && (
+              <TabsTrigger 
+                value="procedures" 
+                className="rounded-t-md border border-gray-200 border-b-0 px-4 py-2 transition-all duration-200 font-semibold text-gray-600 bg-white hover:bg-gray-50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:border-transparent"
+              >
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Análise de Performance
+              </TabsTrigger>
+            )}
             <TabsTrigger 
               value="medical-staff" 
               className="rounded-t-md border border-gray-200 border-b-0 px-4 py-2 transition-all duration-200 font-semibold text-gray-600 bg-white hover:bg-gray-50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:border-transparent"
@@ -1550,10 +1552,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           <MedicalStaffDashboard />
         </TabsContent>
 
-        {/* TAB: PROCEDIMENTOS */}
-        <TabsContent value="procedures" className="space-y-6">
-          <ProcedureHierarchyDashboard selectedHospitals={selectedHospitals} searchTerm={searchTerm} />
-        </TabsContent>
+        {false && (
+          <TabsContent value="procedures" className="space-y-6">
+            <ProcedureHierarchyDashboard selectedHospitals={selectedHospitals} searchTerm={searchTerm} />
+          </TabsContent>
+        )}
 
         {/* Aba Relatórios removida */}
       </Tabs>
