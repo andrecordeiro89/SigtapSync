@@ -119,12 +119,22 @@ export const SihApiAdapter = {
     // 5) Carregar AIHs locais correspondentes para obter CNS responsável e dados de paciente
     let localAihQuery = supabase
       .from('aihs')
-      .select('aih_number, cns_responsavel, hospital_id, patients(name, medical_record)')
+      .select('aih_number, cns_responsavel, hospital_id, discharge_date, competencia, patients(name, medical_record)')
     const localHospitalIds = Array.from(new Set((rdData || []).map(r => String(r.cnes)).filter(Boolean))).map(c => hospByCnes.get(String(c))?.id).filter(Boolean) as string[]
     if (localHospitalIds.length > 0) localAihQuery = localAihQuery.in('hospital_id', localHospitalIds)
+    // Aplicar filtros primários (competência e período de alta) para priorizar nomes do recorte atual
     if (typeof compYear === 'number' && typeof compMonth === 'number') {
       const compISO = `${String(compYear).padStart(4, '0')}-${String(compMonth).padStart(2, '0')}-01`
       localAihQuery = localAihQuery.eq('competencia', compISO)
+    }
+    if (options.dischargeDateRange && (options.dischargeDateRange.from || options.dischargeDateRange.to)) {
+      const from = options.dischargeDateRange.from || undefined
+      const to = options.dischargeDateRange.to || undefined
+      const endExclusive = to ? new Date(to) : undefined
+      if (endExclusive) endExclusive.setDate(endExclusive.getDate() + 1)
+      if (from) localAihQuery = localAihQuery.gte('discharge_date', from)
+      if (endExclusive) localAihQuery = localAihQuery.lt('discharge_date', endExclusive.toISOString().slice(0, 10))
+      localAihQuery = localAihQuery.not('discharge_date', 'is', null)
     }
     const { data: localAihRows } = await localAihQuery
     const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
@@ -138,6 +148,26 @@ export const SihApiAdapter = {
       const mr = r?.patients?.medical_record
       if (nm || mr) localPatientByAih.set(k, { name: nm, medical_record: mr })
     })
+
+    // Fallback: completar nomes por AIH sem respeitar competência/alta, usando a lista de AIHs remotas
+    const missingKeys = aihNumbers
+      .map(n => normalizeAih(String(n)))
+      .filter(k => k && !localPatientByAih.has(k))
+    if (missingKeys.length > 0) {
+      const { data: localAihByNumber } = await supabase
+        .from('aihs')
+        .select('aih_number, patients(name, medical_record), cns_responsavel')
+        .in('aih_number', missingKeys)
+      ;(localAihByNumber || []).forEach((r: any) => {
+        const k = normalizeAih(String(r.aih_number || ''))
+        if (!k) return
+        const nm = r?.patients?.name
+        const mr = r?.patients?.medical_record
+        if (nm || mr) localPatientByAih.set(k, { name: nm, medical_record: mr })
+        const resp = r?.cns_responsavel
+        if (resp && !localRespByAih.has(k)) localRespByAih.set(k, String(resp))
+      })
+    }
 
     const procCodesRaw = Array.from(new Set(spResults.map(p => String(p.sp_atoprof)).filter(Boolean)))
     const procCodes = procCodesRaw.map(formatSigtapCode)

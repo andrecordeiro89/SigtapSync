@@ -924,6 +924,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         return a.name.toLowerCase().localeCompare(b.name.toLowerCase())
       })
       allPatients.forEach((patient) => {
+        if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
+          const parse = (s: string): Date | null => { const parts = s.split('/'); if (parts.length===3) return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`); return null }
+          const d = parse(patient.dischargeLabel)
+          const start = dischargeDateRange.from ? new Date(dischargeDateRange.from) : null
+          const end = dischargeDateRange.to ? new Date(dischargeDateRange.to) : null
+          const endExclusive = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1) : null
+          const startFloor = start ? new Date(start.getFullYear(), start.getMonth(), start.getDate()) : null
+          if (d) {
+            if (startFloor && d < startFloor) return
+            if (endExclusive && d >= endExclusive) return
+          }
+        }
         rows.push([idx++, patient.name, patient.medicalRecord, patient.aih, patient.admissionLabel, patient.dischargeLabel, patient.doctorName, patient.pgtAdm, formatCurrency(patient.baseAih), formatCurrency(patient.increment), formatCurrency(patient.aihWithIncrements)])
       })
       const wb = XLSX.utils.book_new()
@@ -1037,15 +1049,39 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
           let q = supabase
             .from('aihs')
-            .select('aih_number, patient_id, patients(name)')
+            .select('aih_number, patient_id, discharge_date, competencia, patients(name)')
           if (hospitalId) q = q.eq('hospital_id', hospitalId)
           if (selectedCompetencia && selectedCompetencia !== 'all') q = q.eq('competencia', selectedCompetencia)
+          if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
+            const from = dischargeDateRange.from || undefined
+            const to = dischargeDateRange.to || undefined
+            const endExclusive = to ? new Date(to) : undefined
+            if (endExclusive) endExclusive.setDate(endExclusive.getDate() + 1)
+            if (from) q = q.gte('discharge_date', from)
+            if (endExclusive) q = q.lt('discharge_date', endExclusive.toISOString().slice(0, 10))
+            q = q.not('discharge_date', 'is', null)
+          }
           const { data: rows } = await q
           ;(rows || []).forEach((r: any) => {
             const key = normalizeAih(String(r.aih_number || ''))
             const nm = String(r?.patients?.name || '')
             if (key && nm) nameByAih.set(key, nm)
           })
+          // Fallback: completar nomes para AIHs faltantes sem filtrar por competência/alta
+          const missingAihs = dedupPatientsByAIH(doctor.patients || [])
+            .map((p: any) => normalizeAih(String(p?.aih_info?.aih_number || '').trim()))
+            .filter(k => k && !nameByAih.has(k))
+          if (missingAihs.length > 0) {
+            const { data: rows2 } = await supabase
+              .from('aihs')
+              .select('aih_number, patients(name)')
+              .in('aih_number', missingAihs)
+            ;(rows2 || []).forEach((r: any) => {
+              const key = normalizeAih(String(r.aih_number || ''))
+              const nm = String(r?.patients?.name || '')
+              if (key && nm && !nameByAih.has(key)) nameByAih.set(key, nm)
+            })
+          }
         } catch {}
       }
 
@@ -1082,6 +1118,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const proceduresDisplay = mainProcDesc || (mainCode ? `Procedimento ${mainCode}` : 'Sem procedimento principal')
         const dischargeISO = p?.aih_info?.discharge_date || ''
         const dischargeLabel = parseISODateToLocal(dischargeISO)
+        if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
+          try {
+            const d = dischargeISO ? new Date(dischargeISO) : null
+            const start = dischargeDateRange.from ? new Date(dischargeDateRange.from) : null
+            const end = dischargeDateRange.to ? new Date(dischargeDateRange.to) : null
+            const endExclusive = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1) : null
+            if (d) {
+              if (start && d < new Date(start.getFullYear(), start.getMonth(), start.getDate())) return
+              if (endExclusive && d >= endExclusive) return
+            }
+          } catch {}
+        }
         
         // ✅ CORREÇÃO (CÓDIGO DUPLICADO): Lógica de pendência sincronizada
         const isApproved = approvedSetRef.current.has(aihNumber);
@@ -1169,6 +1217,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       const doc = new jsPDF('landscape')
       const pageWidth = doc.internal.pageSize.getWidth()
       const pageHeight = doc.internal.pageSize.getHeight()
+      // Fonte do relatório (topo)
+      try {
+        const sourceLabel = useSihSource ? 'TABWIN' : 'GSUS'
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(80, 80, 80)
+        doc.text(sourceLabel, pageWidth - 20, 10, { align: 'right' })
+      } catch {}
       let yPosition = 20
       if (logoBase64) {
         const logoWidth = 40
@@ -4583,9 +4639,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                          console.log(`📊 [RELATÓRIO MÉDICO SIMPLIFICADO PDF] Total de linhas: ${tableData.length} (ordenadas por data de alta DESC)`);
                                          
                                         // Criar PDF
-                                        const doc = new jsPDF('landscape');
-                                        const pageWidth = doc.internal.pageSize.getWidth();
-                                        const pageHeight = doc.internal.pageSize.getHeight();
+                                       const doc = new jsPDF('landscape');
+                                       const pageWidth = doc.internal.pageSize.getWidth();
+                                       const pageHeight = doc.internal.pageSize.getHeight();
+                                       // Fonte do relatório (topo)
+                                       try {
+                                         const sourceLabel = useSihSource ? 'TABWIN' : 'GSUS';
+                                         doc.setFontSize(10);
+                                         doc.setFont('helvetica', 'bold');
+                                         doc.setTextColor(80, 80, 80);
+                                         doc.text(sourceLabel, pageWidth - 20, 10, { align: 'right' });
+                                       } catch {}
                                         
                                         // ========== CABEÇALHO PROFISSIONAL COM LOGO ==========
                                         let yPosition = 20;
@@ -4879,8 +4943,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         });
                                         
                                         // Criar PDF com orientação paisagem para mais espaço
-                                        const doc = new jsPDF('landscape');
-                                        const pageWidth = doc.internal.pageSize.getWidth();
+                                       const doc = new jsPDF('landscape');
+                                       const pageWidth = doc.internal.pageSize.getWidth();
+                                       // Fonte do relatório (topo)
+                                       try {
+                                         const sourceLabel = useSihSource ? 'TABWIN' : 'GSUS';
+                                         doc.setFontSize(10);
+                                         doc.setFont('helvetica', 'bold');
+                                         doc.setTextColor(80, 80, 80);
+                                         doc.text(sourceLabel, pageWidth - 20, 10, { align: 'right' });
+                                       } catch {}
                                         
                                         // ========================================
                                         // CABEÇALHO PROFISSIONAL COM LOGO
@@ -5200,8 +5272,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         });
                                         
                                         // Criar PDF
-                                        const doc = new jsPDF('landscape');
-                                        const pageWidth = doc.internal.pageSize.getWidth();
+                                       const doc = new jsPDF('landscape');
+                                       const pageWidth = doc.internal.pageSize.getWidth();
+                                       // Fonte do relatório (topo)
+                                       try {
+                                         const sourceLabel = useSihSource ? 'TABWIN' : 'GSUS';
+                                         doc.setFontSize(10);
+                                         doc.setFont('helvetica', 'bold');
+                                         doc.setTextColor(80, 80, 80);
+                                         doc.text(sourceLabel, pageWidth - 20, 10, { align: 'right' });
+                                       } catch {}
                                         
                                         // Logo
                                         if (logoBase64) {
