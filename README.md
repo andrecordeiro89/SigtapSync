@@ -1,358 +1,125 @@
-# 🏥 SIGTAP Sync — Sistema de Repasses Médicos
-Plataforma dedicada exclusivamente ao cálculo, análise e gestão de repasses médicos, com visão 360º por médico, paciente (AIH) e procedimento. Unifica SIGTAP e DATASUS (SIH/SIA) via pipeline ETL, fornecendo dados tratados e normalizados para decisões precisas.
-
-## 🎯 Propósito
-- Calcular repasses médicos com regras claras e auditáveis.
-- Analisar produção por médico/especialidade/hospital com competência mensal.
-- Descomplicar dados legados do DATASUS (SIH/SIA) por padronização e joins consistentes.
-
-## 👥 Usuários-alvo
-- Diretoria e administração (visão executiva de repasses).
-- Coordenação/faturamento (operação e conferência).
-- TI (integrações e observabilidade).
-
-## � Pipeline ETL (Banco Remoto DATASUS)
-- ETL contínuo para SIH/SIA: ingestão, limpeza e normalização.
-- Competência mensal: RD `mes_cmpt (YYYYMM)` e SP `sp_mm (YYYYMM)`.
-- Normalização de códigos: SIGTAP `XX.XX.XX.XXX-X`, CIDs e CBOs.
-- Join de descrições: `sigtap_procedimentos (code, description)` por código formatado.
-- Dados fidedignos para TODOS os arquivos DATASUS (SIH, SIA e afins).
-
-## 🧠 Modelagem de Repasses
-- Hierarquia: Médico → Paciente (AIH) → Procedimentos.
-- AIH Seca: total por internação `val_tot` (SIH_RD).
-- Procedimentos: código, CBO, complexidade, quantidade (`sp_qtd_ato`), valor (`sp_valato`).
-- Descrição de procedimento: join remoto por `code` (fallback CSV local).
-
-## 📐 Lógicas de Cálculo
-- Base SIGTAP por procedimento/AIH.
-- Regras específicas (exemplos):
-  - Incremento Opera Paraná (+150%) quando elegível.
-  - Pagamentos fixos (mensal/por paciente) por médico/hospital.
-  - Percentual sobre total quando previsto.
-  - CBO 225151 (anestesia): valor exibido na UI “apenas visualização”; cálculo segue regras de exclusão (ex.: 04.xxx não calculáveis, exceções como cesariana).
-
-## � Filtros e Navegação
-- Hospital (CNES): filtro em RD e reflexo em SP via `sp_naih`.
-- Competência: `YYYYMM` (SP `sp_mm`) com suporte a `YYYY-MM` em RD; normalizado.
-- Profissionais: visão hierárquica com agrupamento por médico×hospital, busca e paginação.
-
-## 📊 Funcionalidades
-- Visão Executiva de Repasses: KPIs por médico/especialidade/hospital.
-- Hierarquia de Produção: AIH Seca (val_tot) + procedimentos detalhados.
-- Descrição Consolidada: join remoto confiável de SIGTAP.
-- Exportação/Relatórios: séries e ranking via serviço de analytics.
-
-## 🧩 Tecnologias
-- Frontend: React 18, TypeScript, Vite, Tailwind, shadcn/Radix.
-- Dados: Supabase (Postgres, views/RPCs), alternância segura para SIH remoto.
-- Analytics: FastAPI (Python) para ranking/séries por médico.
-- ETL: pipeline DATASUS com padronização de competência e códigos.
-
-## 🔒 Segurança e Conformidade
-- Perfis e acessos por hospital; auditoria de ações.
-- LGPD: minimização de PII (nome do paciente omitido no SIH remoto), tráfego seguro.
-
-## 🚀 Como Usar
-- Ativar fonte remota (SIH): `VITE_SIH_SUPABASE_URL`, `VITE_SIH_SUPABASE_ANON_KEY`, `VITE_USE_SIH_SOURCE=true`.
-- Selecionar hospital (CNES) e competência (YYYYMM).
-- Abrir “Profissionais”: verificar AIH Seca (val_tot) + procedimentos com descrições.
-- Exportar análises executivas quando necessário.
-
-## 🗺️ Roadmap
-- Regras de repasses parametrizáveis por hospital/especialidade.
-- Séries temporais por competência/esp. para decisão executiva.
-- Ampliação de ETL para mais arquivos DATASUS e reconciliações cruzadas.
-
----
-Foco total em repasses médicos: dados confiáveis, regras claras e visão 360º para acelerar a gestão hospitalar.
-- Decisões baseadas em dados
-- Identificação de oportunidades
-- Monitoramento em tempo real
-
-### 2) 🤖 Automação Inteligente
-Processamento híbrido com IA e parsers tradicionais
-
-| **Formato** | **Performance** | **Precisão** | **Custo** |
-|-------------|-----------------|--------------|-----------|
-| **📊 Excel** | **Excelente** | **Máxima** | **Gratuito** |
-| **📦 ZIP Oficial** | **Ótima** | **Alta** | **Gratuito** |
-| **📄 PDF** | **Boa** | **Boa** | **Baixo** |
-
-**Tecnologias:**
-- **Extração Tradicional:** Algoritmos proprietários
-- **IA Gemini:** Processamento de casos complexos
-- **Merge Inteligente:** Combinação dos melhores resultados
-
-### 3) 🎯 Matching Automático (AIH ↔ SIGTAP)
-Sistema de pontuação e validações clínicas/administrativas
-- **Validação de Gênero:** Compatibilidade de sexo
-- **Validação de Idade:** Faixas etárias permitidas
-- **Compatibilidade CID:** Códigos de diagnóstico válidos
-- **Habilitação Hospital:** Procedimentos habilitados
-- **CBO Profissional:** Códigos de ocupação válidos
-
-**Decisão Automática:**
-- **Score Alto:** Aprovação automática
-- **Score Médio:** Revisão manual
-- **Score Baixo:** Rejeição automática
-
-### 4) 🩺 Corpo Médico
-Analytics avançados por médico/especialidade/hospital
-
-### 5) 🔄 Pipeline ETL — Banco Remoto DATASUS
-- Banco remoto operando como pipeline ETL, recebendo dados limpos e tratados (SIH, SIA, etc.)
-- Padronização de colunas e formatos (competência mensal, códigos SIGTAP normalizados)
-- Consistência entre RD (AIH) e SP (procedimentos), com joins confiáveis para descrições
-- Dados fidedignos para análises e repasses em todos os arquivos do DATASUS
-
-### 6) 🔍 Descomplicando Dados Legados
-- Normalização de códigos (procedimentos, CIDs, CBOs) e versões SIGTAP ativas
-- Extração e reconciliação de registros de difícil manipulação com parsers robustos
-- Alternância segura entre fonte local e remota com filtros consistentes (hospital, competência)
-- **Performance individual** por especialidade
-- **Produtividade** e qualidade por médico
-- **Distribuição** por hospital e departamento
-- **Tendências** e benchmarks
-
-**Relatórios Executivos:**
-- Ranking de produtividade
-- Análise de especialidades
-- Oportunidades de melhoria
-- Compliance profissional
-
----
-
-## 🏗️ Arquitetura
-
-### 🔒 Segurança e Compliance
-- **🛡️ Row Level Security (RLS):** Proteção a nível de linha
-- **🔐 Criptografia:** Dados sensíveis protegidos
-- **📋 LGPD Compliant:** Conformidade total
-- **🔍 Auditoria 360°:** Rastreabilidade completa
-- **🚨 Alertas de Segurança:** Monitoramento contínuo
-
-### 📈 Performance
-- **⚡ Consultas Otimizadas:** Banco de dados eficiente
-- **🔄 Alta Disponibilidade:** Sistema estável
-- **📊 Processamento em Lote:** Grandes volumes
-- **🌐 Multi-tenant:** Isolamento por hospital
-- **📱 Responsivo:** Desktop, tablet, mobile
-
-### 🔧 Tecnologias
-```
-Frontend Moderno          Backend Robusto           IA & Analytics
-├── React 18 + TypeScript  ├── Supabase PostgreSQL   ├── Google Gemini AI
-├── Shadcn/UI Premium      ├── APIs RESTful          ├── Algoritmos Proprietários
-├── TailwindCSS            ├── 10 Tabelas Otimizadas ├── Scoring Inteligente
-└── React Query            └── Triggers Automáticos  └── Relatórios Avançados
-```
-
-### Integrações
-- Supabase principal (hospitais, pacientes, AIHs, procedimentos, audit logs, views/RPCs)
-- Supabase SIH remoto (sih_rd, sih_sp, sigtap_procedimentos)
-- FastAPI (analytics por médico/especialidade/séries)
-
----
-
-## 🎯 Casos de Uso
-
-### **🏥 HOSPITAL REGIONAL**
-**Desafios Anteriores:**
-- Múltiplos analistas para faturamento manual
-- Erros frequentes nas AIHs
-- Processo de faturamento demorado
-- Perdas operacionais
-
-**Resultados com SIGTAP Sync:**
-- Redução significativa de equipe necessária
-- Diminuição substancial de erros
-- Aceleração do processo de faturamento
-- Economia operacional considerável
-
-### **🏥 REDE HOSPITALAR**
-**Desafios Anteriores:**
-- Processos descentralizados
-- Falta de visibilidade corporativa
-- Auditoria manual demorada
-- Compliance inconsistente
-
-**Resultados com SIGTAP Sync:**
-- Dashboard corporativo unificado
-- Visibilidade total em tempo real
-- Auditoria automatizada
-- Compliance garantido
-
----
-
-## 📊 Indicadores de Performance
-
-### **📈 OPERACIONAIS**
-- **Volume Processado:** Processamento em grande escala
-- **Tempo de Processamento:** Otimizado por AIH
-- **Taxa de Sucesso:** Alta automatização
-- **Disponibilidade:** Sistema estável
-
-### **💰 FINANCEIROS**
-- **Otimização de Receita:** Melhoria no faturamento
-- **Redução de Custos:** Economia operacional
-- **Eficiência:** Processos otimizados
-
-### **🎯 QUALIDADE**
-- **Taxa de Aprovação:** Alta precisão
-- **Matching Inteligente:** Sistema confiável
-- **Tempo de Resposta:** Interface ágil
-- **Satisfação:** Usuários satisfeitos
-
----
-
-## 🛠️ Implementação e Suporte
-
-### **🚀 IMPLANTAÇÃO RÁPIDA**
-- **Semana 1:** Configuração e treinamento
-- **Semana 2:** Migração de dados
-- **Semana 3:** Homologação e ajustes
-- **Semana 4:** Go-live e suporte
-
-### **📚 TREINAMENTO COMPLETO**
-- **Diretores:** Dashboard executivo e KPIs
-- **Gerentes:** Operação e monitoramento
-- **Analistas:** Uso diário e casos especiais
-- **TI:** Configuração e manutenção
-
-### 🔧 SUPORTE TÉCNICO
-- **24/7 Monitoramento:** Disponibilidade garantida
- - **Atualizações contínuas:** Evolução de regras de repasse e filtros
- - **Observabilidade:** Logs, métricas e saúde de serviços
-- **Suporte Técnico:** Especialistas dedicados
-- **Atualizações:** Melhorias contínuas
-- **Documentação:** Guias completos
-
----
-
-## 📋 **CONTROLE DE ACESSO E ROLES**
-
-### **🔐 NÍVEIS DE ACESSO**
-| **Role** | **Descrição** | **Acesso** |
-|----------|---------------|------------|
-| **👑 Director** | Diretoria Geral | Todos hospitais + Analytics |
-| **🛡️ Admin** | Administrador | Configuração total |
-| **📊 Coordinator** | Coordenação | Supervisão geral |
-| **🔍 Auditor** | Auditoria | Monitoramento completo |
-| **⚙️ TI** | Suporte Técnico | Configuração e logs |
-| **👤 Operator** | Operador | Hospital específico |
-
-### **🏥 CONTROLE POR HOSPITAL**
-- **Acesso Específico:** Usuários por unidade
-- **Visão Corporativa:** Diretores veem tudo
-- **Auditoria Cruzada:** Controle entre unidades
-- **Relatórios Consolidados:** Visão executiva
-
----
-
-## 🌟 **DIFERENCIAIS COMPETITIVOS**
-
-### **🚀 INOVAÇÃO TECNOLÓGICA**
-- **Primeira solução** com IA híbrida no mercado
-- **Scoring proprietário** para matching
-- **Extração multi-formato** otimizada
-- **Dashboard executivo** específico para hospitais
-
-### **🎯 ESPECIALIZAÇÃO SUS**
-- **Regras SUS** 100% implementadas
-- **Compliance total** com DATASUS
-- **Auditoria específica** para SUS
-- **Relacionamento** com órgãos reguladores
-
-### **🏆 RESULTADOS COMPROVADOS**
-- **Múltiplos hospitais** utilizando o sistema
-- **Alta satisfação** dos usuários
-- **Economia significativa** gerada
-- **Alta precisão** nos cálculos
-
----
-
-## 📈 **ROADMAP EXECUTIVO**
-
-### **🚀 PRÓXIMOS 3 MESES**
-- **📱 Mobile App** para auditores
-- **🔔 Notificações** em tempo real
-- **📊 Analytics** avançados com ML
-- **🔗 APIs** para integrações
-
-### **🎯 PRÓXIMOS 6 MESES**
-- **🤖 IA Preditiva** para otimização
-- **📈 Forecasting** financeiro
-- **🔄 Workflow** automatizado
-- **🌐 Multi-idioma** (inglês/espanhol)
-
-### **🏆 PRÓXIMOS 12 MESES**
-- **☁️ Cloud Multi-região**
-- **🔐 Certificação ISO 27001**
-- **📊 Business Intelligence** avançado
-- **🌍 Expansão Internacional**
-
----
-
-## 💼 **RETORNO SOBRE INVESTIMENTO**
-
-### **📊 ANÁLISE DE BENEFÍCIOS**
-- **Investimento**: Custo-benefício atrativo
-- **Economia**: Redução de custos operacionais
-- **Payback**: Retorno em curto prazo
-- **ROI**: Retorno positivo comprovado
-
-### **💰 ECONOMIA OPERACIONAL**
-- **Redução de Pessoal**: Otimização de equipe
-- **Redução de Erros**: Menos retrabalho
-- **Aumento de Receita**: Faturamento otimizado
-- **Eficiência**: Processos automatizados
-
-### **🎯 BENEFÍCIOS INTANGÍVEIS**
-- **Melhoria na Qualidade** do serviço
-- **Redução de Estresse** da equipe
-- **Compliance Garantido** com auditorias
-- **Imagem Corporativa** fortalecida
-
----
-
-
-
-## 🔧 **ESPECIFICAÇÕES TÉCNICAS**
-
-### **📋 REQUISITOS MÍNIMOS**
-- **Navegador:** Chrome/Firefox/Safari (versões recentes)
-- **Internet:** Conexão estável
-- **Resolução:** 1366x768 (recomendado: 1920x1080)
-- **Dispositivos:** Desktop, tablet, mobile
-
-### **🔒 SEGURANÇA**
-- **Criptografia:** AES-256 para dados sensíveis
-- **Autenticação:** Multi-fator opcional
-- **Backup:** Automático regular
-- **Logs:** Auditoria completa
-
-### **📊 CAPACIDADE**
-- **Usuários Simultâneos:** Suporte a múltiplos usuários
-- **Processamento:** Alto volume de AIHs
-- **Armazenamento:** Escalável
-- **Uptime:** Alta disponibilidade
-
----
-
-## 📝 **LICENÇA E CONFORMIDADE**
-
-- **Licença:** Proprietária - Uso Corporativo
-- **LGPD:** Totalmente conforme
-- **Auditoria:** Completa rastreabilidade
-- **Certificações:** Padrões de segurança
-- **Suporte:** Técnico especializado
-
----
-
-**© 2025 SIGTAP Sync. Todos os direitos reservados.**  
-*Sistema de Gestão e Sincronização de Faturamento Hospitalar SUS*
-
-**Versão do Documento:** 4.0  
-**Última Atualização:** Janeiro 2025  
-**Status:** Produção Ativa
+# Sistema de Repasses Médicos — SigtapSync
+
+## Visão Geral
+
+- Plataforma para gestão de produção médica, cálculo de incrementos (Opera Paraná), pagamentos e validação entre base local e fonte remota SIH.
+- Visualização hierárquica completa: Médicos → Pacientes → Procedimentos, com filtros executivos e geração de relatórios.
+
+## Arquitetura
+
+- Front-end React: componentes principais em `src/components` (ExecutiveDashboard, MedicalProductionDashboard, DoctorPatientsDropdown, etc.).
+- Serviços de dados:
+  - Local (Supabase): AIHs, pacientes, procedimentos, médicos e hospitais em `src/services/doctorPatientService.ts`.
+  - Remoto (Supabase SIH): RD (AIHs) e SP (procedimentos) em `src/services/sihApiAdapter.ts`.
+- Regras e utilitários:
+  - Incremento Opera Paraná em `src/config/operaParana.ts`.
+  - Pagamentos médicos e regras por hospital em `src/config/doctorPaymentRules/*`.
+  - Deduplicação e helpers em `src/utils/dedupTest.ts`, `src/utils/valueHelpers.ts`.
+
+## Fontes de Dados
+
+- Local (Supabase):
+  - Tabelas: `aihs`, `patients`, `procedure_records`, `doctors`, `hospitals`.
+  - Campos chave: `aihs.aih_number`, `aihs.cns_responsavel`, `aihs.competencia`, `procedure_records.procedure_code`.
+- Remoto (SIH):
+  - Tabelas: `sih_rd` (AIHs), `sih_sp` (procedimentos), `sigtap_procedimentos` (catálogo).
+  - Filtros: por `cnes` (hospital), competência (`ano_cmpt`/`mes_cmpt`), caráter (`car_int`: '01' Eletivo, '02' Urgência), período de alta.
+
+## Matching e Enriquecimento
+
+- Normalização de AIH: remove não dígitos e zeros à esquerda para chave forte (`normalizeAih`).
+- Join remoto → local:
+  - Busca AIHs locais por `hospital_id` e `competencia`, mapeia por AIH normalizada para obter nome e prontuário do paciente.
+  - Se não houver nome local, exibe “Nome não disponível” (sinal de não processado local).
+- Atribuição do responsável:
+  - Preferência para `cns_responsavel` quando presente; fallback para profissionais do SP quando ausente (podendo aparecer em múltiplos médicos).
+
+## Filtros (Aba Profissionais)
+
+- Hospital (por `id`, mapeado para `cnes` no SIH).
+- Competência (YYYYMM ou YYYY-MM[-DD]).
+- Caráter de Atendimento: `Todos | Eletivo (01) | Urgência (02)`.
+- Período de alta (from/to).
+- Busca por médico (nome/CNS/CRM) e por paciente (nome).
+
+## KPIs
+
+- Valor Total (Remoto/SIGTAP): soma dos valores RD (remoto) ou AIH local deduplicada.
+- Total AIHs (SIH Remoto): quantidade em RD para o recorte atual.
+- Incrementos (total): soma deduplicada por AIH dos incrementos (Eletivo + Urgência) quando SIH ativo.
+- Valor Total (Base + Incremento): soma dos dois anteriores.
+- Pagamento Médico Total: agregado dos valores calculados conforme regras por hospital/médico.
+- Novos KPIs:
+  - Incremento Eletivo: soma dos incrementos das AIHs com `car_int = '01'` (deduplicado por AIH).
+  - Incremento Urgência: soma dos incrementos das AIHs com `car_int = '02'` (deduplicado por AIH).
+
+## Incremento Opera Paraná
+
+- Eletivo: incremento = soma dos procedimentos elegíveis × 1.5 (150%).
+- Urgência/Emergência: incremento = soma dos procedimentos não excluídos × 0.2 (20%).
+- Exclusões: lista de códigos SIGTAP que não recebem incremento (joelho/quadril/otorrino); não há bloqueio global por AIH.
+- Cobertura médica: negações por nome (caixa alta) excluem incremento.
+- Deduplicação: agregações de incremento usam chave AIH para evitar dupla contagem quando a mesma AIH aparece sob múltiplos médicos no SIH.
+
+## Pagamentos Médicos
+
+- Regras fixas, percentuais e individuais por hospital/médico.
+- HON (planilha) para cenários específicos (cirurgia geral e hospital predefinido), com fallback para regras padrão.
+- Cards individuais exibem detalhamento por procedimento com fator (2.5 eletivo, 1.2 urgência) quando aplicável.
+
+## Tratamento de Anestesia
+
+- CBO 225151 (04.xxx): valor zerado nos procedimentos para evitar dupla contagem no incremento e pagamentos.
+- Visibilidade: inclui anestesistas atuantes por SP (match por `professional_name` e `professional_cbo`) quando necessário; pacientes associados com valor financeiro zerado.
+
+## Relatórios
+
+- Relatório Geral (Pacientes/Procedimentos): exporta dados detalhados por paciente e procedimento.
+- Conferência (AIHs): lista AIHs, número, datas, valores e status.
+- Simplificado:
+  - Resolve “Médico” por `cns_responsavel` e faz dedup global por AIH.
+  - “Comp. Aprovação” combina produção (AIH) e aprovação SIH (`sp_mm/sp_aa`).
+  - PDF com alinhamento centralizado da coluna de aprovação.
+- Validação Local vs Remoto (Excel):
+  - Sem inserção local: AIHs no remoto produção que não têm nome local.
+  - Pendentes SIH: AIHs locais não encontradas como homologadas no remoto (busca sem filtro de competência).
+
+## Reconciliação Tabwin (GSUS)
+
+- Processa XLSX (SP_NAIH, SP_ATOPROF, SP_VALATO, SP_QTD_ATO, SP_DTINTER/DTSAIDA, SP_PF_DOC).
+- Matching por `AIH + procedimento` com tolerância de valor (R$ 0,50) e quantidade.
+- Estatísticas: matches perfeitos, diferenças de valor/quantidade, possíveis glosas/rejeições.
+
+## Comportamentos de UI Importantes
+
+- Paciente remoto sem nome local aparece “Nome não disponível” (sinal de não processado local).
+- Filtros ativos são aplicados globalmente (hospital, competência, caráter, alta, buscas).
+- Fonte SIH: KPIs e listagens respeitam `car_int` ('01'/'02'), mapeamento por CNES e competência (`ano_cmpt/mes_cmpt`).
+
+## Configuração
+
+- Ambiente: variáveis em `src/config/env.ts` (flags de produção, uso SIH, avisos, logs).
+- Integração SIH: `src/lib/sihSupabase` (chaves/URL configuradas no ambiente).
+
+## Principais Caminhos de Código
+
+- `src/components/ExecutiveDashboard.tsx`: shell da aba Profissionais, filtros, triggers de relatórios.
+- `src/components/MedicalProductionDashboard.tsx`: KPIs, cards, geração de relatórios e cálculos agregados.
+- `src/services/doctorPatientService.ts`: fonte local e lógica de montagem da hierarquia.
+- `src/services/sihApiAdapter.ts`: fonte remota SIH e enriquecimento com dados locais.
+- `src/config/operaParana.ts`: regras e exclusões do Opera Paraná.
+- `src/services/syncService.ts`: reconciliação Tabwin.
+
+## Boas Práticas e Limitações
+
+- Sempre normalize `aih_number` para matching entre fontes.
+- Ao usar SIH, deduplicar por AIH em agregações para evitar dupla contagem por múltiplos médicos.
+- “Caráter de Atendimento” no SIH é `car_int`: use valores '01' (Eletivo) e '02' (Urgência).
+- Pacientes podem aparecer sem nome quando ausência no local; use relatório de validação para acompanhar inserções pendentes.
+
+## Como Validar
+
+- KPIs: troque entre Eletivo e Urgência no dropdown e verifique os KPIs “Incremento Eletivo” e “Incremento Urgência”.
+- Relatórios: gere o Simplificado para conferir “Comp. Aprovação” e dedup de AIH.
+- Validação: use “Validação Local vs Remoto” para auditoria de inserções e homologações.
+
