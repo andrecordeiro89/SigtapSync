@@ -62,7 +62,7 @@ import { calculateHonPayments } from '../config/doctorPaymentRules/importers/hon
 import ReportGenerator from './ReportGenerator';
 import PatientAihInfoBadges from './PatientAihInfoBadges';
 import AihDatesBadges from './AihDatesBadges';
-import { isDoctorCoveredForOperaParana, computeIncrementForProcedures, hasAnyExcludedCodeInProcedures } from '../config/operaParana';
+import { isDoctorCoveredForOperaParana, computeIncrementForProcedures, hasAnyExcludedCodeInProcedures, isElectiveCare, isUrgencyCare } from '../config/operaParana';
 import { sumProceduresBaseReais } from '@/utils/valueHelpers';
 import { exportAllPatientsExcel } from '../services/exportService'
 import { ENV_CONFIG } from '../config/env'
@@ -2550,6 +2550,34 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
   }, [useSihSource, selectedHospitals, selectedCompetencia]);
 
+  // 🧮 NOVOS KPIs: Incremento Eletivo e Incremento Urgência (separados)
+  const aggregatedIncrementBreakdown = React.useMemo(() => {
+    try {
+      let elective = 0;
+      let urgency = 0;
+      const countedAihs = new Set<string>();
+      for (const doctor of filteredDoctors) {
+        const doctorName = doctor.doctor_info?.name || '';
+        const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+        const patients = doctor.patients || [];
+        for (const p of patients as any[]) {
+          const aihNumRaw = String(p?.aih_info?.aih_number || '').trim();
+          const dis = String(p?.aih_info?.discharge_date || '');
+          const aihKey = normalizeAih(aihNumRaw) || `${hospitalId || ''}::${p?.aih_id || ''}::${dis}`;
+          if (countedAihs.has(aihKey)) continue;
+          countedAihs.add(aihKey);
+          const care = (p?.aih_info?.care_character ?? '') as string | number | null;
+          const inc = computeIncrementForProcedures(p.procedures as any, care, doctorName, hospitalId) || 0;
+          if (isElectiveCare(care)) elective += inc;
+          else if (isUrgencyCare(care)) urgency += inc;
+        }
+      }
+      return { elective, urgency };
+    } catch {
+      return { elective: 0, urgency: 0 };
+    }
+  }, [filteredDoctors]);
+
   // 🧮 TOTAIS AGREGADOS PARA O CABEÇALHO (SIGTAP, Incrementos, Total)
   const aggregatedOperaParanaTotals = React.useMemo(() => {
     try {
@@ -2561,11 +2589,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         console.log(`📊 [TOTAIS AGREGADOS] Usando dados SIH remotos: R$ ${sihRemoteTotals.totalValue.toFixed(2)} | ${sihRemoteTotals.totalAIHs} AIHs`);
         totalBaseSigtap = sihRemoteTotals.totalValue;
         
-        // Incremento ainda usa cálculo local (mantém comportamento atual)
-        for (const doctor of filteredDoctors) {
-          const stats = doctorStatsCache.get(getDoctorCardKey(doctor));
-          if (stats) totalIncrement += stats.operaParanaIncrement || 0;
-        }
+        // Incremento: usar soma deduplicada por AIH (breakdown eletivo/urgência)
+        totalIncrement = (aggregatedIncrementBreakdown.elective || 0) + (aggregatedIncrementBreakdown.urgency || 0);
       } else {
         // ✅ CORREÇÃO: Base SIGTAP deve somar AIHs únicas (não por médico)
         // Deduplificar por (hospital_id, aih_number) para evitar dupla contagem
@@ -2601,7 +2626,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     } catch {
       return { totalBaseSigtap: 0, totalIncrement: 0, totalWithIncrement: 0 };
     }
-  }, [filteredDoctors, doctorStatsCache, useSihSource, remoteConfigured, sihRemoteTotals]);
+  }, [filteredDoctors, doctorStatsCache, useSihSource, remoteConfigured, sihRemoteTotals, aggregatedIncrementBreakdown]);
+
+  
 
   // 🧮 NOVO KPI: Soma dos Pagamentos Médicos (por médico) para comparação
   // ✅ CORREÇÃO: Somar repasses individuais de cada paciente (igual aos cards individuais)
@@ -2989,7 +3016,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             </div>
 
             {/* TOTAIS AGREGADOS - CARDS COM GRADIENTES */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4">
               {/* Valor Total (Remote/Local) */}
               <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-lg p-4 border-2 border-slate-200">
                 <div className="flex items-center justify-between">
@@ -3049,6 +3076,40 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   </div>
                   <div className="flex items-center justify-center w-10 h-10 bg-emerald-100 rounded-full">
                     <TrendingUp className="h-5 w-5 text-emerald-600" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Incremento Eletivo */}
+              <div className="bg-gradient-to-r from-teal-50 to-emerald-50 rounded-lg p-4 border-2 border-teal-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-teal-700 uppercase tracking-wide mb-1">
+                      Incremento Eletivo
+                    </div>
+                    <div className="text-2xl font-black text-teal-700">
+                      {formatCurrency(aggregatedIncrementBreakdown.elective)}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center w-10 h-10 bg-teal-100 rounded-full">
+                    <TrendingUp className="h-5 w-5 text-teal-600" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Incremento Urgência */}
+              <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg p-4 border-2 border-amber-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-1">
+                      Incremento Urgência
+                    </div>
+                    <div className="text-2xl font-black text-amber-700">
+                      {formatCurrency(aggregatedIncrementBreakdown.urgency)}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center w-10 h-10 bg-amber-100 rounded-full">
+                    <TrendingUp className="h-5 w-5 text-amber-600" />
                   </div>
                 </div>
               </div>
