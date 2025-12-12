@@ -1279,21 +1279,23 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             const mark = t.startsWith('§')
             const txt = mark ? t.slice(1) : t
             const parts = txt.split(' | ')
-            const x = (data.cell.textPos && typeof data.cell.textPos.x === 'number')
-              ? data.cell.textPos.x
-              : data.cell.x + 2
-            const y = (data.cell.textPos && typeof data.cell.textPos.y === 'number')
-              ? data.cell.textPos.y
-              : data.cell.y + (data.cell.height / 2) + 3
+            const y = data.cell.y + (data.cell.height / 2)
             if (parts.length === 2) {
+              const left = parts[0]
+              const right = '| ' + parts[1]
+              const totalW = doc.getTextWidth(left + ' ' + right)
+              const xStart = data.cell.x + (data.cell.width / 2) - (totalW / 2)
               doc.setTextColor(mark ? 200 : 50, mark ? 0 : 50, mark ? 0 : 50)
-              doc.text(parts[0], x, y)
+              doc.text(left, xStart, y)
               doc.setTextColor(50, 50, 50)
-              const w = doc.getTextWidth(parts[0] + ' ')
-              doc.text('| ' + parts[1], x + w, y)
+              const wLeft = doc.getTextWidth(left + ' ')
+              doc.text(right, xStart + wLeft, y)
             } else {
+              const totalW = doc.getTextWidth(txt)
+              const xCenter = data.cell.x + (data.cell.width / 2)
+              const xStart = xCenter - (totalW / 2)
               doc.setTextColor(mark ? 200 : 50, mark ? 0 : 50, mark ? 0 : 50)
-              doc.text(txt, x, y)
+              doc.text(txt, xStart, y)
             }
             doc.setTextColor(50, 50, 50)
           }
