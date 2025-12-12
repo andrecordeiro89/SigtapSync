@@ -5576,18 +5576,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Nº AIH:</span>
                                                 <span className="text-xs font-mono font-medium text-gray-900">{patient.aih_info.aih_number || '-'}</span>
                                               </div>
-                                              <div className="flex items-baseline gap-2">
-                                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Competência:</span>
-                                                <span className="text-xs font-semibold text-blue-700">
-                                                  {(() => {
-                                                    const comp = (patient as any)?.aih_info?.competencia;
-                                                    if (!comp) return '-';
-                                                    const m = String(comp).match(/^(\d{4})-(\d{2})/);
-                                                    if (m) return `${m[2]}/${m[1]}`;
-                                                    return comp;
-                                                  })()}
-                                                </span>
-                                              </div>
                                               {patient.patient_info.medical_record && (
                                                 <div className="flex items-baseline gap-2">
                                                   <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Prontuário:</span>
