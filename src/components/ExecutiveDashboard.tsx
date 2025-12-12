@@ -1513,15 +1513,25 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <FileSpreadsheet className="h-4 w-4" />
                   Simplificado
                 </Button>
+                {false && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white w-auto min-w-[160px]"
+                    onClick={() => setImportOpen(true)}
+                    title="Importar CSVs para staging"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Importar CSV
+                  </Button>
+                )}
                 <Button
-                  variant="default"
-                  size="sm"
-                  className="inline-flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white w-auto min-w-[160px]"
-                  onClick={() => setImportOpen(true)}
-                  title="Importar CSVs para staging"
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event('mpd:report-validation'))}
+                  title="Gerar relatório de validação (Local vs Remoto)"
                 >
-                  <FileText className="h-4 w-4" />
-                  Importar CSV
+                  <TrendingUp className="h-4 w-4" />
+                  Validação Local vs Remoto
                 </Button>
               </div>
             </div>

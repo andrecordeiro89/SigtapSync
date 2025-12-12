@@ -949,13 +949,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     const handlerGeneral = () => { generateGeneralPatientsReport() }
     const handlerConference = () => { generateConferencePatientsReport() }
     const handlerSimplified = () => { generateSimplifiedPatientsReport() }
+    const handlerValidation = () => { generateValidationReport(selectedHospitals, selectedCompetencia, useSihSource, filteredDoctors) }
     window.addEventListener('mpd:report-general', handlerGeneral)
     window.addEventListener('mpd:report-conference', handlerConference)
     window.addEventListener('mpd:report-simplified', handlerSimplified)
+    window.addEventListener('mpd:report-validation', handlerValidation)
     return () => {
       window.removeEventListener('mpd:report-general', handlerGeneral)
       window.removeEventListener('mpd:report-conference', handlerConference)
       window.removeEventListener('mpd:report-simplified', handlerSimplified)
+      window.removeEventListener('mpd:report-validation', handlerValidation)
     }
   }, [filteredDoctors])
 
@@ -6206,3 +6209,104 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 };
 
 export default MedicalProductionDashboard;
+  const generateValidationReport = async (
+    selectedHospitals: string[] | undefined,
+    selectedCompetencia: string | undefined,
+    useSihSource: boolean,
+    filteredDoctors: any[]
+  ) => {
+    try {
+      const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
+      const hospitalIds = selectedHospitals?.filter(h => h !== 'all') || []
+      const competenciaFilter = (selectedCompetencia && selectedCompetencia !== 'all' && selectedCompetencia.trim()) ? selectedCompetencia.trim() : undefined
+
+      // Local AIHs com nome (por hospital/competência)
+      let localQuery = supabase
+        .from('aihs')
+        .select('aih_number, hospital_id, competencia, patients(name)')
+      if (hospitalIds.length > 0) localQuery = localQuery.in('hospital_id', hospitalIds)
+      if (competenciaFilter) localQuery = localQuery.eq('competencia', competenciaFilter)
+      const { data: localRows } = await localQuery
+      const localNameByAih = new Map<string, { name: string; hospital_id?: string; competencia?: string }>()
+      ;(localRows || []).forEach((r: any) => {
+        const k = normalizeAih(String(r.aih_number || ''))
+        const nm = String(r?.patients?.name || '')
+        if (k) localNameByAih.set(k, { name: nm, hospital_id: r.hospital_id, competencia: r.competencia })
+      })
+      const localSet = new Set(localNameByAih.keys())
+
+      // Remoto (produção) por hospital/competência
+      let remoteSet = new Set<string>()
+      let remoteMetaByAih = new Map<string, { hospital_id?: string; competencia?: string }>()
+      if (useSihSource) {
+        try {
+          const { SihApiAdapter } = await import('../services/sihApiAdapter')
+          const remoteDocs = await SihApiAdapter.getDoctorsWithPatients({ hospitalIds, competencia: competenciaFilter })
+          remoteDocs.forEach((d: any) => {
+            (d.patients || []).forEach((p: any) => {
+              const k = normalizeAih(String(p?.aih_info?.aih_number || ''))
+              if (!k) return
+              remoteSet.add(k)
+              if (!remoteMetaByAih.has(k)) remoteMetaByAih.set(k, { hospital_id: p?.aih_info?.hospital_id, competencia: p?.aih_info?.competencia })
+            })
+          })
+        } catch {}
+      }
+
+      // Remoto (homologação) sem filtro de competência
+      const { supabaseSih } = await import('../lib/sihSupabase')
+      const allKeys = Array.from(new Set([...remoteSet, ...localSet])).filter(Boolean)
+      const approvedSet = new Set<string>()
+      const chunkSize = 80
+      for (let i = 0; i < allKeys.length; i += chunkSize) {
+        const ch = allKeys.slice(i, i + chunkSize)
+        const { data: spRows } = await supabaseSih
+          .from('sih_sp')
+          .select('sp_naih')
+          .in('sp_naih', ch)
+        ;(spRows || []).forEach((r: any) => {
+          const k = normalizeAih(String(r.sp_naih || ''))
+          if (k) approvedSet.add(k)
+        })
+      }
+
+      // Conjuntos
+      const missingLocal = Array.from(remoteSet).filter(k => !localSet.has(k))
+      const pendingApproved = Array.from(localSet).filter(k => !approvedSet.has(k))
+
+      // Exportar Excel
+      const rowsMissingLocal: any[] = [['Nº AIH', 'Hospital', 'Competência (produção)']]
+      missingLocal.forEach(k => {
+        const meta = remoteMetaByAih.get(k)
+        const hospName = (() => {
+          try {
+            const card = filteredDoctors.find((d: any) => (d.hospitals?.[0]?.hospital_id || '') === (meta?.hospital_id || ''))
+            return card?.hospitals?.[0]?.hospital_name || meta?.hospital_id || ''
+          } catch { return meta?.hospital_id || '' }
+        })()
+        rowsMissingLocal.push([k, hospName, formatCompetencia(String(meta?.competencia || ''))])
+      })
+
+      const rowsPendingApproved: any[] = [['Nº AIH', 'Hospital', 'Competência (produção)', 'Paciente']]
+      pendingApproved.forEach(k => {
+        const local = localNameByAih.get(k)
+        const hospName = (() => {
+          try {
+            const card = filteredDoctors.find((d: any) => (d.hospitals?.[0]?.hospital_id || '') === (local?.hospital_id || ''))
+            return card?.hospitals?.[0]?.hospital_name || local?.hospital_id || ''
+          } catch { return local?.hospital_id || '' }
+        })()
+        rowsPendingApproved.push([k, hospName, formatCompetencia(String(local?.competencia || '')), local?.name || ''])
+      })
+
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsMissingLocal), 'Sem inserção local')
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rowsPendingApproved), 'Pendentes SIH')
+      const fileName = `Validacao_Local_vs_Remoto_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      toast.success('Relatório de validação gerado com sucesso!')
+    } catch (e) {
+      console.error('Erro ao gerar relatório de validação:', e)
+      toast.error('Erro ao gerar relatório de validação')
+    }
+  }
