@@ -1302,18 +1302,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         }
       })
       const finalY = (doc as any).lastAutoTable?.finalY || startY + 50
-      const footerY = pageHeight - 20
+      const footerBaseY = pageHeight - 20
       doc.setDrawColor(200, 200, 200)
       doc.setLineWidth(0.5)
-      doc.line(20, footerY - 10, pageWidth - 20, footerY - 10)
+      const lineY = Math.max(finalY + 8, footerBaseY - 10)
+      doc.line(20, lineY, pageWidth - 20, lineY)
       doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(120, 120, 120)
-      doc.text('CIS - Centro Integrado em Saúde', pageWidth / 2, footerY - 5, { align: 'center' })
+      doc.text('CIS - Centro Integrado em Saúde', pageWidth / 2, lineY + 5, { align: 'center' })
       doc.setFontSize(9)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(0, 51, 102)
-      doc.text(`Total de Pacientes: ${tableData.length} | Valor Total de Repasse: ${formatCurrency(totalRepasse)}`, pageWidth / 2, footerY + 5, { align: 'center' })
+      doc.text(`Total de Pacientes: ${tableData.length} | Valor Total de Repasse: ${formatCurrency(totalRepasse)}`, pageWidth / 2, lineY + 15, { align: 'center' })
       const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`
       doc.save(fileName)
       toast.success('Relatório PDF gerado com sucesso!')
