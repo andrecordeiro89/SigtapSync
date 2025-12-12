@@ -580,6 +580,48 @@ export class DoctorPatientService {
         }
       }
 
+      const targetCns = '705408409597790'
+      const targetName = 'WILLIAN NASCIMENTO GLAUSER'
+      let targetHospitalId: string | undefined
+      try {
+        const santaAlice = Array.from(hospitalsMap.entries()).find(([_, h]) => String((h as any)?.name || '').toLowerCase().includes('santa alice'))
+        if (santaAlice) targetHospitalId = santaAlice[0]
+      } catch {}
+      if (targetHospitalId && !doctorMap.has(targetCns)) {
+        let docInfo = { id: '', name: targetName, cns: targetCns, crm: '', specialty: 'Anestesiologia' }
+        try {
+          const { data: docRow } = await supabase.from('doctors').select('id, name, cns, crm, specialty').eq('cns', targetCns).maybeSingle()
+          if (docRow) docInfo = { id: docRow.id, name: docRow.name || targetName, cns: docRow.cns || targetCns, crm: docRow.crm || '', specialty: docRow.specialty || 'Anestesiologia' }
+        } catch {}
+        const hospitalData = hospitalsMap.get(targetHospitalId)
+        doctorMap.set(targetCns, {
+          key: targetCns,
+          doctor_info: { name: docInfo.name, cns: docInfo.cns, crm: docInfo.crm, specialty: docInfo.specialty },
+          hospitals: [{ hospital_id: targetHospitalId, hospital_name: hospitalData?.name || '', cnes: (hospitalData as any)?.cnes, is_active: true } as any],
+          patients: [],
+          hospitalIds: new Set([targetHospitalId])
+        } as any)
+        const docEntry = doctorMap.get(targetCns)! as any
+        for (const aih of aihs as any[]) {
+          if (aih.hospital_id !== targetHospitalId) continue
+          const procs = (aih.id && procsByAih.success) ? (procsByAih.proceduresByAihId.get(aih.id) || []) : []
+          const match = procs.some((p: any) => String(p.professional_cbo || '').trim() === '225151' && String(p.professional_name || '').trim().toLowerCase() === targetName.toLowerCase())
+          if (!match) continue
+          const entry: PatientWithProcedures = {
+            patient_id: aih.patient_id,
+            aih_id: aih.id,
+            patient_info: { name: (aih.patients as any)?.name || 'Paciente', cns: (aih.patients as any)?.cns || '', birth_date: (aih.patients as any)?.birth_date || '', gender: (aih.patients as any)?.gender || '', medical_record: (aih.patients as any)?.medical_record || '' },
+            aih_info: { admission_date: aih.admission_date, discharge_date: aih.discharge_date, aih_number: aih.aih_number, care_character: aih.care_character, hospital_id: aih.hospital_id, competencia: aih.competencia, pgt_adm: aih.pgt_adm || 'não' },
+            total_value_reais: 0,
+            procedures: [],
+            total_procedures: 0,
+            approved_procedures: 0
+          }
+          const exists = (docEntry.patients as any[]).some((x: any) => x.aih_id === entry.aih_id)
+          if (!exists) (docEntry.patients as any[]).push(entry)
+        }
+      }
+
       const result = Array.from(doctorMap.values()).map((d: any) => ({
         doctor_info: d.doctor_info,
         hospitals: d.hospitals,
