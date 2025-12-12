@@ -509,7 +509,7 @@ export class DoctorPatientService {
         const hospitalId = aih.hospital_id
         const procs = (aihId && procsByAih.success) ? (procsByAih.proceduresByAihId.get(aihId) || []) : []
         for (const p of procs) {
-          const cbo = String(p.professional_cbo || p.cbo || '')
+          const cbo = String((p as any).professional_cbo || '')
           const profName = String(p.professional_name || '').trim()
           if (cbo === '225151' && profName && anesthByName.has(profName)) {
             const docInfo = anesthByName.get(profName)!
