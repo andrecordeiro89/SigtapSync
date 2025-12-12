@@ -771,6 +771,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const doctorName = card.doctor_info?.name || ''
         const hospitalName = card.hospitals?.[0]?.hospital_name || ''
         ;(card.patients || []).forEach((p: any) => {
+          const respCns = String(((p?.aih_info?.cns_responsavel ?? p?.aih_info?.cns_responsible) || '')).trim()
+          const docCns = String(card?.doctor_info?.cns || '').trim()
+          if (respCns && !isZeroCns(respCns) && respCns !== docCns) return
           totalAIHsFound++
           const patientId = p.patient_id
           const name = p.patient_info?.name || 'Paciente'
@@ -847,6 +850,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const doctorName = card.doctor_info?.name || ''
         const hospitalName = card.hospitals?.[0]?.hospital_name || ''
         ;(card.patients || []).forEach((p: any) => {
+          const respCns = String(((p?.aih_info?.cns_responsavel ?? p?.aih_info?.cns_responsible) || '')).trim()
+          const docCns = String(card?.doctor_info?.cns || '').trim()
+          if (respCns && !isZeroCns(respCns) && respCns !== docCns) return
           totalAIHsFound++
           const name = p.patient_info?.name || 'Paciente'
           const medicalRecord = p.patient_info?.medical_record || '-'
@@ -886,6 +892,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       let idx = 1
       const allPatients: any[] = []
       const globalSeen = new Set<string>()
+      const cnsNameMap = new Map<string, string>(filteredDoctors.map((d: any) => [String(d?.doctor_info?.cns || '').trim(), d?.doctor_info?.name || '']))
       filteredDoctors.forEach((card: any) => {
         const doctorName = card.doctor_info?.name || 'Médico não identificado'
         const doctorPatients = dedupPatientsByAIH(card.patients || [])
@@ -906,7 +913,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           const increment = Math.round(incrementRaw * 100) / 100
           const aihWithIncrements = Math.round((baseAih + increment) * 100) / 100
           const pgtAdm = p?.aih_info?.pgt_adm || 'não'
-          allPatients.push({ name, medicalRecord, aih: aihDisplay, admissionLabel, dischargeLabel, doctorName, pgtAdm, baseAih, increment, aihWithIncrements })
+          const respCns = String(((p?.aih_info?.cns_responsavel ?? p?.aih_info?.cns_responsible) || '')).trim()
+          const resolvedDoctorName = (respCns && !isZeroCns(respCns)) ? (cnsNameMap.get(respCns) || doctorName) : doctorName
+          allPatients.push({ name, medicalRecord, aih: aihDisplay, admissionLabel, dischargeLabel, doctorName: resolvedDoctorName, pgtAdm, baseAih, increment, aihWithIncrements })
         })
       })
       allPatients.sort((a, b) => {
@@ -1043,6 +1052,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
       const patientsDedup = dedupPatientsByAIH(doctor.patients || [])
       patientsDedup.forEach((p: any) => {
+        const respCns = String(((p?.aih_info?.cns_responsavel ?? p?.aih_info?.cns_responsible) || '')).trim()
+        const docCns = String(doctor?.doctor_info?.cns || '').trim()
+        if (respCns && !isZeroCns(respCns) && respCns !== docCns) return
         totalPatientsProcessed++
         const aihNumber = normalizeAih(String(p?.aih_info?.aih_number || '').trim())
         if (approvedOnly && (!aihNumber || !approvedSetRef.current.has(aihNumber))) return
@@ -2139,12 +2151,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     try {
       const perAihPerDoctor = new Map<string, Map<string, { sum: number; name: string; cboSet: Set<string>; isAnesth: boolean }>>()
       const nameByCns = new Map<string, string>()
+      const aihResponsibleCns = new Map<string, string>()
       for (const doctor of filteredDoctors) {
         const cns = doctor.doctor_info.cns || 'NO_CNS'
         nameByCns.set(cns, doctor.doctor_info.name || '')
         for (const p of doctor.patients as any[]) {
           const aihKey = normalizeAihNumber(p?.aih_info?.aih_number)
           if (!aihKey) continue
+          const resp = String(((p as any)?.aih_info?.cns_responsavel ?? (p as any)?.aih_info?.cns_responsible) || '').trim()
+          if (resp && !isZeroCns(resp)) aihResponsibleCns.set(aihKey, resp)
           let entry = { sum: 0, name: doctor.doctor_info.name || '', cboSet: new Set<string>(), isAnesth: false }
           for (const proc of (p.procedures || [])) {
             const belongs = (proc?.professional_name || '') === (doctor.doctor_info.name || '')
@@ -2170,6 +2185,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       const assignment = new Map<string, string>()
       const dedupList: Array<{ aih: string; cns: string; cbo?: string; doctorName?: string; value: number }> = []
       for (const [aihKey, byDoctor] of perAihPerDoctor.entries()) {
+        const forced = aihResponsibleCns.get(aihKey)
+        if (forced && !isZeroCns(forced)) {
+          assignment.set(aihKey, forced)
+          const entriesForced = Array.from(byDoctor.entries())
+          for (const [cns, info] of entriesForced) {
+            if (cns !== forced && info.sum > 0) {
+              const cbo = Array.from(info.cboSet.values())[0]
+              dedupList.push({ aih: aihKey, cns, cbo, doctorName: nameByCns.get(cns) || '', value: info.sum })
+            }
+          }
+          continue
+        }
         const entries = Array.from(byDoctor.entries())
         const hasNonAnesth = entries.some(([_, info]) => !info.isAnesth && info.sum > 0)
         let candidates = entries
@@ -4097,6 +4124,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         console.log(`📊 [RELATÓRIO MÉDICO] Total de AIHs: ${(doctor.patients || []).length}`);
                                         
                                         (doctor.patients || []).forEach((p: any) => {
+                                          const respCns = String(((p?.aih_info?.cns_responsavel ?? p?.aih_info?.cns_responsible) || '')).trim()
+                                          const docCns = String(doctor.doctor_info?.cns || '').trim()
+                                          if (respCns && !isZeroCns(respCns) && respCns !== docCns) return
                                           // ✅ FILTRO UNIFICADO: Intervalo de datas (mesmo dos relatórios gerais)
                                           if (false) {
                                             const discharge = p?.aih_info?.discharge_date ? new Date(p.aih_info.discharge_date) : undefined;
