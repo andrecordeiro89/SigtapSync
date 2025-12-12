@@ -2835,9 +2835,29 @@ const PatientManagement = () => {
                                 </span>
                               </td>
                               <td className="px-4 py-3">
-                                <span className="font-semibold text-blue-600">
-                                  {formatCompetencia(item.competencia)}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-blue-600">
+                                    {formatCompetencia(item.competencia)}
+                                  </span>
+                                  {(() => {
+                                    const compStr = item.competencia || '';
+                                    const compMatch = compStr.match(/^(\d{4})-(\d{2})/);
+                                    const compY = compMatch ? parseInt(compMatch[1], 10) : undefined;
+                                    const compM = compMatch ? parseInt(compMatch[2], 10) : undefined;
+                                    const disStr = item.discharge_date || '';
+                                    const disMatch = disStr.match(/^(\d{4})-(\d{2})/);
+                                    const disY = disMatch ? parseInt(disMatch[1], 10) : undefined;
+                                    const disM = disMatch ? parseInt(disMatch[2], 10) : undefined;
+                                    const mismatch = compY && compM && disY && disM && (compY !== disY || compM !== disM);
+                                    if (!mismatch) return null;
+                                    const disLabel = disStr ? formatDate(disStr).slice(3) /* MM/YYYY */ : '';
+                                    return (
+                                      <Badge variant="outline" className="text-xs border-red-300 text-red-600">
+                                        Alta: {disLabel}
+                                      </Badge>
+                                    );
+                                  })()}
+                                </div>
                               </td>
                             </tr>
                           );

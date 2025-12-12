@@ -48,7 +48,7 @@ import { DoctorsCrudService } from '../services/doctorsCrudService';
 import { ProcedureRecordsService, type ProcedureRecord } from '../services/simplifiedProcedureService';
 import { DateRange } from '../types';
 import { DoctorPaymentRules } from './DoctorPaymentRules';
-import { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayment, hasIndividualPaymentRules, isFixedMonthlyPayment } from '../config/doctorPaymentRules';
+import { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayment, hasIndividualPaymentRules, isFixedMonthlyPayment, ALL_HOSPITAL_RULES, detectHospitalFromContext } from '../config/doctorPaymentRules';
 import ProcedurePatientDiagnostic from './ProcedurePatientDiagnostic';
 import CleuezaDebugComponent from './CleuezaDebugComponent';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
@@ -90,6 +90,14 @@ const formatCurrency = (value: number | null | undefined): string => {
 const formatNumber = (value: number | null | undefined): string => {
   if (value == null || isNaN(value)) return '0';
   return Math.round(value).toLocaleString('pt-BR');
+};
+
+// Determinar quando usar planilha HON (apenas hospital Torao Tokuda e cirurgia geral, com fonte remota ativa)
+const shouldUseHonForHospital = (doctorName: string, hospitalId: string | undefined, isGeneralSurgery: boolean): boolean => {
+  if (!ENV_CONFIG.USE_SIH_SOURCE) return false;
+  if (!isGeneralSurgery) return false;
+  const hospitalKey = detectHospitalFromContext(doctorName, hospitalId, ALL_HOSPITAL_RULES);
+  return hospitalKey === 'TORAO_TOKUDA_APUCARANA';
 };
 
 // ✅ FUNÇÃO SEGURA: Parse de data ISO sem problemas de timezone
@@ -340,7 +348,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?:
   
   if (fixedPaymentCalculation.hasFixedRule) {
     // 🔍 VERIFICAR SE É FIXO MENSAL OU FIXO POR PACIENTE
-    const isMonthlyFixed = isFixedMonthlyPayment(doctorData.doctor_info.name, hospitalId);
+    const isMonthlyFixed = isFixedMonthlyPayment(doctorData.doctor_info.name, hospitalId, ALL_HOSPITAL_RULES);
     
     if (isMonthlyFixed) {
       // ✅ FIXO MENSAL: Valor fixo UMA VEZ, independente de pacientes
@@ -380,7 +388,8 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?:
         // Se há procedimentos médicos para este paciente, calcular o valor baseado nas regras
         if (patientMedicalProcedures.length > 0) {
         const isGeneralSurgery = /cirurg/i.test(doctorData.doctor_info.specialty || '') && /geral/i.test(doctorData.doctor_info.specialty || '')
-        const paymentCalculation = (ENV_CONFIG.USE_SIH_SOURCE && isGeneralSurgery)
+        const useHon = shouldUseHonForHospital(doctorData.doctor_info.name, hospitalId, isGeneralSurgery)
+        const paymentCalculation = useHon
           ? calculateHonPayments(patientMedicalProcedures)
           : calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures, hospitalId);
           // Somar os valores calculados individuais (detalhamento por procedimento)
@@ -1112,7 +1121,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         let repasseValue = 0
         if (proceduresWithPayment.length > 0) {
           const isGenSurg = /cirurg/i.test(doctorName) || (/cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || ''))
-          const paymentResult = (ENV_CONFIG.USE_SIH_SOURCE && isGenSurg)
+          const useHon = shouldUseHonForHospital(doctorName, hospitalId, !!isGenSurg)
+          const paymentResult = useHon
             ? calculateHonPayments(proceduresWithPayment)
             : calculateDoctorPayment(
                 doctorName,
@@ -4421,7 +4431,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           let repasseValue = 0;
                                           if (proceduresWithPayment.length > 0) {
                                           const isGenSurg = /cirurg/i.test(doctorName) || (/cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || ''))
-                                          const paymentResult = (ENV_CONFIG.USE_SIH_SOURCE && isGenSurg)
+                                          const useHon = shouldUseHonForHospital(doctorName, hospitalId, !!isGenSurg)
+                                          const paymentResult = useHon
                                             ? calculateHonPayments(proceduresWithPayment)
                                             : calculateDoctorPayment(
                                                 doctorName,
@@ -5416,7 +5427,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         );
                                         const isMonthlyFixed = isFixedMonthlyPayment(
                                           doctor.doctor_info.name,
-                                          hospitalId
+                                          hospitalId,
+                                          ALL_HOSPITAL_RULES
                                         );
                                         
                                         let totalPayment = 0;
@@ -5436,7 +5448,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             }));
                                           
                                           const isGenSurg2 = /cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || '')
-                                          const paymentResult = (ENV_CONFIG.USE_SIH_SOURCE && isGenSurg2)
+                                          const useHon2 = shouldUseHonForHospital(doctor.doctor_info.name, hospitalId, isGenSurg2)
+                                          const paymentResult = useHon2
                                             ? calculateHonPayments(proceduresWithPayment)
                                             : calculateDoctorPayment(
                                                 doctor.doctor_info.name,
@@ -5501,6 +5514,25 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 </div>
                                               </div>
                                               <div className="flex items-center gap-2">
+                                                {(() => {
+                                                  const selComp = selectedCompetencia && selectedCompetencia !== 'all' ? selectedCompetencia : String((patient.aih_info as any).competencia || '')
+                                                  const sm = selComp.match(/^(\d{4})-(\d{2})/) || selComp.match(/^([0-9]{4})([0-9]{2})$/)
+                                                  const selY = sm ? parseInt(sm[1], 10) : undefined
+                                                  const selM = sm ? parseInt(sm[2], 10) : undefined
+                                                  const disStr = String((patient.aih_info as any).discharge_date || '')
+                                                  const dm = disStr.match(/^(\d{4})-(\d{2})/)
+                                                  const disY = dm ? parseInt(dm[1], 10) : undefined
+                                                  const disM = dm ? parseInt(dm[2], 10) : undefined
+                                                  const mismatch = selY && selM && disY && disM && (selY !== disY || selM !== disM)
+                                                  const disLabel = disStr ? (() => { const m = disStr.match(/^(\d{4})-(\d{2})/); return m ? `${m[2]}/${m[1]}` : '-' })() : '-'
+                                                  const compLabel = formatCompetencia(selComp)
+                                                  const cls = mismatch ? 'bg-red-50 text-red-700 border-red-200' : 'bg-slate-100 text-slate-700 border-slate-200'
+                                                  return (
+                                                    <Badge variant="outline" className={`text-[10px] font-semibold ${cls}`}>
+                                                      {disLabel} | {compLabel}
+                                                    </Badge>
+                                                  )
+                                                })()}
                                                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-semibold">
                                                   {patient.procedures.length} PROC
                                                 </Badge>
