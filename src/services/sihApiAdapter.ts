@@ -109,10 +109,16 @@ export const SihApiAdapter = {
     const hospByCnes = new Map((localHosp || []).map(h => [String(h.cnes), h]))
 
     // 5) Carregar AIHs locais correspondentes para obter CNS responsável e dados de paciente
-    const { data: localAihRows } = await supabase
+    let localAihQuery = supabase
       .from('aihs')
       .select('aih_number, cns_responsavel, hospital_id, patients(name, medical_record)')
-      .in('aih_number', aihNumbers)
+    const localHospitalIds = Array.from(new Set((rdData || []).map(r => String(r.cnes)).filter(Boolean))).map(c => hospByCnes.get(String(c))?.id).filter(Boolean) as string[]
+    if (localHospitalIds.length > 0) localAihQuery = localAihQuery.in('hospital_id', localHospitalIds)
+    if (typeof compYear === 'number' && typeof compMonth === 'number') {
+      const compISO = `${String(compYear).padStart(4, '0')}-${String(compMonth).padStart(2, '0')}-01`
+      localAihQuery = localAihQuery.eq('competencia', compISO)
+    }
+    const { data: localAihRows } = await localAihQuery
     const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
     const localRespByAih = new Map<string, string>()
     const localPatientByAih = new Map<string, { name?: string; medical_record?: string }>()
