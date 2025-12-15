@@ -731,7 +731,12 @@ const PatientManagement = () => {
         await new Promise(r => setTimeout(r, 0));
       }
 
-      setAIHs(all);
+      // Dedup por ID de AIH para evitar duplicidade visual e conflitos de expansão
+      const uniqueMap = new Map<string, AIH>();
+      all.forEach((aih: any) => {
+        if (aih && aih.id) uniqueMap.set(String(aih.id), aih);
+      });
+      setAIHs(Array.from(uniqueMap.values()));
       
       // ✅ CARREGAR MÉDICOS EM BATCH
       const uniqueCNS = [...new Set(all.map(aih => aih.cns_responsavel).filter(Boolean))];
@@ -1028,8 +1033,17 @@ const PatientManagement = () => {
     };
   });
 
+  // Remover duplicatas por id antes de aplicar filtros/paginação
+  const uniqueUnifiedData: UnifiedAIHData[] = React.useMemo(() => {
+    const m = new Map<string, UnifiedAIHData>();
+    for (const item of unifiedData) {
+      if (item && item.id) m.set(String(item.id), item);
+    }
+    return Array.from(m.values());
+  }, [aihs.length]);
+
   // ✅ OTIMIZADO: Filtros aplicados (backend já filtrou competência, data e caráter)
-  const filteredData = unifiedData.filter(item => {
+  const filteredData = uniqueUnifiedData.filter(item => {
     // ✅ NOVO: Filtro de competência específico para aba "Mudança de Competência"
     if (activeTab === 'mudanca-competencia' && selectedCompetenciaForBatch !== 'all') {
       if (selectedCompetenciaForBatch === 'sem_competencia') {

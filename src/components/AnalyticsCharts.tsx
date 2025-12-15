@@ -11,11 +11,12 @@ interface AnalyticsChartsProps {
   doctors: DoctorWithPatients[];
   specialty?: string;
   selectedHospitals?: string[];
+  careCharacter?: 'all' | '1' | '2';
 }
 
 const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, specialty, selectedHospitals }) => {
+const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, specialty, selectedHospitals, careCharacter }) => {
   const [granularity, setGranularity] = useState<'week' | 'day'>('week');
   const [loading, setLoading] = useState<boolean>(false);
   const [rankingApi, setRankingApi] = useState<Array<{ doctor: string; avg: number }> | null>(null);
@@ -137,7 +138,9 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
       const filters = {
         dateStart: dateRange ? dateRange.startDate.toISOString() : undefined,
         dateEnd: dateRange ? dateRange.endDate.toISOString() : undefined,
-        specialty: specialty && specialty !== 'all' ? specialty : undefined,
+        hospitals: (selectedHospitals && selectedHospitals.length > 0 && !selectedHospitals.includes('all')) ? selectedHospitals : undefined,
+        specialty: (specialtyLocal && specialtyLocal !== 'all') ? specialtyLocal : undefined,
+        careCharacter: (careCharacter && careCharacter !== 'all') ? careCharacter : undefined,
         topN: 8,
       };
       if (rows.length === 0) { setRankingApi([]); setShareApi([]); return; }
@@ -153,7 +156,7 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({ dateRange, doctors, s
       setRankingApi(null);
       setShareApi(null);
     }
-  }, [scopedDoctors, dateRange?.startDate, dateRange?.endDate, specialty]);
+  }, [scopedDoctors, dateRange?.startDate, dateRange?.endDate, specialtyLocal, selectedHospitals?.[0], careCharacter]);
 
   // Agregações por hospital / semana / procedimento (client-side simples)
   useEffect(() => {

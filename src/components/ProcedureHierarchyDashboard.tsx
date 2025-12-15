@@ -21,7 +21,7 @@ import AnalyticsCharts from './AnalyticsCharts';
 interface ProcedureHierarchyDashboardProps {
   dateRange?: DateRange;
   selectedHospitals?: string[];
-  selectedCareCharacter?: string;
+  selectedCareCharacter?: 'all' | '1' | '2';
   selectedSpecialty?: string;
   searchTerm?: string; // termo global (nome/CNS/CRM)
 }
@@ -146,7 +146,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
 
   // Agregação: Nome Comum x Médico x Média do valor da AIH
   const commonNameDoctorRows = useMemo(() => {
-    if (!selectedCommonName || selectedCommonName === 'all') return [] as Array<{ doctor: string; cns: string; aihCount: number; totalValue: number; avgValue: number }>;
+    if (!selectedCommonName || selectedCommonName === 'all') return [] as Array<{ doctor: string; cns: string; aihCount: number; totalValue: number; avgValue: number; hospitalLabel: string }>;
     const map = new Map<string, { doctor: string; cns: string; aihCount: number; totalValue: number; hospitals: Set<string> }>();
     const source = includeAllHospitalsCommon ? (allDoctorsForCommon && allDoctorsForCommon.length > 0 ? allDoctorsForCommon : filteredDoctors) : filteredDoctors;
     (source || []).forEach(d => {
@@ -736,8 +736,17 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
   };
 
   // Especialidades: agregação por especialidade → procedimentos e valores (exclui anestesista)
+  type ProcAgg = { code: string; desc: string; count: number; total: number };
+  type SpecialtyBucket = {
+    specialty: string;
+    doctors: Set<string>;
+    totalAihs: number;
+    totalAihValue: number;
+    procedureMap: Map<string, ProcAgg>;
+  };
+
   const getSpecialtyAnalytics = (doctorsSubset: DoctorWithPatients[]) => {
-    const specialtyMap = new Map<string, any>();
+    const specialtyMap = new Map<string, SpecialtyBucket>();
     doctorsSubset.forEach(d => {
       const spec = (d.doctor_info.specialty || 'Não informado').trim();
       if (!specialtyMap.has(spec)) {
@@ -746,10 +755,10 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
           doctors: new Set<string>(),
           totalAihs: 0,
           totalAihValue: 0,
-          procedureMap: new Map<string, { code: string; desc: string; count: number; total: number }>(),
+          procedureMap: new Map<string, ProcAgg>(),
         });
       }
-      const bucket = specialtyMap.get(spec);
+      const bucket = specialtyMap.get(spec)!;
       bucket.doctors.add(d.doctor_info.cns || d.doctor_info.name);
       const allAIHs = d.patients || [];
       bucket.totalAihs += allAIHs.length;
@@ -766,12 +775,12 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
       });
     });
 
-    const rows = Array.from(specialtyMap.values()).map((b: any) => {
-      const procedures = Array.from(b.procedureMap.values()).sort((a: any, c: any) => c.count - a.count);
-      const totalProcedures = procedures.reduce((s: number, p: any) => s + p.count, 0);
-      const totalProceduresValue = procedures.reduce((s: number, p: any) => s + p.total, 0);
+    const rows = Array.from(specialtyMap.values()).map((b: SpecialtyBucket) => {
+      const procedures = Array.from(b.procedureMap.values()).sort((a, c) => c.count - a.count);
+      const totalProcedures = procedures.reduce((s, p) => s + p.count, 0);
+      const totalProceduresValue = procedures.reduce((s, p) => s + p.total, 0);
       const topProcedures = procedures.slice(0, 10);
-      const top3Count = procedures.slice(0, 3).reduce((s: number, p: any) => s + p.count, 0);
+      const top3Count = procedures.slice(0, 3).reduce((s, p) => s + p.count, 0);
       const patternRate = totalProcedures > 0 ? Math.round((top3Count / totalProcedures) * 100) : 0;
       return {
         specialty: b.specialty,
@@ -1230,6 +1239,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
             doctors={filteredDoctors}
             specialty={selectedSpecialty}
             selectedHospitals={selectedHospitals}
+            careCharacter={selectedCareCharacter}
           />
         </TabsContent>
 
