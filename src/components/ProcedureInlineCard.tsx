@@ -217,6 +217,15 @@ const ProcedureInlineCard = ({
       return procedure.procedure_description;
     }
 
+    {
+      const rel: any = procedure.sigtap_procedures;
+      const relDesc = Array.isArray(rel) ? rel[0]?.description : rel?.description;
+      if (relDesc && !isUnavailable(relDesc)) {
+        console.log('✅ Usando descrição SIGTAP via join:', relDesc);
+        return relDesc;
+      }
+    }
+
     // 3. displayName como terceira opção (se não for fallback)
     if (procedure.displayName && 
         !isUnavailable(procedure.displayName) &&
@@ -227,7 +236,7 @@ const ProcedureInlineCard = ({
     }
 
     // 4. Fallback final
-    const fallback = `Procedimento ${formattedCode}`;
+    const fallback = formattedCode;
     console.log('⚠️ Usando fallback:', fallback);
     return fallback;
   })();

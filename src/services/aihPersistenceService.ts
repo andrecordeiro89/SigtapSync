@@ -3,6 +3,7 @@ import { sanitizePatientName, isLikelyProcedureString } from '../utils/patientNa
 import { buildAIHIdempotencyKey } from '../utils/idempotency';
 import { AIH } from '../types';
 import { PatientService, AIHService } from './supabaseService';
+import { formatSigtapCode } from '../utils/formatters';
 
 // ================================================================
 // UTILIDADES DE CONVERSÃO
@@ -530,6 +531,50 @@ export class AIHPersistenceService {
       console.warn('⚠️ Falha ao buscar nomes de médicos por CNS. Continuando sem nome.', e);
     }
 
+    // Resolver IDs e descrições do SIGTAP em lote antes de montar os registros
+    let codeToProcedureId: Record<string, string> = {};
+    let codeToDescription: Record<string, string> = {};
+    try {
+      const uniqueCodes = Array.from(new Set(
+        (procedimentos || [])
+          .map(p => formatSigtapCode((p.codigo || '').toString().trim()))
+          .filter(c => c.length > 0)
+      ));
+      if (uniqueCodes.length > 0) {
+        // Preferir RPC de resolução em lote se disponível
+        let rpcOk = false;
+        try {
+          const { data: rpcData, error: rpcError } = await supabase
+            .rpc('resolve_procedure_ids_batch', { p_codes: uniqueCodes });
+          if (!rpcError && Array.isArray(rpcData)) {
+            rpcData.forEach((row: any) => {
+              if (row && row.code) {
+                codeToProcedureId[row.code] = row.procedure_id;
+                if (row.description) codeToDescription[row.code] = row.description;
+              }
+            });
+            rpcOk = true;
+          }
+        } catch {}
+
+        if (!rpcOk) {
+          const { data: sigtapRows } = await supabase
+            .from('sigtap_procedures')
+            .select(`code, id, description, sigtap_versions!inner(is_active)`) 
+            .in('code', uniqueCodes)
+            .eq('sigtap_versions.is_active', true);
+          (sigtapRows || []).forEach((row: any) => {
+            if (row && row.code) {
+              codeToProcedureId[row.code] = row.id;
+              if (row.description) codeToDescription[row.code] = row.description;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Falha ao resolver procedimentos SIGTAP em lote. Continuando sem FK/descrição.', e);
+    }
+
     const rows = procedimentos
       .filter(p => typeof p.linha === 'number' && !existingSeq.has(p.linha))
       .map(p => {
@@ -546,23 +591,41 @@ export class AIHPersistenceService {
           return new Date(p.dataRealizacao).toISOString();
         })();
 
-        return {
+        const codeRaw = (p.codigo || '').toString().trim();
+        const code = formatSigtapCode(codeRaw);
+        const cleanedDesc = (() => {
+          const incoming = (p.descricao || '').toString().trim();
+          if (!incoming || incoming.startsWith('Procedimento') || incoming.startsWith('Procedimento:')) {
+            return codeToDescription[code] || null;
+          }
+          return incoming;
+        })();
+
+        const baseRow: Record<string, any> = {
           hospital_id: hospitalId,
           patient_id: patientId,
           aih_id: aihId,
-          procedure_code: p.codigo,
-          procedure_description: p.descricao || null,
+          procedure_code: code,
+          procedure_description: cleanedDesc,
           procedure_date: procedureDateISO,
           professional_name: profCns ? (doctorNameByCns.get(profCns) || null) : null,
           professional_cns: profCns,
           professional_cbo: prof?.cbo || null,
+          status: 'approved',
           billing_status: 'pending',
-          match_status: 'pending',
+          match_status: 'matched',
           quantity: p.quantidade || 1,
           sequencia: p.linha,
           value_charged: 0,
           total_value: 0
-        } as Record<string, any>;
+        };
+
+        const sigtapId = codeToProcedureId[code];
+        if (sigtapId) {
+          baseRow.procedure_id = sigtapId;
+        }
+
+        return baseRow as Record<string, any>;
       });
 
     if (rows.length === 0) {
@@ -2191,7 +2254,7 @@ export class AIHPersistenceService {
       
       // ✅ CAMPOS USANDO NOMES CORRETOS DO SCHEMA
       procedure_code: data.procedure_code,
-      procedure_description: data.procedure_description || `Procedimento ${data.procedure_code}`,
+      procedure_description: data.procedure_description || data.procedure_code,
       procedure_date: data.procedure_date ? convertBrazilianDateToISO(data.procedure_date) : new Date().toISOString().split('T')[0],  // Nome correto!
       
       // Profissional responsável  
@@ -3022,10 +3085,12 @@ export class AIHPersistenceService {
             participacao,
             aprovado,
             created_at,
-            updated_at
+            updated_at,
+            procedure_id,
+            sigtap_procedures:procedure_id(description, code)
           `)
-        .eq('aih_id', aihId)
-        .order('sequencia', { ascending: true });
+          .eq('aih_id', aihId)
+          .order('sequencia', { ascending: true });
 
         if (error) throw error;
 
@@ -3043,20 +3108,41 @@ export class AIHPersistenceService {
           });
           
           // Normalizar dados com sequencia correto
-          const normalizedProcedures = procedures.map((proc, index) => ({
+          const normalizedProceduresBase = procedures.map((proc, index) => ({
             ...proc,
             procedure_sequence: proc.sequencia || (index + 1),
-            match_status: proc.match_status || 'matched', // ✅ USAR VALOR PERMITIDO
+            match_status: (() => {
+              const rel = (proc as any).sigtap_procedures;
+              const relDesc = Array.isArray(rel) ? rel[0]?.description : rel?.description;
+              const hasJoin = !!relDesc || !!proc.procedure_id;
+              const value = (proc as any).match_status || 'matched';
+              return hasJoin ? 'matched' : value;
+            })(),
             // ✅ Não criar displayName fallback - deixar que o componente decida
-            displayName: proc.procedure_description && 
-                        !proc.procedure_description.startsWith('Procedimento') ? 
-                        proc.procedure_description : undefined,
+            displayName: (() => {
+              const rel = (proc as any).sigtap_procedures;
+              const relDesc = Array.isArray(rel) ? rel[0]?.description : rel?.description;
+              const desc = proc.procedure_description || relDesc;
+              if (desc && !desc.startsWith('Procedimento') && !desc.startsWith('Procedimento:')) return desc;
+              return undefined;
+            })(),
             fullDescription: `${proc.codigo_procedimento_original || proc.procedure_code} - ${
-              proc.procedure_description || 'Descrição não disponível'
+              (() => {
+                const rel = (proc as any).sigtap_procedures;
+                const relDesc = Array.isArray(rel) ? rel[0]?.description : rel?.description;
+                return proc.procedure_description || relDesc || 'Descrição não disponível';
+              })()
             }`
           }));
+
+          // Enriquecer por código se a descrição estiver faltando
+          const needEnrich = normalizedProceduresBase.some(p => !p.procedure_description);
+          if (needEnrich) {
+            const enriched = await this.enrichProceduresWithSigtap(normalizedProceduresBase as any);
+            return enriched;
+          }
           
-          return normalizedProcedures;
+          return normalizedProceduresBase;
         }
       } catch (error) {
         console.warn('Strategy 1 failed, trying fallback:', error);
@@ -3106,6 +3192,62 @@ export class AIHPersistenceService {
     } catch (error) {
       console.error('Error getting AIH procedures:', error);
       return [];
+    }
+  }
+
+  /**
+   * Correção dirigida: garante nomes SIGTAP e status 'matched' para procedimentos de uma AIH
+   */
+  async repairAIHFromSisaih(aihNumber: string, hospitalId: string): Promise<{ updated: number } | null> {
+    try {
+      const { data: aihRow } = await supabase
+        .from('aihs')
+        .select('id')
+        .eq('aih_number', aihNumber)
+        .eq('hospital_id', hospitalId)
+        .maybeSingle();
+
+      if (!aihRow?.id) return null;
+
+      const aihId = aihRow.id as string;
+
+      const { data: procs } = await supabase
+        .from('procedure_records')
+        .select('id, procedure_code, match_status, procedure_description, procedure_id')
+        .eq('aih_id', aihId);
+
+      if (!procs || procs.length === 0) return { updated: 0 };
+
+      const codes = Array.from(new Set(procs.map(p => formatSigtapCode(p.procedure_code))));
+      const { data: resolved } = await supabase
+        .rpc('resolve_procedure_ids_batch', { p_codes: codes });
+
+      const idMap: Record<string, { id: string; description: string | null }> = {};
+      (resolved || []).forEach((r: any) => { idMap[r.code] = { id: r.procedure_id, description: r.description || null }; });
+
+      let updated = 0;
+      for (const p of procs) {
+        const code = formatSigtapCode(p.procedure_code);
+        const hit = idMap[code];
+        if (!hit) continue;
+        const upd: any = { match_status: 'matched' };
+        if (!p.procedure_id && hit.id) upd.procedure_id = hit.id;
+        if ((!p.procedure_description || p.procedure_description.startsWith('Procedimento'))) {
+          if (hit.description) upd.procedure_description = hit.description;
+        }
+        if (Object.keys(upd).length > 0) {
+          const { error } = await supabase
+            .from('procedure_records')
+            .update(upd)
+            .eq('id', p.id);
+          if (!error) updated++;
+        }
+      }
+
+      await this.recalculateAIHStatistics(aihId);
+      return { updated };
+    } catch {
+      return null;
     }
   }
 
@@ -3170,7 +3312,7 @@ export class AIHPersistenceService {
       // Buscar códigos únicos que precisam de descrição
       const codesNeedingDescription = procedures
         .filter(p => p.procedure_code && !p.procedure_description)
-        .map(p => p.procedure_code);
+        .map(p => formatSigtapCode(p.procedure_code));
 
       if (codesNeedingDescription.length > 0) {
         console.log(`Enriching ${codesNeedingDescription.length} procedures with SIGTAP descriptions`);
@@ -3194,29 +3336,27 @@ export class AIHPersistenceService {
           }, {} as Record<string, string>);
 
           // Enriquecer procedimentos
-          return procedures.map(procedure => ({
-            ...procedure,
-            procedure_description: procedure.procedure_description || 
-              descriptionMap[procedure.procedure_code] || 
-              `Procedimento: ${procedure.procedure_code}`,
-            // Garantir compatibilidade com interface existente
-            displayName: procedure.procedure_description || 
-              descriptionMap[procedure.procedure_code] || 
-              `Procedimento: ${procedure.procedure_code}`,
-            fullDescription: `${procedure.procedure_code} - ${
-              procedure.procedure_description || 
-              descriptionMap[procedure.procedure_code] || 
-              'Descrição não disponível'
-            }`
-          }));
+          return procedures.map(procedure => {
+            const codeFmt = formatSigtapCode(procedure.procedure_code);
+            const desc = procedure.procedure_description || descriptionMap[codeFmt] || procedure.procedure_code;
+            const rel = desc && desc !== procedure.procedure_code ? [{ description: desc, code: codeFmt }] : undefined;
+            return {
+              ...procedure,
+              procedure_description: desc,
+              displayName: desc,
+              sigtap_procedures: rel,
+              match_status: procedure.match_status || (descriptionMap[codeFmt] ? 'matched' : 'pending'),
+              fullDescription: `${procedure.procedure_code} - ${desc || 'Descrição não disponível'}`
+            };
+          });
         }
       }
 
       // Se não precisar enriquecer ou falhar, retornar com campos compatíveis
       return procedures.map(procedure => ({
         ...procedure,
-        procedure_description: procedure.procedure_description || `Procedimento: ${procedure.procedure_code}`,
-        displayName: procedure.procedure_description || `Procedimento: ${procedure.procedure_code}`,
+        procedure_description: procedure.procedure_description || procedure.procedure_code,
+        displayName: procedure.procedure_description || procedure.procedure_code,
         fullDescription: `${procedure.procedure_code} - ${
           procedure.procedure_description || 'Descrição não disponível'
         }`
@@ -3228,8 +3368,8 @@ export class AIHPersistenceService {
       // Fallback: retornar com descrições básicas
       return procedures.map(procedure => ({
         ...procedure,
-        procedure_description: procedure.procedure_description || `Procedimento: ${procedure.procedure_code}`,
-        displayName: procedure.procedure_description || `Procedimento: ${procedure.procedure_code}`,
+        procedure_description: procedure.procedure_description || procedure.procedure_code,
+        displayName: procedure.procedure_description || procedure.procedure_code,
         fullDescription: `${procedure.procedure_code} - ${
           procedure.procedure_description || 'Descrição não disponível'
         }`
@@ -3247,7 +3387,7 @@ export class AIHPersistenceService {
       aih_id: proc.aih_id,
       procedure_sequence: proc.sequencia || index + 1,
       procedure_code: proc.procedure_code || proc.codigo_procedimento_original,
-      procedure_description: proc.procedure_description || `Procedimento ${proc.procedure_code}`,
+      procedure_description: proc.procedure_description || proc.procedure_code,
       procedure_date: proc.procedure_date,
       
       // Valores financeiros
@@ -3261,7 +3401,7 @@ export class AIHPersistenceService {
       professional_document: proc.documento_profissional,
       
       // Status e matching
-      match_status: proc.match_status || proc.status || 'pending',
+      match_status: proc.match_status || proc.status || 'matched',
       match_confidence: proc.match_confidence || 0,
       approved: proc.aprovado || false,
       
