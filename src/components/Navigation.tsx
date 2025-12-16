@@ -225,7 +225,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
         <div className="flex items-center justify-between h-16">
           {/* Logo e Nome */}
           <div className="logo-container flex items-center flex-shrink-0">
-            <img src="/icons8-s-67.png" alt="SIGTAP Sync" className="h-8 w-8 rounded-lg" />
+            <img src="/Favicon_Oficial.png?v=2" alt="SIGTAP Sync" className="h-8 w-8 rounded-lg" />
             <div className="ml-2 leading-tight">
               <div className="text-[15px] font-bold text-gray-900 tracking-wide">SIGTAP Sync</div>
               <div className="text-[12px] text-gray-600">Regulação Médica</div>
