@@ -105,7 +105,6 @@ export async function exportAllPatientsExcel(filters: AllPatientsExportFilters =
 
   // Montar linhas únicas por paciente (por cartão). Não deduplica entre médicos/hospitais.
   const rows: Array<Array<string | number>> = [];
-  const summaryMap = new Map<string, { name: string; cns: string; hospital: string; acts: number; aihs: number }>();
 
   // Cabeçalhos
   const summaryHeader: string[] = ['Relatório — Pacientes do Período'];
@@ -222,6 +221,7 @@ export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {
   ];
 
   const rows: Array<Array<string | number>> = [];
+  const summaryMap: Map<string, { name: string; cns: string; hospital: string; acts: number; aihs: number }> = new Map();
   let index = 1;
 
   const cards = (hierarchy as any[]).filter(card => {
@@ -233,7 +233,6 @@ export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {
   });
 
   for (const card of cards) {
-    const hospitalNameFromCard = (card.hospitals && card.hospitals[0]?.hospital_name) || '';
     const hospitalNameFromCard = (card.hospitals && card.hospitals[0]?.hospital_name) || '';
     for (const p of (card.patients || [])) {
       // Filtrar procedimentos de anestesia por CBO 225151
@@ -334,7 +333,7 @@ export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {
 
   // Resumo por Profissional e Hospital
   const summaryHeader = ['Profissional', 'CNS', 'Hospital', 'Atos Anestésicos', 'AIHs com anestesia'];
-  const summaryRows = [summaryHeader, ...Array.from(summaryMap.values()).map(v => [v.name, v.cns, v.hospital, v.acts, v.aihs])];
+  const summaryRows = [summaryHeader, ...Array.from(summaryMap.values()).map((v) => [v.name, v.cns, v.hospital, v.acts, v.aihs])];
   const wsSum = XLSX.utils.aoa_to_sheet(summaryRows);
   (wsSum as any)['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 30 }, { wch: 16 }, { wch: 16 }];
   XLSX.utils.book_append_sheet(wb, wsSum, 'Resumo Profissionais');

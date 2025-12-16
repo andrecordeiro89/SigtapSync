@@ -1518,7 +1518,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 <Button
                   variant="default"
                   size="sm"
-                  className="inline-flex items-center gap-2 bg-black hover:bg-neutral-800 text-white w-auto min-w-[160px]"
+                  className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white w-auto min-w-[160px]"
                   onClick={() => window.dispatchEvent(new Event('mpd:report-general'))}
                   title="Gerar relatório geral de pacientes"
                 >
@@ -1528,7 +1528,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 <Button
                   variant="default"
                   size="sm"
-                  className="inline-flex items-center gap-2 bg-neutral-700 hover:bg-neutral-800 text-white w-auto min-w-[160px]"
+                  className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white w-auto min-w-[160px]"
                   onClick={() => window.dispatchEvent(new Event('mpd:report-conference'))}
                   title="Gerar relatório de conferência de pacientes"
                 >
@@ -1538,7 +1538,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 <Button
                   variant="default"
                   size="sm"
-                  className="inline-flex items-center gap-2 bg-neutral-600 hover:bg-neutral-700 text-white w-auto min-w-[160px]"
+                  className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white w-auto min-w-[160px]"
                   onClick={() => window.dispatchEvent(new Event('mpd:report-simplified'))}
                   title="Gerar relatório simplificado de pacientes"
                 >
@@ -1559,8 +1559,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 )}
                 <Button
                   type="button"
-                  variant="outline"
-                  className="border-black text-black hover:bg-neutral-100"
+                  variant="default"
+                  className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white w-auto min-w-[200px]"
                   onClick={handleAnesthetistsReport}
                   title="Gerar relatório de anestesistas (CBO 225151) por CNS e hospital"
                 >
