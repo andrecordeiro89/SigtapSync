@@ -30,6 +30,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import PatientAihInfoBadges from './PatientAihInfoBadges';
 import AihDatesBadges from './AihDatesBadges';
+import { getSpecialtyName, getModalityName } from '@/utils/aihLookups';
 
 // Ícone customizado: cruz médica vermelha
 const MedicalCrossIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -2180,11 +2181,11 @@ const PatientManagement = () => {
                         <tr className="hover:bg-gray-50">
                           <td className="px-4 py-2.5">
                             <span className="text-gray-500 font-medium">Especialidade: </span>
-                            <span className="text-gray-900 ml-1">{item.specialty || 'Cirúrgico'}</span>
+                            <span className="text-gray-900 ml-1">{getSpecialtyName(item.specialty)}</span>
                           </td>
                           <td className="px-4 py-2.5">
                             <span className="text-gray-500 font-medium">Modalidade: </span>
-                            <span className="text-gray-900 ml-1">{item.care_modality || 'Hospitalar'}</span>
+                            <span className="text-gray-900 ml-1">{getModalityName(item.care_modality)}</span>
                           </td>
                         </tr>
                       </tbody>

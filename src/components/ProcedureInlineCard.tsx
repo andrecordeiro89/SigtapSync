@@ -34,6 +34,7 @@ interface ProcedureData {
   total_value?: number; // Valor total do procedimento (quando disponível)
   quantity?: number; // Quantidade selecionada para o procedimento
   professional?: string;
+  professional_name?: string;
   professional_cbo?: string;
   procedure_date: string;
   sigtap_procedures?: {
@@ -188,6 +189,11 @@ const ProcedureInlineCard = ({
     try { return (procedure.procedure_code || '').trim().startsWith('04'); } catch { return false; }
   })();
 
+  // Relacionamento do Supabase pode vir como objeto ou array; tratar ambos
+  const relProc: any = procedure.sigtap_procedures as any;
+  const relUnitCents: number | undefined = Array.isArray(relProc) ? relProc[0]?.value_hosp_total : relProc?.value_hosp_total;
+  const relComplexity: string | undefined = Array.isArray(relProc) ? relProc[0]?.complexity : relProc?.complexity;
+
   // 🎯 CORREÇÃO DIRETA: Priorizar descrição SIGTAP e filtrar textos genéricos
   const procedureDescription = (() => {
     console.log('🔍 ProcedureInlineCard - Dados recebidos:', {
@@ -271,6 +277,11 @@ const ProcedureInlineCard = ({
               <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
                 Qtd: {procedure.quantity ?? 1}
               </Badge>
+              {procedure.professional_cbo && (
+                <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+                  CBO: {procedure.professional_cbo}
+                </Badge>
+              )}
 
               {/* Badge de anestesista: exibir apenas quando NÃO calculável (mantém visual normal quando calculável) */}
               {anesthInfo.isAnesthetist && !anesthInfo.shouldCalculate && anesthInfo.badge && (
@@ -315,8 +326,8 @@ const ProcedureInlineCard = ({
                     let baseCents: number | null = null;
                     if (canShowMonetary && procedure.value_charged && procedure.value_charged > 0) {
                       baseCents = procedure.value_charged;
-                    } else if (canShowMonetary && procedure.sigtap_procedures?.value_hosp_total) {
-                      const unitCents = procedure.sigtap_procedures.value_hosp_total || 0;
+                    } else if (canShowMonetary && relUnitCents != null) {
+                      const unitCents = relUnitCents || 0;
                       baseCents = unitCents * (qty || 1);
                     }
                     if (baseCents != null) {
@@ -344,8 +355,8 @@ const ProcedureInlineCard = ({
                       let baseCents = 0;
                       if (procedure.value_charged && procedure.value_charged > 0) {
                         baseCents = procedure.value_charged;
-                      } else if (procedure.sigtap_procedures?.value_hosp_total) {
-                        const unitCents = procedure.sigtap_procedures.value_hosp_total || 0;
+                      } else if (relUnitCents != null) {
+                        const unitCents = relUnitCents || 0;
                         baseCents = unitCents * (qty || 1);
                       }
                       return (
@@ -361,11 +372,11 @@ const ProcedureInlineCard = ({
             </div>
               
             {/* Profissional */}
-            {procedure.professional && (
+            {(procedure.professional_name || procedure.professional) && (
               <div className="flex items-center space-x-1 mb-2">
                 <User className="w-3 h-3 text-gray-400" />
                 <span className="text-xs text-gray-600">
-                  {procedure.professional} {procedure.professional_cbo && `(${procedure.professional_cbo})`}
+                  {procedure.professional_name || procedure.professional} {procedure.professional_cbo && `(CBO: ${procedure.professional_cbo})`}
                 </span>
               </div>
             )}
@@ -391,10 +402,10 @@ const ProcedureInlineCard = ({
         </div>
 
         {/* Complexidade SIGTAP (se disponível) */}
-        {procedure.sigtap_procedures?.complexity && (
+        {relComplexity && (
           <div className="mt-3 pt-2 border-t border-gray-100">
             <span className="text-xs text-gray-500">
-              Complexidade: <span className="font-medium">{procedure.sigtap_procedures.complexity}</span>
+              Complexidade: <span className="font-medium">{relComplexity}</span>
             </span>
           </div>
         )}
