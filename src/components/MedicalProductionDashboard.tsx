@@ -5449,8 +5449,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                           <div className="border-t border-slate-200/60 pt-6">
                             <div className="flex items-center justify-between mb-5">
                               <h4 className="text-base font-semibold text-slate-800 flex items-center gap-3">
-                                <div className="w-7 h-7 bg-slate-100 rounded-xl flex items-center justify-center">
-                                  <User className="h-4 w-4 text-slate-600" />
+                                <div className="w-7 h-7 bg-[#0b1736] rounded-xl flex items-center justify-center">
+                                  <User className="h-4 w-4 text-white" />
                                 </div>
                                 Pacientes Atendidos ({(() => {
                                    const doctorKey = doctor.doctor_info.cns;
@@ -5677,8 +5677,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           <div className="mb-3 pb-3 border-b border-gray-100">
                                             <div className="flex items-center justify-between">
                                               <div className="flex items-center gap-2">
-                                                <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full">
-                                                  <User className="h-4 w-4 text-blue-600" />
+                                                <div className="flex items-center justify-center w-8 h-8 bg-[#0b1736] rounded-full">
+                                                  <User className="h-4 w-4 text-white" />
                                                 </div>
                                                 <div className="text-base font-bold text-gray-900">
                                                   {(/procedimento/i.test(patient.patient_info.name) || /\b\d{2}\.\d{2}\.\d{2}\.\d{3}-\d\b/.test(patient.patient_info.name)) ? 'Nome não disponível' : patient.patient_info.name}

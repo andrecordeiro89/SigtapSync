@@ -1981,7 +1981,7 @@ const PatientManagement = () => {
                           }
                         </Button>
                         
-                        <div className="w-8 h-8 bg-black rounded-md flex items-center justify-center flex-shrink-0">
+                        <div className="w-8 h-8 bg-[#0b1736] rounded-md flex items-center justify-center flex-shrink-0">
                           <User className="w-4 h-4 text-white" />
                         </div>
                         
