@@ -1602,6 +1602,7 @@ export class AIHPersistenceService {
     dateTo?: string;     // ✅ Filtra discharge_date <= dateTo (Data de Alta)
     patientName?: string;
     aihNumber?: string;
+    search?: string;     // ✅ Busca livre: AIH, nome, CNS, prontuário
     processedBy?: string;
     limit?: number;
     offset?: number;
@@ -1665,6 +1666,16 @@ export class AIHPersistenceService {
       
       if (filters?.aihNumber) {
         query = query.ilike('aih_number', `%${filters.aihNumber}%`);
+      }
+
+      // ✅ Busca livre (AIH, nome do paciente, CNS, prontuário)
+      if (filters?.search) {
+        const term = filters.search.trim();
+        if (term.length > 0) {
+          query = query.or(
+            `aih_number.ilike.%${term}%,patients.name.ilike.%${term}%,patients.cns.ilike.%${term}%,patients.medical_record.ilike.%${term}%`
+          );
+        }
       }
 
       // ✅ OTIMIZADO: Filtro de caráter de atendimento

@@ -223,18 +223,12 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
     <nav className="bg-white border-b border-gray-200 shadow-sm">
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo e Nome - Otimizado para Largura Total */}
+          {/* Logo e Nome */}
           <div className="logo-container flex items-center flex-shrink-0">
-            <Building2 className="logo-icon h-8 w-8 text-blue-600" />
-          <div className="ml-2">
-            <div className="text-base font-bold text-gray-900 leading-tight">
-              SIGTAP
-            </div>
-            <div className="text-sm font-medium text-blue-600 leading-tight">
-              Sync
-            </div>
-            <div className="text-xs font-medium text-gray-500 leading-tight">
-              Repasses Médicos
+            <img src="/icons8-s-67.png" alt="SIGTAP Sync" className="h-8 w-8 rounded-lg" />
+            <div className="ml-2 leading-tight">
+              <div className="text-[15px] font-bold text-gray-900 tracking-wide">SIGTAP Sync</div>
+              <div className="text-[12px] text-gray-600">Regulação Médica</div>
             </div>
           </div>
             {canAccessAllHospitals() && (
@@ -243,7 +237,6 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                 ADMIN
               </Badge>
             )}
-          </div>
 
           {/* Tabs de Navegação - Centralizadas e Responsivas */}
           <div className="flex-1 flex justify-center">
@@ -258,8 +251,8 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                     onClick={() => onTabChange(tab.id)}
                     className={`nav-tab ${
                       activeTab === tab.id
-                        ? 'border-blue-500 text-blue-600 bg-blue-50 active'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                        ? 'border-black text-black bg-transparent active'
+                        : 'border-transparent text-neutral-600 hover:text-neutral-800 hover:border-neutral-300 hover:bg-neutral-50'
                     } whitespace-nowrap py-2 px-3 border-b-2 font-medium text-sm inline-flex items-center gap-2 relative rounded-t-md`}
                     title={tab.description}
                   >
@@ -460,7 +453,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       </div>
 
       {/* Navegação Mobile - Tabs Horizontais Compactas */}
-      <div className="nav-tabs-mobile sm:hidden border-t border-gray-200 bg-gray-50">
+      <div className="nav-tabs-mobile sm:hidden border-t border-neutral-200 bg-white">
         <div className="nav-tabs-container flex overflow-x-auto px-3 py-2 space-x-2 scrollbar-hide">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -472,8 +465,8 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                 onClick={() => onTabChange(tab.id)}
                 className={`${
                   activeTab === tab.id
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                    ? 'bg-black text-white shadow-md'
+                    : 'bg-white text-neutral-700 hover:bg-neutral-100 border border-neutral-300'
                 } flex-shrink-0 px-3 py-2 rounded-lg font-medium text-sm transition-all duration-200 inline-flex items-center gap-2`}
                 title={tab.description}
               >

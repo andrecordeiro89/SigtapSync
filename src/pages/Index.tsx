@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Navigation from '../components/Navigation';
-import Dashboard from '../components/Dashboard';
+import Landing from '../components/Landing';
 import SigtapImport from '../components/SigtapImport';
 import SigtapViewer from '../components/SigtapViewer';
 import PatientManagement from '../components/PatientManagement';
@@ -21,7 +21,7 @@ const Index = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Landing />;
       case 'aih-multipage-tester':
         return <AIHMultiPageTester />;
       case 'aih-upload':
@@ -44,7 +44,7 @@ const Index = () => {
       case 'procedure-debugger':
         return <ProcedureDebugger />;
       default:
-        return <Dashboard />;
+        return <Landing />;
     }
   };
 

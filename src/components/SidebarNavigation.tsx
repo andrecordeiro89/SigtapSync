@@ -288,20 +288,17 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
           <div className="flex items-center gap-3">
             {/* Logo/Ícone */}
             <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
-                <Building2 className="h-5 w-5 text-white" />
-              </div>
+              <img src="/icons8-s-67.png" alt="SIGTAP Sync" className="w-10 h-10 rounded-lg shadow-sm" />
             </div>
-            
-            {/* Nome e Badge */}
+
+            {/* Nome, Slogan e Badge */}
             <div className="group-data-[collapsible=icon]:hidden flex-1 min-w-0">
-              <h1 className="text-lg font-bold text-gray-900 tracking-tight">
-                SIGTAP Sync
-              </h1>
+              <div className="text-[16px] font-bold text-gray-900 tracking-tight">SIGTAP Sync</div>
+              <div className="text-[12px] text-gray-600">Regulação Médica</div>
               {canAccessAllHospitals() && (
-                <Badge className="mt-1 bg-blue-100 text-blue-700 border-blue-200 text-[10px] px-2 py-0 font-semibold">
+                <Badge className="mt-1 bg-purple-50 text-purple-700 border-purple-200 text-[10px] px-2 py-0 font-semibold">
                   <Globe className="h-2.5 w-2.5 mr-1" />
-                  ACESSO TOTAL
+                  ADMIN
                 </Badge>
               )}
             </div>

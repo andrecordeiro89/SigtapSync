@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, AlertCircle, RotateCcw, Info, Activity, CreditCard, Stethoscope, FileSpreadsheet, X } from 'lucide-react';
+import { User, FileText, Clock, CheckCircle, DollarSign, Calendar, RefreshCw, Search, Trash2, Eye, Edit, ChevronDown, ChevronUp, Filter, Download, Settings, AlertTriangle, AlertCircle, RotateCcw, Info, Activity, CreditCard, Stethoscope, FileSpreadsheet, X, Target } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AIHPersistenceService } from '../services/aihPersistenceService';
 import { supabase } from '../lib/supabase';
@@ -162,13 +162,14 @@ const PatientManagement = () => {
   const [availableCompetencias, setAvailableCompetencias] = useState<string[]>([]);
   
   // ✅ NOVO: Filtro de hospital (apenas para administradores)
-  const [selectedHospitalFilter, setSelectedHospitalFilter] = useState<string>('all');
+  const [selectedHospitalFilter, setSelectedHospitalFilter] = useState<string>('select');
   const [availableHospitals, setAvailableHospitals] = useState<Array<{id: string, name: string}>>([]);
   
   // ✅ NOVO: Filtro de médicos (apenas para administradores)
   const [selectedDoctorFilter, setSelectedDoctorFilter] = useState<string>('all');
   const [availableDoctors, setAvailableDoctors] = useState<Array<{cns: string, name: string}>>([]);
   const [doctorSearchTerm, setDoctorSearchTerm] = useState<string>('');
+  const [selectedCareCharacter, setSelectedCareCharacter] = useState<string>('all');
 
   // Paginação
   const [currentPage, setCurrentPage] = useState(0);
@@ -558,10 +559,10 @@ const PatientManagement = () => {
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResults, setSyncResults] = useState<any>(null);
-
-  // ✅ REMOVIDO: Filtros de data de admissão e alta (agora usa apenas competência)
-
-  // Removido: Range mensal e lista de competências não são mais necessários
+  const [isFullLoading, setIsFullLoading] = useState(false);
+  const [loadedCount, setLoadedCount] = useState(0);
+  const [admissionDateFrom, setAdmissionDateFrom] = useState<string>('');
+  const [dischargeDateTo, setDischargeDateTo] = useState<string>('');
 
   // 🎯 NOVA FUNÇÃO: Recalcular valor total da AIH baseado nos procedimentos ativos
   const recalculateAIHTotal = (aihId: string, procedures: any[]) => {
@@ -631,16 +632,25 @@ const PatientManagement = () => {
 
   // ✅ SIMPLIFICADO: Recarregar dados quando hospital ou competência mudarem
   useEffect(() => {
-    if (currentHospitalId || isDirector) {
-      loadAIHs(); // Recarregar AIHs
+    if (isDirector) {
+      if (!selectedHospitalFilter || selectedHospitalFilter === 'select') {
+        setAIHs([]);
+        return;
+      }
+      loadAIHs();
+      return;
     }
-  }, [currentHospitalId, selectedHospitalFilter, selectedCompetencia]);
+    if (currentHospitalId) {
+      loadAIHs();
+    }
+  }, [currentHospitalId, selectedHospitalFilter, selectedCompetencia, admissionDateFrom, dischargeDateTo, selectedCareCharacter]);
 
   // Resetar página quando filtros mudarem + atualizar contagem
   useEffect(() => {
     setCurrentPage(0);
+    if (isDirector && selectedHospitalFilter === 'select') return;
     loadAIHsCount();
-  }, [globalSearch, selectedCompetencia, selectedHospitalFilter, selectedDoctorFilter]);
+  }, [globalSearch, selectedCompetencia, selectedHospitalFilter, selectedDoctorFilter, admissionDateFrom, dischargeDateTo, selectedCareCharacter]);
 
   // Carregar competências disponíveis quando AIHs mudarem
   useEffect(() => {
@@ -691,15 +701,23 @@ const PatientManagement = () => {
 
   const loadAIHs = async () => {
     try {
+      setIsLoading(true);
+      setIsFullLoading(false);
+      setLoadedCount(0);
+      if (isDirector && selectedHospitalFilter === 'select') {
+        setIsLoading(false);
+        return;
+      }
       // ✅ ADMINISTRADOR: Usar filtro de hospital selecionado
-      const hospitalIdToLoad = isDirector && selectedHospitalFilter !== 'all' 
-        ? selectedHospitalFilter 
+      const hospitalIdToLoad = isDirector 
+        ? (selectedHospitalFilter === 'all' ? 'ALL' : selectedHospitalFilter)
         : (currentHospitalId || 'ALL');
       
       console.log('🔍 Carregando AIHs (com paginação, filtros e médicos) para hospital:', hospitalIdToLoad);
       console.log('🗓️ Filtro de competência:', selectedCompetencia !== 'all' ? selectedCompetencia : 'Todas');
       console.log('👨‍⚕️ Filtro de médico:', selectedDoctorFilter !== 'all' ? selectedDoctorFilter : 'Todos');
-      const pageSize = 1000; // Supabase limita a 1000 por request
+      console.log('🏷️ Caráter:', selectedCareCharacter !== 'all' ? selectedCareCharacter : 'Todos');
+      const pageSize = isDirector ? 300 : 200; // Carregamento leve com batches
       let offset = 0;
       const all: any[] = [];
 
@@ -708,12 +726,28 @@ const PatientManagement = () => {
         ? selectedCompetencia 
         : undefined;
 
+      // Para ADMIN: obter contagem total antes de carregar, para exibir progresso
+      if (isDirector) {
+        try {
+          const countTotal = await persistenceService.countAIHs(hospitalIdToLoad, {
+            dateFrom: admissionDateFrom || undefined,
+            dateTo: dischargeDateTo || undefined,
+          });
+          setTotalAIHsCount(countTotal);
+          setIsFullLoading(true);
+        } catch {}
+      }
+
       while (true) {
         // ✅ BUSCAR AIHs usando persistenceService COM FILTRO DE COMPETÊNCIA
         const batch = await persistenceService.getAIHs(hospitalIdToLoad, {
           limit: pageSize,
           offset,
-          competencia: competenciaFilter // ✅ NOVO: Filtrar no SQL
+          competencia: competenciaFilter,
+          dateFrom: admissionDateFrom || undefined,
+          dateTo: dischargeDateTo || undefined,
+          search: (globalSearch || '').trim() || undefined,
+          careCharacter: selectedCareCharacter !== 'all' ? selectedCareCharacter : undefined
         });
 
         const error = null;
@@ -726,19 +760,14 @@ const PatientManagement = () => {
         const batchLen = batch?.length || 0;
         if (batchLen === 0) break;
         all.push(...batch);
+        if (isDirector) setLoadedCount(prev => prev + batchLen);
+        
         if (batchLen < pageSize) break;
         offset += pageSize;
         // Evitar UI freeze em listas enormes
-        await new Promise(r => setTimeout(r, 0));
+        await new Promise(r => setTimeout(r, 10));
       }
 
-      // Dedup por ID de AIH para evitar duplicidade visual e conflitos de expansão
-      const uniqueMap = new Map<string, AIH>();
-      all.forEach((aih: any) => {
-        if (aih && aih.id) uniqueMap.set(String(aih.id), aih);
-      });
-      setAIHs(Array.from(uniqueMap.values()));
-      
       // ✅ CARREGAR MÉDICOS EM BATCH
       const uniqueCNS = [...new Set(all.map(aih => aih.cns_responsavel).filter(Boolean))];
       if (uniqueCNS.length > 0) {
@@ -761,7 +790,13 @@ const PatientManagement = () => {
         }
       }
       
-      console.log('📊 AIHs carregadas:', all.length, '| Filtro de competência aplicado no BACKEND (SQL)');
+      console.log('📊 AIHs carregadas:', all.length, '| Filtros aplicados no BACKEND (SQL)');
+      // Definir dados somente após o carregamento completo
+      const uniqueMap = new Map<string, AIH>();
+      all.forEach((aih: any) => { if (aih && aih.id) uniqueMap.set(String(aih.id), aih); });
+      setAIHs(Array.from(uniqueMap.values()));
+      setIsFullLoading(false);
+      setIsLoading(false);
     } catch (error) {
       console.error('❌ Erro ao carregar AIHs:', error);
       toast({
@@ -769,6 +804,8 @@ const PatientManagement = () => {
         description: "Falha ao carregar lista de AIHs",
         variant: "destructive"
       });
+      setIsFullLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -780,7 +817,10 @@ const PatientManagement = () => {
         ? selectedHospitalFilter 
         : (currentHospitalId || 'ALL');
       
-      const count = await persistenceService.countAIHs(hospitalIdToCount, {});
+      const count = await persistenceService.countAIHs(hospitalIdToCount, {
+        dateFrom: admissionDateFrom || undefined,
+        dateTo: dischargeDateTo || undefined
+      });
       setTotalAIHsCount(count);
       console.log('🧮 Contagem exata de AIHs (back-end):', count);
     } catch (error) {
@@ -1088,7 +1128,8 @@ const PatientManagement = () => {
         aihNumberNormalized.includes(searchNormalized) || // Busca normalizada no número da AIH
         item.aih_number?.toLowerCase().includes(searchLower) || // Busca tradicional na AIH
         patientCNSNormalized.includes(searchNormalized) || // Busca normalizada no CNS
-        patientCNS.includes(searchPatientName.trim()); // Busca tradicional no CNS
+        patientCNS.includes(searchPatientName.trim()) || // Busca tradicional no CNS
+        ((item.patient?.medical_record || item.patients?.medical_record || '').toLowerCase().includes(searchLower)); // Prontuário
       
       if (!matchesSearch) {
         return false;
@@ -1106,6 +1147,10 @@ const PatientManagement = () => {
       
       const searchNormalized = normalizeAihNumber(globalSearch);
       const aihNumberNormalized = normalizeAihNumber(item.aih_number || '');
+      const medicalRecordLower = (item.patient?.medical_record || item.patients?.medical_record || '').toLowerCase();
+      const medicalRecordNormalized = (item.patient?.medical_record || item.patients?.medical_record || '')
+        .replace(/[\.\-\s]/g, '')
+        .toLowerCase();
       
       return (
         // Busca normalizada no número da AIH (remove pontos, hífens e espaços)
@@ -1115,7 +1160,9 @@ const PatientManagement = () => {
         // Busca no nome do paciente
         (item.patient?.name && item.patient.name.toLowerCase().includes(searchLower)) ||
         // Busca no CNS do paciente
-        (item.patient?.cns && item.patient.cns.replace(/[.\-\s]/g, '').includes(searchNormalized))
+        (item.patient?.cns && item.patient.cns.replace(/[\.\-\s]/g, '').includes(searchNormalized)) ||
+        // Busca no Prontuário
+        medicalRecordLower.includes(searchLower) || medicalRecordNormalized.includes(searchNormalized)
       );
     }
     
@@ -1609,37 +1656,7 @@ const PatientManagement = () => {
           <p className="text-gray-600">Visualize e gerencie AIHs processadas e dados dos pacientes</p>
         </div>
         <div className="flex items-center space-x-4">
-          {/* Informações do Usuário */}
-          <div className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-lg">
-            <User className="w-4 h-4 text-gray-500" />
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">
-                {user?.full_name || user?.email || 'Usuário'}
-              </p>
-              <p className="text-xs text-gray-500">
-                {user?.role === 'director' ? 'Diretor' : 
-                 user?.role === 'admin' ? 'Administrador' :
-                 user?.role === 'coordinator' ? 'Coordenador' :
-                 user?.role === 'auditor' ? 'Auditor' :
-                 user?.role === 'developer' ? 'Desenvolvedor' :
-                 'Operador'}
-              </p>
-            </div>
-          </div>
-
-          {/* Botões de Ação */}
           <div className="flex space-x-2">
-            <Button 
-              onClick={loadAllData} 
-              disabled={isLoading}
-              variant="outline"
-              size="sm"
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Atualizar
-            </Button>
-            
-            {/* NOVO: Botão de Diagnóstico */}
             {(user?.role === 'admin' || user?.role === 'developer') && (
               <Button 
                 onClick={() => setDiagnosticModalOpen(true)}
@@ -1660,11 +1677,7 @@ const PatientManagement = () => {
 
 
       {/* ✅ NOVO: Sistema de Tabs */}
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pacientes' | 'mudanca-competencia')} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
-          <TabsTrigger value="pacientes">Pacientes</TabsTrigger>
-          <TabsTrigger value="mudanca-competencia">Mudança de Competência</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pacientes')} className="w-full">
 
         {/* Aba: Pacientes (conteúdo atual) */}
         <TabsContent value="pacientes" className="space-y-6 mt-0">
@@ -1680,7 +1693,7 @@ const PatientManagement = () => {
           
           <div className="flex flex-col md:flex-row md:items-end gap-3">
             {/* Campo de Busca */}
-            <div className="space-y-3 flex-1 min-w-[240px]">
+          <div className="space-y-3 flex-1 min-w-[240px]">
               <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
                 <div className="p-1 bg-blue-100 rounded">
                   <Search className="w-3 h-3 text-blue-600" />
@@ -1688,50 +1701,48 @@ const PatientManagement = () => {
                 <span>Buscar</span>
               </label>
               <Input
-                placeholder="AIH, paciente ou CNS..."
+                placeholder="AIH, paciente, CNS ou prontuário..."
                 value={globalSearch}
                 onChange={(e) => setGlobalSearch(e.target.value)}
                 className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white/80 hover:bg-white transition-colors"
               />
-              {/* espaço vazio para manter espaçamento vertical uniforme no mobile */}
-            </div>
+            {/* espaço vazio para manter espaçamento vertical uniforme no mobile */}
+          </div>
 
-            {/* ✅ SIMPLIFICADO: Apenas filtro de Competência */}
-            <div className="space-y-3 w-full md:w-[180px]">
-              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                <div className="p-1 bg-indigo-100 rounded">
-                  <Calendar className="w-3 h-3 text-indigo-600" />
-                </div>
-                <span>Competência</span>
-              </label>
-              <Select value={selectedCompetencia} onValueChange={setSelectedCompetencia}>
-                <SelectTrigger className="w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 bg-white/80 hover:bg-white transition-colors">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    <div className="flex items-center gap-2">
-                      Todas
-                    </div>
-                  </SelectItem>
-                  {/* 🆕 OPÇÃO ESPECIAL: Sem Competência */}
-                  <SelectItem value="sem_competencia">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                      <span className="text-orange-700 font-medium">⚠️ Sem Competência</span>
-                    </div>
-                  </SelectItem>
-                  {availableCompetencias.map(comp => (
-                    <SelectItem key={comp} value={comp}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-                        {formatCompetencia(comp)}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-3 w-full md:w-[180px]">
+            <label className="text-sm font-medium text-gray-700">Admissão desde</label>
+            <Input type="date" value={admissionDateFrom} onChange={(e) => setAdmissionDateFrom(e.target.value)} />
+          </div>
+
+          <div className="space-y-3 w-full md:w-[180px]">
+            <label className="text-sm font-medium text-gray-700">Alta até</label>
+            <Input type="date" value={dischargeDateTo} onChange={(e) => setDischargeDateTo(e.target.value)} />
+          </div>
+
+          <div className="space-y-3 w-full md:w-[200px]">
+            <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
+              <div className="p-1 bg-violet-100 rounded">
+                <Activity className="w-3 h-3 text-violet-600" />
+              </div>
+              <span>Caráter</span>
+            </label>
+            <Select value={selectedCareCharacter} onValueChange={setSelectedCareCharacter}>
+              <SelectTrigger className="w-full border-gray-300 focus:border-violet-500 focus:ring-violet-500 bg-white/80 hover:bg-white transition-colors">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  <div className="flex items-center gap-2">Todos</div>
+                </SelectItem>
+                <SelectItem value="1">
+                  <div className="flex items-center gap-2">Eletivo</div>
+                </SelectItem>
+                <SelectItem value="2">
+                  <div className="flex items-center gap-2">Urgência/Emergência</div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
             {/* ✅ NOVO: Filtro de Hospital (apenas para administradores) */}
             {isDirector && (
@@ -1747,6 +1758,11 @@ const PatientManagement = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="select">
+                      <div className="flex items-center gap-2 text-neutral-700">
+                        Selecione Hospital
+                      </div>
+                    </SelectItem>
                     <SelectItem value="all">
                       <div className="flex items-center gap-2">
                         Todos os Hospitais
@@ -1930,7 +1946,17 @@ const PatientManagement = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isDirector && selectedHospitalFilter === 'select' ? (
+            <div className="text-center py-10 text-gray-600">
+              <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <p className="mb-2">Selecione um hospital no filtro para carregar as AIHs.</p>
+              <p className="text-sm text-gray-500">Em modo administrador, os dados só são carregados após escolher o hospital.</p>
+            </div>
+          ) : isFullLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
+            </div>
+          ) : isLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
             </div>
@@ -2020,49 +2046,7 @@ const PatientManagement = () => {
                           
                           return hasPermission && (
                             <>
-                              {/* ✅ NOVO: Toggle Pagamento Administrativo - REPOSICIONADO ANTES DO EDITAR */}
-                              {(() => {
-                                // 🔒 ISOLAMENTO GARANTIDO: Capturar valores imediatamente no momento da renderização
-                                const aihIdIsolated = item.id;
-                                const aihNumberIsolated = item.aih_number;
-                                const currentPgtAdm = item.pgt_adm || 'não';
-                                const patientNameIsolated = (item.patient || item.patients)?.name || 'Paciente';
-                                
-                                return (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      
-                                      // 🔍 LOG DETALHADO: Ver qual card foi clicado
-                                      console.log('👆 CLIQUE NO SWITCH:', {
-                                        paciente: patientNameIsolated,
-                                        aihNumber: aihNumberIsolated,
-                                        aihId: aihIdIsolated,
-                                        pgt_adm_atual: currentPgtAdm,
-                                        posicaoNaLista: aihs.findIndex(a => a.id === aihIdIsolated)
-                                      });
-                                      
-                                      handleTogglePgtAdm(aihIdIsolated, aihNumberIsolated, currentPgtAdm);
-                                    }}
-                                    disabled={savingPgtAdm[aihIdIsolated]}
-                                    className={`relative inline-flex items-center h-8 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200 border ${
-                                      currentPgtAdm === 'sim'
-                                        ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-                                        : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                                    } ${savingPgtAdm[aihIdIsolated] ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
-                                    title={`${patientNameIsolated} - AIH ${aihNumberIsolated} - Pgt. Adm: ${currentPgtAdm === 'sim' ? 'Ativado' : 'Desativado'}`}
-                                  >
-                                    {savingPgtAdm[aihIdIsolated] ? (
-                                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-gray-500 mr-1.5"></div>
-                                    ) : (
-                                      <span className={`w-3.5 h-3.5 rounded-full mr-1.5 ${
-                                        currentPgtAdm === 'sim' ? 'bg-green-500' : 'bg-gray-400'
-                                      }`}></span>
-                                    )}
-                                    <span className="hidden md:inline">Pgt. Adm</span>
-                                  </button>
-                                );
-                              })()}
+                              {/* (Removido) Botão Pgt. Adm */}
                               
                               <Button
                                 size="sm"
@@ -2165,15 +2149,38 @@ const PatientManagement = () => {
                           </td>
                         </tr>
                         
-                        {/* Linha 4: Competência e Hospital */}
                         <tr className="hover:bg-gray-50">
-                          <td className="px-4 py-2.5">
-                            <span className="text-gray-500 font-medium">Competência: </span>
-                            <span className="font-semibold text-blue-600 ml-1">{formatCompetencia(item.competencia)}</span>
-                          </td>
                           <td className="px-4 py-2.5">
                             <span className="text-gray-500 font-medium">Hospital: </span>
                             <span className="text-gray-900 font-medium ml-1">{item.hospitals?.name || '-'}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">Modalidade: </span>
+                            <span className="text-gray-900 ml-1">{getModalityName(item.care_modality)}</span>
+                          </td>
+                        </tr>
+
+                        {/* Linha adicional: Nascimento e Gênero */}
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">Nascimento: </span>
+                            <span className="text-gray-900 ml-1">{(item.patient || item.patients)?.birth_date ? formatDate((item.patient || item.patients).birth_date) : '-'}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">Gênero: </span>
+                            <span className="text-gray-900 ml-1">{(item.patient || item.patients)?.gender === 'M' ? 'Masculino' : (item.patient || item.patients)?.gender === 'F' ? 'Feminino' : '-'}</span>
+                          </td>
+                        </tr>
+
+                        {/* Linha adicional: Caráter e Médico */}
+                        <tr className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">Caráter: </span>
+                            <span className="text-gray-900 ml-1">{item.care_character ? CareCharacterUtils.formatForDisplay(item.care_character) : '-'}</span>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className="text-gray-500 font-medium">Médico: </span>
+                            <span className="text-gray-900 ml-1">{doctorsCache.get(item.cns_responsavel || '') || item.requesting_physician || proceduresData[item.id]?.[0]?.professional_name || '-'}</span>
                           </td>
                         </tr>
                         
@@ -2183,10 +2190,7 @@ const PatientManagement = () => {
                             <span className="text-gray-500 font-medium">Especialidade: </span>
                             <span className="text-gray-900 ml-1">{getSpecialtyName(item.specialty)}</span>
                           </td>
-                          <td className="px-4 py-2.5">
-                            <span className="text-gray-500 font-medium">Modalidade: </span>
-                            <span className="text-gray-900 ml-1">{getModalityName(item.care_modality)}</span>
-                          </td>
+                          <td className="px-4 py-2.5"></td>
                         </tr>
                       </tbody>
                     </table>
@@ -2287,110 +2291,7 @@ const PatientManagement = () => {
                         onRefresh={() => loadAIHProcedures(item.id)}
                       />
 
-                      {/* Seção Premium Unificada: Paciente + AIH */}
-                      <div className="bg-gradient-to-r from-indigo-50 via-white to-emerald-50 rounded-xl border p-4 border-indigo-200">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center">
-                              <User className="w-4 h-4 text-indigo-600" />
-                            </div>
-                            <h4 className="text-sm font-semibold text-indigo-900">Dados do Paciente e AIH</h4>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-12 gap-4 text-[13px]">
-                          {/* Linha 1: Nome + Caráter */}
-                          <div className="col-span-12 md:col-span-8 xl:col-span-9">
-                            <span className="text-[11px] text-gray-500">Nome</span>
-                            <p className="font-medium text-gray-900 truncate">{(item.patient || item.patients)?.name || 'N/A'}</p>
-                          </div>
-                          <div className="col-span-12 md:col-span-4 xl:col-span-3 flex md:justify-end items-end">
-                            <div>
-                              <span className="text-[11px] text-gray-500 block">Caráter</span>
-                              <div className={`text-[11px] leading-none font-medium px-2 py-1 rounded-md border inline-block mt-1 ${item.care_character ? CareCharacterUtils.getStyleClasses(item.care_character) : 'text-gray-600 bg-gray-100 border-gray-200'}`}>
-                                {item.care_character ? CareCharacterUtils.formatForDisplay(item.care_character) : 'N/A'}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Linha 2: CNS, Prontuário, Nascimento, Gênero */}
-                          <div className="col-span-6 md:col-span-3">
-                            <span className="text-[11px] text-gray-500">CNS</span>
-                            <p className="font-medium text-gray-900">{(item.patient || item.patients)?.cns || 'N/A'}</p>
-                          </div>
-                          {(item.patient || item.patients)?.medical_record && (
-                            <div className="col-span-6 md:col-span-3">
-                              <span className="text-[11px] text-gray-500">Prontuário</span>
-                              <p className="font-medium text-gray-900">{(item.patient || item.patients)?.medical_record}</p>
-                            </div>
-                          )}
-                          <div className="col-span-6 md:col-span-3">
-                            <span className="text-[11px] text-gray-500">Nascimento</span>
-                            <p className="font-medium text-gray-900">{(item.patient || item.patients)?.birth_date ? formatDate((item.patient || item.patients).birth_date) : 'N/A'}</p>
-                          </div>
-                          <div className="col-span-6 md:col-span-3">
-                            <span className="text-[11px] text-gray-500">Gênero</span>
-                            <p className="font-medium text-gray-900">{(item.patient || item.patients)?.gender === 'M' ? 'Masculino' : (item.patient || item.patients)?.gender === 'F' ? 'Feminino' : 'N/A'}</p>
-                          </div>
-
-                          {/* Linha 3: Código Proc, CID */}
-                          <div className="col-span-12 md:col-span-6">
-                            <span className="text-[11px] text-gray-500">Código Proc</span>
-                            <p className="font-medium text-gray-900">{item.procedure_code || 'N/A'}</p>
-                          </div>
-                          <div className="col-span-12 md:col-span-6">
-                            <span className="text-[11px] text-gray-500">CID Principal</span>
-                            <p className="font-medium text-gray-900">{item.main_cid || 'N/A'}</p>
-                          </div>
-
-                          {/* Linha 4: Admissão, Alta, Competência, Especialidade, Modalidade */}
-                          <div className="col-span-6 md:col-span-3">
-                            <span className="text-[11px] text-gray-500">Admissão</span>
-                            <p className="font-medium text-gray-900">{formatDate(item.admission_date)}</p>
-                          </div>
-                          {item.discharge_date && (
-                            <div className="col-span-6 md:col-span-3">
-                              <span className="text-[11px] text-gray-500">Alta</span>
-                              <p className="font-medium text-gray-900">{formatDate(item.discharge_date)}</p>
-                            </div>
-                          )}
-                          <div className="col-span-6 md:col-span-3">
-                            <span className="text-[11px] text-gray-500">Competência</span>
-                            <p className="font-semibold text-blue-700">{formatCompetencia(item.competencia)}</p>
-                          </div>
-                          {item.specialty && (
-                            <div className="col-span-6 md:col-span-3">
-                              <span className="text-[11px] text-gray-500">Especialidade</span>
-                              <p className="font-medium text-gray-900">{item.specialty}</p>
-                            </div>
-                          )}
-                          {item.care_modality && (
-                            <div className="col-span-6 md:col-span-3">
-                              <span className="text-[11px] text-gray-500">Modalidade</span>
-                              <p className="font-medium text-gray-900">{item.care_modality}</p>
-                            </div>
-                          )}
-
-                          {/* Linha 5: Hospital, Médico, CBO */}
-                          {item.hospitals?.name && (
-                            <div className="col-span-12 xl:col-span-12">
-                              <span className="text-[11px] text-gray-500">Hospital</span>
-                              <p className="font-medium text-gray-900">{item.hospitals?.name}</p>
-                            </div>
-                          )}
-                          {(doctorsCache.get(item.cns_responsavel || '') || item.requesting_physician || proceduresData[item.id]?.[0]?.professional_name) && (
-                            <div className="col-span-12 md:col-span-8">
-                              <span className="text-[11px] text-gray-500">Médico</span>
-                              <p className="font-medium text-gray-900">{doctorsCache.get(item.cns_responsavel || '') || item.requesting_physician || proceduresData[item.id]?.[0]?.professional_name}</p>
-                            </div>
-                          )}
-                          {item.professional_cbo && (
-                            <div className="col-span-6 md:col-span-4">
-                              <span className="text-[11px] text-gray-500">CBO</span>
-                              <p className="font-medium text-gray-900">{item.professional_cbo}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      {/* (Removido) Card "Dados do Paciente e AIH" – dados migrados para o card principal */}
 
                       {/* Matches SIGTAP removido do card do paciente */}
 
