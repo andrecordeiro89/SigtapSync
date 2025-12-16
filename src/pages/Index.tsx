@@ -21,7 +21,7 @@ const Index = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Landing />;
+        return <Landing onNavigate={setActiveTab} />;
       case 'aih-multipage-tester':
         return <AIHMultiPageTester />;
       case 'aih-upload':
@@ -44,7 +44,7 @@ const Index = () => {
       case 'procedure-debugger':
         return <ProcedureDebugger />;
       default:
-        return <Landing />;
+        return <Landing onNavigate={setActiveTab} />;
     }
   };
 
@@ -53,7 +53,7 @@ const Index = () => {
   return (
     <div className="min-h-svh flex flex-col bg-background">
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-      <main className={`flex-1 overflow-y-auto overflow-x-hidden ${isCompact ? 'p-3' : 'p-4 md:p-6'}`}>
+      <main className={`flex-1 ${activeTab === 'dashboard' ? 'overflow-y-hidden' : 'overflow-y-auto'} overflow-x-hidden ${isCompact ? 'p-3' : 'p-4 md:p-6'}`}>
         <div className="w-full h-full">
           {renderContent()}
         </div>

@@ -27,23 +27,21 @@ const SigtapCrossSearch: React.FC = () => {
 	}, [procedures, term]);
 
 	return (
-		<Card className="border-slate-200">
-			<CardHeader>
-				<CardTitle className="flex items-center gap-2">
-					<Search className="w-5 h-5 text-blue-600" />
-					<span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent font-semibold">
-						Pesquisa por Procedimento ou CID
-					</span>
+		<Card className="bg-white border border-gray-200">
+			<CardHeader className="p-3 border-b border-gray-200">
+				<CardTitle className="flex items-center gap-2 text-black">
+					<Search className="w-5 h-5 text-black" />
+					<span className="font-semibold">Pesquisa por Procedimento ou CID</span>
 				</CardTitle>
 			</CardHeader>
-			<CardContent className="space-y-4">
+			<CardContent className="space-y-3 p-3">
 				<div className="relative">
-					<Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+					<Search className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
 					<Input
 						placeholder="Digite código/descrição do procedimento ou um CID (ex: A310)"
 						value={term}
 						onChange={(e) => setTerm(e.target.value)}
-						className="pl-10"
+						className="pl-10 border-gray-300 focus:border-black focus:ring-black"
 					/>
 				</div>
 
@@ -65,11 +63,11 @@ const SigtapCrossSearch: React.FC = () => {
 										{Array.isArray(proc.cid) && proc.cid.length > 0 ? (
 											<div className="flex flex-col gap-2">
 												<div className="flex flex-wrap gap-1">
-													{(expanded.has(proc.code) ? proc.cid : proc.cid.slice(0, 12)).map((c, i) => (
-														<Badge key={i} variant="outline" className="bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200 text-slate-700 px-2 py-0.5">
-															CID: {String(c)}
-														</Badge>
-													))}
+										{(expanded.has(proc.code) ? proc.cid : proc.cid.slice(0, 12)).map((c, i) => (
+											<Badge key={i} variant="outline" className="bg-white border-gray-200 text-black px-2 py-0.5">
+												CID: {String(c)}
+											</Badge>
+										))}
 												</div>
 												{proc.cid.length > 12 && (
 													<div>

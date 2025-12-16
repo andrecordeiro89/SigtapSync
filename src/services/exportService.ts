@@ -105,6 +105,7 @@ export async function exportAllPatientsExcel(filters: AllPatientsExportFilters =
 
   // Montar linhas únicas por paciente (por cartão). Não deduplica entre médicos/hospitais.
   const rows: Array<Array<string | number>> = [];
+  const summaryMap = new Map<string, { name: string; cns: string; hospital: string; acts: number; aihs: number }>();
 
   // Cabeçalhos
   const summaryHeader: string[] = ['Relatório — Pacientes do Período'];
@@ -188,6 +189,7 @@ export async function exportAllPatientsExcel(filters: AllPatientsExportFilters =
 
 export interface AnesthesiaExportFilters extends HierarchyFilters {
   maxColumnsPerPatient?: number; // padrão 5
+  doctorNameContains?: string;
 }
 
 export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {}): Promise<void> {
@@ -208,7 +210,9 @@ export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {
     '#',
     'Nome do Paciente',
     'Prontuário',
-    'CNS',
+    'CNS Paciente',
+    'Profissional',
+    'CNS Profissional',
     'Nº AIH',
     'Data Alta (SUS)',
     'Hospital',
@@ -220,7 +224,16 @@ export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {
   const rows: Array<Array<string | number>> = [];
   let index = 1;
 
-  for (const card of hierarchy as any[]) {
+  const cards = (hierarchy as any[]).filter(card => {
+    if (filters.doctorNameContains) {
+      const name = (card?.doctor_info?.name || '').toString().toLowerCase();
+      return name.includes(filters.doctorNameContains.toLowerCase());
+    }
+    return true;
+  });
+
+  for (const card of cards) {
+    const hospitalNameFromCard = (card.hospitals && card.hospitals[0]?.hospital_name) || '';
     const hospitalNameFromCard = (card.hospitals && card.hospitals[0]?.hospital_name) || '';
     for (const p of (card.patients || [])) {
       // Filtrar procedimentos de anestesia por CBO 225151
@@ -252,11 +265,35 @@ export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {
 
       const extra = sorted.length > maxColumnsPerPatient ? `+${sorted.length - maxColumnsPerPatient}` : '';
 
+      // Profissional anestesista principal (primeiro ato) ou múltiplos
+      const first = sorted[0] || {};
+      const anestName = first?.professional_name || 'Múltiplos profissionais';
+      const anestCns = first?.professional_cns || '';
+
+      // Resumo por cada ato (CNS/hospital)
+      for (const ap of sorted) {
+        const name = String(ap?.professional_name || anestName || '');
+        const cnsProf = String(ap?.professional_cns || anestCns || '');
+        const key = `${cnsProf}::${hospitalNameFromCard}`;
+        const curr = summaryMap.get(key) || { name, cns: cnsProf, hospital: hospitalNameFromCard, acts: 0, aihs: 0 };
+        curr.acts += 1;
+        summaryMap.set(key, curr);
+      }
+      // Contabilizar AIH para o (primeiro) profissional
+      if (anestCns) {
+        const keyAIH = `${anestCns}::${hospitalNameFromCard}`;
+        const curr = summaryMap.get(keyAIH) || { name: anestName, cns: anestCns, hospital: hospitalNameFromCard, acts: 0, aihs: 0 };
+        curr.aihs += 1;
+        summaryMap.set(keyAIH, curr);
+      }
+
       rows.push([
         index++,
         patientName,
         medicalRecord,
         cns,
+        anestName,
+        anestCns,
         aihNumberClean,
         dischargeLabel,
         hospitalNameFromCard,
@@ -283,7 +320,9 @@ export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {
     { wch: 5 },   // #
     { wch: 40 },  // Paciente
     { wch: 16 },  // Prontuário
-    { wch: 20 },  // CNS
+    { wch: 18 },  // CNS Paciente
+    { wch: 28 },  // Profissional
+    { wch: 18 },  // CNS Profissional
     { wch: 18 },  // AIH
     { wch: 16 },  // Data Alta
     { wch: 30 },  // Hospital
@@ -292,6 +331,13 @@ export async function exportAnesthesiaExcel(filters: AnesthesiaExportFilters = {
     { wch: 8 }    // Obs
   ];
   XLSX.utils.book_append_sheet(wb, ws, 'Anestesia');
+
+  // Resumo por Profissional e Hospital
+  const summaryHeader = ['Profissional', 'CNS', 'Hospital', 'Atos Anestésicos', 'AIHs com anestesia'];
+  const summaryRows = [summaryHeader, ...Array.from(summaryMap.values()).map(v => [v.name, v.cns, v.hospital, v.acts, v.aihs])];
+  const wsSum = XLSX.utils.aoa_to_sheet(summaryRows);
+  (wsSum as any)['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 30 }, { wch: 16 }, { wch: 16 }];
+  XLSX.utils.book_append_sheet(wb, wsSum, 'Resumo Profissionais');
 
   const fileName = `Relatorio_Anestesia_CBO_225151_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
   XLSX.writeFile(wb, fileName);

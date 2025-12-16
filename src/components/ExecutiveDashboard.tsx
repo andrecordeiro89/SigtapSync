@@ -47,6 +47,7 @@ import MedicalProductionDashboard from './MedicalProductionDashboard';
 import MedicalStaffDashboard from './MedicalStaffDashboard';
 import ProcedureHierarchyDashboard from './ProcedureHierarchyDashboard';
 import { CareCharacterUtils } from '../config/careCharacterCodes';
+import { exportAnesthesiaExcel } from '../services/exportService';
 // import ReportGenerator from './ReportGenerator';
 // import ExecutiveDateFilters from './ExecutiveDateFilters';
 
@@ -512,6 +513,39 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     // ✅ CABEÇALHO SEMPRE MOSTRA DADOS DIRETOS DA TABELA AIHs
     // Não depende mais dos dados dos médicos ou da aba ativa
     // Valores fixos: 818 AIHs + soma calculated_total_value
+  };
+
+  const toISOStartOfDay = (d?: string) => {
+    if (!d) return undefined;
+    const dt = new Date(d);
+    dt.setHours(0,0,0,0);
+    return dt.toISOString();
+  };
+  const toISOEndOfDay = (d?: string) => {
+    if (!d) return undefined;
+    const dt = new Date(d);
+    dt.setHours(23,59,59,999);
+    return dt.toISOString();
+  };
+
+  const handleAnesthetistsReport = async () => {
+    try {
+      const hospitalIds = selectedHospitals && selectedHospitals.length > 0 && !selectedHospitals.includes('all')
+        ? selectedHospitals
+        : undefined;
+      await exportAnesthesiaExcel({
+        hospitalIds,
+        dateFromISO: toISOStartOfDay(dischargeFrom) || undefined,
+        dateToISO: toISOEndOfDay(dischargeTo) || undefined,
+        careCharacter: filterCareCharacter === 'all' ? undefined : filterCareCharacter,
+        doctorNameContains: (searchTerm || '').trim() || undefined,
+        maxColumnsPerPatient: 5,
+      });
+      toast.success('Relatório Anestesistas gerado');
+    } catch (e: any) {
+      console.error('Erro relatório anestesistas', e);
+      toast.error('Erro ao gerar relatório de anestesistas');
+    }
   };
 
   // Abreviação elegante de nomes de hospitais para exibição nas abas
@@ -1013,31 +1047,31 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   return (
     <>
     <div className="w-full px-6 space-y-6">
-      {/* ✅ CABEÇALHO - DESIGN MINIMALISTA */}
-      <Card className="shadow-sm border border-slate-200 bg-white">
+      {/* Cabeçalho branco e preto */}
+      <Card className="shadow-sm border border-gray-200 bg-white">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md">
-                <BarChart4 className="h-7 w-7 text-white" />
+              <div className="flex items-center justify-center w-14 h-14 bg-gray-100 rounded-xl">
+                <BarChart4 className="h-7 w-7 text-black" />
               </div>
               <div>
-                <h1 className="text-3xl font-black text-gray-900">Análise de Dados</h1>
-                <p className="text-sm text-gray-500 mt-1">Central executiva de insights e relatórios</p>
+                <h1 className="text-3xl font-black text-black">Análise de Dados</h1>
+                <p className="text-sm text-neutral-700 mt-1">Central executiva de insights e relatórios</p>
               </div>
             </div>
             <div className="flex flex-col items-end gap-2">
               {currentHospitalFullName && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg px-4 py-2 border-2 border-blue-200">
+                <div className="rounded-lg px-4 py-2 border border-gray-200 bg-white">
                   <div className="flex items-center gap-2">
-                    <Hospital className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-bold text-blue-900">{currentHospitalFullName}</span>
+                    <Hospital className="h-4 w-4 text-black" />
+                    <span className="text-sm font-semibold text-black">{currentHospitalFullName}</span>
                   </div>
                 </div>
               )}
               {lastUpdate && (
-                <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <Clock className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-1.5 text-xs text-neutral-700">
+                  <Clock className="h-3.5 w-3.5 text-black" />
                   <span>Atualizado: {lastUpdate.toLocaleTimeString('pt-BR')}</span>
                 </div>
               )}
@@ -1046,13 +1080,12 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         </CardHeader>
       </Card>
 
-      {/* ✅ ABAS - DESIGN MINIMALISTA */}
+      {/* Abas profissional em preto e branco */}
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-        <div className="inline-block bg-white rounded-xl border-2 border-gray-200 shadow-sm">
-          <TabsList className="inline-flex items-end gap-1 border-b border-gray-200 bg-transparent px-2 pt-2">
+          <TabsList className="inline-flex items-end gap-1 bg-transparent px-0 pt-0">
             <TabsTrigger 
               value="doctors" 
-              className="rounded-t-md border border-gray-200 border-b-0 px-4 py-2 transition-all duration-200 font-semibold text-gray-600 bg-white hover:bg-gray-50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:border-transparent"
+              className="rounded-md border border-gray-300 px-4 py-2 transition-all duration-200 font-semibold text-black bg-white hover:bg-neutral-100 data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:border-black"
             >
               <Users className="h-4 w-4 mr-2" />
               Profissionais
@@ -1060,7 +1093,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {false && (
               <TabsTrigger 
                 value="procedures" 
-                className="rounded-t-md border border-gray-200 border-b-0 px-4 py-2 transition-all duration-200 font-semibold text-gray-600 bg-white hover:bg-gray-50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:border-transparent"
+                className="rounded-md border border-gray-300 px-4 py-2 transition-all duration-200 font-semibold text-black bg-white hover:bg-neutral-100 data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:border-black"
               >
                 <TrendingUp className="h-4 w-4 mr-2" />
                 Análise de Performance
@@ -1068,13 +1101,12 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             )}
             <TabsTrigger 
               value="medical-staff" 
-              className="rounded-t-md border border-gray-200 border-b-0 px-4 py-2 transition-all duration-200 font-semibold text-gray-600 bg-white hover:bg-gray-50 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-green-600 data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:border-transparent"
+              className="rounded-md border border-gray-300 px-4 py-2 transition-all duration-200 font-semibold text-black bg-white hover:bg-neutral-100 data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:border-black"
             >
               <Stethoscope className="h-4 w-4 mr-2" />
               Corpo Médico
             </TabsTrigger>
           </TabsList>
-        </div>
 
         {/* 🔍 FILTROS EXECUTIVOS GLOBAIS - DESIGN MINIMALISTA */}
         {(activeTab === 'doctors' || activeTab === 'procedures') && (
@@ -1083,25 +1115,25 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {/* HEADER COM DESIGN MINIMALISTA */}
             <div className="mb-4 pb-4 border-b border-gray-100">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-md">
-                    <Filter className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold text-gray-900">Filtros de Produção Médica</h3>
-                    <p className="text-sm text-gray-500 mt-1">Ajuste os filtros para análise da produção médica</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl px-6 py-3 border-2 border-blue-700 shadow-md">
-                    <div className="text-xs font-bold text-white/90 uppercase tracking-wide">
-                      AIHs (Registros Únicos)
-                    </div>
-                    <div className="text-2xl font-black text-white">
-                      {medicalProductionStats ? (medicalProductionStats.totalAIHs || 0) : '...'}
-                    </div>
-                  </div>
-                </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl">
+              <Filter className="h-6 w-6 text-black" />
+            </div>
+            <div>
+              <h3 className="text-2xl font-bold text-black">Filtros de Produção Médica</h3>
+              <p className="text-sm text-neutral-700 mt-1">Ajuste os filtros para análise da produção médica</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="rounded-xl px-6 py-3 border border-gray-200 bg-white">
+              <div className="text-xs font-semibold text-black uppercase tracking-wide">
+                AIHs (Registros Únicos)
+              </div>
+              <div className="text-2xl font-black text-black">
+                {medicalProductionStats ? (medicalProductionStats.totalAIHs || 0) : '...'}
+              </div>
+            </div>
+          </div>
               </div>
             </div>
 
@@ -1113,7 +1145,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     <Button 
                       variant="ghost" 
                       size="sm"
-                      className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 p-2 h-auto font-normal"
+                      className="flex items-center gap-2 text-xs text-black hover:bg-neutral-100 p-2 h-auto font-normal"
                     >
                       <AlertCircle className="w-3 h-3" />
                       <span>
@@ -1123,29 +1155,29 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="mt-2 bg-blue-50/50 rounded-lg p-3 border border-blue-100">
+                    <div className="mt-2 bg-white rounded-lg p-3 border border-gray-200">
                       <div className="flex items-center gap-2 mb-2">
-                        <Users className="w-4 h-4 text-blue-600" />
-                        <h4 className="text-xs font-semibold text-blue-900">Pacientes com Múltiplas AIHs</h4>
+                        <Users className="w-4 h-4 text-black" />
+                        <h4 className="text-xs font-semibold text-black">Pacientes com Múltiplas AIHs</h4>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[400px] overflow-y-auto">
                         {medicalProductionStats.multipleAIHsDetails && medicalProductionStats.multipleAIHsDetails.length > 0 ? (
                           medicalProductionStats.multipleAIHsDetails.map((patient: any, index: number) => (
                             <div 
                               key={index}
-                              className="bg-white rounded-md p-2.5 border border-blue-100 hover:border-blue-300 transition-colors h-fit"
+                              className="bg-white rounded-md p-2.5 border border-gray-200 hover:border-black transition-colors h-fit"
                             >
                               {/* Cabeçalho do Paciente */}
                               <div className="flex items-start justify-between mb-2">
                                 <div className="flex items-center gap-2 flex-1">
-                                  <User className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                                  <User className="w-3.5 h-3.5 text-black flex-shrink-0" />
                                   <div className="flex flex-col">
                                     <span className="font-semibold text-gray-900 text-xs">{patient.patient_name}</span>
                                     <span className="text-gray-500 text-[10px]">CNS: {patient.patient_cns}</span>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                  <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5">
+                                  <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-gray-300 text-black">
                                     {patient.aih_count}× AIHs
                                   </Badge>
                                 </div>
@@ -1153,30 +1185,30 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                               
                               {/* Lista de AIHs */}
                               {patient.aihs && patient.aihs.length > 0 && (
-                                <div className="space-y-1 pl-5 border-l-2 border-blue-200 ml-1">
+                                <div className="space-y-1 pl-5 border-l-2 border-gray-300 ml-1">
                                   {patient.aihs.map((aih: any, aihIndex: number) => (
                                     <div 
                                       key={aihIndex}
                                       className="text-[10px] text-gray-600 bg-gray-50 rounded px-2 py-1"
                                     >
                                       <div className="flex items-center justify-between flex-wrap gap-1">
-                                        <span className="font-medium text-gray-700">
+                                        <span className="font-medium text-black">
                                           AIH: {aih.aih_number}
                                         </span>
                                         {aih.competencia && (
-                                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-purple-50 text-purple-700 border-purple-200">
+                                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 bg-white text-black border-gray-300">
                                             {formatCompetencia(aih.competencia)}
                                           </Badge>
                                         )}
                                       </div>
                                       <div className="flex items-center gap-2 mt-0.5 text-[9px]">
                                         {aih.admission_date && (
-                                          <span className="text-green-600">
+                                          <span className="text-black">
                                             📅 Admissão: {parseISODateToLocal(aih.admission_date)}
                                           </span>
                                         )}
                                         {aih.discharge_date && (
-                                          <span className="text-blue-600">
+                                          <span className="text-black">
                                             📤 Alta: {parseISODateToLocal(aih.discharge_date)}
                                           </span>
                                         )}
@@ -1189,7 +1221,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                               {/* Hospital */}
                               {patient.hospital_name && (
                                 <div className="mt-1.5 text-[10px] text-gray-500 flex items-center gap-1">
-                                  <Hospital className="w-3 h-3" />
+                                  <Hospital className="w-3 h-3 text-black" />
                                   <span>{patient.hospital_name}</span>
                                 </div>
                               )}
@@ -1240,20 +1272,20 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             )}
             
             {/* FILTROS EM GRID - DESIGN MINIMALISTA */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
               {/* BUSCAR MÉDICO */}
               <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
-                  <Stethoscope className="h-3.5 w-3.5 text-blue-600" />
+                <label className="flex items-center gap-2 text-xs font-bold text-black uppercase tracking-wide mb-2">
+                  <Stethoscope className="h-3.5 w-3.5 text-black" />
                   Buscar Médico
                 </label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-blue-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
                   <Input
                     placeholder="Nome, CNS, CRM..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 h-10 border-2 border-gray-200 focus:border-blue-500 focus:ring-0 text-sm rounded-lg bg-white hover:border-gray-300 transition-colors"
+                    className="pl-10 h-10 border-2 border-gray-200 focus:border-black focus:ring-0 text-sm rounded-lg bg-white hover:border-gray-300 transition-colors"
                   />
                   {searchTerm && (
                     <button
@@ -1269,17 +1301,17 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
               {/* BUSCAR PACIENTE */}
               <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
-                  <User className="h-3.5 w-3.5 text-green-600" />
+                <label className="flex items-center gap-2 text-xs font-bold text-black uppercase tracking-wide mb-2">
+                  <User className="h-3.5 w-3.5 text-black" />
                   Buscar Paciente
                 </label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-green-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
                   <Input
                     placeholder="Nome do paciente..."
                     value={patientSearchTerm}
                     onChange={(e) => setPatientSearchTerm(e.target.value)}
-                    className="pl-10 h-10 border-2 border-gray-200 focus:border-green-500 focus:ring-0 text-sm rounded-lg bg-white hover:border-gray-300 transition-colors"
+                    className="pl-10 h-10 border-2 border-gray-200 focus:border-black focus:ring-0 text-sm rounded-lg bg-white hover:border-gray-300 transition-colors"
                   />
                   {patientSearchTerm && (
                     <button
@@ -1295,8 +1327,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
               {/* FILTRO DE HOSPITAL */}
               <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
-                  <Building className="h-3.5 w-3.5 text-purple-600" />
+                <label className="flex items-center gap-2 text-xs font-bold text-black uppercase tracking-wide mb-2">
+                  <Building className="h-3.5 w-3.5 text-black" />
                   Hospital
                 </label>
                 <div className="flex items-center gap-2">
@@ -1307,7 +1339,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       setSelectedHospitals(value === 'all' ? ['all'] : [value]);
                       setActiveHospitalTab(value === 'all' ? null : value);
                     }}
-                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-purple-500 hover:border-gray-300 transition-colors h-10"
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
                   >
                     <option value="all">Todos os Hospitais</option>
                     {hospitalStats.map(hospital => (
@@ -1333,15 +1365,15 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
               {/* FILTRO DE COMPETÊNCIA DE APROVAÇÃO */}
               <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
-                  <Calendar className="h-3.5 w-3.5 text-indigo-600" />
+                <label className="flex items-center gap-2 text-xs font-bold text-black uppercase tracking-wide mb-2">
+                  <Calendar className="h-3.5 w-3.5 text-black" />
                   Competência de Aprovação
                 </label>
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedCompetency}
                     onChange={(e) => setSelectedCompetency(e.target.value)}
-                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-indigo-500 hover:border-gray-300 transition-colors h-10"
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
                   >
                     <option value="all">Todas</option>
                     {availableCompetencies.map(comp => (
@@ -1364,15 +1396,15 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
               {/* ✅ Filtro: Caráter de Atendimento */}
               <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                <label className="flex items-center gap-2 text-xs font-bold text-black uppercase tracking-wide mb-2">
+                  <AlertTriangle className="h-3.5 w-3.5 text-black" />
                   Caráter de Atendimento
                 </label>
                 <div className="flex items-center gap-2">
                   <select
                     value={filterCareCharacter}
                     onChange={(e) => setFilterCareCharacter(e.target.value as 'all' | '1' | '2')}
-                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-emerald-500 hover:border-gray-300 transition-colors h-10"
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
                   >
                     <option value="all">Todos</option>
                     <option value="1">Eletivo</option>
@@ -1391,21 +1423,21 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
-                  <Calendar className="h-3.5 w-3.5 text-blue-600" />
+                <label className="flex items-center gap-2 text-xs font-bold text-black uppercase tracking-wide mb-2">
+                  <Calendar className="h-3.5 w-3.5 text-black" />
                   Alta (Início)
                 </label>
                 <input
                   type="date"
                   value={dischargeFrom}
                   onChange={(e) => setDischargeFrom(e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-blue-500 hover:border-gray-300 transition-colors h-10"
+                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
                 />
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
-                  <Calendar className="h-3.5 w-3.5 text-blue-600" />
+                <label className="flex items-center gap-2 text-xs font-bold text-black uppercase tracking-wide mb-2">
+                  <Calendar className="h-3.5 w-3.5 text-black" />
                   Alta (Fim)
                 </label>
                 <div className="flex items-center gap-2">
@@ -1413,7 +1445,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     type="date"
                     value={dischargeTo}
                     onChange={(e) => setDischargeTo(e.target.value)}
-                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-blue-500 hover:border-gray-300 transition-colors h-10"
+                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
                   />
                   {(dischargeFrom || dischargeTo) && (
                     <button
@@ -1435,41 +1467,41 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all') || selectedCompetency !== 'all' || filterCareCharacter !== 'all' || dischargeFrom || dischargeTo) && (
               <div className="flex items-center justify-between pt-4 border-t-2 border-gray-100">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                  <span className="text-xs font-bold text-black uppercase tracking-wide">
                     Filtros Ativos:
                   </span>
                   {searchTerm && (
-                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border-blue-200 font-medium px-2 py-1">
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-white text-black border-gray-300 font-medium px-2 py-1">
                       <Stethoscope className="h-3 w-3" />
                       {searchTerm}
                     </Badge>
                   )}
                   {patientSearchTerm && (
-                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-green-50 text-green-700 border-green-200 font-medium px-2 py-1">
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-white text-black border-gray-300 font-medium px-2 py-1">
                       <User className="h-3 w-3" />
                       {patientSearchTerm}
                     </Badge>
                   )}
                   {!selectedHospitals.includes('all') && (
-                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-purple-50 text-purple-700 border-purple-200 font-medium px-2 py-1">
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-white text-black border-gray-300 font-medium px-2 py-1">
                       <Building className="h-3 w-3" />
                       {hospitalStats.find(h => h.id === selectedHospitals[0])?.name || 'Hospital'}
                     </Badge>
                   )}
                   {selectedCompetency !== 'all' && (
-                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 border-indigo-200 font-medium px-2 py-1">
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-white text-black border-gray-300 font-medium px-2 py-1">
                       <Calendar className="h-3 w-3" />
                       Comp. Aprovação: {availableCompetencies.find(c => c.value === selectedCompetency)?.label || selectedCompetency}
                     </Badge>
                   )}
                   {filterCareCharacter !== 'all' && (
-                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border-amber-200 font-medium px-2 py-1">
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-white text-black border-gray-300 font-medium px-2 py-1">
                       <AlertTriangle className="h-3 w-3" />
                       Caráter: {CareCharacterUtils.formatForDisplay(filterCareCharacter, false)}
                     </Badge>
                   )}
                   {(dischargeFrom || dischargeTo) && (
-                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-sky-50 text-sky-700 border-sky-200 font-medium px-2 py-1">
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-white text-black border-gray-300 font-medium px-2 py-1">
                       <Calendar className="h-3 w-3" />
                       Alta: {dischargeFrom ? dischargeFrom.split('-').reverse().join('/') : '—'} — {dischargeTo ? dischargeTo.split('-').reverse().join('/') : '—'}
                     </Badge>
@@ -1486,7 +1518,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 <Button
                   variant="default"
                   size="sm"
-                  className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white w-auto min-w-[160px]"
+                  className="inline-flex items-center gap-2 bg-black hover:bg-neutral-800 text-white w-auto min-w-[160px]"
                   onClick={() => window.dispatchEvent(new Event('mpd:report-general'))}
                   title="Gerar relatório geral de pacientes"
                 >
@@ -1496,7 +1528,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 <Button
                   variant="default"
                   size="sm"
-                  className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white w-auto min-w-[160px]"
+                  className="inline-flex items-center gap-2 bg-neutral-700 hover:bg-neutral-800 text-white w-auto min-w-[160px]"
                   onClick={() => window.dispatchEvent(new Event('mpd:report-conference'))}
                   title="Gerar relatório de conferência de pacientes"
                 >
@@ -1506,7 +1538,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 <Button
                   variant="default"
                   size="sm"
-                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white w-auto min-w-[160px]"
+                  className="inline-flex items-center gap-2 bg-neutral-600 hover:bg-neutral-700 text-white w-auto min-w-[160px]"
                   onClick={() => window.dispatchEvent(new Event('mpd:report-simplified'))}
                   title="Gerar relatório simplificado de pacientes"
                 >
@@ -1527,11 +1559,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 )}
                 <Button
                   type="button"
-                  onClick={() => window.dispatchEvent(new Event('mpd:report-validation'))}
-                  title="Gerar relatório de validação (Local vs Remoto)"
+                  variant="outline"
+                  className="border-black text-black hover:bg-neutral-100"
+                  onClick={handleAnesthetistsReport}
+                  title="Gerar relatório de anestesistas (CBO 225151) por CNS e hospital"
                 >
-                  <TrendingUp className="h-4 w-4" />
-                  Validação Local vs Remoto
+                  <Stethoscope className="h-4 w-4" />
+                  Relatório Anestesistas
                 </Button>
               </div>
             </div>

@@ -2966,39 +2966,39 @@ const AIHMultiPageTester = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header Refinado */}
-      <div className="bg-gradient-to-r from-blue-50 via-white to-purple-50 rounded-xl p-6 border border-blue-100/50 shadow-sm">
-      <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-900 flex items-center justify-center space-x-3 mb-3">
-            <div className="p-2 bg-gradient-to-br from-blue-100 to-purple-200 rounded-xl shadow-sm">
-              <Layers className="w-8 h-8 text-blue-700" />
+      {/* Header Branco & Preto */}
+      <div className="bg-white rounded-xl p-6 border border-gray-200">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-black flex items-center justify-center gap-3 mb-2">
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <Layers className="w-8 h-8 text-black" />
             </div>
-          <span>AIH Avançado</span>
-        </h2>
-          <p className="text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            <span>AIH Avançado</span>
+          </h2>
+          <p className="text-neutral-700 max-w-2xl mx-auto leading-relaxed">
             Processamento inteligente de PDFs AIH com múltiplas páginas de procedimentos
-        </p>
+          </p>
         </div>
       </div>
 
       {/* Upload Section Refinada */}
-      <Card className="border-slate-200/60 shadow-md hover:shadow-lg transition-all duration-300">
-        <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100">
-          <CardTitle className="flex items-center space-x-3">
-            <div className="p-2 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg shadow-sm">
-              <Upload className="w-5 h-5 text-blue-700" />
+      <Card className="border-gray-200">
+        <CardHeader className="p-4 border-b border-gray-200">
+          <CardTitle className="flex items-center gap-3">
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <Upload className="w-5 h-5 text-black" />
             </div>
-            <span className="text-gray-900">Upload PDF AIH</span>
+            <span className="text-black">Upload PDF AIH</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6 p-6">
+        <CardContent className="space-y-6 p-4">
           <div 
-            className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 group cursor-pointer ${
+            className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 group cursor-pointer ${
               isDragOver 
-                ? 'border-blue-500 bg-blue-100/50 scale-102' 
+                ? 'border-black bg-neutral-100' 
                 : selectedFile
-                  ? 'border-green-400/80 bg-green-50/40 hover:border-green-500/80'
-                  : 'border-blue-300/60 bg-gradient-to-br from-blue-50/30 via-white to-blue-50/20 hover:border-blue-400/80 hover:bg-blue-50/40'
+                  ? 'border-black bg-white'
+                  : 'border-gray-300 bg-white'
             }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -3012,28 +3012,16 @@ const AIHMultiPageTester = () => {
               id="pdf-upload"
             />
             <label htmlFor="pdf-upload" className="cursor-pointer block">
-              <div className={`p-3 rounded-xl shadow-sm w-fit mx-auto mb-4 group-hover:scale-105 transition-transform duration-200 ${
-                isDragOver 
-                  ? 'bg-gradient-to-br from-blue-200 to-blue-300' 
-                  : selectedFile
-                    ? 'bg-gradient-to-br from-green-100 to-green-200'
-                    : 'bg-gradient-to-br from-blue-100 to-blue-200'
-              }`}>
+              <div className="p-3 rounded-xl w-fit mx-auto mb-4 group-hover:scale-105 transition-transform duration-200 bg-gray-100">
                 {isDragOver ? (
-                  <Upload className="w-12 h-12 text-blue-700 animate-bounce" />
+                  <Upload className="w-12 h-12 text-black" />
                 ) : selectedFile ? (
-                  <CheckCircle className="w-12 h-12 text-green-700" />
+                  <CheckCircle className="w-12 h-12 text-black" />
                 ) : (
-                  <FileText className="w-12 h-12 text-blue-700" />
+                  <FileText className="w-12 h-12 text-black" />
                 )}
               </div>
-              <p className={`font-medium text-lg mb-2 ${
-                isDragOver 
-                  ? 'text-blue-700' 
-                  : selectedFile
-                    ? 'text-green-700'
-                    : 'text-gray-700'
-              }`}>
+              <p className={`font-medium text-lg mb-2 text-black`}>
                 {isDragOver 
                   ? 'Solte o arquivo PDF aqui!' 
                   : selectedFile 
@@ -3041,7 +3029,7 @@ const AIHMultiPageTester = () => {
                     : 'Clique ou arraste o PDF AIH aqui'
                 }
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-neutral-600">
                 {isDragOver 
                   ? 'Processamento automático após soltar o arquivo'
                   : selectedFile
@@ -3051,37 +3039,23 @@ const AIHMultiPageTester = () => {
               </p>
               {selectedFile && (
                 <div className="mt-3">
-                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
-                    ✅ Pronto para processamento
+                  <Badge variant="outline" className="bg-white text-black border-gray-300">
+                    Pronto para processamento
                   </Badge>
                 </div>
               )}
             </label>
           </div>
 
-          {/* Status SIGTAP Refinado */}
-          <Alert className={`shadow-sm border-2 transition-all duration-300 ${
-            sigtapLoading ? "border-blue-300/60 bg-gradient-to-r from-blue-50 to-blue-100/50" :
-            sigtapProcedures.length > 0 ? "border-green-300/60 bg-gradient-to-r from-green-50 to-green-100/50" : "border-yellow-300/60 bg-gradient-to-r from-yellow-50 to-yellow-100/50"
-          }`}>
-            <div className={`p-1 rounded-lg w-fit ${
-              sigtapLoading ? 'bg-blue-200' :
-              sigtapProcedures.length > 0 ? 'bg-green-200' : 'bg-yellow-200'
-            }`}>
-            <CheckCircle className={`h-4 w-4 ${
-                sigtapLoading ? 'text-blue-700 animate-spin' :
-                sigtapProcedures.length > 0 ? 'text-green-700' : 'text-yellow-700'
-            }`} />
-            </div>
-            <AlertDescription className={`font-medium ${
-              sigtapLoading ? 'text-blue-800' :
-              sigtapProcedures.length > 0 ? 'text-green-800' : 'text-yellow-800'
-            }`}>
+          {/* Status SIGTAP Neutro */}
+          <Alert className="shadow-sm border border-gray-300 bg-white">
+            <CheckCircle className="h-4 w-4 text-black" />
+            <AlertDescription className="text-black font-medium">
               {sigtapLoading
-                ? `⏳ Carregando SIGTAP do banco de dados...`
+                ? `Carregando SIGTAP do banco de dados...`
                 : sigtapProcedures.length > 0 
-                  ? `✅ SIGTAP carregado: ${sigtapProcedures.length.toLocaleString()} procedimentos disponíveis para matching`
-                  : `⚠️ Tabela SIGTAP não carregada. Vá para "SIGTAP" → Upload da tabela primeiro.`
+                  ? `SIGTAP carregado: ${sigtapProcedures.length.toLocaleString()} procedimentos disponíveis para matching`
+                  : `Tabela SIGTAP não carregada. Vá para "SIGTAP" → Upload da tabela primeiro.`
               }
             </AlertDescription>
           </Alert>
@@ -3090,7 +3064,7 @@ const AIHMultiPageTester = () => {
             <Button
               onClick={handleProcessPDF}
               disabled={!selectedFile || isProcessing}
-              className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] py-3"
+              className="flex-1 bg-black hover:bg-neutral-800 text-white shadow-sm transition-colors py-3"
             >
               {isProcessing ? (
                 <>
@@ -3111,7 +3085,7 @@ const AIHMultiPageTester = () => {
                   onClick={performManualMatching} 
                   variant="outline"
                   disabled={isMatching || sigtapProcedures.length === 0}
-                  className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-300 text-purple-700 hover:from-purple-100 hover:to-purple-200 hover:border-purple-400 shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-[1.02] py-3"
+                  className="border-black text-black hover:bg-neutral-100 transition-colors py-3"
                 >
                   {isMatching ? (
                     <>
@@ -3131,150 +3105,7 @@ const AIHMultiPageTester = () => {
         </CardContent>
       </Card>
 
-      {/* Upload Excel/CSV */}
-      <Card className="border-slate-200/60 shadow-md hover:shadow-lg transition-all duration-300">
-        <CardHeader className="bg-gradient-to-r from-indigo-50 to-white border-b border-slate-100">
-          <CardTitle className="flex items-center space-x-3">
-            <div className="p-2 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-lg shadow-sm">
-              <Database className="w-5 h-5 text-indigo-700" />
-            </div>
-            <span className="text-gray-900">Importar Excel/CSV (patients, aihs, procedure_records)</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-            <div>
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide mb-1 block">hospital_id</label>
-              <div className="flex items-center gap-2">
-                <select
-                  value={hospitalIdExcel}
-                  onChange={e => setHospitalIdExcel(e.target.value)}
-                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-indigo-500 h-10"
-                >
-                  <option value="">Selecione o hospital</option>
-                  {hospitalsLoading && <option value="" disabled>Carregando...</option>}
-                  {hospitalsList.map(h => (
-                    <option key={h.id} value={h.id}>
-                      {h.name}{h.cnes ? ` · CNES ${h.cnes}` : ''}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-indigo-500"
-                  placeholder="UUID manual (opcional)"
-                  value={hospitalIdExcel}
-                  onChange={e => setHospitalIdExcel(e.target.value)}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" checked={safeMode} onChange={e => setSafeMode(e.target.checked)} id="safe-mode" />
-                  <label htmlFor="safe-mode" className="text-xs text-gray-700">Modo seguro (não sobrescrever AIHs existentes)</label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" checked={dryRun} onChange={e => setDryRun(e.target.checked)} id="dry-run" />
-                  <label htmlFor="dry-run" className="text-xs text-gray-700">Dry-run (somente validar)</label>
-                </div>
-                <div>
-                  <input
-                    className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-indigo-500"
-                    placeholder="Lote (import_batch_id opcional)"
-                    value={importBatchId}
-                    onChange={e => setImportBatchId(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="text-right">
-              <Button
-                onClick={handleExcelImport}
-                disabled={excelLoading || !hospitalIdExcel}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                {excelLoading ? 'Processando...' : 'Enviar e Mesclar'}
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <div className="font-medium">Patients</div>
-              <input type="file" accept=".csv, .xlsx, .xls" onChange={e => e.target.files && parseExcelFile(e.target.files[0], setExcelPatientsRows)} />
-              <div className="text-xs text-gray-600">{excelPatientsRows.length ? `${excelPatientsRows.length} linhas` : 'Nenhum arquivo selecionado'}</div>
-            </div>
-            <div className="space-y-2">
-              <div className="font-medium">AIHs</div>
-              <input type="file" accept=".csv, .xlsx, .xls" onChange={e => e.target.files && parseExcelFile(e.target.files[0], setExcelAihsRows)} />
-              <div className="text-xs text-gray-600">{excelAihsRows.length ? `${excelAihsRows.length} linhas` : 'Nenhum arquivo selecionado'}</div>
-            </div>
-            <div className="space-y-2">
-              <div className="font-medium">Procedures</div>
-              <input type="file" accept=".csv, .xlsx, .xls" onChange={e => e.target.files && parseExcelFile(e.target.files[0], setExcelProcRows)} />
-              <div className="text-xs text-gray-600">{excelProcRows.length ? `${excelProcRows.length} linhas` : 'Nenhum arquivo selecionado'}</div>
-            </div>
-          </div>
-
-          {/* Pré-validação */}
-          <div className="mt-4 space-y-2">
-            {(() => {
-              const aihNumbers = new Map<string, number>()
-              excelAihsRows.forEach(r => {
-                const n = String(r.aih_number || '').trim()
-                if (!n) return
-                aihNumbers.set(n, (aihNumbers.get(n) || 0) + 1)
-              })
-              const duplicates = Array.from(aihNumbers.entries()).filter(([, c]) => c > 1)
-              const aihSet = new Set(Array.from(aihNumbers.keys()))
-              const procMissing = excelProcRows.filter(r => {
-                const n = String(r.aih_number || '').trim()
-                return !n || !aihSet.has(n)
-              })
-              return (
-                <div className="text-xs">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={duplicates.length ? 'destructive' as any : 'secondary'}>
-                      Duplicatas AIH: {duplicates.length}
-                    </Badge>
-                    <Badge variant={procMissing.length ? 'destructive' as any : 'secondary'}>
-                      Procedimentos sem AIH: {procMissing.length}
-                    </Badge>
-                  </div>
-                  {(duplicates.length || procMissing.length) && (
-                    <div className="text-amber-700 mt-1">
-                      Corrija duplicatas de `aih_number` e garanta que todos os procedimentos referenciem uma AIH válida.
-                    </div>
-                  )}
-                </div>
-              )
-            })()}
-          </div>
-
-          {excelResult && (
-            <div className="text-sm bg-indigo-50 border border-indigo-200 rounded p-2">
-              {typeof excelResult === 'object' ? JSON.stringify(excelResult) : String(excelResult)}
-            </div>
-          )}
-          {importBatchId && (
-            <div className="flex items-center gap-2 mt-2">
-              <Button
-                variant="outline"
-                className="border-red-300 text-red-700"
-                onClick={async () => {
-                  try {
-                    const { data, error } = await supabase.rpc('rollback_import_batch', { p_hospital_id: hospitalIdExcel, p_import_batch: importBatchId })
-                    if (error) throw error
-                    toast({ title: 'Rollback concluído', description: JSON.stringify(data) })
-                  } catch (e: any) {
-                    toast({ title: 'Erro no rollback', description: String(e.message || e), variant: 'destructive' })
-                  }
-                }}
-              >
-                Desfazer Lote
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* (Removido) Upload Excel/CSV - processado externamente por ETL */}
 
       {/* Results */}
       {result && (

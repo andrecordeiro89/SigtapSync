@@ -478,111 +478,23 @@ const SigtapViewer = () => {
   // ✅ TELA PRINCIPAL COM DADOS CARREGADOS
   return (
     <div className="space-y-6">
-      {/* Header Refinado */}
-      <div className="bg-gradient-to-r from-purple-50 via-white to-blue-50 rounded-xl p-6 border border-purple-100/50 shadow-sm">
-        <div className="flex justify-between items-center">
-          <div>
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="p-2 bg-gradient-to-br from-purple-100 to-blue-200 rounded-xl shadow-sm">
-                <FileText className="w-8 h-8 text-purple-700" />
-              </div>
-              <h2 className="text-3xl font-bold text-gray-900">Consulta SIGTAP</h2>
+      {/* Header Corporativo Minimalista */}
+      <div className="bg-white rounded-xl p-4 border border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <FileText className="w-6 h-6 text-black" />
             </div>
-            <div className="text-gray-600 space-y-2">
-              <p className="leading-relaxed max-w-2xl">
-                Base inteligente de procedimentos SIGTAP com tecnologia híbrida de extração
-              </p>
+            <div>
+              <h2 className="text-2xl font-bold text-black">Consulta SIGTAP</h2>
               {lastImportDate && (
-                <span className="text-sm text-gray-500 block">
-                  📅 Importado em: {new Date(lastImportDate).toLocaleString('pt-BR')}
-                </span>
+                <span className="text-xs text-neutral-600">Importado em {new Date(lastImportDate).toLocaleString('pt-BR')}</span>
               )}
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-1 bg-blue-100 rounded">
-                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                  </div>
-                  <span className="text-sm font-medium text-blue-700">
-                    {procedures.length.toLocaleString()} procedimentos
-                  </span>
-                </div>
-                
-                <Badge variant={procedures.length >= 10000 ? 'destructive' : procedures.length < 2000 ? 'secondary' : 'default'} 
-                       className="px-3 py-1">
-                  {procedures.length >= 10000 ? '⚠️ Limite' : procedures.length < 2000 ? '❌ Incompleto' : '✅ Completo'}
-                </Badge>
-                
-                {/* ✅ INDICADOR DE CACHE */}
-                <Badge variant="outline" className="bg-gradient-to-r from-gray-50 to-gray-100 border-gray-300 text-gray-700">
-                  {cacheStatus === 'cached' && '💾 Cache'}
-                  {cacheStatus === 'loading' && '⏳ Carregando'}
-                  {cacheStatus === 'error' && '❌ Erro'}
-                  {cacheStatus === 'empty' && '🔄 Vazio'}
-                </Badge>
-              </div>
             </div>
           </div>
-        
-        {/* Botões Administrativos - Apenas para Diretoria */}
-        {isAdminUser && (
-          <div className="flex space-x-2">
-            {/* 📊 BOTÃO EXCEL - DESTAQUE (RECOMENDADO) */}
-            <Button 
-              onClick={handleExportExcel} 
-              variant="default" 
-              className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white shadow-md"
-              disabled={!filteredProcedures.length}
-              title="Exportar para Excel (XLSX) - Formato profissional com filtros e formatação"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Exportar Excel</span>
-            </Button>
-            
-            {/* CSV - Opção alternativa */}
-            <Button 
-              onClick={handleExportCSV} 
-              variant="outline" 
-              className="flex items-center space-x-2"
-              disabled={!filteredProcedures.length}
-              title="Exportar dados para CSV (formato simples) - Apenas Diretoria"
-            >
-              <Download className="w-4 h-4" />
-              <span>CSV</span>
-            </Button>
-            
-            <Button 
-              onClick={() => {
-                if (confirm('Limpar todos os dados? Você precisará importar novamente.')) {
-                  clearData();
-                }
-              }}
-              variant="outline" 
-              className="flex items-center space-x-2 text-red-600 hover:text-red-700"
-              title="Limpar dados - Apenas Diretoria"
-            >
-              <AlertCircle className="w-4 h-4" />
-              <span>Limpar</span>
-            </Button>
-            <Button 
-              onClick={handleClearCache}
-              variant="outline" 
-              className="flex items-center space-x-2 bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100"
-              disabled={isCurrentlyLoading}
-              title="Limpar cache e recarregar dados - Apenas Diretoria"
-            >
-              {isCurrentlyLoading ? '⏳' : '🧹'} Cache
-            </Button>
-            <Button 
-              onClick={handleForceReload}
-              variant="outline" 
-              className="flex items-center space-x-2 bg-green-50 border-green-300 text-green-700 hover:bg-green-100"
-              disabled={isCurrentlyLoading}
-              title="Recarregar dados do banco - Apenas Diretoria"
-            >
-              {isCurrentlyLoading ? '⏳' : '🔧'} Reload
-            </Button>
+          <div className="text-sm text-neutral-700">
+            {procedures.length.toLocaleString()} procedimentos
           </div>
-        )}
         </div>
       </div>
 
@@ -596,38 +508,28 @@ const SigtapViewer = () => {
         </div>
       )}
 
-      {/* Filtros Refinados */}
-      <Card className="bg-gradient-to-r from-slate-50 via-white to-slate-50/50 border-slate-200/60 shadow-md hover:shadow-lg transition-all duration-300">
-        <CardHeader className="bg-gradient-to-r from-purple-50 to-blue-50 border-b border-purple-100">
+      {/* Filtros - Corporativo Preto e Branco */}
+      <Card className="bg-white border border-gray-200">
+        <CardHeader className="p-4 border-b border-gray-200">
           <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg shadow-sm">
-                <Filter className="w-5 h-5 text-purple-700" />
-              </div>
-              <span className="text-gray-900">Filtros de Pesquisa</span>
+            <div className="flex items-center gap-2">
+              <Filter className="w-5 h-5 text-black" />
+              <span className="text-black font-semibold">Filtros de Pesquisa</span>
             </div>
-            <div className="flex items-center space-x-3">
-              <Badge variant="secondary" className="bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 border-purple-300 px-3 py-1.5 font-medium">
-                {filteredProcedures.length} de {totalProcedures} resultados
-              </Badge>
-              {/* ✅ INFO DE CACHE */}
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                {getCacheInfo()}
-              </span>
+            <div className="text-sm text-black">
+              {filteredProcedures.length.toLocaleString()} resultados
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                <div className="p-1 bg-blue-100 rounded">
-                  <Search className="w-3 h-3 text-blue-600" />
-                </div>
+        <CardContent className="p-4 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-black flex items-center gap-2">
+                <Search className="w-4 h-4 text-black" />
                 <span>Busca</span>
               </label>
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                <Search className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
                 <Input
                   placeholder="Código ou descrição..."
                   value={searchTerm}
@@ -635,23 +537,21 @@ const SigtapViewer = () => {
                     setSearchTerm(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white/80 hover:bg-white transition-colors"
+                  className="pl-10 border-gray-300 focus:border-black focus:ring-black bg-white"
                 />
               </div>
             </div>
             
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                <div className="p-1 bg-green-100 rounded">
-                  <Filter className="w-3 h-3 text-green-600" />
-                </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-black flex items-center gap-2">
+                <Filter className="w-4 h-4 text-black" />
                 <span>Complexidade</span>
               </label>
               <Select value={complexityFilter} onValueChange={(value) => {
                 setComplexityFilter(value);
                 setCurrentPage(1);
               }}>
-                <SelectTrigger className="border-gray-300 focus:border-green-500 focus:ring-green-500 bg-white/80 hover:bg-white transition-colors">
+                <SelectTrigger className="border-gray-300 focus:border-black focus:ring-black bg-white">
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
                 <SelectContent>
@@ -665,18 +565,16 @@ const SigtapViewer = () => {
               </Select>
             </div>
 
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                <div className="p-1 bg-purple-100 rounded">
-                  <Filter className="w-3 h-3 text-purple-600" />
-                </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-black flex items-center gap-2">
+                <Filter className="w-4 h-4 text-black" />
                 <span>Financiamento</span>
               </label>
               <Select value={financingFilter} onValueChange={(value) => {
                 setFinancingFilter(value);
                 setCurrentPage(1);
               }}>
-                <SelectTrigger className="border-gray-300 focus:border-purple-500 focus:ring-purple-500 bg-white/80 hover:bg-white transition-colors">
+                <SelectTrigger className="border-gray-300 focus:border-black focus:ring-black bg-white">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
@@ -690,18 +588,16 @@ const SigtapViewer = () => {
               </Select>
             </div>
 
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                <div className="p-1 bg-orange-100 rounded">
-                  <Filter className="w-3 h-3 text-orange-600" />
-                </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-black flex items-center gap-2">
+                <Filter className="w-4 h-4 text-black" />
                 <span>Modalidade</span>
               </label>
               <Select value={modalityFilter} onValueChange={(value) => {
                 setModalityFilter(value);
                 setCurrentPage(1);
               }}>
-                <SelectTrigger className="border-gray-300 focus:border-orange-500 focus:ring-orange-500 bg-white/80 hover:bg-white transition-colors">
+                <SelectTrigger className="border-gray-300 focus:border-black focus:ring-black bg-white">
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
                 <SelectContent>
@@ -715,14 +611,12 @@ const SigtapViewer = () => {
               </Select>
             </div>
           </div>
+          {/* Pesquisa cruzada integrada */}
+          <SigtapCrossSearch />
         </CardContent>
       </Card>
 
-      {/* Separador entre filtros e título, igual ao header (bordas/tons) */}
-      <div className="border-t border-purple-100 my-4" />
-
-      {/* Pesquisa cruzada Procedimento ↔ CID */}
-      <SigtapCrossSearch />
+      
 
       <Card>
         <CardContent className="p-0">

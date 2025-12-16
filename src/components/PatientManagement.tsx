@@ -1685,10 +1685,10 @@ const PatientManagement = () => {
       <Card className="bg-gradient-to-r from-slate-50 via-white to-slate-50/50 border-slate-200/60 shadow-md hover:shadow-lg transition-all duration-300">
         <CardContent className="p-6">
           <div className="flex items-center space-x-3 mb-6">
-            <div className="p-2 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg shadow-sm">
-              <Filter className="w-5 h-5 text-blue-700" />
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <Filter className="w-5 h-5 text-black" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">Filtros de Pesquisa</h3>
+            <h3 className="text-lg font-semibold text-black">Filtros de Pesquisa</h3>
           </div>
           
           <div className="flex flex-col md:flex-row md:items-end gap-3">
@@ -1710,13 +1710,13 @@ const PatientManagement = () => {
           </div>
 
           <div className="space-y-3 w-full md:w-[180px]">
-            <label className="text-sm font-medium text-gray-700">Admissão desde</label>
-            <Input type="date" value={admissionDateFrom} onChange={(e) => setAdmissionDateFrom(e.target.value)} />
+            <label className="text-sm font-medium text-black">Admissão desde</label>
+            <Input type="date" value={admissionDateFrom} onChange={(e) => setAdmissionDateFrom(e.target.value)} className="border-gray-300 focus:border-black focus:ring-black" />
           </div>
 
           <div className="space-y-3 w-full md:w-[180px]">
-            <label className="text-sm font-medium text-gray-700">Alta até</label>
-            <Input type="date" value={dischargeDateTo} onChange={(e) => setDischargeDateTo(e.target.value)} />
+            <label className="text-sm font-medium text-black">Alta até</label>
+            <Input type="date" value={dischargeDateTo} onChange={(e) => setDischargeDateTo(e.target.value)} className="border-gray-300 focus:border-black focus:ring-black" />
           </div>
 
           <div className="space-y-3 w-full md:w-[200px]">
@@ -1748,13 +1748,11 @@ const PatientManagement = () => {
             {isDirector && (
               <div className="space-y-3 w-full md:w-[220px]">
                 <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                  <div className="p-1 bg-blue-100 rounded">
-                    <Activity className="w-3 h-3 text-blue-600" />
-                  </div>
+                  <Activity className="w-3 h-3 text-black" />
                   <span>Hospital</span>
                 </label>
                 <Select value={selectedHospitalFilter} onValueChange={setSelectedHospitalFilter}>
-                  <SelectTrigger className="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-white/80 hover:bg-white transition-colors">
+                  <SelectTrigger className="w-full border-gray-300 focus:border-black focus:ring-black bg-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1771,7 +1769,7 @@ const PatientManagement = () => {
                     {availableHospitals.map(hospital => (
                       <SelectItem key={hospital.id} value={hospital.id}>
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                          <div className="w-2 h-2 rounded-full bg-black"></div>
                           {hospital.name}
                         </div>
                       </SelectItem>
@@ -1784,10 +1782,8 @@ const PatientManagement = () => {
             {/* ✅ NOVO: Filtro de Médicos com Busca (apenas para administradores) */}
             {isDirector && (
               <div className="space-y-3 w-full md:w-[250px]">
-                <label className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                  <div className="p-1 bg-green-100 rounded">
-                    <Stethoscope className="w-3 h-3 text-green-600" />
-                  </div>
+                <label className="text-sm font-medium text-black flex items-center space-x-2">
+                  <Stethoscope className="w-3 h-3 text-black" />
                   <span>Médico</span>
                 </label>
                 <div className="relative">
@@ -1796,7 +1792,7 @@ const PatientManagement = () => {
                     placeholder="Digite para buscar médico..."
                     value={doctorSearchTerm}
                     onChange={(e) => setDoctorSearchTerm(e.target.value)}
-                    className="w-full border-gray-300 focus:border-green-500 focus:ring-green-500 bg-white/80 hover:bg-white transition-colors pr-8"
+                    className="w-full border-gray-300 focus:border-black focus:ring-black bg-white pr-8"
                   />
                   {doctorSearchTerm && (
                     <button
@@ -1804,7 +1800,7 @@ const PatientManagement = () => {
                         setDoctorSearchTerm('');
                         setSelectedDoctorFilter('all');
                       }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -1890,7 +1886,7 @@ const PatientManagement = () => {
       </Card>
 
       {/* Lista Unificada de AIHs */}
-      <Card>
+      <Card className="border border-gray-200">
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-xl">
             <div className="flex flex-col gap-1">
@@ -1970,14 +1966,14 @@ const PatientManagement = () => {
               {paginatedData.map((item) => (
                 <div key={item.id} className="border border-gray-200 rounded-lg bg-white hover:shadow-md transition-all duration-200 overflow-hidden">
                   {/* Header com Nome e Ações */}
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-200">
+                  <div className="bg-white px-4 py-3 border-b border-gray-200">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleExpandAIH(item.id)}
-                          className="text-gray-600 hover:text-blue-600 hover:bg-blue-100 rounded-md transition-colors p-1.5 flex-shrink-0"
+                          className="text-black hover:bg-neutral-100 rounded-md transition-colors p-1.5 flex-shrink-0"
                         >
                           {expandedItems.has(item.id) ? 
                             <ChevronUp className="w-4 h-4" /> : 
@@ -1985,12 +1981,12 @@ const PatientManagement = () => {
                           }
                         </Button>
                         
-                        <div className="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center flex-shrink-0">
+                        <div className="w-8 h-8 bg-black rounded-md flex items-center justify-center flex-shrink-0">
                           <User className="w-4 h-4 text-white" />
                         </div>
                         
                         <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 text-base truncate">
+                          <h3 className="font-semibold text-black text-base truncate">
                             {item.patient?.name || item.patients?.name || 'Paciente não identificado'}
                           </h3>
                           
