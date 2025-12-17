@@ -385,7 +385,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
       <div className="hidden lg:flex items-center justify-center border-r border-gray-200 p-10">
         <div className="max-w-md space-y-4">
           <div className="flex items-center gap-3">
-            <img src="/Favicon_Oficial.png?v=2" alt="Logo" className="w-10 h-10" />
+            <img
+              src="/Favicon_Oficial.png?v=2"
+              alt="Logo"
+              className="w-10 h-10"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/favicon.png'; }}
+            />
             <div>
               <h1 className="text-3xl font-bold text-black">SIGTAP Sync</h1>
               <p className="text-sm text-neutral-700">Rastreabilidade e produção médica corporativa</p>

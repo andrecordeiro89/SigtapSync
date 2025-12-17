@@ -288,7 +288,12 @@ const SidebarNavigation = ({ activeTab, onTabChange }: SidebarNavigationProps) =
           <div className="flex items-center gap-3">
             {/* Logo/Ícone */}
             <div className="flex-shrink-0">
-              <img src="/icons8-s-67.png" alt="SIGTAP Sync" className="w-10 h-10 rounded-lg shadow-sm" />
+              <img
+                src="/Favicon_Oficial.png?v=2"
+                alt="SIGTAP Sync"
+                className="w-10 h-10 rounded-lg shadow-sm"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/favicon.png'; }}
+              />
             </div>
 
             {/* Nome, Slogan e Badge */}

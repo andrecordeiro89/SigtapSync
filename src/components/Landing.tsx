@@ -14,7 +14,12 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
         <section className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
             <div className="flex items-center gap-3">
-              <img src="/Favicon_Oficial.png?v=2" alt="SigtapSync" className="h-12 w-12 rounded-lg" />
+              <img
+                src="/Favicon_Oficial.png?v=2"
+                alt="SigtapSync"
+                className="h-12 w-12 rounded-lg"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/favicon.png'; }}
+              />
               <div className="flex items-baseline gap-3">
                 <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight">SigtapSync</h1>
                 <span className="text-sm md:text-base text-neutral-700">Regulação Médica</span>
