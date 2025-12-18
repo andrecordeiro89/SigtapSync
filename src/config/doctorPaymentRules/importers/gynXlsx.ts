@@ -29,18 +29,9 @@ let initPromise: Promise<Map<string, HonValues>> | null = null
 
 const candidateUrls: string[] = [
   '/VBA%20GINECOLOGIA.xlsx',
-  '/VBA GINECOLOGIA.xlsx',
-  '/VBA_GINECOLOGIA.xlsx'
+  '/VBA GINECOLOGIA.xlsx'
 ]
-let resolvedUrl: string | undefined = (() => {
-  try {
-    // @ts-ignore
-    const url = new URL('@/assets/VBA_GINECOLOGIA.xlsx', import.meta.url)
-    return url as unknown as string
-  } catch {
-    return candidateUrls[0]
-  }
-})()
+let resolvedUrl: string | undefined = candidateUrls[0]
 
 export const loadGynHonMap = async (): Promise<Map<string, HonValues>> => {
   if (GYN_HON_MAP) return GYN_HON_MAP

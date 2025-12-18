@@ -27,19 +27,7 @@ const extractCode = (cell: string): string => {
 let OTO_SJ_HON_MAP: Map<string, HonValues> | null = null
 let initPromise: Promise<Map<string, HonValues>> | null = null
 
-const assetUrl: string | undefined = (() => {
-  try {
-    // @ts-ignore
-    const url = new URL('@/assets/VBA_OTORRINO_HOSPITAL_MUNICIPAL_SAO_JOSE.xlsx', import.meta.url)
-    return url as unknown as string
-  } catch {
-    try {
-      return '/VBA%20OTORRINO%20HOSPITAL%20MUNICIPAL%20S%C3%83O%20JOSE.xlsx'
-    } catch {
-      return undefined
-    }
-  }
-})()
+const assetUrl: string | undefined = '/VBA%20OTORRINO%20HOSPITAL%20MUNICIPAL%20S%C3%83O%20JOSE.xlsx'
 
 export const loadOtoSaoJoseHonMap = async (): Promise<Map<string, HonValues>> => {
   // sempre refazer a leitura para garantir atualização do arquivo

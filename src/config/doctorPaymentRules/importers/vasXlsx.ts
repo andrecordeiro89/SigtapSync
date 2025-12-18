@@ -27,19 +27,7 @@ const extractCode = (cell: string): string => {
 let VAS_HON_MAP: Map<string, HonValues> | null = null
 let initPromise: Promise<Map<string, HonValues>> | null = null
 
-const assetUrl: string | undefined = (() => {
-  try {
-    // @ts-ignore
-    const url = new URL('@/assets/VBA_VASCULAR.xlsx', import.meta.url)
-    return url as unknown as string
-  } catch {
-    try {
-      return '/VBA%20VASCULAR.xlsx'
-    } catch {
-      return undefined
-    }
-  }
-})()
+const assetUrl: string | undefined = '/VBA%20VASCULAR.xlsx'
 
 export const loadVasHonMap = async (): Promise<Map<string, HonValues>> => {
   if (VAS_HON_MAP) return VAS_HON_MAP

@@ -27,19 +27,7 @@ const extractCode = (cell: string): string => {
 let URO_HON_MAP: Map<string, HonValues> | null = null
 let initPromise: Promise<Map<string, HonValues>> | null = null
 
-const assetUrl: string | undefined = (() => {
-  try {
-    // @ts-ignore
-    const url = new URL('@/assets/VBA_UROLOGIA.xlsx', import.meta.url)
-    return url as unknown as string
-  } catch {
-    try {
-      return '/VBA%20UROLOGIA.xlsx'
-    } catch {
-      return undefined
-    }
-  }
-})()
+const assetUrl: string | undefined = '/VBA%20UROLOGIA.xlsx'
 
 export const loadUroHonMap = async (): Promise<Map<string, HonValues>> => {
   if (URO_HON_MAP) return URO_HON_MAP
