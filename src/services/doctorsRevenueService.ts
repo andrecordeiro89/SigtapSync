@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '../lib/supabase';
+import { calculateDoctorPayment, calculateFixedPayment, calculatePercentagePayment } from '../config/doctorPaymentRules'
 
 // ================================================================
 // TIPOS E INTERFACES
@@ -189,9 +190,7 @@ export class DoctorsRevenueService {
     try {
       console.log('🔍 Contando pacientes sem repasse médico:', doctorName);
 
-      // Importar funções de cálculo
-      const { calculateDoctorPayment, calculateFixedPayment, calculatePercentagePayment } = await import('../components/DoctorPaymentRules');
-
+      // Impo calculateDoctorPayment,rtar funções de cálculo (import estático no topo)
       // Calcular data de 12 meses atrás
       const twelveMonthsAgo = new Date();
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
@@ -245,19 +244,24 @@ export class DoctorsRevenueService {
         // Buscar procedimentos 04.xxx da AIH
         const { data: procedures, error: procError } = await supabase
           .from('procedure_records')
-          .select('procedure_code, value_cents')
+          .select('procedure_code, value_cents, professional_cbo, sequencia, procedure_date')
           .eq('aih_id', aih.id)
-          .ilike('procedure_code', '04%');
+          .ilike('procedure_code', '04%')
+          .order('sequencia', { ascending: true })
+          .order('procedure_date', { ascending: true });
 
         if (procError) {
           console.error('❌ Erro ao buscar procedimentos:', procError);
           continue;
         }
 
-        const procedures04 = (procedures || []).map(p => ({
-          procedure_code: p.procedure_code,
-          value_reais: (p.value_cents || 0) / 100
-        }));
+        const procedures04 = (procedures || [])
+          .map(p => ({
+            procedure_code: p.procedure_code,
+            value_reais: (p.value_cents || 0) / 100,
+            cbo: p.professional_cbo
+          }))
+          .filter(pp => typeof pp.procedure_code === 'string' && pp.procedure_code.startsWith('04'));
 
         // Calcular pagamento médico
         const fixedPaymentCalc = calculateFixedPayment(doctorName, hospitalId);

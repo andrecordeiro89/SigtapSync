@@ -7,7 +7,11 @@ const toNumber = (raw: any): number => {
   if (typeof raw === 'number') return raw
   const s = String(raw).trim()
   if (!s) return 0
-  const normalized = s.replace(/\./g, '').replace(/,/, '.')
+  const cleaned = s
+    .replace(/\s*/g, '')
+    .replace(/^R\$\s*/i, '')
+    .replace(/[^\d,.-]/g, '')
+  const normalized = cleaned.replace(/\./g, '').replace(/,/, '.')
   const n = Number(normalized)
   return isNaN(n) ? 0 : n
 }
@@ -27,19 +31,36 @@ const extractCode = (cell: string): string => {
 let OTO_HON_MAP: Map<string, HonValues> | null = null
 let initPromise: Promise<Map<string, HonValues>> | null = null
 
-const assetUrl: string | undefined = '/VBA%20OTORRINO.xlsx'
+const candidateUrls: string[] = [
+  '/VBA%20OTORRINO.xlsx',
+  '/VBA OTORRINO.xlsx'
+]
+let resolvedUrl: string | undefined = candidateUrls[0]
 
 export const loadOtoHonMap = async (): Promise<Map<string, HonValues>> => {
   if (OTO_HON_MAP) return OTO_HON_MAP
   if (initPromise) return initPromise
   initPromise = (async () => {
     try {
-      if (!assetUrl) {
+      if (!resolvedUrl) {
         OTO_HON_MAP = new Map()
         return OTO_HON_MAP
       }
-      const res = await fetch(assetUrl)
-      const buf = await res.arrayBuffer()
+      let buf: ArrayBuffer | null = null
+      for (const u of candidateUrls) {
+        try {
+          const res = await fetch(`${u}?t=${Date.now()}`)
+          if (res.ok) {
+            buf = await res.arrayBuffer()
+            resolvedUrl = u
+            break
+          }
+        } catch {}
+      }
+      if (!buf) {
+        OTO_HON_MAP = new Map()
+        return OTO_HON_MAP
+      }
       const wb = XLSX.read(buf, { type: 'array', cellDates: false })
       const wsName = wb.SheetNames[0]
       const ws = wb.Sheets[wsName]
@@ -50,27 +71,32 @@ export const loadOtoHonMap = async (): Promise<Map<string, HonValues>> => {
         return map
       }
       const headers = (rows[0] || []).map((h: any) => String(h || '').toUpperCase().trim())
-      const idxCode = headers.findIndex(h => /PROCEDIMENTO|CÓDIGO|CODIGO/i.test(h))
-      const idxHon1 = headers.findIndex(h => /^HON1$/i.test(h))
-      const idxHon2 = headers.findIndex(h => /^HON2$/i.test(h))
-      const idxHon3 = headers.findIndex(h => /^HON3$/i.test(h))
-      const idxHon4 = headers.findIndex(h => /^HON4$/i.test(h))
-      const idxHon5 = headers.findIndex(h => /^HON5$/i.test(h))
+      const idxCode = headers.findIndex(h => /(CODIGO|C[ÓO]DIGO|PROCEDIMENTO(S)?)/i.test(h))
+      const idxHon1 = headers.findIndex(h => /^HON[\s-]?1$/i.test(h))
+      const idxHon2 = headers.findIndex(h => /^HON[\s-]?2$/i.test(h))
+      const idxHon3 = headers.findIndex(h => /^HON[\s-]?3$/i.test(h))
+      const idxHon4 = headers.findIndex(h => /^HON[\s-]?4$/i.test(h))
+      const idxHon5 = headers.findIndex(h => /^HON[\s-]?5$/i.test(h))
       const codeIndex = idxCode >= 0 ? idxCode : 0
-      const h1 = idxHon1 >= 0 ? idxHon1 : 1
-      const h2 = idxHon2 >= 0 ? idxHon2 : 2
-      const h3 = idxHon3 >= 0 ? idxHon3 : 3
-      const h4 = idxHon4 >= 0 ? idxHon4 : 4
-      const h5 = idxHon5 >= 0 ? idxHon5 : 5
+      const h1 = idxHon1 >= 0 ? idxHon1 : -1
+      const h2 = idxHon2 >= 0 ? idxHon2 : -1
+      const h3 = idxHon3 >= 0 ? idxHon3 : -1
+      const h4 = idxHon4 >= 0 ? idxHon4 : -1
+      const h5 = idxHon5 >= 0 ? idxHon5 : -1
       for (const row of rows.slice(1)) {
-        if (!row || row.length < Math.max(codeIndex, h1, h2, h3, h4, h5) + 1) continue
+        if (!row || row.length < codeIndex + 1) continue
         const code = extractCode(String(row[codeIndex] || ''))
         if (!code) continue
-        const hon1 = toNumber(row[h1])
-        const hon2 = toNumber(row[h2])
-        const hon3 = toNumber(row[h3])
-        const hon4 = toNumber(row[h4])
-        const hon5 = toNumber(row[h5])
+        const raw1 = h1 >= 0 ? row[h1] : undefined
+        const raw2 = h2 >= 0 ? row[h2] : undefined
+        const raw3 = h3 >= 0 ? row[h3] : undefined
+        const raw4 = h4 >= 0 ? row[h4] : undefined
+        const raw5 = h5 >= 0 ? row[h5] : undefined
+        const hon1 = raw1 != null && String(raw1).trim() !== '' ? toNumber(raw1) : 0
+        const hon2 = (h2 < 0 || raw2 == null || String(raw2).trim() === '') ? hon1 : toNumber(raw2)
+        const hon3 = (h3 < 0 || raw3 == null || String(raw3).trim() === '') ? hon1 : toNumber(raw3)
+        const hon4 = (h4 < 0 || raw4 == null || String(raw4).trim() === '') ? hon1 : toNumber(raw4)
+        const hon5 = (h5 < 0 || raw5 == null || String(raw5).trim() === '') ? hon1 : toNumber(raw5)
         OTO_HON_MAP?.set(code, { hon1, hon2, hon3, hon4, hon5 })
         map.set(code, { hon1, hon2, hon3, hon4, hon5 })
       }
@@ -108,7 +134,7 @@ export const calculateOtoHonPaymentsSync = (procedures: ProcedurePaymentInfo[]):
   const paidCodes = new Set<string>()
   const out = procedures.map((p) => {
     const codeNorm = p.procedure_code.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)?.[1] || p.procedure_code
-    const isExcluded = p.cbo === '000000' || p.cbo === '225151'
+    const isExcluded = p.cbo === '225151'
     const isDuplicate = paidCodes.has(codeNorm)
     const idx = (isExcluded || isDuplicate) ? -1 : pos
     if (!(isExcluded || isDuplicate)) pos++
