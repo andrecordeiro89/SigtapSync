@@ -15,6 +15,11 @@ import { Card, CardContent } from "./components/ui/card";
 import { RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from 'sonner';
 import { viewRefreshService } from './services/viewRefreshService';
+import { loadGynHonMap } from './config/doctorPaymentRules/importers/gynXlsx';
+import { loadUroHonMap } from './config/doctorPaymentRules/importers/uroXlsx';
+import { loadOtoHonMap } from './config/doctorPaymentRules/importers/otoXlsx';
+import { loadOtoSaoJoseHonMap } from './config/doctorPaymentRules/importers/otoSaoJoseXlsx';
+import { loadVasHonMap } from './config/doctorPaymentRules/importers/vasXlsx';
 
 const queryClient = new QueryClient();
 
@@ -23,6 +28,14 @@ function AppContent() {
   const { user, loading } = useAuth();
   const [loadingTime, setLoadingTime] = useState(0);
   const [showResetOption, setShowResetOption] = useState(false);
+
+  useEffect(() => {
+    loadGynHonMap();
+    loadUroHonMap();
+    loadOtoHonMap();
+    loadOtoSaoJoseHonMap();
+    loadVasHonMap();
+  }, []);
 
   // Contar tempo de loading
   useEffect(() => {

@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run copy-vba-rules && vite",
     "build": "npm run copy-vba-rules && vite build",
     "build:dev": "npm run copy-vba-rules && vite build --mode development",
     "build:prod": "npm run copy-vba-rules && vite build --mode production",
