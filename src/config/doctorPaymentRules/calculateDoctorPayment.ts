@@ -20,6 +20,8 @@ import {
   formatCurrency
 } from './utils';
 import { getHonValuesForCode, calculateHonByPosition } from './importers/honCsv'
+import { calculateGynHonPaymentsSync, loadGynHonMap } from './importers/gynXlsx'
+import { calculateUroHonPaymentsSync, loadUroHonMap } from './importers/uroXlsx'
 
 import { TORAO_TOKUDA_RULES } from './hospitals/toraoTokuda';
 import { HOSPITAL_18_DEZEMBRO_RULES } from './hospitals/hospital18Dezembro';
@@ -123,6 +125,29 @@ export function calculateDoctorPayment(
       totalPayment: 0,
       appliedRule: 'Nenhuma regra de pagamento definida para este médico'
     };
+  }
+
+  const hasUroCodes = procedures.some(p => {
+    const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
+    return /^04\.09\.(0[1-5])\./.test(code);
+  });
+  if (hasUroCodes && rule.rules && !rule.fixedPaymentRule) {
+    const resUro = calculateUroHonPaymentsSync(procedures);
+    if (resUro) return resUro;
+    void loadUroHonMap();
+  }
+
+  // ✅ Regra parametrizada por XLSX Ginecologia (apenas para médicos com regras por procedimento)
+  // Detecta perfil ginecologia por códigos 04.09.xx e aplica HON1..HON5 do arquivo XLSX
+  const hasGynCodes = procedures.some(p => {
+    const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
+    return /^04\.09\./.test(code);
+  });
+  if (hasGynCodes && rule.rules && !rule.fixedPaymentRule) {
+    const res = calculateGynHonPaymentsSync(procedures);
+    if (res) return res;
+    // lazy initialize in background; fallback permanece nas regras do hospital
+    void loadGynHonMap();
   }
 
   // Filtrar procedimentos que têm regras definidas
