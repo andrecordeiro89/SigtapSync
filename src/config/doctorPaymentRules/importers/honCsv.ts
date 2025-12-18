@@ -78,7 +78,12 @@ export const calculateHonPayments = (procedures: ProcedurePaymentInfo[]): Calcul
     const idx = (isExcluded || isDuplicate) ? -1 : pos
     if (!(isExcluded || isDuplicate)) pos++
     const hon = getHonValuesForCode(codeNorm)
-    const base = hon ? calculateHonByPosition(idx, hon) : 0
+    const base = (() => {
+      if (!hon) return 0
+      const alwaysHon1 = codeNorm === '04.01.02.010-0'
+      const effectiveIdx = alwaysHon1 ? 0 : idx
+      return calculateHonByPosition(effectiveIdx, hon)
+    })()
     const pay = (isExcluded || isDuplicate) ? 0 : base
     if (!isExcluded && !isDuplicate && hon) paidCodes.add(codeNorm)
     total += pay

@@ -125,9 +125,23 @@ export function calculateDoctorPayment(
 
   // Fallback: CSV Cirurgia Geral
   const processedCsv = calculateHonPayments(procedures);
+  const overrides = new Set<string>(['04.01.02.010-0']);
+  let adjustedTotal = processedCsv.totalPayment;
+  const adjustedProcedures = processedCsv.procedures.map(p => {
+    const codeNorm = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
+    if (overrides.has(codeNorm)) {
+      const hon = getHonValuesForCode(codeNorm);
+      const overridePay = hon ? hon.hon1 : (p.calculatedPayment || 0);
+      if ((p.calculatedPayment || 0) !== overridePay) {
+        adjustedTotal += overridePay - (p.calculatedPayment || 0);
+        return { ...p, calculatedPayment: overridePay, paymentRule: 'CSV HON (override HON1)', isSpecialRule: true };
+      }
+    }
+    return p;
+  });
   return {
-    procedures: processedCsv.procedures,
-    totalPayment: processedCsv.totalPayment,
+    procedures: adjustedProcedures,
+    totalPayment: adjustedTotal,
     appliedRule: processedCsv.appliedRule
   };
 }
