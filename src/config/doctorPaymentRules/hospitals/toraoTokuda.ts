@@ -535,6 +535,7 @@ export const TORAO_TOKUDA_RULES: HospitalRules = {
     ]
   },
 
+
   'ROGERIO YOSHIKAZU NABESHIMA': {
     doctorName: 'ROGERIO YOSHIKAZU NABESHIMA',
     rules: [

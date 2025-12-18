@@ -2099,7 +2099,27 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         });
         if (error) {
           console.warn('⚠️ Falha RPC get_aih_count:', error);
-          setDbAihCount(null);
+          try {
+            let query = supabase.from('aihs').select('id', { count: 'exact', head: true });
+            if (hospitalIds) query = query.in('hospital_id', hospitalIds as any);
+            const comp = (selectedCompetencia && selectedCompetencia !== 'all' && selectedCompetencia.trim() !== '') ? selectedCompetencia.trim() : null;
+            if (comp) query = query.eq('competencia', comp);
+            if (careNormalized) query = query.eq('care_character', careNormalized);
+            const from = dischargeDateRange?.from || null;
+            const to = dischargeDateRange?.to || null;
+            if (from) query = query.gte('discharge_date', from);
+            if (to) query = query.lt('discharge_date', new Date(new Date(to).getTime() + 24*60*60*1000).toISOString());
+            const { count, error: countErr } = await query;
+            if (countErr) {
+              console.warn('⚠️ Fallback count em aihs falhou:', countErr);
+              setDbAihCount(null);
+            } else {
+              setDbAihCount(typeof count === 'number' ? count : null);
+            }
+          } catch (fallbackErr) {
+            console.warn('⚠️ Erro fallback count:', fallbackErr);
+            setDbAihCount(null);
+          }
         } else {
           setDbAihCount(typeof data === 'number' ? data : null);
         }

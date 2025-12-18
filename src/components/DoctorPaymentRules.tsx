@@ -258,7 +258,7 @@ export const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
       {/* ================================================================
           ALERTA DE PROCEDIMENTOS SEM REGRAS
           ================================================================ */}
-      {unruledCheck.hasUnruledProcedures && (
+      {false && (
         <Card className="bg-red-50 border-red-200">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
