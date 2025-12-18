@@ -125,6 +125,8 @@ export class DoctorPatientService {
     filterCareCharacter?: '1' | '2';
     dischargeDateRange?: { from?: string; to?: string };
     useSihSource?: boolean;
+    doctorNameContains?: string;
+    patientNameContains?: string;
   }): Promise<DoctorWithPatients[]> {
     try {
       console.log('📥 [TABELAS - OTIMIZADO] Carregando dados em paralelo...', options);
@@ -210,6 +212,29 @@ export class DoctorPatientService {
         const normalized = raw === '01' ? '1' : raw === '02' ? '2' : raw;
         aihsQuery = aihsQuery.eq('care_character', normalized);
         console.log('⚕️ Filtrando por Caráter de Atendimento:', normalized);
+      }
+
+      // Filtro por nome do paciente
+      if (options?.patientNameContains && options.patientNameContains.trim() !== '') {
+        const term = options.patientNameContains.trim();
+        aihsQuery = aihsQuery.ilike('patients.name', `%${term}%`);
+        console.log('🧑‍⚕️ Filtrando por nome de paciente:', term);
+      }
+
+      // Filtro por nome do médico via CNS
+      if (options?.doctorNameContains && options.doctorNameContains.trim() !== '') {
+        const term = options.doctorNameContains.trim();
+        const { data: doctorRows, error: docErr } = await supabase
+          .from('doctors')
+          .select('cns')
+          .ilike('name', `%${term}%`);
+        if (!docErr) {
+          const cnsList = (doctorRows || []).map((d: any) => d.cns).filter(Boolean);
+          if (cnsList.length > 0) {
+            aihsQuery = aihsQuery.in('cns_responsavel', cnsList);
+            console.log('👨‍⚕️ Filtrando AIHs por CNS de médicos:', cnsList.length);
+          }
+        }
       }
 
       // ✅ CORREÇÃO: Limitar a 500 AIHs apenas no carregamento inicial (sem filtros)

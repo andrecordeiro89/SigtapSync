@@ -673,11 +673,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   filterCareCharacter = 'all'
   , dischargeDateRange
 }) => {
+  const useDebounced = <T,>(value: T, delay: number) => {
+    const [debounced, setDebounced] = useState<T>(value);
+    useEffect(() => {
+      const id = setTimeout(() => setDebounced(value), delay);
+      return () => clearTimeout(id);
+    }, [value, delay]);
+    return debounced;
+  };
+  const debouncedSearchTerm = useDebounced(searchTerm, 300);
+  const debouncedPatientSearchTerm = useDebounced(patientSearchTerm, 300);
   const { user, canAccessAllHospitals, hasFullAccess } = useAuth();
   const [doctors, setDoctors] = useState<DoctorWithPatients[]>([]);
   const [filteredDoctors, setFilteredDoctors] = useState<DoctorWithPatients[]>([]);
   const [availableHospitals, setAvailableHospitals] = useState<Array<{id: string, name: string, cnes?: string}>>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dbAihCount, setDbAihCount] = useState<number | null>(null);
   const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
   const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set());
   const [showDiagnostic, setShowDiagnostic] = useState(false); // 🆕 ESTADO PARA MOSTRAR DIAGNÓSTICO
@@ -1954,7 +1965,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             competencia: competenciaFilter, // ✅ Passar undefined se não houver filtro
             filterCareCharacter: careFilter,
             dischargeDateRange,
-            useSihSource
+            useSihSource,
+            doctorNameContains: searchTerm?.trim() || undefined,
+            patientNameContains: patientSearchTerm?.trim() || undefined
           });
           // Usar diretamente a fonte das tabelas, garantindo pacientes e procedimentos
           mergedDoctors = doctorsWithPatients;
@@ -2068,6 +2081,35 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   //   return () => clearInterval(id);
   // }, []);
 
+  // 🔢 Contagem de AIHs via RPC otimizada (mesmos filtros da tela)
+  useEffect(() => {
+    (async () => {
+      try {
+        const hospitalIds = (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) ? selectedHospitals : null;
+        const rawCare = String(filterCareCharacter || '').trim();
+        const careNormalized = rawCare === '01' ? '1' : rawCare === '02' ? '2' : (rawCare === 'all' ? null : rawCare || null);
+        const { data, error } = await supabase.rpc('get_aih_count', {
+          hospital_ids: hospitalIds,
+          competencia: (selectedCompetencia && selectedCompetencia !== 'all' && selectedCompetencia.trim() !== '') ? selectedCompetencia.trim() : null,
+          care_character: careNormalized,
+          discharge_from: dischargeDateRange?.from || null,
+          discharge_to: dischargeDateRange?.to || null,
+          doctor_name: (searchTerm && searchTerm.trim() !== '') ? searchTerm.trim() : null,
+          patient_name: (patientSearchTerm && patientSearchTerm.trim() !== '') ? patientSearchTerm.trim() : null
+        });
+        if (error) {
+          console.warn('⚠️ Falha RPC get_aih_count:', error);
+          setDbAihCount(null);
+        } else {
+          setDbAihCount(typeof data === 'number' ? data : null);
+        }
+      } catch (err) {
+        console.warn('⚠️ Erro ao obter contagem de AIHs no banco:', err);
+        setDbAihCount(null);
+      }
+    })();
+  }, [selectedHospitals, selectedCompetencia, filterCareCharacter, dischargeDateRange, patientSearchTerm, searchTerm]);
+
   // ✅ FILTRAR MÉDICOS BASEADO NO TERMO DE BUSCA, HOSPITAL, CARÁTER DE ATENDIMENTO E DATAS
   useEffect(() => {
     let filtered = doctors;
@@ -2087,11 +2129,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     // Auditoria: NÃO filtrar pacientes por caráter de atendimento; manter todos
     
     // 👨‍⚕️ FILTRAR POR TERMO DE BUSCA DE MÉDICO
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase();
+    if (debouncedSearchTerm.trim()) {
+      const searchLower = debouncedSearchTerm.toLowerCase();
       filtered = filtered.filter(doctor => {
         return doctor.doctor_info.name.toLowerCase().includes(searchLower) ||
-               doctor.doctor_info.cns.includes(searchTerm) ||
+               doctor.doctor_info.cns.includes(debouncedSearchTerm) ||
                doctor.doctor_info.crm?.toLowerCase().includes(searchLower) ||
                doctor.doctor_info.specialty?.toLowerCase().includes(searchLower);
       });
@@ -2101,8 +2143,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     filtered = filtered.filter(doctor => !isZeroCns(doctor.doctor_info?.cns));
 
     // 🧑‍🦱 NOVO: FILTRAR POR NOME DO PACIENTE
-    if (patientSearchTerm.trim()) {
-      const patientSearchLower = patientSearchTerm.toLowerCase();
+    if (debouncedPatientSearchTerm.trim()) {
+      const patientSearchLower = debouncedPatientSearchTerm.toLowerCase();
       console.log('🔍 [FILTRO PACIENTE] Buscando por:', patientSearchTerm);
       
       filtered = filtered.map(doctor => {
@@ -2132,7 +2174,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     // Reset da página atual quando filtros são aplicados
     setCurrentDoctorPage(1);
-  }, [searchTerm, patientSearchTerm, selectedCompetencia, doctors, selectedHospitals]);
+  }, [debouncedSearchTerm, debouncedPatientSearchTerm, selectedCompetencia, doctors, selectedHospitals]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
   const toggleDoctorExpansion = (doctorKey: string) => {
@@ -2424,22 +2466,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   
   // ✅ NOVO: Calcular pacientes com múltiplas AIHs (igual PatientManagement)
   const multipleAIHsStats = React.useMemo(() => {
-    const aihNumbers = new Set<string>();
+    const aihIds = new Set<string>();
     const patientAIHCount = new Map<string, number>();
     const patientDetails = new Map<string, any>();
     const patientAIHsList = new Map<string, any[]>();
     
     filteredDoctors.forEach(doctor => {
       doctor.patients.forEach(patient => {
-        const aihNum = String(patient.aih_info?.aih_number || '').trim();
-        if (aihNum) aihNumbers.add(aihNum);
+        const aihId = String(patient.aih_id || '').trim();
+        if (aihId) aihIds.add(aihId);
         const pid = patient.patient_id || undefined;
         if (pid) {
           const current = patientAIHCount.get(pid) || 0;
           patientAIHCount.set(pid, current + 1);
           if (!patientAIHsList.has(pid)) patientAIHsList.set(pid, []);
           patientAIHsList.get(pid)!.push({
-            aih_number: aihNum || 'Não informado',
+            aih_number: String(patient.aih_info?.aih_number || '').trim() || 'Não informado',
             admission_date: patient.aih_info?.admission_date,
             discharge_date: patient.aih_info?.discharge_date,
             competencia: patient.aih_info?.competencia
@@ -2470,7 +2512,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       .sort((a, b) => b.aih_count - a.aih_count);
 
     return {
-      totalAIHs: aihNumbers.size,
+      totalAIHs: aihIds.size,
       patientsWithMultipleAIHs: patientsWithMultiple.size,
       totalMultipleAIHs,
       aihsWithoutPatients: 0,
@@ -2726,12 +2768,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         totalProcedures: filteredStats.totalProcedures,
         patientsWithMultipleAIHs: multipleAIHsStats.patientsWithMultipleAIHs,
         totalMultipleAIHs: multipleAIHsStats.totalMultipleAIHs,
-        totalAIHs: multipleAIHsStats.totalAIHs,
+        totalAIHs: (dbAihCount ?? multipleAIHsStats.totalAIHs),
         uniquePatients: filteredStats.uniquePatients, // 🆕 Pacientes únicos
         multipleAIHsDetails: multipleAIHsStats.multipleAIHsDetails // 🆕 Passar detalhes dos pacientes
       });
     }
-  }, [filteredStats, multipleAIHsStats, onStatsUpdate, isLoading]);
+  }, [filteredStats, multipleAIHsStats, dbAihCount, onStatsUpdate, isLoading]);
 
   // 🏥 Nome do hospital selecionado para exibir como badge no título (incluindo CNES)
   const selectedHospitalName = React.useMemo(() => {

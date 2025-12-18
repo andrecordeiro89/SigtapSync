@@ -398,6 +398,16 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [proceduresHospitalId, setProceduresHospitalId] = useState<string>('all');
   const [proceduresData, setProceduresData] = useState<AIHBillingByProcedure[]>([]);
   const [includeAnesthesia, setIncludeAnesthesia] = useState<boolean>(true);
+  const [aihDbCount, setAihDbCount] = useState<number | null>(null);
+  const [aihKpi, setAihKpi] = useState<{ totalAIHs: number; totalRevenue: number; averageTicket: number; approvalRate: number } | null>(null);
+  const [financialKpis, setFinancialKpis] = useState<{
+    sigtapTotalValue: number;
+    incrementTotal: number;
+    incrementElective: number;
+    incrementUrgency: number;
+    totalValue: number;
+    medicalPaymentTotal: number;
+  } | null>(null);
   
 
 
@@ -948,6 +958,123 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     }
   }, [selectedHospitals, selectedCompetency, hasExecutiveAccess]);
 
+  useEffect(() => {
+    (async () => {
+      if (!hasExecutiveAccess) return;
+      try {
+        const rawCare = String(filterCareCharacter || '').trim();
+        const careNormalized = rawCare === '01' ? '1' : rawCare === '02' ? '2' : (rawCare === 'all' ? null : rawCare || null);
+        const hospitalIds = (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) ? selectedHospitals : null;
+        const { data, error } = await supabase.rpc('get_aih_count', {
+          hospital_ids: hospitalIds,
+          competencia: (selectedCompetency && selectedCompetency !== 'all' && selectedCompetency.trim() !== '') ? selectedCompetency.trim() : null,
+          care_character: careNormalized,
+          discharge_from: dischargeFrom || null,
+          discharge_to: dischargeTo || null,
+          doctor_name: null,
+          patient_name: null
+        });
+        if (!error) {
+          setAihDbCount(typeof data === 'number' ? data : null);
+        } else {
+          console.warn('⚠️ Falha RPC get_aih_count (exec):', error);
+          setAihDbCount(null);
+        }
+      } catch (e) {
+        console.warn('⚠️ Erro RPC get_aih_count (exec):', e);
+        setAihDbCount(null);
+      }
+    })();
+  }, [hasExecutiveAccess, selectedHospitals, selectedCompetency, filterCareCharacter, dischargeFrom, dischargeTo]);
+
+  useEffect(() => {
+    if (aihDbCount != null) {
+      setKpiData(prev => ({ ...prev, totalAIHs: aihDbCount }));
+    }
+  }, [aihDbCount]);
+
+  useEffect(() => {
+    (async () => {
+      if (!hasExecutiveAccess) return;
+      try {
+        const rawCare = String(filterCareCharacter || '').trim();
+        const careNormalized = rawCare === '01' ? '1' : rawCare === '02' ? '2' : (rawCare === 'all' ? null : rawCare || null);
+        const hospitalIds = (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) ? selectedHospitals : null;
+        const { data, error } = await supabase.rpc('get_aih_kpis', {
+          hospital_ids: hospitalIds,
+          competencia: (selectedCompetency && selectedCompetency !== 'all' && selectedCompetency.trim() !== '') ? selectedCompetency.trim() : null,
+          care_character: careNormalized,
+          discharge_from: dischargeFrom || null,
+          discharge_to: dischargeTo || null,
+          doctor_name: null,
+          patient_name: null
+        });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const row: any = data[0];
+          setAihKpi({
+            totalAIHs: Number(row.total_aihs || 0),
+            totalRevenue: Number(row.total_value || 0),
+            averageTicket: Number(row.average_ticket || 0),
+            approvalRate: Number(row.approval_rate || 0)
+          });
+        } else {
+          setAihKpi(null);
+        }
+      } catch {
+        setAihKpi(null);
+      }
+    })();
+  }, [hasExecutiveAccess, selectedHospitals, selectedCompetency, filterCareCharacter, dischargeFrom, dischargeTo]);
+
+  useEffect(() => {
+    if (aihKpi) {
+      setKpiData(prev => ({
+        ...prev,
+        totalAIHs: aihKpi.totalAIHs,
+        totalRevenue: aihKpi.totalRevenue,
+        averageTicket: aihKpi.averageTicket,
+        approvalRate: aihKpi.approvalRate
+      }));
+    }
+  }, [aihKpi]);
+
+  useEffect(() => {
+    (async () => {
+      if (!hasExecutiveAccess) return;
+      try {
+        const rawCare = String(filterCareCharacter || '').trim();
+        const careNormalized = rawCare === '01' ? '1' : rawCare === '02' ? '2' : (rawCare === 'all' ? null : rawCare || null);
+        const hospitalIds = (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) ? selectedHospitals : null;
+        const { data, error } = await supabase.rpc('get_aih_financial_kpis', {
+          hospital_ids: hospitalIds,
+          competencia: (selectedCompetency && selectedCompetency !== 'all' && selectedCompetency.trim() !== '') ? selectedCompetency.trim() : null,
+          care_character: careNormalized,
+          discharge_from: dischargeFrom || null,
+          discharge_to: dischargeTo || null,
+          doctor_name: null,
+          patient_name: null,
+          match_statuses: ['approved', 'matched', 'manual'],
+          billing_statuses: ['paid', 'approved']
+        });
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const row: any = data[0];
+          setFinancialKpis({
+            sigtapTotalValue: Number(row.sigtap_total_value || 0),
+            incrementTotal: Number(row.increment_total || 0),
+            incrementElective: Number(row.increment_elective || 0),
+            incrementUrgency: Number(row.increment_urgency || 0),
+            totalValue: Number(row.total_value || 0),
+            medicalPaymentTotal: Number(row.medical_payment_total || 0)
+          });
+        } else {
+          setFinancialKpis(null);
+        }
+      } catch {
+        setFinancialKpis(null);
+      }
+    })();
+  }, [hasExecutiveAccess, selectedHospitals, selectedCompetency, filterCareCharacter, dischargeFrom, dischargeTo]);
+
   // ✅ Carregar competências disponíveis do campo `competencia` da tabela `aihs`
   // ✅ CORREÇÃO: Implementar paginação para buscar TODAS as competências (sem limite de 1000)
   useEffect(() => {
@@ -1133,6 +1260,58 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 {medicalProductionStats ? (medicalProductionStats.totalAIHs || 0) : '...'}
               </div>
             </div>
+            {financialKpis && (
+              <div className="flex items-center gap-2">
+                <div className="rounded-xl px-4 py-3 border border-gray-200 bg-white">
+                  <div className="text-[10px] font-semibold text-black uppercase tracking-wide">
+                    Valor Total SIGTAP
+                  </div>
+                  <div className="text-sm font-black text-black">
+                    {formatCurrency(financialKpis.sigtapTotalValue)}
+                  </div>
+                </div>
+                <div className="rounded-xl px-4 py-3 border border-gray-200 bg-white">
+                  <div className="text-[10px] font-semibold text-black uppercase tracking-wide">
+                    Incrementos
+                  </div>
+                  <div className="text-sm font-black text-black">
+                    {formatCurrency(financialKpis.incrementTotal)}
+                  </div>
+                </div>
+                <div className="rounded-xl px-4 py-3 border border-gray-200 bg-white">
+                  <div className="text-[10px] font-semibold text-black uppercase tracking-wide">
+                    Inc. Eletivo
+                  </div>
+                  <div className="text-sm font-black text-black">
+                    {formatCurrency(financialKpis.incrementElective)}
+                  </div>
+                </div>
+                <div className="rounded-xl px-4 py-3 border border-gray-200 bg-white">
+                  <div className="text-[10px] font-semibold text-black uppercase tracking-wide">
+                    Inc. Urgência
+                  </div>
+                  <div className="text-sm font-black text-black">
+                    {formatCurrency(financialKpis.incrementUrgency)}
+                  </div>
+                </div>
+                <div className="rounded-xl px-4 py-3 border border-gray-200 bg-white">
+                  <div className="text-[10px] font-semibold text-black uppercase tracking-wide">
+                    Valor Total
+                  </div>
+                  <div className="text-sm font-black text-black">
+                    {formatCurrency(financialKpis.totalValue)}
+                  </div>
+                </div>
+                <div className="rounded-xl px-4 py-3 border border-gray-200 bg-white">
+                  <div className="text-[10px] font-semibold text-black uppercase tracking-wide">
+                    Pagamento Médico Total
+                  </div>
+                  <div className="text-sm font-black text-black">
+                    {formatCurrency(financialKpis.medicalPaymentTotal)}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
               </div>
             </div>
