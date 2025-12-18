@@ -88,10 +88,10 @@ export const loadVasHonMap = async (): Promise<Map<string, HonValues>> => {
         const code = extractCode(String(row[codeIndex] || ''))
         if (!code) continue
         const hon1 = h1 >= 0 ? toNumber(row[h1]) : 0
-        const hon2 = h2 >= 0 ? toNumber(row[h2]) : hon1
-        const hon3 = h3 >= 0 ? toNumber(row[h3]) : hon1
-        const hon4 = h4 >= 0 ? toNumber(row[h4]) : hon1
-        const hon5 = h5 >= 0 ? toNumber(row[h5]) : hon1
+        const hon2 = h2 >= 0 ? toNumber(row[h2]) : 0
+        const hon3 = h3 >= 0 ? toNumber(row[h3]) : 0
+        const hon4 = h4 >= 0 ? toNumber(row[h4]) : 0
+        const hon5 = h5 >= 0 ? toNumber(row[h5]) : 0
         map.set(code, { hon1, hon2, hon3, hon4, hon5 })
       }
       VAS_HON_MAP = map
@@ -128,7 +128,7 @@ export const calculateVasHonPaymentsSync = (procedures: ProcedurePaymentInfo[]):
   const paidCodes = new Set<string>()
   const out = procedures.map((p) => {
     const codeNorm = p.procedure_code.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)?.[1] || p.procedure_code
-    const isExcluded = p.cbo === '000000' || p.cbo === '225151'
+    const isExcluded = p.cbo === '225151'
     const isDuplicate = paidCodes.has(codeNorm)
     const idx = (isExcluded || isDuplicate) ? -1 : pos
     if (!(isExcluded || isDuplicate)) pos++

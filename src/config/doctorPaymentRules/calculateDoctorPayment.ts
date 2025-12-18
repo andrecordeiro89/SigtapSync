@@ -21,7 +21,7 @@ import {
 } from './utils';
 import { getHonValuesForCode, calculateHonByPosition, calculateHonPayments } from './importers/honCsv'
 import { calculateGynHonPaymentsSync, loadGynHonMap } from './importers/gynXlsx'
-import { calculateUroHonPaymentsSync, loadUroHonMap } from './importers/uroXlsx'
+import { calculateUroHonPaymentsSync, loadUroHonMap, getUroHonMapSync } from './importers/uroXlsx'
 import { calculateOtoHonPaymentsSync, loadOtoHonMap } from './importers/otoXlsx'
 import { calculateOtoSaoJoseHonPaymentsSync, loadOtoSaoJoseHonMap } from './importers/otoSaoJoseXlsx'
 import { calculateVasHonPaymentsSync, loadVasHonMap } from './importers/vasXlsx'
@@ -75,8 +75,8 @@ export function calculateDoctorPayment(
   const isSaoJose = hospitalKey === 'HOSPITAL_MUNICIPAL_SAO_JOSE'
 
   const hasUroCodes = procedures.some(p => {
-    const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
-    return /^04\.09\.(0[1-5])\./.test(code);
+    const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code
+    return /^04\.09\./.test(code)
   });
   if (hasUroCodes && !isSaoJose) {
     const resUro = calculateUroHonPaymentsSync(procedures);
