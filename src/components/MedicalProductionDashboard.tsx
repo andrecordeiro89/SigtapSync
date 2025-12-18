@@ -3116,133 +3116,119 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             {/* Indicadores — branco/preto com contorno colorido */}
             <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4">
               {/* Valor Total (Remote/Local) */}
-              <div className="bg-white rounded-lg p-4 border-2 border-gray-300">
+              <div className="bg-white rounded-lg p-3 border-2 border-gray-300">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-bold text-black uppercase tracking-wide mb-1">
+                    <div className="text-[11px] font-bold text-black uppercase tracking-wide mb-1">
                       {useSihSource && remoteConfigured ? 'Valor Total (Remoto)' : 'Valor Total SIGTAP'}
                     </div>
-                    <div className="text-2xl font-black text-black">
+                    <div className="text-xl font-black text-black">
                       {formatCurrency(aggregatedOperaParanaTotals.totalBaseSigtap)}
                     </div>
                     {useSihSource && remoteConfigured && sihRemoteTotals && (
-                      <div className="text-xs text-black mt-1 flex items-center gap-1">
+                      <div className="text-[11px] text-black mt-1 flex items-center gap-1">
                         <span className="inline-block w-2 h-2 bg-black rounded-full"></span>
                         Fonte: SIH Remoto
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-gray-300">
-                    <Database className="h-5 w-5 text-black" />
-            </div>
+                  
           </div>
               </div>
 
               {/* Total AIHs (SIH Remoto quando disponível) */}
               {useSihSource && remoteConfigured && sihRemoteTotals && (
-                <div className="bg-white rounded-lg p-4 border-2 border-blue-400">
+                <div className="bg-white rounded-lg p-3 border-2 border-blue-400">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-xs font-bold text-black uppercase tracking-wide mb-1">
+                      <div className="text-[11px] font-bold text-black uppercase tracking-wide mb-1">
                         Total AIHs (SIH Remoto)
                       </div>
-                      <div className="text-2xl font-black text-black">
+                      <div className="text-xl font-black text-black">
                         {formatNumber(sihRemoteTotals.totalAIHs)}
                       </div>
-                      <div className="text-xs text-black mt-1 flex items-center gap-1">
+                      <div className="text-[11px] text-black mt-1 flex items-center gap-1">
                         <span className="inline-block w-2 h-2 bg-black rounded-full"></span>
                         Fonte: Banco SIH
                       </div>
                     </div>
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-blue-400">
-                      <FileText className="h-5 w-5 text-black" />
-                    </div>
+                    
                   </div>
                 </div>
               )}
 
               {/* Valor Total Incrementos */}
-              <div className="bg-white rounded-lg p-4 border-2 border-emerald-400">
+              <div className="bg-white rounded-lg p-3 border-2 border-emerald-400">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-bold text-black uppercase tracking-wide mb-1">
+                    <div className="text-[11px] font-bold text-black uppercase tracking-wide mb-1">
                       Incrementos
                     </div>
-                    <div className="text-2xl font-black text-black">
+                    <div className="text-xl font-black text-black">
                       {formatCurrency(aggregatedOperaParanaTotals.totalIncrement)}
                     </div>
                   </div>
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-emerald-400">
-                    <TrendingUp className="h-5 w-5 text-black" />
-                  </div>
+                  
                 </div>
               </div>
 
               {/* Incremento Eletivo */}
-              <div className="bg-white rounded-lg p-4 border-2 border-teal-400">
+              <div className="bg-white rounded-lg p-3 border-2 border-teal-400">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-bold text-black uppercase tracking-wide mb-1">
+                    <div className="text-[11px] font-bold text-black uppercase tracking-wide mb-1">
                       Incremento Eletivo
                     </div>
-                    <div className="text-2xl font-black text-black">
+                    <div className="text-xl font-black text-black">
                       {formatCurrency(aggregatedIncrementBreakdown.elective)}
                     </div>
                   </div>
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-teal-400">
-                    <TrendingUp className="h-5 w-5 text-black" />
-                  </div>
+                  
                 </div>
               </div>
 
               {/* Incremento Urgência */}
-              <div className="bg-white rounded-lg p-4 border-2 border-amber-400">
+              <div className="bg-white rounded-lg p-3 border-2 border-amber-400">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-bold text-black uppercase tracking-wide mb-1">
+                    <div className="text-[11px] font-bold text-black uppercase tracking-wide mb-1">
                       Incremento Urgência
                     </div>
-                    <div className="text-2xl font-black text-black">
+                    <div className="text-xl font-black text-black">
                       {formatCurrency(aggregatedIncrementBreakdown.urgency)}
                     </div>
                   </div>
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-amber-400">
-                    <TrendingUp className="h-5 w-5 text-black" />
-                  </div>
+                  
                 </div>
               </div>
 
               {/* Valor Total (com Opera Paraná) */}
-              <div className="bg-white rounded-lg p-4 border-2 border-blue-400">
+              <div className="bg-white rounded-lg p-3 border-2 border-blue-400">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-bold text-black uppercase tracking-wide mb-1">
+                    <div className="text-[11px] font-bold text-black uppercase tracking-wide mb-1">
                       Valor Total
                     </div>
-                    <div className="text-2xl font-black text-black">
+                    <div className="text-xl font-black text-black">
                       {formatCurrency(aggregatedOperaParanaTotals.totalWithIncrement)}
                     </div>
                   </div>
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-blue-400">
-                    <BarChart3 className="h-5 w-5 text-black" />
-                  </div>
+                  
                 </div>
               </div>
 
               {/* Pagamento Médico Total - DESTAQUE */}
-              <div className="bg-white rounded-lg p-4 border-2 border-green-500 shadow-sm">
+              <div className="bg-white rounded-lg p-3 border-2 border-green-500 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-bold text-black uppercase tracking-wide mb-1">
+                    <div className="text-[11px] font-bold text-black uppercase tracking-wide mb-1">
                       Pagamento Médico Total
                     </div>
-                    <div className="text-2xl font-black text-black">
+                    <div className="text-xl font-black text-black">
                       {formatCurrency(aggregatedMedicalPayments)}
                     </div>
                   </div>
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full border-2 border-green-500">
-                    <DollarSign className="h-5 w-5 text-black" />
-                  </div>
+                  
                 </div>
                 </div>
               </div>

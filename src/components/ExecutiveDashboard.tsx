@@ -1256,57 +1256,57 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               <div className="text-xs font-semibold text-black uppercase tracking-wide">
                 AIHs (Registros Únicos)
               </div>
-              <div className="text-2xl font-black text-black">
+              <div className="text-xl font-black text-black">
                 {medicalProductionStats ? (medicalProductionStats.totalAIHs || 0) : '...'}
               </div>
             </div>
             {financialKpis && (
               <div className="flex items-center gap-2">
-                <div className="rounded-xl px-4 py-3 border border-gray-200 bg-white">
-                  <div className="text-[10px] font-semibold text-black uppercase tracking-wide">
+                <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
+                  <div className="text-[9px] font-semibold text-black uppercase tracking-wide">
                     Valor Total SIGTAP
                   </div>
-                  <div className="text-sm font-black text-black">
+                  <div className="text-[13px] font-black text-black">
                     {formatCurrency(financialKpis.sigtapTotalValue)}
                   </div>
                 </div>
-                <div className="rounded-xl px-4 py-3 border border-gray-200 bg-white">
-                  <div className="text-[10px] font-semibold text-black uppercase tracking-wide">
+                <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
+                  <div className="text-[9px] font-semibold text-black uppercase tracking-wide">
                     Incrementos
                   </div>
-                  <div className="text-sm font-black text-black">
+                  <div className="text-[13px] font-black text-black">
                     {formatCurrency(financialKpis.incrementTotal)}
                   </div>
                 </div>
-                <div className="rounded-xl px-4 py-3 border border-gray-200 bg-white">
-                  <div className="text-[10px] font-semibold text-black uppercase tracking-wide">
+                <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
+                  <div className="text-[9px] font-semibold text-black uppercase tracking-wide">
                     Inc. Eletivo
                   </div>
-                  <div className="text-sm font-black text-black">
+                  <div className="text-[13px] font-black text-black">
                     {formatCurrency(financialKpis.incrementElective)}
                   </div>
                 </div>
-                <div className="rounded-xl px-4 py-3 border border-gray-200 bg-white">
-                  <div className="text-[10px] font-semibold text-black uppercase tracking-wide">
+                <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
+                  <div className="text-[9px] font-semibold text-black uppercase tracking-wide">
                     Inc. Urgência
                   </div>
-                  <div className="text-sm font-black text-black">
+                  <div className="text-[13px] font-black text-black">
                     {formatCurrency(financialKpis.incrementUrgency)}
                   </div>
                 </div>
-                <div className="rounded-xl px-4 py-3 border border-gray-200 bg-white">
-                  <div className="text-[10px] font-semibold text-black uppercase tracking-wide">
+                <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
+                  <div className="text-[9px] font-semibold text-black uppercase tracking-wide">
                     Valor Total
                   </div>
-                  <div className="text-sm font-black text-black">
+                  <div className="text-[13px] font-black text-black">
                     {formatCurrency(financialKpis.totalValue)}
                   </div>
                 </div>
-                <div className="rounded-xl px-4 py-3 border border-gray-200 bg-white">
-                  <div className="text-[10px] font-semibold text-black uppercase tracking-wide">
+                <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
+                  <div className="text-[9px] font-semibold text-black uppercase tracking-wide">
                     Pagamento Médico Total
                   </div>
-                  <div className="text-sm font-black text-black">
+                  <div className="text-[13px] font-black text-black">
                     {formatCurrency(financialKpis.medicalPaymentTotal)}
                   </div>
                 </div>
