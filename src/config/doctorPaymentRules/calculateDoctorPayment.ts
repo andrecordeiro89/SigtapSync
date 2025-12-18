@@ -74,11 +74,12 @@ export function calculateDoctorPayment(
 
   const isSaoJose = hospitalKey === 'HOSPITAL_MUNICIPAL_SAO_JOSE'
 
-  const hasUroCodes = procedures.some(p => {
+  const uroMap = getUroHonMapSync()
+  const hasUroCodes = !!uroMap && procedures.some(p => {
     const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code
-    return /^04\.09\./.test(code)
+    return uroMap.has(code)
   });
-  if (hasUroCodes && !isSaoJose) {
+  if (hasUroCodes) {
     const resUro = calculateUroHonPaymentsSync(procedures);
     if (resUro) return resUro;
     void loadUroHonMap();

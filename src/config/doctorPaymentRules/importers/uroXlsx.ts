@@ -131,8 +131,8 @@ export const calculateUroHonPaymentsSync = (procedures: ProcedurePaymentInfo[]):
     const isExcluded = p.cbo === '225151'
     const isDuplicate = paidCodes.has(codeNorm)
     const idx = (isExcluded || isDuplicate) ? -1 : pos
-    if (!(isExcluded || isDuplicate)) pos++
     const hon = map.get(codeNorm) || null
+    if (!(isExcluded || isDuplicate) && hon) pos++
     const base =
       !hon ? 0 :
       idx <= 0 ? hon.hon1 :
