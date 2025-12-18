@@ -17,7 +17,7 @@
     "copy-pdf-worker": "copyfiles -u 3 node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/",
     "copy-pdf-worker-safe": "copyfiles -u 3 node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/ || echo PDF worker copy failed - continuing without it",
     "postinstall": "npm run copy-pdf-worker-safe && npm run copy-vba-rules || echo 'Postinstall completed with warnings'",
-    "copy-vba-rules": "copyfiles -f \"VBA GINECOLOGIA.xlsx\" \"VBA OTORRINO.xlsx\" \"VBA UROLOGIA.xlsx\" \"VBA VASCULAR.xlsx\" public/ && copyfiles -f \"VBA CIRURGIA GERAL.csv\" src/assets/",
+    "copy-vba-rules": "copyfiles -f \"VBA GINECOLOGIA.xlsx\" \"VBA OTORRINO.xlsx\" \"VBA OTORRINO HOSPITAL MUNICIPAL SÃO JOSE.xlsx\" \"VBA UROLOGIA.xlsx\" \"VBA VASCULAR.xlsx\" public/ && copyfiles -f \"VBA CIRURGIA GERAL.csv\" src/assets/",
     "clean": "rm -rf node_modules package-lock.json && npm install",
     "clean-install": "rm -rf node_modules .npm package-lock.json && npm install --force --include=optional",
     "fix-rollup": "npm install @rollup/rollup-linux-x64-gnu@latest --save-optional --force",
