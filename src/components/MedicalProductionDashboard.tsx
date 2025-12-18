@@ -68,6 +68,11 @@ import { exportAllPatientsExcel } from '../services/exportService'
 import { ENV_CONFIG } from '../config/env'
 import { supabaseSih } from '../lib/sihSupabase'
 import { dedupPatientsByAIH, normalizeAih, summarizeDedup } from '../utils/dedupTest'
+import { loadGynHonMap } from '../config/doctorPaymentRules/importers/gynXlsx'
+import { loadUroHonMap } from '../config/doctorPaymentRules/importers/uroXlsx'
+import { loadOtoHonMap } from '../config/doctorPaymentRules/importers/otoXlsx'
+import { loadOtoSaoJoseHonMap } from '../config/doctorPaymentRules/importers/otoSaoJoseXlsx'
+import { loadVasHonMap } from '../config/doctorPaymentRules/importers/vasXlsx'
 
 // ✅ FUNÇÕES UTILITÁRIAS LOCAIS
 // Função para identificar procedimentos médicos (código 04)
@@ -2081,6 +2086,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   //   return () => clearInterval(id);
   // }, []);
 
+  // 🔧 Pré-carregar mapas de HON (VBA) para garantir aplicação imediata
+  useEffect(() => {
+    (async () => {
+      try {
+        await Promise.all([
+          loadGynHonMap(),
+          loadUroHonMap(),
+          loadOtoHonMap(),
+          loadOtoSaoJoseHonMap(),
+          loadVasHonMap()
+        ])
+        setRefreshTick(t => t + 1)
+      } catch {}
+    })()
+  }, [])
   // 🔢 Contagem de AIHs via RPC otimizada (mesmos filtros da tela)
   useEffect(() => {
     (async () => {

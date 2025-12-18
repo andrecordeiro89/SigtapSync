@@ -13,8 +13,8 @@ const toNumber = (raw: any): number => {
 }
 
 const extractCode = (cell: string): string => {
-  const s = (cell || '').toString().trim()
-  const m = s.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)
+  const s = (cell || '').toString().trim().replace(/\u2013|\u2014/g, '-') // normaliza hifens especiais
+  const m = s.match(/(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)
   if (m) return m[1]
   const digits = s.replace(/[^0-9]/g, '')
   if (digits.length >= 10) {
@@ -27,17 +27,18 @@ const extractCode = (cell: string): string => {
 let GYN_HON_MAP: Map<string, HonValues> | null = null
 let initPromise: Promise<Map<string, HonValues>> | null = null
 
-const assetUrl: string | undefined = (() => {
+const candidateUrls: string[] = [
+  '/VBA%20GINECOLOGIA.xlsx',
+  '/VBA GINECOLOGIA.xlsx',
+  '/VBA_GINECOLOGIA.xlsx'
+]
+let resolvedUrl: string | undefined = (() => {
   try {
     // @ts-ignore
     const url = new URL('@/assets/VBA_GINECOLOGIA.xlsx', import.meta.url)
     return url as unknown as string
   } catch {
-    try {
-      return '/VBA%20GINECOLOGIA.xlsx'
-    } catch {
-      return undefined
-    }
+    return candidateUrls[0]
   }
 })()
 
@@ -46,12 +47,25 @@ export const loadGynHonMap = async (): Promise<Map<string, HonValues>> => {
   if (initPromise) return initPromise
   initPromise = (async () => {
     try {
-      if (!assetUrl) {
+      // tentar múltiplos caminhos até obter sucesso
+      let fetchOk = false
+      let buf: ArrayBuffer | null = null
+      const tryUrls = [resolvedUrl!, ...candidateUrls].filter(Boolean)
+      for (const u of tryUrls) {
+        try {
+          const res = await fetch(`${u}?t=${Date.now()}`)
+          if (res.ok) {
+            buf = await res.arrayBuffer()
+            resolvedUrl = u
+            fetchOk = true
+            break
+          }
+        } catch {}
+      }
+      if (!fetchOk || !buf) {
         GYN_HON_MAP = new Map()
         return GYN_HON_MAP
       }
-      const res = await fetch(assetUrl)
-      const buf = await res.arrayBuffer()
       const wb = XLSX.read(buf, { type: 'array', cellDates: false })
       const wsName = wb.SheetNames[0]
       const ws = wb.Sheets[wsName]
