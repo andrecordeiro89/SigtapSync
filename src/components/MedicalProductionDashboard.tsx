@@ -5684,36 +5684,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         } else if (isMonthlyFixed) {
                                           showRepasseCard = false;
                                         } else {
-                                        const mainCandidates2 = patient.procedures.filter((proc: any) => (typeof proc.registration_instrument === 'string' ? proc.registration_instrument.includes('03') : false) && (proc.cbo !== '225151'))
-                                        let mainProc2 = mainCandidates2.length > 0 ? mainCandidates2[0] : null
-                                        if (!mainProc2) {
-                                          const seqSorted2 = patient.procedures
-                                            .filter((x: any) => x.cbo !== '225151' && typeof x.sequence === 'number')
-                                            .sort((a: any, b: any) => (a.sequence || 9999) - (b.sequence || 9999))
-                                          mainProc2 = seqSorted2[0] || null
-                                        }
-                                        if (!mainProc2) {
-                                          mainProc2 = patient.procedures
-                                            .filter((x: any) => x.cbo !== '225151')
-                                            .reduce((max: any, proc: any) => {
-                                              const v = typeof proc.value_reais === 'number' ? proc.value_reais : 0
-                                              const mv = typeof (max && max.value_reais) === 'number' ? max.value_reais : -1
-                                              return v > mv ? proc : max
-                                            }, null as any)
-                                        }
-                                        const calculableProcs = patient.procedures.filter(filterCalculableProcedures)
-                                        const orderedCalculables = [...calculableProcs].sort((a: any, b: any) => {
-                                          if (mainProc2 && a === mainProc2) return -1
-                                          if (mainProc2 && b === mainProc2) return 1
-                                          const sa = typeof a.sequence === 'number' ? a.sequence : 9999
-                                          const sb = typeof b.sequence === 'number' ? b.sequence : 9999
-                                          return sa - sb
-                                        })
-                                        const proceduresWithPayment = orderedCalculables.map((proc: any) => ({
-                                          procedure_code: proc.procedure_code,
-                                          procedure_description: proc.procedure_description,
-                                          value_reais: proc.value_reais || 0,
-                                        }));
+                                          const proceduresWithPayment = patient.procedures
+                                            .filter(filterCalculableProcedures)
+                                            .map((proc: any) => ({
+                                              procedure_code: proc.procedure_code,
+                                              procedure_description: proc.procedure_description,
+                                              value_reais: proc.value_reais || 0,
+                                            }));
                                           
                                           const isGenSurg2 = /cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || '')
                                           const useHon2 = shouldUseHonForHospital(doctor.doctor_info.name, hospitalId, isGenSurg2)
