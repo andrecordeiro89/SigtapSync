@@ -22,6 +22,9 @@ import {
 import { getHonValuesForCode, calculateHonByPosition } from './importers/honCsv'
 import { calculateGynHonPaymentsSync, loadGynHonMap } from './importers/gynXlsx'
 import { calculateUroHonPaymentsSync, loadUroHonMap } from './importers/uroXlsx'
+import { calculateOtoHonPaymentsSync, loadOtoHonMap } from './importers/otoXlsx'
+import { calculateOtoSaoJoseHonPaymentsSync, loadOtoSaoJoseHonMap } from './importers/otoSaoJoseXlsx'
+import { calculateVasHonPaymentsSync, loadVasHonMap } from './importers/vasXlsx'
 
 import { TORAO_TOKUDA_RULES } from './hospitals/toraoTokuda';
 import { HOSPITAL_18_DEZEMBRO_RULES } from './hospitals/hospital18Dezembro';
@@ -127,14 +130,41 @@ export function calculateDoctorPayment(
     };
   }
 
+  const isSaoJose = hospitalKey === 'HOSPITAL_MUNICIPAL_SAO_JOSE'
+
   const hasUroCodes = procedures.some(p => {
     const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
     return /^04\.09\.(0[1-5])\./.test(code);
   });
-  if (hasUroCodes && rule.rules && !rule.fixedPaymentRule) {
+  if (hasUroCodes && rule.rules && !rule.fixedPaymentRule && !isSaoJose) {
     const resUro = calculateUroHonPaymentsSync(procedures);
     if (resUro) return resUro;
     void loadUroHonMap();
+  }
+
+  const hasOtoCodes = procedures.some(p => {
+    const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
+    return /^04\.04\./.test(code);
+  });
+  if (hasOtoCodes && rule.rules && !rule.fixedPaymentRule && isSaoJose) {
+    const resOtoSj = calculateOtoSaoJoseHonPaymentsSync(procedures);
+    if (resOtoSj) return resOtoSj;
+    void loadOtoSaoJoseHonMap();
+  }
+  if (hasOtoCodes && rule.rules && !rule.fixedPaymentRule && !isSaoJose) {
+    const resOto = calculateOtoHonPaymentsSync(procedures);
+    if (resOto) return resOto;
+    void loadOtoHonMap();
+  }
+
+  const hasVasCodes = procedures.some(p => {
+    const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
+    return /^04\.06\./.test(code);
+  });
+  if (hasVasCodes && rule.rules && !rule.fixedPaymentRule) {
+    const resVas = calculateVasHonPaymentsSync(procedures);
+    if (resVas) return resVas;
+    void loadVasHonMap();
   }
 
   // ✅ Regra parametrizada por XLSX Ginecologia (apenas para médicos com regras por procedimento)
@@ -143,7 +173,7 @@ export function calculateDoctorPayment(
     const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
     return /^04\.09\./.test(code);
   });
-  if (hasGynCodes && rule.rules && !rule.fixedPaymentRule) {
+  if (hasGynCodes && rule.rules && !rule.fixedPaymentRule && !isSaoJose) {
     const res = calculateGynHonPaymentsSync(procedures);
     if (res) return res;
     // lazy initialize in background; fallback permanece nas regras do hospital

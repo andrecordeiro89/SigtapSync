@@ -3104,7 +3104,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => setRefreshTick(t => t + 1)}
+                    onClick={() => {
+                      try {
+                        const { invalidateOtoSaoJoseHonMap } = require('../config/doctorPaymentRules/importers/otoSaoJoseXlsx');
+                        if (invalidateOtoSaoJoseHonMap) invalidateOtoSaoJoseHonMap();
+                      } catch {}
+                      setRefreshTick(t => t + 1)
+                    }}
                     className="h-9 px-3 border-black text-black hover:bg-neutral-100"
                   >
                   <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
