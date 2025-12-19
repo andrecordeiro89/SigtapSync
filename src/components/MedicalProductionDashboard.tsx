@@ -247,9 +247,9 @@ const normalizeAihNumber = (s: string | undefined | null): string => {
   return v.replace(/\D/g, '').replace(/^0+/, '')
 }
 
-const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?: Map<string, string>) => {
-  // ✅ SIMPLIFICADO: Usar TODOS os pacientes (sem filtro de data)
-  let patientsForStats = doctorData.patients;
+  const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?: Map<string, string>) => {
+    // ✅ SIMPLIFICADO: Usar TODOS os pacientes (sem filtro de data)
+    let patientsForStats = doctorData.patients;
   if (aihAssignmentMap) {
     const cns = doctorData.doctor_info.cns || 'NO_CNS'
     patientsForStats = patientsForStats.filter(p => {
@@ -318,6 +318,14 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?:
   // 💰 CALCULAR VALOR TOTAL BASEADO NAS REGRAS DE PAGAMENTO ESPECÍFICAS
   let medicalProceduresValue = 0;
   let calculatedPaymentValue = 0;
+  // 🧮 CONTAGEM DE PACIENTES ÚNICOS (independente de nº AIH)
+  const uniquePatientKeys = new Set<string>();
+  for (const p of patientsForStats) {
+    const k = String((p as any).patient_id || (p as any)?.patient_info?.medical_record || '')
+      || `${(p as any)?.patient_info?.name || ''}|${(p as any)?.aih_info?.admission_date || ''}`;
+    if (k) uniquePatientKeys.add(k);
+  }
+  const totalPatientsUnique = uniquePatientKeys.size;
   
   // Calcular valor original de todos os procedimentos médicos (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
   medicalProceduresValue = patientsForStats.reduce((sum, patient) => 
@@ -363,8 +371,8 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?:
     } else {
       // ✅ FIXO POR PACIENTE: Multiplicar pelo número de pacientes
       // Exemplo: RAFAEL LUCENA BASTOS - R$ 450,00 × 31 pacientes = R$ 13.950,00
-      calculatedPaymentValue = fixedPaymentCalculation.calculatedPayment * patientsForStats.length;
-      console.log(`💰 ${doctorData.doctor_info.name}: FIXO POR PACIENTE - R$ ${fixedPaymentCalculation.calculatedPayment.toFixed(2)} × ${patientsForStats.length} pacientes = R$ ${calculatedPaymentValue.toFixed(2)}`);
+      calculatedPaymentValue = fixedPaymentCalculation.calculatedPayment * totalPatientsUnique;
+      console.log(`💰 ${doctorData.doctor_info.name}: FIXO POR PACIENTE - R$ ${fixedPaymentCalculation.calculatedPayment.toFixed(2)} × ${totalPatientsUnique} pacientes únicos = R$ ${calculatedPaymentValue.toFixed(2)}`);
     }
   } else {
     // 2. Verificar regra de percentual
@@ -411,6 +419,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?:
     totalProcedures,
     totalValue,
     totalAIHs: totalAIHsAll,
+    totalPatientsUnique,
     avgTicket,
     approvalRate,
     medicalProceduresValue,
@@ -1392,7 +1401,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       doc.setLineWidth(0.5)
       doc.line(20, yPosition, pageWidth - 20, yPosition)
       const metricY = yPosition + 7
-      const patientsCount = tableData.length
+      const patientsCount = (() => {
+        const uniq: Record<string, true> = {}
+        for (const p of (doctor.patients || []) as any[]) {
+          const key = String(p.patient_id || p?.patient_info?.medical_record || '') || `${p?.patient_info?.name || ''}|${p?.aih_info?.admission_date || ''}`
+          if (key) uniq[key] = true
+        }
+        return Object.keys(uniq).length
+      })()
       doc.setFontSize(10)
       doc.setTextColor(60, 60, 60)
       doc.text('Pacientes:', 20, metricY)
@@ -4250,10 +4266,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   }
                                   return 'Não definido';
                                 })()}</span>
-                              </div>
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">AIHs (relacionadas):</span>
-                                <span className="text-xs font-bold text-indigo-700">{doctorStats.totalAIHs}</span>
                               </div>
                             </div>
 
