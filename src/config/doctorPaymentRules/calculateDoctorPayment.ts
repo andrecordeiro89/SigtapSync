@@ -20,11 +20,12 @@ import {
   formatCurrency
 } from './utils';
 import { getHonValuesForCode, calculateHonByPosition, calculateHonPayments } from './importers/honCsv'
-import { calculateGynHonPaymentsSync, loadGynHonMap } from './importers/gynXlsx'
+import { calculateGynHonPaymentsSync, loadGynHonMap, getGynHonMapSync } from './importers/gynXlsx'
 import { calculateUroHonPaymentsSync, loadUroHonMap, getUroHonMapSync } from './importers/uroXlsx'
 import { calculateOtoHonPaymentsSync, loadOtoHonMap } from './importers/otoXlsx'
 import { calculateOtoSaoJoseHonPaymentsSync, loadOtoSaoJoseHonMap } from './importers/otoSaoJoseXlsx'
 import { calculateVasHonPaymentsSync, loadVasHonMap } from './importers/vasXlsx'
+import { LEAN_MODE } from '../system'
 
 // VBA-first: não usamos regras TS de hospitais; apenas mapas das planilhas
 
@@ -37,13 +38,7 @@ export const ALL_HOSPITAL_RULES: Record<string, HospitalRules> = {};
 // Inicializar cache automaticamente
 initializeRulesCache(ALL_HOSPITAL_RULES);
 
-// 🔍 DEBUG: Verificar estrutura do Hospital Maternidade
-if (typeof window !== 'undefined') {
-  const maternidadeRules = ALL_HOSPITAL_RULES['HOSPITAL_MATERNIDADE_NOSSA_SENHORA_APARECIDA_FRG'];
-  console.log('🏥 [DEBUG] Hospital Maternidade - Médicos cadastrados:', Object.keys(maternidadeRules || {}));
-  console.log('🏥 [DEBUG] INGRID BARRETO PINHEIRO - Regras:', maternidadeRules?.['INGRID BARRETO PINHEIRO']?.rules?.length || 0);
-  console.log('🏥 [DEBUG] Primeira regra INGRID:', maternidadeRules?.['INGRID BARRETO PINHEIRO']?.rules?.[0]);
-}
+// Debug desativado no modo enxuto
 
 // ================================================================
 // FUNÇÃO PRINCIPAL: CALCULAR PAGAMENTO MÉDICO
@@ -54,6 +49,28 @@ export function calculateDoctorPayment(
   procedures: ProcedurePaymentInfo[],
   hospitalId?: string
 ): CalculatedPaymentResult {
+  if (LEAN_MODE) {
+    const processedCsv = calculateHonPayments(procedures);
+    const overrides = new Set<string>(['04.01.02.010-0']);
+    let adjustedTotal = processedCsv.totalPayment;
+    const adjustedProcedures = processedCsv.procedures.map(p => {
+      const codeNorm = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
+      if (overrides.has(codeNorm)) {
+        const hon = getHonValuesForCode(codeNorm);
+        const overridePay = hon ? hon.hon1 : (p.calculatedPayment || 0);
+        if ((p.calculatedPayment || 0) !== overridePay) {
+          adjustedTotal += overridePay - (p.calculatedPayment || 0);
+          return { ...p, calculatedPayment: overridePay, paymentRule: 'CSV HON (override HON1)', isSpecialRule: true } as any;
+        }
+      }
+      return p as any;
+    });
+    return {
+      procedures: adjustedProcedures,
+      totalPayment: adjustedTotal,
+      appliedRule: processedCsv.appliedRule
+    };
+  }
   
   console.log(`\n🔍 [CÁLCULO] Iniciando cálculo para ${doctorName}`);
   console.log(`   📋 Total de procedimentos: ${procedures.length}`);
@@ -110,17 +127,19 @@ export function calculateDoctorPayment(
     void loadVasHonMap();
   }
 
-  // ✅ Regra parametrizada por XLSX Ginecologia (apenas para médicos com regras por procedimento)
-  // Detecta perfil ginecologia por códigos 04.09.xx e aplica HON1..HON5 do arquivo XLSX
-  const hasGynCodes = procedures.some(p => {
-    const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
-    return /^04\.09\./.test(code);
-  });
-  if (hasGynCodes && !isSaoJose) {
-    const res = calculateGynHonPaymentsSync(procedures);
-    if (res && res.totalPayment > 0) return res;
-    // lazy initialize in background; fallback permanece nas regras do hospital
-    void loadGynHonMap();
+  // ✅ Regra parametrizada por XLSX Ginecologia e Obstetrícia
+  // Aplica HON1..HON5 se qualquer procedimento existir no mapa GYN (arquivo XLSX)
+  {
+    const gynMap = getGynHonMapSync();
+    const hasGynMatch = procedures.some(p => {
+      const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
+      return !!gynMap?.has(code);
+    });
+    if (hasGynMatch) {
+      const res = calculateGynHonPaymentsSync(procedures);
+      if (res && res.totalPayment > 0) return res;
+      void loadGynHonMap();
+    }
   }
 
   // Fallback: CSV Cirurgia Geral

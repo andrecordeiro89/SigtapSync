@@ -17,6 +17,7 @@ import { COMMON_PROCEDURE_NAME_RULES } from '../config/commonProcedureNames';
 import { CUSTOM_COMMON_PROCEDURE_NAME_RULES } from '../config/commonProcedureNames.custom';
 import DoctorsSpecialtyComparison from './DoctorsSpecialtyComparison';
 import AnalyticsCharts from './AnalyticsCharts';
+import { LEAN_MODE } from '../config/system';
 
 interface ProcedureHierarchyDashboardProps {
   dateRange?: DateRange;
@@ -820,7 +821,7 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
           <TabsTrigger value="hospitals">Hospitais</TabsTrigger>
           <TabsTrigger value="comparisons">Comparativos</TabsTrigger>
           <TabsTrigger value="common">Nomes Comuns</TabsTrigger>
-          <TabsTrigger value="charts">Gráficos</TabsTrigger>
+          {!LEAN_MODE && (<TabsTrigger value="charts">Gráficos</TabsTrigger>)}
         </TabsList>
 
         <TabsContent value="analytics" className="space-y-4">
@@ -1233,15 +1234,17 @@ const ProcedureHierarchyDashboard: React.FC<ProcedureHierarchyDashboardProps> = 
           />
         </TabsContent>
 
-        <TabsContent value="charts" className="space-y-4">
-          <AnalyticsCharts
-            dateRange={dateRange}
-            doctors={filteredDoctors}
-            specialty={selectedSpecialty}
-            selectedHospitals={selectedHospitals}
-            careCharacter={selectedCareCharacter}
-          />
-        </TabsContent>
+        {!LEAN_MODE && (
+          <TabsContent value="charts" className="space-y-4">
+            <AnalyticsCharts
+              dateRange={dateRange}
+              doctors={filteredDoctors}
+              specialty={selectedSpecialty}
+              selectedHospitals={selectedHospitals}
+              careCharacter={selectedCareCharacter}
+            />
+          </TabsContent>
+        )}
 
         {/* NOME COMUM x MÉDICO x MÉDIA AIH */}
         <TabsContent value="common" className="space-y-4">

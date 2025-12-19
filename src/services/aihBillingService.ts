@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, centavosToReais } from '../lib/supabase';
 import { DateRange } from '../types';
 
 // ===== INTERFACES BASEADAS NAS VIEWS =====
@@ -185,33 +185,54 @@ export class AIHBillingService {
         
         return {
           total_aihs: totalAihs,
-          total_value: totalValue / 100, // Converter centavos para reais
-          avg_value_per_aih: totalAihs > 0 ? (totalValue / 100) / totalAihs : 0,
+          total_value: centavosToReais(totalValue),
+          avg_value_per_aih: totalAihs > 0 ? centavosToReais(totalValue) / totalAihs : 0,
           approved_aihs: approvedAihs,
-          approved_value: approvedValue / 100,
+          approved_value: centavosToReais(approvedValue),
           rejected_aihs: 0,
           rejected_value: 0,
           pending_aihs: totalAihs - approvedAihs,
-          pending_value: (totalValue - approvedValue) / 100,
+          pending_value: centavosToReais(totalValue - approvedValue),
           earliest_date: dateRange.startDate.toISOString(),
           latest_date: dateRange.endDate.toISOString(),
           avg_length_of_stay: 3.5
         };
       }
       
-      // Usar view padrão se não há filtro de data
+      // Sem filtro de data: calcular resumo diretamente da tabela aihs (últimos 12 meses)
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
       const { data, error } = await supabase
-        .from('v_aih_billing_summary')
-        .select('*')
-        .single();
+        .from('aihs')
+        .select('calculated_total_value, processing_status, discharge_date')
+        .gte('discharge_date', twelveMonthsAgo.toISOString())
+        .not('discharge_date', 'is', null);
 
       if (error) {
-        console.error('❌ Erro ao buscar resumo das AIHs:', error);
+        console.error('❌ Erro ao buscar resumo das AIHs (12m):', error);
         return null;
       }
 
-      console.log('✅ Resumo das AIHs obtido:', data);
-      return data;
+      const totalAihs = data?.length || 0;
+      const totalValue = data?.reduce((sum, aih) => sum + (aih.calculated_total_value || 0), 0) || 0;
+      const approvedAihs = data?.filter(aih => aih.processing_status === 'approved' || aih.processing_status === 'matched').length || 0;
+      const approvedValue = data?.filter(aih => aih.processing_status === 'approved' || aih.processing_status === 'matched')
+        .reduce((sum, aih) => sum + (aih.calculated_total_value || 0), 0) || 0;
+
+      return {
+        total_aihs: totalAihs,
+        total_value: centavosToReais(totalValue),
+        avg_value_per_aih: totalAihs > 0 ? centavosToReais(totalValue) / totalAihs : 0,
+        approved_aihs: approvedAihs,
+        approved_value: centavosToReais(approvedValue),
+        rejected_aihs: 0,
+        rejected_value: 0,
+        pending_aihs: totalAihs - approvedAihs,
+        pending_value: centavosToReais(totalValue - approvedValue),
+        earliest_date: twelveMonthsAgo.toISOString(),
+        latest_date: new Date().toISOString(),
+        avg_length_of_stay: 3.5
+      };
     } catch (error) {
       console.error('❌ Erro na consulta do resumo:', error);
       return null;
@@ -232,11 +253,7 @@ export class AIHBillingService {
       
       const { data: aihs, error } = await supabase
         .from('aihs')
-        .select(`
-          hospital_id,
-          hospitals!inner(name),
-          original_value
-        `)
+        .select('hospital_id, original_value')
         .gte('admission_date', twelveMonthsAgo.toISOString())
         .order('created_at', { ascending: false });
 
@@ -255,8 +272,8 @@ export class AIHBillingService {
 
       (aihs || []).forEach((aih: any) => {
         const hospitalId = aih.hospital_id;
-        const hospitalName = aih.hospitals?.name || 'Hospital Desconhecido';
-        const value = (aih.original_value || 0) / 100;
+        const hospitalName = aih.hospital_id;
+        const value = centavosToReais(aih.original_value || 0);
 
         if (!hospitalMap.has(hospitalId)) {
           hospitalMap.set(hospitalId, {
@@ -272,7 +289,25 @@ export class AIHBillingService {
         current.total_value += value;
       });
 
-      const result = Array.from(hospitalMap.values())
+      let result: AIHBillingByHospital[] = Array.from(hospitalMap.values())
+        .map(h => ({
+          hospital_id: h.hospital_id,
+          hospital_name: h.hospital_name,
+          hospital_cnpj: '',
+          total_aihs: h.total_aihs,
+          total_value: h.total_value,
+          avg_value_per_aih: h.total_aihs > 0 ? h.total_value / h.total_aihs : 0,
+          approved_aihs: 0,
+          approved_value: 0,
+          rejected_aihs: 0,
+          rejected_value: 0,
+          pending_aihs: Math.max(0, h.total_aihs - 0),
+          pending_value: 0,
+          avg_length_of_stay: 0,
+          unique_procedures: 0,
+          unique_diagnoses: 0,
+          unique_doctors: 0,
+        }))
         .sort((a, b) => b.total_value - a.total_value);
 
       console.log(`✅ Dados de ${result.length} hospitais obtidos (últimos 12 meses)`);
@@ -318,7 +353,7 @@ export class AIHBillingService {
         
         const date = new Date(aih.admission_date);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const value = (aih.original_value || 0) / 100;
+        const value = centavosToReais(aih.original_value || 0);
 
         if (!monthMap.has(monthKey)) {
           monthMap.set(monthKey, {
@@ -333,8 +368,24 @@ export class AIHBillingService {
         current.total_value += value;
       });
 
-      const result = Array.from(monthMap.values())
-        .sort((a, b) => a.month.localeCompare(b.month));
+      const result: AIHBillingByMonth[] = Array.from(monthMap.values())
+        .sort((a, b) => a.month.localeCompare(b.month))
+        .map(m => ({
+          month: m.month,
+          total_aihs: m.total_aihs,
+          total_value: m.total_value,
+          avg_value_per_aih: m.total_aihs > 0 ? m.total_value / m.total_aihs : 0,
+          approved_aihs: 0,
+          approved_value: 0,
+          rejected_aihs: 0,
+          rejected_value: 0,
+          pending_aihs: Math.max(0, m.total_aihs - 0),
+          pending_value: 0,
+          avg_length_of_stay: 0,
+          unique_hospitals: 0,
+          unique_procedures: 0,
+          unique_doctors: 0,
+        }));
 
       console.log(`✅ Dados de ${result.length} meses obtidos (últimos 12 meses)`);
       return result;
@@ -380,7 +431,7 @@ export class AIHBillingService {
         if (!cns) return;
         
         const name = aih.requesting_physician || 'Médico Desconhecido';
-        const value = (aih.original_value || 0) / 100;
+        const value = centavosToReais(aih.original_value || 0);
 
         if (!doctorMap.has(cns)) {
           doctorMap.set(cns, {
@@ -396,9 +447,30 @@ export class AIHBillingService {
         current.total_value += value;
       });
 
-      const result = Array.from(doctorMap.values())
+      const result: AIHBillingByDoctor[] = Array.from(doctorMap.values())
         .sort((a, b) => b.total_value - a.total_value)
-        .slice(0, limit);
+        .slice(0, limit)
+        .map(d => ({
+          doctor_id: d.doctor_cns,
+          doctor_name: d.doctor_name,
+          doctor_cns: d.doctor_cns,
+          doctor_crm: '',
+          doctor_crm_state: '',
+          doctor_specialty: '',
+          total_aihs: d.total_aihs,
+          total_value: d.total_value,
+          avg_value_per_aih: d.total_aihs > 0 ? d.total_value / d.total_aihs : 0,
+          approved_aihs: 0,
+          approved_value: 0,
+          rejected_aihs: 0,
+          rejected_value: 0,
+          pending_aihs: Math.max(0, d.total_aihs - 0),
+          pending_value: 0,
+          avg_length_of_stay: 0,
+          unique_procedures: 0,
+          unique_diagnoses: 0,
+          unique_hospitals: 0,
+        }));
 
       console.log(`✅ Dados de ${result.length} médicos obtidos (últimos 12 meses)`);
       return result;
@@ -495,7 +567,7 @@ export class AIHBillingService {
         const code = proc.procedure_code;
         if (!code) return;
         
-        const value = (proc.value_charged || 0) / 100;
+        const value = centavosToReais(proc.value_charged || 0);
 
         if (!procedureMap.has(code)) {
           procedureMap.set(code, {
@@ -510,9 +582,28 @@ export class AIHBillingService {
         current.total_value += value;
       });
 
-      const result = Array.from(procedureMap.values())
+      const result: AIHBillingByProcedure[] = Array.from(procedureMap.values())
         .sort((a, b) => b.total_value - a.total_value)
-        .slice(0, effectiveLimit);
+        .slice(0, effectiveLimit)
+        .map(p => ({
+          procedure_code: p.procedure_code,
+          procedure_description: '',
+          total_aihs: 0,
+          total_procedures: p.count,
+          total_value: p.total_value,
+          avg_value_per_aih: 0,
+          approved_aihs: 0,
+          approved_value: 0,
+          rejected_aihs: 0,
+          rejected_value: 0,
+          pending_aihs: 0,
+          pending_value: 0,
+          avg_length_of_stay: 0,
+          unique_specialties: 0,
+          unique_hospitals: 0,
+          unique_doctors: 0,
+          principal_count: undefined,
+        }));
 
       console.log(`✅ Dados de ${result.length} procedimentos obtidos (últimos 12 meses, top ${effectiveLimit})`);
       return result;
@@ -530,18 +621,13 @@ export class AIHBillingService {
     excludeAnesthesia?: boolean
   ): Promise<AIHBillingByProcedure[]> {
     try {
-      let anesthesiaCodes = new Set<string>();
-      if (excludeAnesthesia) {
-        try {
-          const { data: anesthesiaRows } = await supabase
-            .from('sigtap_procedures')
-            .select('code')
-            .ilike('description', '%ANESTES%');
-          (anesthesiaRows || []).forEach(r => {
-            if (r && (r as any).code) anesthesiaCodes.add((r as any).code);
-          });
-        } catch {}
-      }
+      const isAnesthesiaRow = (row: any): boolean => {
+        const cbo = (row.professional_cbo || '').toString();
+        const code = (row.procedure_code || '').toString();
+        if (!excludeAnesthesia) return false;
+        if (cbo === '225151' && !code.startsWith('03') && code !== '04.17.01.001-0') return true;
+        return false;
+      };
 
       const pageSize = 2000;
       let page = 0;
@@ -550,7 +636,7 @@ export class AIHBillingService {
       while (hasMore) {
         let q = supabase
           .from('procedure_records')
-          .select('procedure_code, value_charged, billing_status, aih_id, hospital_id, professional_name, professional_cbo, procedure_date, sequencia')
+          .select('procedure_code, procedure_name, procedure_description, value_charged, billing_status, aih_id, hospital_id, professional_name, professional_cbo, procedure_date, sequencia')
           .order('procedure_date', { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1);
       
@@ -578,6 +664,7 @@ export class AIHBillingService {
 
       const byCode: Record<string, {
         procedure_code: string;
+        description?: string;
         total_value_cents: number;
         count: number;
         aihSet: Set<string>;
@@ -591,10 +678,9 @@ export class AIHBillingService {
 
       for (const row of (data || [])) {
         if (!row.procedure_code) continue;
-        const code = row.procedure_code as string;
-        if (excludeAnesthesia && anesthesiaCodes.has(code)) {
-          continue; // pular linhas de procedimentos de anestesia
-        }
+        const code = (row.procedure_code || '') as string;
+        if (!code) continue;
+        if (isAnesthesiaRow(row)) continue;
         if (!byCode[code]) {
           byCode[code] = {
             procedure_code: code,
@@ -610,6 +696,7 @@ export class AIHBillingService {
           };
         }
         const bucket = byCode[code];
+        bucket.description = bucket.description || (row.procedure_description || row.procedure_name || '');
         const aihId = (row.aih_id || '') as string;
         const hospitalId = (row.hospital_id || '') as string;
         const professionalName = (row.professional_name || '') as string;
@@ -628,46 +715,17 @@ export class AIHBillingService {
         else if (status === 'pending' || status === 'submitted') bucket.pendingAihSet.add(aihId);
       }
 
-      // Buscar descrições dos códigos
       const codes = Object.keys(byCode);
-      let descriptions: Record<string, string> = {};
-      if (codes.length > 0) {
-        const { data: sigtapRows, error: sigtapError } = await supabase
-          .from('sigtap_procedures')
-          .select('code, description')
-          .in('code', codes);
-        if (!sigtapError) {
-          descriptions = (sigtapRows || []).reduce((acc: Record<string, string>, r: any) => {
-            acc[r.code] = r.description;
-            return acc;
-          }, {});
-        }
-        // Fallback: tentar tabela oficial se ainda faltarem descrições
-        const missingCodes = codes.filter(c => !descriptions[c]);
-        if (missingCodes.length > 0) {
-          try {
-            const { data: officialRows } = await supabase
-              .from('sigtap_procedimentos_oficial')
-              .select('code, description')
-              .in('code', missingCodes);
-            (officialRows || []).forEach((r: any) => {
-              if (r && r.code && r.description && !descriptions[r.code]) {
-                descriptions[r.code] = r.description;
-              }
-            });
-          } catch {}
-        }
-      }
 
       // Montar resposta (incluir flag principal com base em sequencia = 1)
       let result: AIHBillingByProcedure[] = codes.map(code => {
         const b = byCode[code];
         const totalAihs = b.aihSet.size;
-        const totalValueReais = Math.round((b.total_value_cents / 100) * 100) / 100;
-        const avgValue = totalAihs > 0 ? Math.round(((b.total_value_cents / 100) / totalAihs) * 100) / 100 : 0;
+        const totalValueReais = Math.round(centavosToReais(b.total_value_cents) * 100) / 100;
+        const avgValue = totalAihs > 0 ? Math.round((centavosToReais(b.total_value_cents) / totalAihs) * 100) / 100 : 0;
         return {
           procedure_code: code,
-          procedure_description: descriptions[code] || '',
+          procedure_description: byCode[code].description || '',
           total_aihs: totalAihs,
           total_procedures: b.count,
           total_value: totalValueReais,
@@ -737,6 +795,35 @@ export class AIHBillingService {
         });
       }
       
+      // Guard de dados: se não houver dados em AIHs e Procedure Records no escopo, retornar estrutura vazia
+      const startISO = dateRange ? new Date(dateRange.startDate.getFullYear(), dateRange.startDate.getMonth(), dateRange.startDate.getDate(), 0, 0, 0, 0).toISOString() : undefined;
+      const endISO = dateRange ? new Date(dateRange.endDate.getFullYear(), dateRange.endDate.getMonth(), dateRange.endDate.getDate(), 23, 59, 59, 999).toISOString() : undefined;
+      const { hasAihsData, hasProcedureRecordsData } = await import('./dataGuard');
+      const [aihsHaveData, procHaveData] = await Promise.all([
+        hasAihsData({ hospitalIds: options?.hospitalIds, startDateISO: startISO, endDateISO: endISO }),
+        hasProcedureRecordsData({ hospitalIds: options?.hospitalIds, startDateISO: startISO, endDateISO: endISO })
+      ]);
+
+      if (!aihsHaveData && !procHaveData) {
+        return {
+          summary: null,
+          byHospital: [],
+          byMonth: [],
+          byDoctor: [],
+          byProcedure: [],
+          byHospitalSpecialty: [],
+          metrics: {
+            totalRevenue: 0,
+            totalAIHs: 0,
+            averageTicket: 0,
+            approvalRate: 0,
+            totalPatients: 0,
+            activeHospitals: 0,
+            activeDoctors: 0
+          }
+        };
+      }
+
       // Buscar todos os dados em paralelo
       // ✅ CORREÇÃO: Usar Promise.allSettled para continuar mesmo se uma view falhar (timeout)
       const results = await Promise.allSettled([
@@ -827,14 +914,14 @@ export class AIHBillingService {
               .reduce((sum, aih: any) => sum + (aih.calculated_total_value || 0), 0);
             filteredSummary = {
               total_aihs: totalAihs,
-              total_value: totalValue / 100,
-              avg_value_per_aih: totalAihs > 0 ? (totalValue / 100) / totalAihs : 0,
+              total_value: centavosToReais(totalValue),
+              avg_value_per_aih: totalAihs > 0 ? centavosToReais(totalValue) / totalAihs : 0,
               approved_aihs: approvedAihs,
-              approved_value: approvedValue / 100,
+              approved_value: centavosToReais(approvedValue),
               rejected_aihs: 0,
               rejected_value: 0,
               pending_aihs: totalAihs - approvedAihs,
-              pending_value: (totalValue - approvedValue) / 100,
+              pending_value: centavosToReais(totalValue - approvedValue),
               earliest_date: dateRange.startDate.toISOString(),
               latest_date: dateRange.endDate.toISOString(),
               avg_length_of_stay: 3.5

@@ -1714,16 +1714,18 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <FileSpreadsheet className="h-4 w-4" />
                   Conferência
                 </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white w-auto min-w-[160px]"
-                  onClick={() => window.dispatchEvent(new Event('mpd:report-simplified'))}
-                  title="Gerar relatório simplificado de pacientes"
-                >
-                  <FileSpreadsheet className="h-4 w-4" />
-                  Simplificado
-                </Button>
+                {false && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white w-auto min-w-[160px]"
+                    onClick={() => window.dispatchEvent(new Event('mpd:report-simplified'))}
+                    title="Gerar relatório simplificado de pacientes"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Simplificado
+                  </Button>
+                )}
                 {false && (
                   <Button
                     variant="default"
@@ -1736,16 +1738,18 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     Importar CSV
                   </Button>
                 )}
-                <Button
-                  type="button"
-                  variant="default"
-                  className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white w-auto min-w-[200px]"
-                  onClick={handleAnesthetistsReport}
-                  title="Gerar relatório de anestesistas (CBO 225151) por CNS e hospital"
-                >
-                  <Stethoscope className="h-4 w-4" />
-                  Relatório Anestesistas
-                </Button>
+                {false && (
+                  <Button
+                    type="button"
+                    variant="default"
+                    className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white w-auto min-w-[200px]"
+                    onClick={handleAnesthetistsReport}
+                    title="Gerar relatório de anestesistas (CBO 225151) por CNS e hospital"
+                  >
+                    <Stethoscope className="h-4 w-4" />
+                    Relatório Anestesistas
+                  </Button>
+                )}
               </div>
             </div>
           </CardContent>

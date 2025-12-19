@@ -14,12 +14,7 @@ import { Button } from "./components/ui/button";
 import { Card, CardContent } from "./components/ui/card";
 import { RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from 'sonner';
-import { viewRefreshService } from './services/viewRefreshService';
-import { loadGynHonMap } from './config/doctorPaymentRules/importers/gynXlsx';
-import { loadUroHonMap } from './config/doctorPaymentRules/importers/uroXlsx';
-import { loadOtoHonMap } from './config/doctorPaymentRules/importers/otoXlsx';
-import { loadOtoSaoJoseHonMap } from './config/doctorPaymentRules/importers/otoSaoJoseXlsx';
-import { loadVasHonMap } from './config/doctorPaymentRules/importers/vasXlsx';
+import { LEAN_MODE } from './config/system';
 
 const queryClient = new QueryClient();
 
@@ -30,11 +25,20 @@ function AppContent() {
   const [showResetOption, setShowResetOption] = useState(false);
 
   useEffect(() => {
-    loadGynHonMap();
-    loadUroHonMap();
-    loadOtoHonMap();
-    loadOtoSaoJoseHonMap();
-    loadVasHonMap();
+    if (!LEAN_MODE) {
+      (async () => {
+        const { loadGynHonMap } = await import('./config/doctorPaymentRules/importers/gynXlsx');
+        const { loadUroHonMap } = await import('./config/doctorPaymentRules/importers/uroXlsx');
+        const { loadOtoHonMap } = await import('./config/doctorPaymentRules/importers/otoXlsx');
+        const { loadOtoSaoJoseHonMap } = await import('./config/doctorPaymentRules/importers/otoSaoJoseXlsx');
+        const { loadVasHonMap } = await import('./config/doctorPaymentRules/importers/vasXlsx');
+        loadGynHonMap();
+        loadUroHonMap();
+        loadOtoHonMap();
+        loadOtoSaoJoseHonMap();
+        loadVasHonMap();
+      })();
+    }
   }, []);
 
   // Contar tempo de loading

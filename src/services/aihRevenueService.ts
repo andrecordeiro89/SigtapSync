@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { supabase, centavosToReais } from '../lib/supabase';
 
 export interface AIHRevenueStats {
   totalRevenue: number;
@@ -68,6 +68,32 @@ export class AIHRevenueService {
       
       // ✅ MODO ADMINISTRADOR: Se hospitalId for "ALL", undefined ou inválido, buscar todos os hospitais
       const isAdminMode = !hospitalId || hospitalId === 'ALL' || hospitalId === 'undefined';
+      // Guard de dados: retornar estrutura vazia se não houver registros
+      const { hasAihsData, hasProcedureRecordsData } = await import('./dataGuard');
+      const hospitalFilter = !isAdminMode ? [hospitalId!] : undefined;
+      const [aihsHaveData, procHaveData] = await Promise.all([
+        hasAihsData({ hospitalIds: hospitalFilter }),
+        hasProcedureRecordsData({ hospitalIds: hospitalFilter })
+      ]);
+      if (!aihsHaveData && !procHaveData) {
+        return {
+          totalRevenue: 0,
+          totalAIHs: 0,
+          averageTicket: 0,
+          averageRevenuePenalty: 0,
+          totalProcedures: 0,
+          approvedProcedures: 0,
+          rejectedProcedures: 0,
+          approvalRate: 0,
+          totalPatients: 0,
+          activeHospitals: 0,
+          revenueByHospital: [],
+          revenueBySpecialty: [],
+          revenueByDoctor: [],
+          processingStats: { pending: 0, completed: 0, rejected: 0 },
+          monthlyTrend: []
+        };
+      }
       
       // BUSCAR DADOS PRINCIPAIS DAS AIHS
       let aihQuery = supabase
@@ -84,15 +110,7 @@ export class AIHRevenueService {
           created_at,
           total_procedures,
           approved_procedures,
-          rejected_procedures,
-          hospitals (
-            id,
-            name
-          ),
-          patients (
-            id,
-            name
-          )
+          rejected_procedures
         `);
 
       if (!isAdminMode) {
@@ -114,19 +132,11 @@ export class AIHRevenueService {
           hospital_id,
           aih_id,
           procedure_code,
-          calculated_value,
-          original_value,
-          approved,
+          value_charged,
           match_status,
           professional_name,
-          cbo,
-          procedure_date,
-          aihs (
-            hospital_id,
-            hospitals (
-              name
-            )
-          )
+          professional_cbo,
+          procedure_date
         `);
 
       if (!isAdminMode) {
@@ -145,17 +155,19 @@ export class AIHRevenueService {
       const procedures = proceduresData || [];
 
       // Totais principais
-      const totalRevenue = aihs.reduce((sum, aih) => 
-        sum + (aih.calculated_total_value || 0), 0) / 100; // Converter de centavos para reais
+      const totalRevenue = centavosToReais(
+        aihs.reduce((sum, aih) => sum + (aih.calculated_total_value || 0), 0)
+      );
 
-      const totalOriginalValue = aihs.reduce((sum, aih) => 
-        sum + (aih.original_value || 0), 0) / 100;
+      const totalOriginalValue = centavosToReais(
+        aihs.reduce((sum, aih) => sum + (aih.original_value || 0), 0)
+      );
 
       const totalAIHs = aihs.length;
       const totalProcedures = procedures.length;
       
-      const approvedProcedures = procedures.filter(p => p.approved === true).length;
-      const rejectedProcedures = procedures.filter(p => p.approved === false).length;
+      const approvedProcedures = procedures.filter(p => p.match_status === 'approved' || p.match_status === 'paid').length;
+      const rejectedProcedures = procedures.filter(p => p.match_status === 'rejected').length;
       
       const approvalRate = totalProcedures > 0 ? (approvedProcedures / totalProcedures) * 100 : 0;
       const averageTicket = totalAIHs > 0 ? totalRevenue / totalAIHs : 0;
@@ -179,9 +191,9 @@ export class AIHRevenueService {
       // FATURAMENTO POR HOSPITAL
       const hospitalRevenueMap = new Map<string, HospitalRevenue>();
       
-             aihs.forEach(aih => {
-         const hospitalId = aih.hospital_id;
-         const hospitalName = (aih.hospitals as any)?.name || 'Hospital não identificado';
+      aihs.forEach(aih => {
+        const hospitalId = aih.hospital_id;
+        const hospitalName = aih.hospital_id;
         
         if (!hospitalRevenueMap.has(hospitalId)) {
           hospitalRevenueMap.set(hospitalId, {
@@ -205,7 +217,7 @@ export class AIHRevenueService {
       // Calcular taxa de aprovação por hospital
       hospitalRevenueMap.forEach((hospitalStats, hospitalId) => {
         const hospitalProcedures = procedures.filter(p => p.hospital_id === hospitalId);
-        const hospitalApproved = hospitalProcedures.filter(p => p.approved === true).length;
+        const hospitalApproved = hospitalProcedures.filter(p => p.match_status === 'approved' || p.match_status === 'paid').length;
         
         hospitalStats.approvalRate = hospitalProcedures.length > 0 ? 
           (hospitalApproved / hospitalProcedures.length) * 100 : 0;
@@ -294,8 +306,9 @@ export class AIHRevenueService {
           return aihDate >= monthStart && aihDate <= monthEnd;
         });
         
-        const monthRevenue = monthAIHs.reduce((sum, aih) => 
-          sum + (aih.calculated_total_value || 0), 0) / 100;
+      const monthRevenue = centavosToReais(
+        monthAIHs.reduce((sum, aih) => sum + (aih.calculated_total_value || 0), 0)
+      );
         
         monthlyTrend.push({
           month: month.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }),

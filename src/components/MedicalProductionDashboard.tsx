@@ -336,7 +336,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?:
   const operaParanaIncrement = doctorCovered 
     ? patientsForStats.reduce((acc, patient) => 
         acc + computeIncrementForProcedures(
-          patient.procedures as any, 
+          (((patient as any).calculable_procedures) || patient.procedures.filter(filterCalculableProcedures)) as any, 
           (patient as any)?.aih_info?.care_character, 
           doctorData.doctor_info.name, 
           hospitalId
@@ -378,7 +378,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?:
       // ✅ USAR REGRAS INDIVIDUAIS POR PROCEDIMENTO
       calculatedPaymentValue = patientsForStats.reduce((totalSum, patient) => {
         // Coletar procedimentos médicos deste paciente (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
-        const patientMedicalProcedures = patient.procedures
+        const patientMedicalProcedures = (((patient as any).calculable_procedures) || patient.procedures.filter(filterCalculableProcedures))
           .filter(proc => 
             isMedicalProcedure(proc.procedure_code) && 
             shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
@@ -392,7 +392,7 @@ const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?:
         
         // Se há procedimentos médicos para este paciente, calcular o valor baseado nas regras
         if (patientMedicalProcedures.length > 0) {
-        const isGeneralSurgery = /cirurg/i.test(doctorData.doctor_info.specialty || '') && /geral/i.test(doctorData.doctor_info.specialty || '')
+        const isGeneralSurgery = /cirurg/i.test(doctorData.doctor_info.name || '') || (/cirurg/i.test(doctorData.doctor_info.specialty || '') && /geral/i.test(doctorData.doctor_info.specialty || ''))
         const useHon = shouldUseHonForHospital(doctorData.doctor_info.name, hospitalId, isGeneralSurgery)
         const paymentCalculation = useHon
           ? calculateHonPayments(patientMedicalProcedures)
@@ -759,6 +759,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const generateGeneralPatientsReport = async () => {
     try {
       const rows: Array<Array<string | number>> = []
+      const allAihIds: Set<string> = new Set()
+      const aihIdsWithProcedures: Set<string> = new Set()
       const header = [
         '#',
         'Prontuário',
@@ -793,6 +795,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           const medicalRecord = p.patient_info?.medical_record || '-'
           const aihRaw = normalizeAih(String(p?.aih_info?.aih_number || '').trim())
           const aih = aihRaw || 'Aguardando geração'
+          const aihKey = String(p?.aih_id || aihRaw || `${patientId}|${p?.aih_info?.admission_date || ''}`)
+          if (aihKey) allAihIds.add(aihKey)
           if (!aihRaw) aihsWithoutNumber++
           const careSpec = (p?.aih_info?.specialty || '').toString()
           const careCharacter = (() => {
@@ -801,7 +805,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           })()
           const disISO = p?.aih_info?.discharge_date || ''
           const disLabel = disISO ? parseISODateToLocal(disISO) : ''
-          const procedures = p.procedures || []
+          // Usar o mesmo filtro da tela para garantir fidelidade
+          const procedures = (p as any).calculable_procedures || (p.procedures || []).filter(filterCalculableProcedures)
           procedures.forEach((proc: any) => {
             const procCode = proc.procedure_code || ''
             const procDesc = proc.procedure_description || proc.sigtap_description || ''
@@ -810,9 +815,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             const procValue = Number(proc.value_reais || 0)
             const baseAih = Number(p.total_value_reais || 0)
             const doctorCovered = isDoctorCoveredForOperaParana(doctorName, card.hospitals?.[0]?.hospital_id)
-            const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0
+            // Calcular incremento com o mesmo conjunto de procedimentos exibidos
+            const increment = doctorCovered ? computeIncrementForProcedures(procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0
             const aihWithIncrements = baseAih + increment
             const pgtAdm = p?.aih_info?.pgt_adm || 'não'
+            aihIdsWithProcedures.add(aihKey)
             rows.push([
               idx++,
               medicalRecord,
@@ -833,15 +840,65 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               formatCurrency(aihWithIncrements)
             ])
           })
+          // Garantir 1 linha por AIH mesmo sem procedimentos calculáveis
+          if (procedures.length === 0) {
+            const doctorCovered = isDoctorCoveredForOperaParana(doctorName, card.hospitals?.[0]?.hospital_id)
+            const increment = doctorCovered ? computeIncrementForProcedures([], p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0
+            const aihWithIncrements = Number(p.total_value_reais || 0) + increment
+            rows.push([
+              idx++,
+              medicalRecord,
+              name,
+              aih,
+              '—',
+              'Sem procedimento calculável no período/filtros',
+              '',
+              disLabel,
+              formatEspecialidade(careSpec),
+              careCharacter,
+              doctorName,
+              hospitalName,
+              p?.aih_info?.pgt_adm || 'não',
+              formatCurrency(0),
+              formatCurrency(Number(p.total_value_reais || 0)),
+              formatCurrency(increment),
+              formatCurrency(aihWithIncrements)
+            ])
+          }
         })
       })
       rows.forEach((row, index) => { row[0] = index + 1 })
       const wb = XLSX.utils.book_new()
       const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
-      ;(ws as any)['!cols'] = [
+      const wsAny: any = ws
+      wsAny['!cols'] = [
         { wch: 5 }, { wch: 15 }, { wch: 35 }, { wch: 18 }, { wch: 20 }, { wch: 45 }, { wch: 16 }, { wch: 16 }, { wch: 25 }, { wch: 22 }, { wch: 30 }, { wch: 35 }, { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 20 }
       ]
       XLSX.utils.book_append_sheet(wb, ws, 'Pacientes')
+
+      // Resumo com reconciliação (tela x relatório)
+      const uniqueKeys: Record<string, true> = {}
+      for (const d of (filteredDoctors || []) as any[]) {
+        for (const p of (d.patients || []) as any[]) {
+          const aihId = String(p.aih_id || '').trim()
+          const aihNumber = String((p?.aih_info?.aih_number || '')).replace(/\D/g, '').replace(/^0+/, '')
+          const key = aihId || aihNumber || `${p.patient_id || ''}|${p?.aih_info?.admission_date || ''}`
+          if (key) uniqueKeys[key] = true
+        }
+      }
+      const totalCardAihs = Object.keys(uniqueKeys).length
+      const totalAihsWithProcedures = aihIdsWithProcedures.size
+      const totalAihsWithoutProcedures = Math.max(0, totalCardAihs - totalAihsWithProcedures)
+      const summaryRows = [
+        ['AIHs (registros únicos) na tela', totalCardAihs],
+        ['AIHs com ao menos 1 procedimento calculável (no relatório)', totalAihsWithProcedures],
+        ['AIHs sem procedimento calculável (não entram no relatório)', totalAihsWithoutProcedures],
+        ['Linhas no relatório (procedimentos)', rows.length]
+      ]
+      const wsSummary = XLSX.utils.aoa_to_sheet([['Resumo'], ...summaryRows])
+      const wsSummaryAny: any = wsSummary
+      wsSummaryAny['!cols'] = [{ wch: 52 }, { wch: 18 }]
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo')
       const fileName = `Relatorio_Pacientes_Procedimentos_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`
       XLSX.writeFile(wb, fileName)
       if (aihsWithoutNumber > 0) toast.success(`Relatório geral gerado! ${aihsWithoutNumber} registro(s) sem AIH incluído(s).`)
@@ -855,6 +912,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const generateConferencePatientsReport = async () => {
     try {
       const rows: Array<Array<string | number>> = []
+      const aihIdsWithProcedures: Set<string> = new Set()
       const header = ['#','Prontuário','Nome do Paciente','Nº AIH','Data Alta (SUS)','Médico','Hospital','Pgt. Administrativo','AIH Seca','Incremento','AIH c/ Incremento']
       let idx = 1
       let totalAIHsFound = 0
@@ -873,7 +931,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           const disLabel = parseISODateToLocal(disISO)
           const baseAih = Number(p.total_value_reais || 0)
           const doctorCovered = isDoctorCoveredForOperaParana(doctorName, card.hospitals?.[0]?.hospital_id)
-          const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0
+          const procedures = (p as any).calculable_procedures || (p.procedures || []).filter(filterCalculableProcedures)
+          if (procedures.length > 0) {
+            aihIdsWithProcedures.add(String(p.aih_id || aihRaw || `${p.patient_id}|${p?.aih_info?.admission_date || ''}`))
+          }
+          const increment = doctorCovered ? computeIncrementForProcedures(procedures as any, p?.aih_info?.care_character, doctorName, card.hospitals?.[0]?.hospital_id) : 0
           const aihWithIncrements = baseAih + increment
           const pgtAdm = p?.aih_info?.pgt_adm || 'não'
           rows.push([idx++, medicalRecord, name, aih, disLabel, doctorName, hospitalName, pgtAdm, formatCurrency(baseAih), formatCurrency(increment), formatCurrency(aihWithIncrements)])
@@ -883,8 +945,32 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       rows.forEach((row, index) => { row[0] = index + 1 })
       const wb = XLSX.utils.book_new()
       const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
-      ;(ws as any)['!cols'] = [{ wch: 5 },{ wch: 15 },{ wch: 35 },{ wch: 18 },{ wch: 16 },{ wch: 30 },{ wch: 35 },{ wch: 20 },{ wch: 18 },{ wch: 18 },{ wch: 20 }]
+      const wsAny: any = ws
+      wsAny['!cols'] = [{ wch: 5 },{ wch: 15 },{ wch: 35 },{ wch: 18 },{ wch: 16 },{ wch: 30 },{ wch: 35 },{ wch: 20 },{ wch: 18 },{ wch: 18 },{ wch: 20 }]
       XLSX.utils.book_append_sheet(wb, ws, 'AIHs')
+      // Resumo com reconciliação (tela x relatório)
+      const uniqueKeys: Record<string, true> = {}
+      for (const d of (filteredDoctors || []) as any[]) {
+        for (const p of (d.patients || []) as any[]) {
+          const aihId = String(p.aih_id || '').trim()
+          const aihNumber = String((p?.aih_info?.aih_number || '')).replace(/\D/g, '').replace(/^0+/, '')
+          const key = aihId || aihNumber || `${p.patient_id || ''}|${p?.aih_info?.admission_date || ''}`
+          if (key) uniqueKeys[key] = true
+        }
+      }
+      const totalCardAihs = Object.keys(uniqueKeys).length
+      const totalAihsWithProcedures = aihIdsWithProcedures.size
+      const totalAihsWithoutProcedures = Math.max(0, totalCardAihs - totalAihsWithProcedures)
+      const summaryRows = [
+        ['AIHs (registros únicos) na tela', totalCardAihs],
+        ['AIHs com ao menos 1 procedimento calculável (no relatório)', totalAihsWithProcedures],
+        ['AIHs sem procedimento calculável (não entram no relatório)', totalAihsWithoutProcedures],
+        ['Linhas no relatório (AIHs)', rows.length]
+      ]
+      const wsSummary = XLSX.utils.aoa_to_sheet([['Resumo'], ...summaryRows])
+      const wsSummaryAny: any = wsSummary
+      wsSummaryAny['!cols'] = [{ wch: 52 }, { wch: 18 }]
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo')
       const fileName = `Relatorio_AIHs_Conferencia_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`
       XLSX.writeFile(wb, fileName)
       if (aihsWithoutNumber > 0) toast.success(`Relatório de conferência gerado! ${aihsWithoutNumber} AIH(s) sem número incluída(s).`)
@@ -1114,14 +1200,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           name = candidate || (name || 'Paciente')
         }
         const procsAll = p.procedures || []
-        const mainCandidates = procsAll.filter((proc: any) => (typeof proc.registration_instrument === 'string' ? proc.registration_instrument.includes('03') : false) && (proc.cbo !== '225151'))
+        const calculable = (p as any).calculable_procedures || procsAll.filter(filterCalculableProcedures)
+        const mainCandidates = calculable.filter((proc: any) => (typeof proc.registration_instrument === 'string' ? proc.registration_instrument.includes('03') : false) && (proc.cbo !== '225151'))
         let mainProc = mainCandidates.length > 0 ? mainCandidates[0] : null
         if (!mainProc) {
-          const seqSorted = procsAll.filter((x: any) => x.cbo !== '225151' && typeof x.sequence === 'number').sort((a: any, b: any) => (a.sequence || 9999) - (b.sequence || 9999))
+          const seqSorted = calculable.filter((x: any) => x.cbo !== '225151' && typeof x.sequence === 'number').sort((a: any, b: any) => (a.sequence || 9999) - (b.sequence || 9999))
           mainProc = seqSorted[0] || null
         }
         if (!mainProc) {
-          mainProc = procsAll.filter((x: any) => x.cbo !== '225151').reduce((max: any, proc: any) => {
+          mainProc = calculable.filter((x: any) => x.cbo !== '225151').reduce((max: any, proc: any) => {
             const v = typeof proc.value_reais === 'number' ? proc.value_reais : 0
             const mv = typeof (max && max.value_reais) === 'number' ? max.value_reais : -1
             return v > mv ? proc : max
@@ -1179,7 +1266,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           ? (apprCompLabel ? `${highlightProd ? '§' : ''}${leftLabel} | ${apprCompLabel}` : `${highlightProd ? '§' : ''}${leftLabel}`)
           : ''
         
-        const proceduresWithPayment = p.procedures
+        const proceduresWithPayment = calculable
           .filter((proc: any) => 
             isMedicalProcedure(proc.procedure_code) && 
             shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
@@ -2458,14 +2545,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       
       console.log(`📊 [FILTERED STATS] Usando SIH remoto: ${totalAIHs} AIHs | R$ ${totalRevenue.toFixed(2)}`);
     } else {
-      // Usar cálculo local tradicional
-      // ✅ CONTAGEM DUPLA: Total de AIHs E Pacientes Únicos
-      totalAIHs = filteredDoctors.reduce((sum, doctor) => sum + doctor.patients.length, 0);
+      // Usar cálculo local com deduplicação por AIH
+      const uniqueAihSet = new Set<string>();
+      filteredDoctors.forEach(doctor => {
+        (doctor.patients || []).forEach((p: any) => {
+          const aihId = String(p.aih_id || '').trim();
+          const aihNumber = String(p?.aih_info?.aih_number || '').replace(/\D/g, '').replace(/^0+/, '');
+          const key = aihId || aihNumber || `${p.patient_id || ''}|${p?.aih_info?.admission_date || ''}`;
+          if (key) uniqueAihSet.add(key);
+        });
+      });
+      totalAIHs = uniqueAihSet.size;
       
       // Coletar todos os procedimentos dos médicos filtrados (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
       const allProcedures = filteredDoctors.flatMap(doctor => 
         doctor.patients.flatMap(patient => 
-          patient.procedures.filter(filterCalculableProcedures)
+          ((patient as any).calculable_procedures || patient.procedures.filter(filterCalculableProcedures))
         )
       );
       
@@ -4351,11 +4446,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           // ✅ CÁLCULOS FINANCEIROS (mesma lógica do relatório geral)
                                           const baseAih = Number(p.total_value_reais || 0);
                                           const doctorCovered = isDoctorCoveredForOperaParana(doctorName, hospitalId);
-                                          const increment = doctorCovered ? computeIncrementForProcedures(p.procedures as any, p?.aih_info?.care_character, doctorName, hospitalId) : 0;
+                                          const procedures = (p as any).calculable_procedures || (p.procedures || []).filter(filterCalculableProcedures);
+                                          const increment = doctorCovered ? computeIncrementForProcedures(procedures as any, p?.aih_info?.care_character, doctorName, hospitalId) : 0;
                                           const aihWithIncrements = baseAih + increment;
                                           
-                                          // ✅ FIX: Mostrar todos os procedimentos da AIH (que já foi filtrada por competência)
-                                          const procedures = p.procedures || [];
+                                          // ✅ FIX: Mostrar os mesmos procedimentos calculáveis usados na tela
                                           if (procedures.length > 0) {
                                             procedures.forEach((proc: any) => {
                                               const procCode = proc.procedure_code || '';
@@ -4449,7 +4544,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         const wb = XLSX.utils.book_new();
                                         const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
                                         // ✅ LARGURAS DAS COLUNAS (atualizado com Instrumento de Registro)
-                                        (ws as any)['!cols'] = [
+                                        const wsAny: any = ws;
+                                        wsAny['!cols'] = [
                                           { wch: 5 },   // #
                                           { wch: 35 },  // Nome do Paciente
                                           { wch: 18 },  // Nº AIH
@@ -4468,6 +4564,27 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           { wch: 20 },  // AIH c/ Incremento
                                         ];
                                         XLSX.utils.book_append_sheet(wb, ws, 'Pacientes');
+                                        // ✅ Resumo por médico
+                                        const uniqueKeys: Record<string, true> = {};
+                                        let aihsWithProcedures = 0;
+                                        for (const p of (doctor.patients || []) as any[]) {
+                                          const aihId = String(p.aih_id || '').trim();
+                                          const aihNumber = String((p?.aih_info?.aih_number || '')).replace(/\D/g, '').replace(/^0+/, '');
+                                          const key = aihId || aihNumber || `${p.patient_id || ''}|${p?.aih_info?.admission_date || ''}`;
+                                          if (key) uniqueKeys[key] = true;
+                                          const calcs = (p as any).calculable_procedures || (p.procedures || []).filter(filterCalculableProcedures);
+                                          if (calcs.length > 0) aihsWithProcedures++;
+                                        }
+                                        const totalCardAihs = Object.keys(uniqueKeys).length;
+                                        const summaryRows = [
+                                          ['AIHs (registros únicos) na tela', totalCardAihs],
+                                          ['AIHs com ≥1 procedimento calculável', aihsWithProcedures],
+                                          ['Linhas no relatório (procedimentos + placeholders)', rows.length],
+                                        ];
+                                        const wsSummary = XLSX.utils.aoa_to_sheet([['Resumo'], ...summaryRows]);
+                                        const wsSummaryAny: any = wsSummary;
+                                        wsSummaryAny['!cols'] = [{ wch: 52 }, { wch: 18 }];
+                                        XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo');
                                         const fileName = `Relatorio_Pacientes_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`;
                                         XLSX.writeFile(wb, fileName);
                                         toast.success('Relatório de pacientes do médico gerado com sucesso!');

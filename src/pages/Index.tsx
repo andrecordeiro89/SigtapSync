@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
 import Landing from '../components/Landing';
 import SigtapImport from '../components/SigtapImport';
@@ -10,6 +10,7 @@ import MedicalStaffDashboard from '../components/MedicalStaffDashboard';
 import ProcedureDebugger from '../components/ProcedureDebugger';
 import SISAIH01Page from '../components/SISAIH01Page';
 import AIHMultiPageTester from '../components/AIHMultiPageTester';
+import { LEAN_MODE } from '../config/system';
  
  
 import { useIsCompact } from '../hooks/use-compact';
@@ -17,6 +18,12 @@ import { useIsCompact } from '../hooks/use-compact';
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const isCompact = useIsCompact();
+
+  useEffect(() => {
+    if (LEAN_MODE && (activeTab === 'aih-multipage-tester' || activeTab === 'aih-upload')) {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab]);
 
   const renderContent = () => {
     switch (activeTab) {

@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { Home, Search, FileUp, Users, BarChart4, Code, Crown, User, LogOut, Settings, Building2, Shield, Eye, UserCheck, Globe, GitCompare } from 'lucide-react';
 import ProfileEditModal from './ProfileEditModal';
+import { LEAN_MODE } from '../config/system';
 
 interface NavigationProps {
   activeTab: string;
@@ -106,6 +107,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
   };
 
   const tabs = getVisibleTabs();
+  const tabsFiltered = LEAN_MODE ? tabs.filter(t => t.id !== 'aih-upload' && t.id !== 'aih-multipage-tester') : tabs;
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -246,7 +248,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
           {/* Tabs de Navegação - Centralizadas e Responsivas */}
           <div className="flex-1 flex justify-center">
             <div className="flex space-x-1 overflow-x-auto max-w-none">
-              {tabs.map((tab) => {
+              {tabsFiltered.map((tab) => {
                 const Icon = tab.icon;
                 const isDeveloper = user?.role === 'developer' || user?.role === 'ti';
                 
@@ -460,7 +462,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
       {/* Navegação Mobile - Tabs Horizontais Compactas */}
       <div className="nav-tabs-mobile sm:hidden border-t border-neutral-200 bg-white">
         <div className="nav-tabs-container flex overflow-x-auto px-3 py-2 space-x-2 scrollbar-hide">
-          {tabs.map((tab) => {
+          {tabsFiltered.map((tab) => {
             const Icon = tab.icon;
             const isDeveloper = user?.role === 'developer' || user?.role === 'ti';
             
