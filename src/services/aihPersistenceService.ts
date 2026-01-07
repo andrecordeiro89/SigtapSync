@@ -4,6 +4,7 @@ import { buildAIHIdempotencyKey } from '../utils/idempotency';
 import { AIH } from '../types';
 import { PatientService, AIHService } from './supabaseService';
 import { formatSigtapCode } from '../utils/formatters';
+import { validateCNS } from '../utils/validation';
 
 // ================================================================
 // UTILIDADES DE CONVERSÃO
@@ -62,6 +63,8 @@ const normalizeCareCharacterStrict = (raw?: any): '1' | '2' => {
     return '1';
   }
 };
+
+const normalizeCNS = (v?: string): string => (v ?? '').replace(/\D/g, '');
 
 export interface AIHPersistenceResult {
   success: boolean;
@@ -694,16 +697,17 @@ export class AIHPersistenceService {
       console.log('🔍 Nome:', aih.nomePaciente);
       console.log('🔍 Nascimento:', aih.nascimento);
       
-      // Procurar por CNS ou nome+data nascimento
       let existingPatient: PatientDB | null = null;
       
-      if (aih.cns && aih.cns.length === 15) {
+      const normalizedCNS = normalizeCNS(aih.cns);
+      const hasValidCNS = normalizedCNS.length === 15 && validateCNS(normalizedCNS);
+      if (hasValidCNS) {
         console.log('🔍 Buscando por CNS...');
         const { data, error } = await supabase
           .from('patients')
           .select('*')
           .eq('hospital_id', hospitalId)
-          .eq('cns', aih.cns);
+          .eq('cns', normalizedCNS);
         
         console.log('📊 Resposta busca por CNS:', { data, error });
         
@@ -715,14 +719,14 @@ export class AIHPersistenceService {
         }
       }
 
-      // Se não encontrou por CNS, procurar por nome + data nascimento
       if (!existingPatient && aih.nomePaciente && aih.nascimento) {
         console.log('🔍 Buscando por nome + nascimento...');
+        const sanitizedName = sanitizePatientName(aih.nomePaciente);
         const { data, error } = await supabase
           .from('patients')
           .select('*')
           .eq('hospital_id', hospitalId)
-          .eq('name', aih.nomePaciente)
+          .eq('name', sanitizedName)
           .eq('birth_date', aih.nascimento);
         
         if (!error && data && data.length > 0) {
@@ -767,12 +771,12 @@ export class AIHPersistenceService {
   private static async createPatientFromAIH(aih: AIH, hospitalId: string): Promise<PatientDB> {
     console.log('👤 Criando novo paciente...', aih.nomePaciente);
     
-    // Preparar dados do paciente COM TODOS OS NOVOS CAMPOS EXPANDIDOS
+    const normalizedCNS = normalizeCNS(aih.cns);
+    const hasValidCNS = normalizedCNS.length === 15 && validateCNS(normalizedCNS);
     const patientData = {
-      id: crypto.randomUUID(),
       hospital_id: hospitalId,
       name: sanitizePatientName(aih.nomePaciente),
-      cns: aih.cns || '',
+      cns: hasValidCNS ? normalizedCNS : '',
       birth_date: aih.nascimento || null,
       gender: (aih.sexo === 'Masculino' ? 'M' : aih.sexo === 'Feminino' ? 'F' : aih.sexo) as 'M' | 'F',
       medical_record: aih.prontuario || null,
@@ -796,7 +800,6 @@ export class AIHPersistenceService {
       nome_responsavel: aih.nomeResponsavel || null, // Novo: nome do responsável
       
       is_active: true,
-      created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
 
@@ -812,11 +815,10 @@ export class AIHPersistenceService {
       responsavel: patientData.nome_responsavel
     });
 
-    // Tentar criar com schema expandido primeiro
     console.log('👤 Tentando criar paciente com schema COMPLETAMENTE expandido...');
     const { data: expandedData, error: expandedError } = await supabase
       .from('patients')
-      .insert([patientData])
+      .upsert([patientData], { onConflict: 'hospital_id,cns' })
       .select()
       .single();
 
@@ -827,17 +829,14 @@ export class AIHPersistenceService {
     } else {
       console.log('⚠️ Erro com schema expandido para paciente, tentando schema básico...', expandedError);
       
-      // Tentar com schema básico (campos obrigatórios apenas)
       console.log('👤 Tentando criar paciente com schema básico...');
       const basicData = {
-        id: patientData.id,
         hospital_id: patientData.hospital_id,
         name: patientData.name,
         cns: patientData.cns,
         birth_date: patientData.birth_date,
         gender: patientData.gender,
         is_active: true,
-        created_at: patientData.created_at,
         updated_at: patientData.updated_at
       };
 
@@ -845,7 +844,7 @@ export class AIHPersistenceService {
 
       const { data: basicPatientData, error: basicError } = await supabase
         .from('patients')
-        .insert([basicData])
+        .upsert([basicData], { onConflict: 'hospital_id,cns' })
         .select()
         .single();
 
@@ -866,9 +865,7 @@ export class AIHPersistenceService {
   private static async updatePatientFromAIH(existingPatient: PatientDB, aih: AIH): Promise<PatientDB> {
     const updates: Partial<PatientDB> = {};
     
-    // Atualizar campos que podem ter mudado
     try {
-      // Corrigir nomes inválidos pré-existentes (ex.: "Procedimento solicitado")
       const extractedName = sanitizePatientName(aih.nomePaciente || '');
       const shouldFixName = (
         !!extractedName &&
@@ -885,6 +882,12 @@ export class AIHPersistenceService {
         updates.name = extractedName;
       }
     } catch {}
+
+    const normalizedCNS = normalizeCNS(aih.cns);
+    const hasValidCNS = normalizedCNS.length === 15 && validateCNS(normalizedCNS);
+    if (hasValidCNS && (!existingPatient.cns || existingPatient.cns.trim() === '')) {
+      updates.cns = normalizedCNS;
+    }
 
     if (aih.endereco && aih.endereco !== existingPatient.address) {
       updates.address = aih.endereco;
@@ -1290,48 +1293,23 @@ export class AIHPersistenceService {
    */
   async savePatient(patientData: PatientData): Promise<any> {
     try {
-      // Primeiro, verificar se paciente já existe (por CNS ou nome+hospital)
-      const { data: existingPatient } = await supabase
+      const normalizedCNS = normalizeCNS(patientData.cns);
+      const hasValidCNS = normalizedCNS.length === 15 && validateCNS(normalizedCNS);
+      const payload = {
+        ...patientData,
+        cns: hasValidCNS ? normalizedCNS : ''
+      };
+      const { data, error } = await supabase
         .from('patients')
-        .select('id')
-        .eq('hospital_id', patientData.hospital_id)
-        .or(`cns.eq.${patientData.cns},and(name.eq.${patientData.name},hospital_id.eq.${patientData.hospital_id})`)
+        .upsert([{
+          ...payload,
+          updated_at: new Date().toISOString()
+        }], { onConflict: 'hospital_id,cns' })
+        .select()
         .single();
-
-      if (existingPatient) {
-        // Atualizar paciente existente
-        const { data, error } = await supabase
-          .from('patients')
-          .update({
-            ...patientData,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingPatient.id)
-          .select()
-          .single();
-
-        if (error) throw error;
-        
-        console.log('✅ Paciente atualizado:', data.name);
-        return data;
-      } else {
-        // Criar novo paciente
-        const { data, error } = await supabase
-          .from('patients')
-          .insert([{
-            ...patientData,
-            id: crypto.randomUUID(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        
-        console.log('✅ Paciente criado:', data.name);
-        return data;
-      }
+      if (error) throw error;
+      console.log('✅ Paciente salvo:', data.name);
+      return data;
     } catch (error) {
       console.error('❌ Erro ao salvar paciente:', error);
       throw error;

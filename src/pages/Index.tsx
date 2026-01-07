@@ -20,7 +20,7 @@ const Index = () => {
   const isCompact = useIsCompact();
 
   useEffect(() => {
-    if (LEAN_MODE && (activeTab === 'aih-multipage-tester' || activeTab === 'aih-upload')) {
+    if (LEAN_MODE && (activeTab === 'aih-upload')) {
       setActiveTab('dashboard');
     }
   }, [activeTab]);

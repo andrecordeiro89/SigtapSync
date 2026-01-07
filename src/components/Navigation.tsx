@@ -107,7 +107,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
   };
 
   const tabs = getVisibleTabs();
-  const tabsFiltered = LEAN_MODE ? tabs.filter(t => t.id !== 'aih-upload' && t.id !== 'aih-multipage-tester') : tabs;
+  const tabsFiltered = LEAN_MODE ? tabs.filter(t => t.id !== 'aih-upload') : tabs;
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
