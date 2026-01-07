@@ -1168,20 +1168,21 @@ const PatientManagement = () => {
     
     return true;
   }).sort((a, b) => {
-    // ✅ Ordenação por updated_at (processados mais recentemente primeiro)
+    const dischargeA = a.discharge_date ? new Date(a.discharge_date).getTime() : 0;
+    const dischargeB = b.discharge_date ? new Date(b.discharge_date).getTime() : 0;
+    if (dischargeA && dischargeB) return dischargeB - dischargeA;
+    if (dischargeA && !dischargeB) return -1;
+    if (!dischargeA && dischargeB) return 1;
+    const admissionA = a.admission_date ? new Date(a.admission_date).getTime() : 0;
+    const admissionB = b.admission_date ? new Date(b.admission_date).getTime() : 0;
+    if (admissionA && admissionB) return admissionB - admissionA;
+    if (admissionA && !admissionB) return -1;
+    if (!admissionA && admissionB) return 1;
     const updatedA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
     const updatedB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-    
-    // Se ambos têm updated_at, ordenar do mais recente para o mais antigo
-    if (updatedA && updatedB) {
-      return updatedB - updatedA;
-    }
-    
-    // Se apenas um tem updated_at, priorizar o que tem
+    if (updatedA && updatedB) return updatedB - updatedA;
     if (updatedA && !updatedB) return -1;
     if (!updatedA && updatedB) return 1;
-    
-    // Fallback: ordenar por created_at se não houver updated_at
     const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
     const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
     return createdB - createdA;

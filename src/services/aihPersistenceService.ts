@@ -1621,7 +1621,8 @@ export class AIHPersistenceService {
         query = query.eq('hospital_id', hospitalId);
       }
       
-      // ✅ Ordenar por updated_at (processados mais recentes primeiro)
+      query = query.order('discharge_date', { ascending: false });
+      query = query.order('admission_date', { ascending: false });
       query = query.order('updated_at', { ascending: false });
 
       // Aplicar filtros
