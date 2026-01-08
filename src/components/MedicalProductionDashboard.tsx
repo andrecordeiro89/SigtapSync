@@ -254,6 +254,7 @@ const normalizeAihNumber = (s: string | undefined | null): string => {
     const cns = doctorData.doctor_info.cns || 'NO_CNS'
     patientsForStats = patientsForStats.filter(p => {
       const key = normalizeAihNumber((p as any)?.aih_info?.aih_number)
+      if (!key) return true
       const assigned = aihAssignmentMap.get(key)
       return assigned === cns
     })
@@ -1094,7 +1095,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         .map((p: any) => normalizeAih(String(p?.aih_info?.aih_number || '').trim()))
         .filter((v: string) => !!v)
       const uniqueAih = Array.from(new Set(allAihNumbers))
-      const totalPatients = uniqueAih.length || (doctor.patients || []).length
+      const totalPatients = dedupPatientsByAIH(doctor.patients || []).length
       if (uniqueAih.length === 0) {
         setSimplifiedValidationStats({ total: totalPatients, approved: 0, notApproved: totalPatients, remote: remoteConfigured })
         return
@@ -4189,7 +4190,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     </div>
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-semibold">
-                                  {doctorStats.totalAIHs} PACIENTES
+                                  {(doctorStats.totalPatientsUnique || doctorStats.totalAIHs)} PACIENTES
                                 </Badge>
                                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-semibold">
                                   {doctorStats.totalProcedures} PROC
