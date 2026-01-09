@@ -247,7 +247,11 @@ const normalizeAihNumber = (s: string | undefined | null): string => {
   return v.replace(/\D/g, '').replace(/^0+/, '')
 }
 
-  const calculateDoctorStats = (doctorData: DoctorWithPatients, aihAssignmentMap?: Map<string, string>) => {
+  const calculateDoctorStats = (
+    doctorData: DoctorWithPatients,
+    aihAssignmentMap?: Map<string, string>,
+    drRange?: { from?: string; to?: string }
+  ) => {
     // ✅ SIMPLIFICADO: Usar TODOS os pacientes (sem filtro de data)
     let patientsForStats = doctorData.patients;
   if (aihAssignmentMap) {
@@ -327,6 +331,36 @@ const normalizeAihNumber = (s: string | undefined | null): string => {
     if (k) uniquePatientKeys.add(k);
   }
   const totalPatientsUnique = uniquePatientKeys.size;
+  
+  // 📄 CONTAGEM ALINHADA AO RELATÓRIO SIMPLIFICADO (uma linha por paciente)
+  const simplifiedReportLineCount = (() => {
+    const list = dedupPatientsByAIH(doctorData.patients || [])
+      .filter((p: any) => {
+        if (aihAssignmentMap) {
+          const cns = doctorData.doctor_info.cns || 'NO_CNS'
+          const key = normalizeAih(String(p?.aih_info?.aih_number || '').trim())
+          if (key) {
+            const assigned = aihAssignmentMap.get(key)
+            if (assigned && assigned !== cns) return false
+          }
+        }
+        if (drRange && (drRange.from || drRange.to)) {
+          try {
+            const dischargeISO = p?.aih_info?.discharge_date || ''
+            const d = dischargeISO ? new Date(dischargeISO) : null
+            const start = drRange.from ? new Date(drRange.from) : null
+            const end = drRange.to ? new Date(drRange.to) : null
+            const endExclusive = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1) : null
+            if (d) {
+              if (start && d < new Date(start.getFullYear(), start.getMonth(), start.getDate())) return false
+              if (endExclusive && d >= endExclusive) return false
+            }
+          } catch {}
+        }
+        return true
+      })
+    return list.length
+  })()
   
   // Calcular valor original de todos os procedimentos médicos (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
   medicalProceduresValue = patientsForStats.reduce((sum, patient) => 
@@ -421,6 +455,7 @@ const normalizeAihNumber = (s: string | undefined | null): string => {
     totalValue,
     totalAIHs: totalAIHsAll,
     totalPatientsUnique,
+    simplifiedReportLineCount,
     avgTicket,
     approvalRate,
     medicalProceduresValue,
@@ -1303,20 +1338,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         }
         patientsWithPayment++
         tableData.push([
+          '', // será preenchido com a numeração após ordenação
           medicalRecord,
           aihNumber || '-',
           name,
           proceduresDisplay,
           dischargeLabel,
           competenciaLabel,
-          approvedLabel,
           formatCurrency(repasseValue)
         ])
       })
 
       tableData.sort((a, b) => {
-        const dateA = a[4] as string
-        const dateB = b[4] as string
+        const dateA = a[5] as string
+        const dateB = b[5] as string
         if (!dateA && !dateB) return 0
         if (!dateA) return 1
         if (!dateB) return -1
@@ -1326,6 +1361,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const db = partsB.length === 3 ? new Date(parseInt(partsB[2]), parseInt(partsB[1]) - 1, parseInt(partsB[0])) : new Date(0)
         return db.getTime() - da.getTime()
       })
+      tableData.forEach((row, idx) => { row[0] = String(idx + 1) })
 
       const doc = new jsPDF('landscape')
       const pageWidth = doc.internal.pageSize.getWidth()
@@ -1424,7 +1460,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       doc.text(formatCurrency(totalRepasse), pageWidth - 20, metricY, { align: 'right' })
       const startY = yPosition + 16
       autoTable(doc, {
-        head: [['Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Comp. Aprovação', 'Homologado (SIH)', 'Valor de Repasse']],
+        head: [['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Comp. Aprovação', 'Valor de Repasse']],
         body: tableData,
         startY,
         theme: 'striped',
@@ -1432,27 +1468,27 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         headStyles: { fillColor: [0, 51, 102], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 2 },
         bodyStyles: { fontSize: 8, textColor: [50, 50, 50], cellPadding: 2 },
         columnStyles: {
-          0: { cellWidth: 24, halign: 'center' },
-          1: { cellWidth: 32, halign: 'center' },
-          2: { cellWidth: 42, halign: 'left' },
-          3: { cellWidth: 62, halign: 'left', fontSize: 7 },
-          4: { cellWidth: 22, halign: 'center' },
-          5: { cellWidth: 28, halign: 'center' },
-          6: { cellWidth: 24, halign: 'center' },
+          0: { cellWidth: 12, halign: 'center' },
+          1: { cellWidth: 24, halign: 'center' },
+          2: { cellWidth: 32, halign: 'center' },
+          3: { cellWidth: 42, halign: 'left' },
+          4: { cellWidth: 62, halign: 'left', fontSize: 7 },
+          5: { cellWidth: 22, halign: 'center' },
+          6: { cellWidth: 28, halign: 'center' },
           7: { cellWidth: 32, halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
         },
         styles: { overflow: 'linebreak', cellPadding: 2, fontSize: 8 },
         margin: { left: 15, right: 15 },
         alternateRowStyles: { fillColor: [245, 245, 245] },
         didParseCell: (data: any) => {
-          if (data.section === 'body' && data.column.index === 5) {
+          if (data.section === 'body' && data.column.index === 6) {
             const t = (data.cell.text || []).join(' ')
             ;(data.cell as any).compText = t
             data.cell.text = ['']
           }
         },
         didDrawCell: (data: any) => {
-          if (data.section === 'body' && data.column.index === 5) {
+          if (data.section === 'body' && data.column.index === 6) {
             const t: string = (data.cell as any).compText || ''
             if (!t) return
             const mark = t.startsWith('§')
@@ -1493,7 +1529,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       doc.setFontSize(9)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(0, 51, 102)
-      doc.text(`Total de Pacientes: ${tableData.length} | Valor Total de Repasse: ${formatCurrency(totalRepasse)}`, pageWidth / 2, lineY + 15, { align: 'center' })
+      doc.text(`Valor Total de Repasse: ${formatCurrency(totalRepasse)}`, pageWidth / 2, lineY + 15, { align: 'center' })
       const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`
       doc.save(fileName)
       toast.success('Relatório PDF gerado com sucesso!')
@@ -2502,7 +2538,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     // Calcular total de procedimentos de anestesistas iniciados em '04' (excluindo cesarianas)
     const totalAnesthetistProcedures04 = doctors.reduce((total, doctor) => {
-      const doctorStats = calculateDoctorStats(doctor, dedupeReport.assignmentMap);
+      const doctorStats = calculateDoctorStats(doctor, dedupeReport.assignmentMap, dischargeDateRange);
       return total + doctorStats.anesthetistProcedures04Count;
     }, 0);
     
@@ -2680,7 +2716,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     
     for (const doctor of filteredDoctors) {
       const key = getDoctorCardKey(doctor);
-      let stats = calculateDoctorStats(doctor, dedupeReport.assignmentMap);
+      let stats = calculateDoctorStats(doctor, dedupeReport.assignmentMap, dischargeDateRange);
       // ✅ Regra especial: quando a fonte SIH remota está ativa e a especialidade é Anestesiologia,
       // zerar os cards financeiros para evitar dupla contagem (pagamento por AIH é tratado separadamente)
       try {
@@ -4190,7 +4226,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     </div>
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-semibold">
-                                  {(doctorStats.totalPatientsUnique || doctorStats.totalAIHs)} PACIENTES
+                                  {doctorStats.simplifiedReportLineCount} PACIENTES
                                 </Badge>
                                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] font-semibold">
                                   {doctorStats.totalProcedures} PROC
@@ -4616,11 +4652,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                      type="button"
                                      onClick={async (e) => {
                                        e.stopPropagation();
-                                       setSelectedDoctorForReport(doctor);
-                                       setSimplifiedValidationOpen(true);
-                                       setSimplifiedValidationLoading(true);
-                                       await validateSimplifiedReport(doctor);
-                                       setSimplifiedValidationLoading(false);
+                                       await generateSimplifiedReport(doctor, false);
                                        return;
                                        try {
                                          // 🖼️ Carregar logo do CIS

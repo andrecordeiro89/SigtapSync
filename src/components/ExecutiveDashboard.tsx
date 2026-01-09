@@ -978,7 +978,25 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           setAihDbCount(typeof data === 'number' ? data : null);
         } else {
           console.warn('⚠️ Falha RPC get_aih_count (exec):', error);
-          setAihDbCount(null);
+          try {
+            let query = supabase.from('aihs').select('id', { count: 'exact', head: true });
+            if (hospitalIds) query = query.in('hospital_id', hospitalIds as any);
+            const comp = (selectedCompetency && selectedCompetency !== 'all' && selectedCompetency.trim() !== '') ? selectedCompetency.trim() : null;
+            if (comp) query = query.eq('competencia', comp);
+            if (careNormalized) query = query.eq('care_character', careNormalized);
+            if (dischargeFrom) query = query.gte('discharge_date', dischargeFrom);
+            if (dischargeTo) query = query.lt('discharge_date', new Date(new Date(dischargeTo).getTime() + 24*60*60*1000).toISOString());
+            const { count, error: countErr } = await query;
+            if (countErr) {
+              console.warn('⚠️ Fallback count (exec) falhou:', countErr);
+              setAihDbCount(null);
+            } else {
+              setAihDbCount(typeof count === 'number' ? count : null);
+            }
+          } catch (fallbackErr) {
+            console.warn('⚠️ Erro fallback count (exec):', fallbackErr);
+            setAihDbCount(null);
+          }
         }
       } catch (e) {
         console.warn('⚠️ Erro RPC get_aih_count (exec):', e);
@@ -1018,7 +1036,30 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             approvalRate: Number(row.approval_rate || 0)
           });
         } else {
-          setAihKpi(null);
+          try {
+            let query = supabase
+              .from('aihs')
+              .select('id, calculated_total_value, approval_status, hospital_id, competencia, care_character, discharge_date');
+            if (hospitalIds) query = query.in('hospital_id', hospitalIds as any);
+            const comp = (selectedCompetency && selectedCompetency !== 'all' && selectedCompetency.trim() !== '') ? selectedCompetency.trim() : null;
+            if (comp) query = query.eq('competencia', comp);
+            if (careNormalized) query = query.eq('care_character', careNormalized);
+            if (dischargeFrom) query = query.gte('discharge_date', dischargeFrom);
+            if (dischargeTo) query = query.lt('discharge_date', new Date(new Date(dischargeTo).getTime() + 24*60*60*1000).toISOString());
+            const { data: rows, error: err2 } = await query;
+            if (err2 || !rows) {
+              setAihKpi(null);
+            } else {
+              const totalAIHs = rows.length;
+              const totalRevenue = rows.reduce((sum: number, r: any) => sum + (Number(r.calculated_total_value || 0)), 0);
+              const averageTicket = totalAIHs > 0 ? totalRevenue / totalAIHs : 0;
+              const approved = rows.filter((r: any) => String(r.approval_status || '').toLowerCase() === 'approved').length;
+              const approvalRate = totalAIHs > 0 ? (approved / totalAIHs) * 100 : 0;
+              setAihKpi({ totalAIHs, totalRevenue, averageTicket, approvalRate });
+            }
+          } catch {
+            setAihKpi(null);
+          }
         }
       } catch {
         setAihKpi(null);
