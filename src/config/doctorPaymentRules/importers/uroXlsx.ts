@@ -139,12 +139,19 @@ export const calculateUroHonPaymentsSync = (procedures: ProcedurePaymentInfo[]):
     const hon = map.get(codeNorm) || null
     if (!(isExcluded || isDuplicate) && hon) pos++
     const base =
-      !hon ? 0 :
-      idx <= 0 ? hon.hon1 :
-      idx === 1 ? hon.hon2 :
-      idx === 2 ? hon.hon3 :
-      idx === 3 ? hon.hon4 :
-      hon.hon5
+      codeNorm === '04.09.01.017-0'
+        ? (idx <= 0 ? 250 : 100)
+        : !hon
+          ? 0
+          : idx <= 0
+            ? hon.hon1
+            : idx === 1
+              ? hon.hon2
+              : idx === 2
+                ? hon.hon3
+                : idx === 3
+                  ? hon.hon4
+                  : hon.hon5
     const pay = (isExcluded || isDuplicate) ? 0 : base
     if (!isExcluded && !isDuplicate && hon) paidCodes.add(codeNorm)
     total += pay

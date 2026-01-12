@@ -71,7 +71,11 @@ export function calculateDoctorPayment(
   const isSaoJose = hospitalKey === 'HOSPITAL_MUNICIPAL_SAO_JOSE'
 
   // 🧩 REGRAS ESPECÍFICAS POR PROFISSIONAL (HOSPITAL SÃO JOSÉ)
-  if (isSaoJose) {
+  const hasOtoCodesInProcedures = procedures.some(p => {
+    const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code
+    return /^04\.04\./.test(code)
+  })
+  if (isSaoJose && hasOtoCodesInProcedures) {
     const hospitalRules = ALL_HOSPITAL_RULES[hospitalKey] || {}
     const indiv = hospitalRules[doctorNameUpper]
     if (indiv && (indiv.rules?.length || indiv.multipleRules?.length || indiv.multipleRule)) {
@@ -142,6 +146,31 @@ export function calculateDoctorPayment(
       if (total > 0) {
         return { procedures: out, totalPayment: total, appliedRule: `Regras específicas - ${hospitalKey}` }
       }
+    }
+  }
+
+  {
+    const norm = (c: string) => c.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || c
+    const codes = procedures.filter(p => p.cbo !== '225151').map(p => norm(p.procedure_code))
+    const hasUreterolito = codes.includes('04.09.01.059-6')
+    const hasLitotripsia = codes.includes('04.09.01.018-9')
+    const hasCateter = codes.includes('04.09.01.017-0')
+    if (hasUreterolito && hasLitotripsia && !hasCateter) {
+      let total = 1100
+      const out = procedures.map(p => ({
+        ...p,
+        calculatedPayment: 0,
+        paymentRule: 'URO COMBO (LITOTRIPSIA + URETEROLITOTRIPSIA)',
+        isSpecialRule: true
+      }))
+      const idx = out.findIndex(o => {
+        const code = norm(o.procedure_code)
+        return code === '04.09.01.018-9' || code === '04.09.01.059-6'
+      })
+      if (idx >= 0) {
+        out[idx] = { ...out[idx], calculatedPayment: total }
+      }
+      return { procedures: out, totalPayment: total, appliedRule: 'URO COMBO 1100' }
     }
   }
 
