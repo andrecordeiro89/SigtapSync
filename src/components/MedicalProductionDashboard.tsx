@@ -738,6 +738,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   useEffect(() => {
     try { localStorage.setItem('useSihSource', 'false') } catch {}
   }, [])
+  const [zeroRepasseOpen, setZeroRepasseOpen] = useState<boolean>(false)
+  const [zeroRepasseItems, setZeroRepasseItems] = useState<Array<{ medicalRecord: string; aihNumber: string; name: string; procedures: string; discharge: string }>>([])
+  const [zeroRepasseDoctorName, setZeroRepasseDoctorName] = useState<string>('')
   useEffect(() => {
     try { 
       localStorage.setItem('useSihSource', useSihSource ? 'true' : 'false') 
@@ -2351,6 +2354,75 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       calculated: true
     }));
   }, [patientsWithoutPaymentCache]);
+
+  const openZeroRepasseModal = React.useCallback(async (doctor: DoctorWithPatients) => {
+    try {
+      const hospitalId = doctor.hospitals?.[0]?.hospital_id
+      const normalizeAih = (s: string) => String(s || '').replace(/\D/g, '').replace(/^0+/, '')
+      const items: Array<{ medicalRecord: string; aihNumber: string; name: string; procedures: string; discharge: string }> = []
+      const localMap = sigtapMap
+      for (const p of (doctor.patients || []) as any[]) {
+        const medicalRecord = p?.patient_info?.medical_record || '-'
+        const aihNumber = normalizeAih(p?.aih_info?.aih_number)
+        const dischargeISO = p?.aih_info?.discharge_date || ''
+        const discharge = parseISODateToLocal(dischargeISO)
+        let name = p?.patient_info?.name || 'Paciente'
+        const procsAll = p.procedures || []
+        const calculable = (p as any).calculable_procedures || procsAll.filter(filterCalculableProcedures)
+        const medicalSorted = calculable
+          .filter((x: any) => isMedicalProcedure(x.procedure_code) && shouldCalculateAnesthetistProcedure(x.cbo, x.procedure_code))
+          .sort((a: any, b: any) => {
+            const sa = typeof a.sequence === 'number' ? a.sequence : 9999
+            const sb = typeof b.sequence === 'number' ? b.sequence : 9999
+            if (sa !== sb) return sa - sb
+            const va = typeof a.value_reais === 'number' ? a.value_reais : 0
+            const vb = typeof b.value_reais === 'number' ? b.value_reais : 0
+            return vb - va
+          })
+        const labels = medicalSorted.slice(0, 3).map((m: any) => {
+          const code = m.procedure_code || ''
+          const digits = code.replace(/\D/g, '')
+          const descFallback = code && localMap ? ((localMap.get(code) || localMap.get(digits) || '') as string) : ''
+          const desc = ((m.procedure_description || m.sigtap_description || descFallback || '') as string).trim()
+          return desc || (code ? `Procedimento ${code}` : 'Procedimento')
+        })
+        const proceduresLabel = labels.length > 0 ? labels.join(' + ') : 'Sem procedimento principal'
+        let repasseValue = 0
+        if (medicalSorted.length > 0) {
+          const doctorName = doctor.doctor_info?.name || ''
+          const isGenSurg = /cirurg/i.test(doctorName) || (/cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || ''))
+          const paymentResult = (shouldUseHonForHospital(doctorName, hospitalId, !!isGenSurg)
+            ? calculateHonPayments(medicalSorted.map((proc: any) => ({ procedure_code: proc.procedure_code, value_reais: proc.value_reais || 0, cbo: proc.cbo })))
+            : calculateDoctorPayment(doctorName, medicalSorted.map((proc: any) => ({ procedure_code: proc.procedure_code, value_reais: proc.value_reais || 0, cbo: proc.cbo })), hospitalId))
+          repasseValue = paymentResult.totalPayment || 0
+        }
+        if (repasseValue === 0) {
+          items.push({ medicalRecord, aihNumber: aihNumber || '-', name, procedures: proceduresLabel, discharge })
+        }
+      }
+      setZeroRepasseDoctorName(doctor.doctor_info?.name || '')
+      setZeroRepasseItems(items)
+      setZeroRepasseOpen(true)
+    } catch {}
+  }, [sigtapMap])
+
+  const exportZeroRepasseExcel = React.useCallback(() => {
+    const header = ['Prontuário', 'Nº AIH', 'Nome', 'Procedimentos', 'Data Alta']
+    const rows = zeroRepasseItems.map(it => [it.medicalRecord, it.aihNumber, it.name, it.procedures, it.discharge])
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
+    const wsAny: any = ws
+    wsAny['!cols'] = [
+      { wch: 14 },
+      { wch: 18 },
+      { wch: 30 },
+      { wch: 50 },
+      { wch: 12 }
+    ]
+    XLSX.utils.book_append_sheet(wb, ws, 'Sem Repasse')
+    const fileName = `Sem_Repasse_${(zeroRepasseDoctorName || 'Medico').replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`
+    XLSX.writeFile(wb, fileName)
+  }, [zeroRepasseItems, zeroRepasseDoctorName])
 
   // ✅ TOGGLE EXPANDIR PACIENTE
   const togglePatientExpansion = (patientKey: string) => {
@@ -4185,7 +4257,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                   if (cached && cached.calculated && doctor.patients && doctor.patients.length > 0) {
                                     if (cached.count > 0) {
                                       return (
-                                        <Badge variant="destructive" className="text-[10px] font-semibold">
+                                        <Badge variant="destructive" className="text-[10px] font-semibold cursor-pointer" onClick={() => openZeroRepasseModal(doctor)}>
                                           <AlertCircle className="h-3 w-3 mr-1" />
                                           {cached.count} sem repasse
                                         </Badge>
@@ -6508,6 +6580,43 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         </DialogContent>
   </Dialog>
 
+      <Dialog open={zeroRepasseOpen} onOpenChange={setZeroRepasseOpen}>
+        <DialogContent className="max-w-5xl w-[90vw]">
+          <DialogHeader>
+            <DialogTitle>Pacientes sem repasse – {zeroRepasseDoctorName}</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-end mb-3">
+            <Button onClick={exportZeroRepasseExcel} className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white h-8 px-3 rounded-md text-xs">
+              <FileSpreadsheet className="h-3 w-3" />
+              Exportar Excel
+            </Button>
+          </div>
+          <div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-gray-600">
+                  <th className="text-left p-2">Prontuário</th>
+                  <th className="text-left p-2">Nº AIH</th>
+                  <th className="text-left p-2">Nome</th>
+                  <th className="text-left p-2">Procedimentos</th>
+                  <th className="text-left p-2">Data Alta</th>
+                </tr>
+              </thead>
+              <tbody>
+                {zeroRepasseItems.map((it, idx) => (
+                  <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
+                    <td className="p-2">{it.medicalRecord}</td>
+                    <td className="p-2">{it.aihNumber}</td>
+                    <td className="p-2">{it.name}</td>
+                    <td className="p-2">{it.procedures}</td>
+                    <td className="p-2">{it.discharge}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={simplifiedValidationOpen} onOpenChange={setSimplifiedValidationOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
