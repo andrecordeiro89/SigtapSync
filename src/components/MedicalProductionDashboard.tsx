@@ -389,66 +389,29 @@ const normalizeAihNumber = (s: string | undefined | null): string => {
   // 🎯 CALCULAR SOMA DOS VALORES DO DETALHAMENTO POR PROCEDIMENTO (POR PACIENTE)
   // 🆕 VERIFICAR TIPO DE REGRA: VALOR FIXO → PERCENTUAL → INDIVIDUAL
   
-  // 🔥 1. PRIORIDADE MÁXIMA: Verificar regra de VALOR FIXO primeiro
-  const fixedPaymentCalculation = calculateFixedPayment(doctorData.doctor_info.name, hospitalId);
-  
-  console.log(`🔍 DEBUG MÉDICO: ${doctorData.doctor_info.name} | Hospital ID: ${hospitalId} | Has Fixed Rule: ${fixedPaymentCalculation.hasFixedRule} | Amount: ${fixedPaymentCalculation.calculatedPayment}`);
-  
-  if (fixedPaymentCalculation.hasFixedRule) {
-    // 🔍 VERIFICAR SE É FIXO MENSAL OU FIXO POR PACIENTE
-    const isMonthlyFixed = isFixedMonthlyPayment(doctorData.doctor_info.name, hospitalId, ALL_HOSPITAL_RULES);
-    
-    if (isMonthlyFixed) {
-      // ✅ FIXO MENSAL: Valor fixo UMA VEZ, independente de pacientes
-      // Exemplo: THADEU TIESSI SUZUKI - R$ 47.000,00 fixo mensal
-      calculatedPaymentValue = fixedPaymentCalculation.calculatedPayment;
-      console.log(`💎 ${doctorData.doctor_info.name}: FIXO MENSAL - R$ ${fixedPaymentCalculation.calculatedPayment.toFixed(2)} (${patientsForStats.length} pacientes)`);
-    } else {
-      // ✅ FIXO POR PACIENTE: Multiplicar pelo número de pacientes
-      // Exemplo: RAFAEL LUCENA BASTOS - R$ 450,00 × 31 pacientes = R$ 13.950,00
-      calculatedPaymentValue = fixedPaymentCalculation.calculatedPayment * totalPatientsUnique;
-      console.log(`💰 ${doctorData.doctor_info.name}: FIXO POR PACIENTE - R$ ${fixedPaymentCalculation.calculatedPayment.toFixed(2)} × ${totalPatientsUnique} pacientes únicos = R$ ${calculatedPaymentValue.toFixed(2)}`);
+  calculatedPaymentValue = patientsForStats.reduce((totalSum, patient) => {
+    const patientMedicalProcedures = (((patient as any).calculable_procedures) || patient.procedures.filter(filterCalculableProcedures))
+      .filter(proc => 
+        isMedicalProcedure(proc.procedure_code) && 
+        shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+      )
+      .map(proc => ({
+        procedure_code: proc.procedure_code,
+        procedure_description: proc.procedure_description,
+        value_reais: proc.value_reais || 0,
+        cbo: (proc as any).cbo
+      }));
+    if (patientMedicalProcedures.length > 0) {
+      const isGeneralSurgery = /cirurg/i.test(doctorData.doctor_info.name || '') || (/cirurg/i.test(doctorData.doctor_info.specialty || '') && /geral/i.test(doctorData.doctor_info.specialty || ''))
+      const useHon = shouldUseHonForHospital(doctorData.doctor_info.name, hospitalId, isGeneralSurgery)
+      const paymentCalculation = useHon
+        ? calculateHonPayments(patientMedicalProcedures)
+        : calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures, hospitalId);
+      const patientCalculatedSum = paymentCalculation.procedures.reduce((sum, proc) => sum + proc.calculatedPayment, 0);
+      return totalSum + patientCalculatedSum;
     }
-  } else {
-    // 2. Verificar regra de percentual
-    const percentageCalculation = calculatePercentagePayment(doctorData.doctor_info.name, totalValue, hospitalId);
-    
-    if (percentageCalculation.hasPercentageRule) {
-      // ✅ USAR REGRA DE PERCENTUAL SOBRE VALOR TOTAL
-      calculatedPaymentValue = percentageCalculation.calculatedPayment;
-      console.log(`🎯 ${doctorData.doctor_info.name}: ${percentageCalculation.appliedRule}`);
-    } else {
-      // ✅ USAR REGRAS INDIVIDUAIS POR PROCEDIMENTO
-      calculatedPaymentValue = patientsForStats.reduce((totalSum, patient) => {
-        // Coletar procedimentos médicos deste paciente (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
-        const patientMedicalProcedures = (((patient as any).calculable_procedures) || patient.procedures.filter(filterCalculableProcedures))
-          .filter(proc => 
-            isMedicalProcedure(proc.procedure_code) && 
-            shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
-          )
-          .map(proc => ({
-            procedure_code: proc.procedure_code,
-            procedure_description: proc.procedure_description,
-            value_reais: proc.value_reais || 0,
-            cbo: (proc as any).cbo
-          }));
-        
-        // Se há procedimentos médicos para este paciente, calcular o valor baseado nas regras
-        if (patientMedicalProcedures.length > 0) {
-        const isGeneralSurgery = /cirurg/i.test(doctorData.doctor_info.name || '') || (/cirurg/i.test(doctorData.doctor_info.specialty || '') && /geral/i.test(doctorData.doctor_info.specialty || ''))
-        const useHon = shouldUseHonForHospital(doctorData.doctor_info.name, hospitalId, isGeneralSurgery)
-        const paymentCalculation = useHon
-          ? calculateHonPayments(patientMedicalProcedures)
-          : calculateDoctorPayment(doctorData.doctor_info.name, patientMedicalProcedures, hospitalId);
-          // Somar os valores calculados individuais (detalhamento por procedimento)
-          const patientCalculatedSum = paymentCalculation.procedures.reduce((sum, proc) => sum + proc.calculatedPayment, 0);
-          return totalSum + patientCalculatedSum;
-        }
-        
-        return totalSum;
-      }, 0);
-    }
-  }
+    return totalSum;
+  }, 0);
   
   return {
     totalProcedures,
@@ -1167,7 +1130,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
   }
 
-  const generateSimplifiedReport = async (doctor: any, approvedOnly: boolean) => {
+  const generateSimplifiedReport = async (doctor: any, approvedOnly: boolean, excludeZeros?: boolean) => {
     try {
       let logoBase64 = null as string | null
       try {
@@ -1353,16 +1316,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           repasseValue = paymentResult.totalPayment || 0
           totalRepasse += repasseValue
         }
-        patientsWithPayment++
-        tableData.push([
-          '', // será preenchido com a numeração após ordenação
-          medicalRecord,
-          aihNumber || '-',
-          name,
-          proceduresDisplay,
-          dischargeLabel,
-          formatCurrency(repasseValue)
-        ])
+        if (!excludeZeros || repasseValue > 0) {
+          patientsWithPayment++
+          tableData.push([
+            '',
+            medicalRecord,
+            aihNumber || '-',
+            name,
+            proceduresDisplay,
+            dischargeLabel,
+            formatCurrency(repasseValue)
+          ])
+        }
       })
 
       tableData.sort((a, b) => {
@@ -5009,8 +4974,19 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                      className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white shadow-sm h-9 px-3 rounded-md text-sm w-auto min-w-[200px]"
                                    >
                                     <FileSpreadsheet className="h-4 w-4" />
-                                    Relatório Pacientes Simplificado
-                                   </Button>
+                                   Relatório Pacientes Simplificado
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      await generateSimplifiedReport(doctor, false, true);
+                                    }}
+                                    className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white shadow-sm h-9 px-3 rounded-md text-sm w-auto min-w-[200px]"
+                                  >
+                                    <FileSpreadsheet className="h-4 w-4" />
+                                    Relatório Simplificado (Sem Zeros)
+                                  </Button>
                                    {false && (<>
                                    {/* 📋 PROTOCOLO DE ATENDIMENTO APROVADO */}
                                   <Button
