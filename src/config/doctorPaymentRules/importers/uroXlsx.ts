@@ -18,7 +18,7 @@ const toNumber = (raw: any): number => {
 
 const extractCode = (cell: string): string => {
   const s = (cell || '').toString().trim()
-  const m = s.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)
+  const m = s.match(/(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)
   if (m) return m[1]
   const digits = s.replace(/[^0-9]/g, '')
   if (digits.length >= 10) {
@@ -87,11 +87,16 @@ export const loadUroHonMap = async (): Promise<Map<string, HonValues>> => {
         if (!row || row.length < codeIndex + 1) continue
         const code = extractCode(String(row[codeIndex] || ''))
         if (!code) continue
-        const hon1 = h1 >= 0 ? toNumber(row[h1]) : 0
-        const hon2 = h2 >= 0 ? toNumber(row[h2]) : 0
-        const hon3 = h3 >= 0 ? toNumber(row[h3]) : 0
-        const hon4 = h4 >= 0 ? toNumber(row[h4]) : 0
-        const hon5 = h5 >= 0 ? toNumber(row[h5]) : 0
+        const raw1 = h1 >= 0 ? row[h1] : undefined
+        const raw2 = h2 >= 0 ? row[h2] : undefined
+        const raw3 = h3 >= 0 ? row[h3] : undefined
+        const raw4 = h4 >= 0 ? row[h4] : undefined
+        const raw5 = h5 >= 0 ? row[h5] : undefined
+        const hon1 = raw1 != null && String(raw1).trim() !== '' ? toNumber(raw1) : 0
+        const hon2 = (h2 < 0 || raw2 == null || String(raw2).trim() === '') ? hon1 : toNumber(raw2)
+        const hon3 = (h3 < 0 || raw3 == null || String(raw3).trim() === '') ? hon1 : toNumber(raw3)
+        const hon4 = (h4 < 0 || raw4 == null || String(raw4).trim() === '') ? hon1 : toNumber(raw4)
+        const hon5 = (h5 < 0 || raw5 == null || String(raw5).trim() === '') ? hon1 : toNumber(raw5)
         map.set(code, { hon1, hon2, hon3, hon4, hon5 })
       }
       URO_HON_MAP = map
