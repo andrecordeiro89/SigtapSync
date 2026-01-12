@@ -25,6 +25,7 @@ import { calculateUroHonPaymentsSync, loadUroHonMap, getUroHonMapSync } from './
 import { calculateOtoHonPaymentsSync, loadOtoHonMap } from './importers/otoXlsx'
 import { calculateOtoSaoJoseHonPaymentsSync, loadOtoSaoJoseHonMap } from './importers/otoSaoJoseXlsx'
 import { calculateVasHonPaymentsSync, loadVasHonMap } from './importers/vasXlsx'
+import { HOSPITAL_SAO_JOSE_RULES } from './hospitals/hospitalSaoJose'
 
 // VBA-first: não usamos regras TS de hospitais; apenas mapas das planilhas
 
@@ -32,7 +33,9 @@ import { calculateVasHonPaymentsSync, loadVasHonMap } from './importers/vasXlsx'
 // CONSOLIDAR REGRAS DE TODOS OS HOSPITAIS
 // ================================================================
 
-export const ALL_HOSPITAL_RULES: Record<string, HospitalRules> = {};
+export const ALL_HOSPITAL_RULES: Record<string, HospitalRules> = {
+  HOSPITAL_MUNICIPAL_SAO_JOSE: HOSPITAL_SAO_JOSE_RULES
+};
 
 // Inicializar cache automaticamente
 initializeRulesCache(ALL_HOSPITAL_RULES);
@@ -66,6 +69,81 @@ export function calculateDoctorPayment(
   // Particionar procedimentos por especialidade, aplicar apenas regras das planilhas
 
   const isSaoJose = hospitalKey === 'HOSPITAL_MUNICIPAL_SAO_JOSE'
+
+  // 🧩 REGRAS ESPECÍFICAS POR PROFISSIONAL (HOSPITAL SÃO JOSÉ)
+  if (isSaoJose) {
+    const hospitalRules = ALL_HOSPITAL_RULES[hospitalKey] || {}
+    const indiv = hospitalRules[doctorNameUpper]
+    if (indiv && (indiv.rules?.length || indiv.multipleRules?.length || indiv.multipleRule)) {
+      const paidCodes = new Set<string>()
+      let pos = 0
+      const normalize = (c: string) => c.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || c
+      const codesPerformed = procedures
+        .filter(p => p.cbo !== '225151')
+        .map(p => normalize(p.procedure_code))
+      const performedSet = new Set(codesPerformed)
+      let total = 0
+      let out: (ProcedurePaymentInfo & { calculatedPayment: number; paymentRule: string; isSpecialRule: boolean })[] = procedures.map(p => ({
+        ...p,
+        calculatedPayment: 0,
+        paymentRule: 'Sem regra específica',
+        isSpecialRule: true
+      }))
+      // Aplicar regras múltiplas (preferência)
+      let comboApplied = false
+      const applyCombo = (codes: string[], value: number, desc: string) => {
+        // aplicar no primeiro código da combinação, zerar os demais
+        const firstIdx = out.findIndex(o => codes.includes(normalize(o.procedure_code)) && o.cbo !== '225151')
+        if (firstIdx >= 0) {
+          out[firstIdx] = { ...out[firstIdx], calculatedPayment: value, paymentRule: desc, isSpecialRule: true }
+          codes.forEach(c => paidCodes.add(c))
+          comboApplied = true
+        }
+      }
+      if (indiv.multipleRules && indiv.multipleRules.length > 0) {
+        for (const mr of indiv.multipleRules) {
+          const allPresent = mr.codes.every(c => performedSet.has(c))
+          if (allPresent) {
+            applyCombo(mr.codes.map(normalize), mr.totalValue, mr.description || 'Regra múltipla (total)')
+          }
+        }
+      } else if (indiv.multipleRule && indiv.multipleRule.codes?.length) {
+        const allPresent = indiv.multipleRule.codes.every(c => performedSet.has(c))
+        if (allPresent) {
+          applyCombo(indiv.multipleRule.codes.map(normalize), indiv.multipleRule.totalValue, indiv.multipleRule.description || 'Regra múltipla (total)')
+        }
+      }
+      // Aplicar regras individuais com valores por posição
+      const ruleByCode = new Map<string, typeof indiv.rules[number]>()
+      for (const r of (indiv.rules || [])) {
+        ruleByCode.set(r.procedureCode, r)
+      }
+      out = out.map((p) => {
+        const code = normalize(p.procedure_code)
+        const isDup = paidCodes.has(code)
+        const r = ruleByCode.get(code)
+        if (p.cbo === '225151' || isDup || !r) {
+          return { ...p, calculatedPayment: 0, paymentRule: isDup ? 'Duplicado (não pago)' : 'Sem regra específica', isSpecialRule: true }
+        }
+        const idx = pos
+        pos++
+        const base =
+          idx <= 0 ? (r.standardValue ?? 0) :
+          idx === 1 ? (r.secondaryValue ?? r.standardValue ?? 0) :
+          idx === 2 ? (r.tertiaryValue ?? r.secondaryValue ?? r.standardValue ?? 0) :
+          (r.quaternaryValue ?? r.tertiaryValue ?? r.secondaryValue ?? r.standardValue ?? 0)
+        paidCodes.add(code)
+        total += base
+        return { ...p, calculatedPayment: base, paymentRule: r.description || `Regra específica (pos ${idx+1})`, isSpecialRule: true }
+      })
+      if (comboApplied) {
+        total = out.reduce((s, o) => s + (o.calculatedPayment || 0), 0)
+      }
+      if (total > 0) {
+        return { procedures: out, totalPayment: total, appliedRule: `Regras específicas - ${hospitalKey}` }
+      }
+    }
+  }
 
   const uroMap = getUroHonMapSync()
   const hasUroCodes = !!uroMap && procedures.some(p => {
