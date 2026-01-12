@@ -161,5 +161,39 @@ export const calculateOtoSaoJoseHonPaymentsSync = (procedures: ProcedurePaymentI
       isSpecialRule: true
     }
   })
+  const comboSet = new Set<string>([
+    '04.04.01.048-2',
+    '04.04.01.041-5',
+    '04.04.01.002-4',
+    '04.04.01.001-6',
+    '04.04.01.003-2'
+  ])
+  const presentComboKeys = new Set<string>()
+  const comboIndices: number[] = []
+  out.forEach((o, i) => {
+    const codeNorm = o.procedure_code.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)?.[1] || o.procedure_code
+    if (comboSet.has(codeNorm) && o.cbo !== '225151') {
+      if (!presentComboKeys.has(codeNorm)) {
+        presentComboKeys.add(codeNorm)
+        comboIndices.push(i)
+      }
+    }
+  })
+  const comboCount = presentComboKeys.size
+  if (comboCount > 0) {
+    const target = comboCount >= 2 ? 800 : 650
+    let otherSum = 0
+    out.forEach(o => {
+      const codeNorm = o.procedure_code.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)?.[1] || o.procedure_code
+      if (!comboSet.has(codeNorm) && /^04\.04\./.test(codeNorm)) {
+        otherSum += o.calculatedPayment || 0
+      }
+    })
+    const leadPay = Math.max(0, target - otherSum)
+    comboIndices.forEach((idx, j) => {
+      out[idx] = { ...out[idx], calculatedPayment: j === 0 ? leadPay : 0, paymentRule: comboCount >= 2 ? 'OTORRINO COMBO (teto 800)' : 'OTORRINO HON1 (teto 650)', isSpecialRule: true }
+    })
+    total = out.reduce((s, o) => s + (o.calculatedPayment || 0), 0)
+  }
   return { procedures: out, totalPayment: total, appliedRule: 'XLSX Otorrino São José HON1..HON5' }
 }
