@@ -25,7 +25,6 @@ import { calculateUroHonPaymentsSync, loadUroHonMap, getUroHonMapSync } from './
 import { calculateOtoHonPaymentsSync, loadOtoHonMap } from './importers/otoXlsx'
 import { calculateOtoSaoJoseHonPaymentsSync, loadOtoSaoJoseHonMap } from './importers/otoSaoJoseXlsx'
 import { calculateVasHonPaymentsSync, loadVasHonMap } from './importers/vasXlsx'
-import { LEAN_MODE } from '../system'
 
 // VBA-first: não usamos regras TS de hospitais; apenas mapas das planilhas
 
@@ -49,29 +48,6 @@ export function calculateDoctorPayment(
   procedures: ProcedurePaymentInfo[],
   hospitalId?: string
 ): CalculatedPaymentResult {
-  if (LEAN_MODE) {
-    const processedCsv = calculateHonPayments(procedures);
-    const overrides = new Set<string>(['04.01.02.010-0']);
-    let adjustedTotal = processedCsv.totalPayment;
-    const adjustedProcedures = processedCsv.procedures.map(p => {
-      const codeNorm = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
-      if (overrides.has(codeNorm)) {
-        const hon = getHonValuesForCode(codeNorm);
-        const overridePay = hon ? hon.hon1 : (p.calculatedPayment || 0);
-        if ((p.calculatedPayment || 0) !== overridePay) {
-          adjustedTotal += overridePay - (p.calculatedPayment || 0);
-          return { ...p, calculatedPayment: overridePay, paymentRule: 'CSV HON (override HON1)', isSpecialRule: true } as any;
-        }
-      }
-      return p as any;
-    });
-    return {
-      procedures: adjustedProcedures,
-      totalPayment: adjustedTotal,
-      appliedRule: processedCsv.appliedRule
-    };
-  }
-  
   console.log(`\n🔍 [CÁLCULO] Iniciando cálculo para ${doctorName}`);
   console.log(`   📋 Total de procedimentos: ${procedures.length}`);
   console.log(`   🏥 Hospital ID: ${hospitalId || 'não fornecido'}`);

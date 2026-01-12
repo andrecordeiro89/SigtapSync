@@ -25,20 +25,18 @@ function AppContent() {
   const [showResetOption, setShowResetOption] = useState(false);
 
   useEffect(() => {
-    if (!LEAN_MODE) {
-      (async () => {
-        const { loadGynHonMap } = await import('./config/doctorPaymentRules/importers/gynXlsx');
-        const { loadUroHonMap } = await import('./config/doctorPaymentRules/importers/uroXlsx');
-        const { loadOtoHonMap } = await import('./config/doctorPaymentRules/importers/otoXlsx');
-        const { loadOtoSaoJoseHonMap } = await import('./config/doctorPaymentRules/importers/otoSaoJoseXlsx');
-        const { loadVasHonMap } = await import('./config/doctorPaymentRules/importers/vasXlsx');
-        loadGynHonMap();
-        loadUroHonMap();
-        loadOtoHonMap();
-        loadOtoSaoJoseHonMap();
-        loadVasHonMap();
-      })();
-    }
+    (async () => {
+      const { loadGynHonMap } = await import('./config/doctorPaymentRules/importers/gynXlsx');
+      const { loadUroHonMap } = await import('./config/doctorPaymentRules/importers/uroXlsx');
+      const { loadOtoHonMap } = await import('./config/doctorPaymentRules/importers/otoXlsx');
+      const { loadOtoSaoJoseHonMap } = await import('./config/doctorPaymentRules/importers/otoSaoJoseXlsx');
+      const { loadVasHonMap } = await import('./config/doctorPaymentRules/importers/vasXlsx');
+      loadGynHonMap();
+      loadUroHonMap();
+      loadOtoHonMap();
+      loadOtoSaoJoseHonMap();
+      loadVasHonMap();
+    })();
   }, []);
 
   // Contar tempo de loading

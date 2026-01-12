@@ -1,0 +1,34 @@
+[
+  {
+    "CIRURGIAS OTORRINO SUELLEN BAGATIM": "04.04.01.048-2- Septoplastia ",
+    "HON1": 700
+  },
+  {
+    "CIRURGIAS OTORRINO SUELLEN BAGATIM": "04.04.01.041-5 - Turbinectomia ",
+    "HON1": 700
+  },
+  {
+    "CIRURGIAS OTORRINO SUELLEN BAGATIM": "04.04.01.002-4-Amigdalectomia ",
+    "HON1": 700
+  },
+  {
+    "CIRURGIAS OTORRINO SUELLEN BAGATIM": "04.04.01.001-6- Adenoidectomia ",
+    "HON1": 700
+  },
+  {
+    "CIRURGIAS OTORRINO SUELLEN BAGATIM": "04.04.01.003-2- Adenoamigdalectomia",
+    "HON1": 700
+  },
+  {
+    "CIRURGIAS OTORRINO SUELLEN BAGATIM": "04.04.01.048-2- Septoplastia + 04.04.01.041-5 - Turbinectomia",
+    "HON1": 700
+  },
+  {
+    "CIRURGIAS OTORRINO SUELLEN BAGATIM": null,
+    "HON1": null
+  },
+  {
+    "CIRURGIAS OTORRINO SUELLEN BAGATIM": "Combinação de dois ou mais entre os códigos acima (não soma valores individuais)",
+    "HON1": 700
+  }
+]

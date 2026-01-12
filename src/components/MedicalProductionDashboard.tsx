@@ -1438,14 +1438,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       doc.setLineWidth(0.5)
       doc.line(20, yPosition, pageWidth - 20, yPosition)
       const metricY = yPosition + 7
-      const patientsCount = (() => {
-        const uniq: Record<string, true> = {}
-        for (const p of (doctor.patients || []) as any[]) {
-          const key = String(p.patient_id || p?.patient_info?.medical_record || '') || `${p?.patient_info?.name || ''}|${p?.aih_info?.admission_date || ''}`
-          if (key) uniq[key] = true
-        }
-        return Object.keys(uniq).length
-      })()
+      const patientsCount = tableData.length
       doc.setFontSize(10)
       doc.setTextColor(60, 60, 60)
       doc.text('Pacientes:', 20, metricY)
