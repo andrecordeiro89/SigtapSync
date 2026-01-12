@@ -1263,7 +1263,24 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const mainCodeDigits = mainCode.replace(/\D/g, '')
         const descFallback = mainCode && sigtapMap ? ((sigtapMap.get(mainCode) || sigtapMap.get(mainCodeDigits) || '') as string) : ''
         const mainProcDesc = ((mainProc?.procedure_description || mainProc?.sigtap_description || descFallback || '') as string).trim()
-        const proceduresDisplay = mainProcDesc || (mainCode ? `Procedimento ${mainCode}` : 'Sem procedimento principal')
+        const medicalForDisplay = calculable
+          .filter((x: any) => isMedicalProcedure(x.procedure_code) && shouldCalculateAnesthetistProcedure(x.cbo, x.procedure_code))
+          .sort((a: any, b: any) => {
+            const sa = typeof a.sequence === 'number' ? a.sequence : 9999
+            const sb = typeof b.sequence === 'number' ? b.sequence : 9999
+            if (sa !== sb) return sa - sb
+            const va = typeof a.value_reais === 'number' ? a.value_reais : 0
+            const vb = typeof b.value_reais === 'number' ? b.value_reais : 0
+            return vb - va
+          })
+        const labels = medicalForDisplay.slice(0, 2).map((m: any) => {
+          const code = m.procedure_code || ''
+          const digits = code.replace(/\D/g, '')
+          const descFallback2 = code && sigtapMap ? ((sigtapMap.get(code) || sigtapMap.get(digits) || '') as string) : ''
+          const desc = ((m.procedure_description || m.sigtap_description || descFallback2 || '') as string).trim()
+          return desc || (code ? `Procedimento ${code}` : 'Procedimento')
+        })
+        const proceduresDisplay = labels.length > 0 ? labels.join(' + ') : (mainProcDesc || (mainCode ? `Procedimento ${mainCode}` : 'Sem procedimento principal'))
         const dischargeISO = p?.aih_info?.discharge_date || ''
         const dischargeLabel = parseISODateToLocal(dischargeISO)
         if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
@@ -1344,7 +1361,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           name,
           proceduresDisplay,
           dischargeLabel,
-          competenciaLabel,
           formatCurrency(repasseValue)
         ])
       })
@@ -1453,7 +1469,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       doc.text(formatCurrency(totalRepasse), pageWidth - 20, metricY, { align: 'right' })
       const startY = yPosition + 16
       autoTable(doc, {
-        head: [['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimento Principal', 'Data Alta', 'Comp. Aprovação', 'Valor de Repasse']],
+        head: [['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Valor de Repasse']],
         body: tableData,
         startY,
         theme: 'striped',
@@ -1461,53 +1477,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         headStyles: { fillColor: [0, 51, 102], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 2 },
         bodyStyles: { fontSize: 8, textColor: [50, 50, 50], cellPadding: 2 },
         columnStyles: {
-          0: { cellWidth: 12, halign: 'center' },
-          1: { cellWidth: 24, halign: 'center' },
-          2: { cellWidth: 32, halign: 'center' },
-          3: { cellWidth: 42, halign: 'left' },
-          4: { cellWidth: 62, halign: 'left', fontSize: 7 },
-          5: { cellWidth: 22, halign: 'center' },
-          6: { cellWidth: 28, halign: 'center' },
-          7: { cellWidth: 32, halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
+          0: { cellWidth: 'auto', halign: 'center' },
+          1: { cellWidth: 'auto', halign: 'center' },
+          2: { cellWidth: 'auto', halign: 'center' },
+          3: { cellWidth: 'auto', halign: 'left' },
+          4: { cellWidth: 'auto', halign: 'left', fontSize: 7 },
+          5: { cellWidth: 'auto', halign: 'center' },
+          6: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
         },
         styles: { overflow: 'linebreak', cellPadding: 2, fontSize: 8 },
-        margin: { left: 15, right: 15 },
+        margin: { left: 20, right: 20 },
         alternateRowStyles: { fillColor: [245, 245, 245] },
-        didParseCell: (data: any) => {
-          if (data.section === 'body' && data.column.index === 6) {
-            const t = (data.cell.text || []).join(' ')
-            ;(data.cell as any).compText = t
-            data.cell.text = ['']
-          }
-        },
-        didDrawCell: (data: any) => {
-          if (data.section === 'body' && data.column.index === 6) {
-            const t: string = (data.cell as any).compText || ''
-            if (!t) return
-            const mark = t.startsWith('§')
-            const txt = mark ? t.slice(1) : t
-            const parts = txt.split(' | ')
-            const y = data.cell.y + (data.cell.height / 2)
-            if (parts.length === 2) {
-              const left = parts[0]
-              const right = '| ' + parts[1]
-              const totalW = doc.getTextWidth(left + ' ' + right)
-              const xStart = data.cell.x + (data.cell.width / 2) - (totalW / 2)
-              doc.setTextColor(mark ? 200 : 50, mark ? 0 : 50, mark ? 0 : 50)
-              doc.text(left, xStart, y)
-              doc.setTextColor(50, 50, 50)
-              const wLeft = doc.getTextWidth(left + ' ')
-              doc.text(right, xStart + wLeft, y)
-            } else {
-              const totalW = doc.getTextWidth(txt)
-              const xCenter = data.cell.x + (data.cell.width / 2)
-              const xStart = xCenter - (totalW / 2)
-              doc.setTextColor(mark ? 200 : 50, mark ? 0 : 50, mark ? 0 : 50)
-              doc.text(txt, xStart, y)
-            }
-            doc.setTextColor(50, 50, 50)
-          }
-        }
+        
       })
       const finalY = (doc as any).lastAutoTable?.finalY || startY + 50
       const footerBaseY = pageHeight - 20
