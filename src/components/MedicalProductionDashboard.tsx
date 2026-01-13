@@ -389,17 +389,29 @@ const normalizeAihNumber = (s: string | undefined | null): string => {
   // 🎯 CALCULAR SOMA DOS VALORES DO DETALHAMENTO POR PROCEDIMENTO (POR PACIENTE)
   // 🆕 VERIFICAR TIPO DE REGRA: VALOR FIXO → PERCENTUAL → INDIVIDUAL
   
+  // ✅ CORREÇÃO FINAL: Usar EXATAMENTE a mesma lógica do card do paciente
+  // - Usar patient.procedures diretamente (não calculable_procedures)
+  // - Ordenar por sequence e valor (igual ao card)
   calculatedPaymentValue = patientsForStats.reduce((totalSum, patient) => {
-    const patientMedicalProcedures = (((patient as any).calculable_procedures) || patient.procedures.filter(filterCalculableProcedures))
-      .filter(proc => 
+    const patientMedicalProcedures = (patient.procedures || [])
+      .filter((proc: any) => 
         isMedicalProcedure(proc.procedure_code) && 
         shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
       )
-      .map(proc => ({
+      .sort((a: any, b: any) => {
+        // Ordenar por sequence primeiro, depois por valor (decrescente) - IGUAL AO CARD
+        const sa = typeof a.sequence === 'number' ? a.sequence : 9999;
+        const sb = typeof b.sequence === 'number' ? b.sequence : 9999;
+        if (sa !== sb) return sa - sb;
+        const va = typeof a.value_reais === 'number' ? a.value_reais : 0;
+        const vb = typeof b.value_reais === 'number' ? b.value_reais : 0;
+        return vb - va;
+      })
+      .map((proc: any) => ({
         procedure_code: proc.procedure_code,
         procedure_description: proc.procedure_description,
         value_reais: proc.value_reais || 0,
-        cbo: (proc as any).cbo
+        cbo: proc.cbo
       }));
     if (patientMedicalProcedures.length > 0) {
       const isGeneralSurgery = /cirurg/i.test(doctorData.doctor_info.name || '') || (/cirurg/i.test(doctorData.doctor_info.specialty || '') && /geral/i.test(doctorData.doctor_info.specialty || ''))
@@ -1295,11 +1307,22 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           ? (apprCompLabel ? `${highlightProd ? '§' : ''}${leftLabel} | ${apprCompLabel}` : `${highlightProd ? '§' : ''}${leftLabel}`)
           : ''
         
-        const proceduresWithPayment = calculable
+        // ✅ CORREÇÃO FINAL: Usar p.procedures diretamente (IGUAL ao card do paciente)
+        // O card usa patient.procedures, então o relatório deve usar p.procedures
+        const proceduresWithPayment = (p.procedures || [])
           .filter((proc: any) => 
             isMedicalProcedure(proc.procedure_code) && 
             shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
           )
+          .sort((a: any, b: any) => {
+            // Ordenar por sequence primeiro, depois por valor (decrescente)
+            const sa = typeof a.sequence === 'number' ? a.sequence : 9999;
+            const sb = typeof b.sequence === 'number' ? b.sequence : 9999;
+            if (sa !== sb) return sa - sb;
+            const va = typeof a.value_reais === 'number' ? a.value_reais : 0;
+            const vb = typeof b.value_reais === 'number' ? b.value_reais : 0;
+            return vb - va;
+          })
           .map((proc: any) => ({
             procedure_code: proc.procedure_code,
             procedure_description: proc.procedure_description,
@@ -4822,11 +4845,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           
                                           // ✅ NOVO: Calcular valor de repasse (mesma lógica do card)
                                           // ⚠️ CORREÇÃO: Usar MESMO filtro do card (apenas códigos 04.xxx)
+                                          // ✅ CORREÇÃO 2: Ordenar procedimentos por sequence e valor (igual ao card)
                                           const proceduresWithPayment = p.procedures
                                             .filter((proc: any) => 
                                               isMedicalProcedure(proc.procedure_code) && 
                                               shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
                                             )
+                                            .sort((a: any, b: any) => {
+                                              // Ordenar por sequence primeiro, depois por valor (decrescente)
+                                              const sa = typeof a.sequence === 'number' ? a.sequence : 9999;
+                                              const sb = typeof b.sequence === 'number' ? b.sequence : 9999;
+                                              if (sa !== sb) return sa - sb;
+                                              const va = typeof a.value_reais === 'number' ? a.value_reais : 0;
+                                              const vb = typeof b.value_reais === 'number' ? b.value_reais : 0;
+                                              return vb - va;
+                                            })
                                             .map((proc: any) => ({
                                               procedure_code: proc.procedure_code,
                                               procedure_description: proc.procedure_description,
@@ -5880,15 +5913,31 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                         } else if (isMonthlyFixed) {
                                           showRepasseCard = false;
                                         } else {
+                                          // ✅ CORREÇÃO: Usar MESMO filtro do relatório e stats (04.xxx + anestesista)
+                                          // ✅ CORREÇÃO 2: Ordenar procedimentos por sequence e valor (igual ao relatório)
                                           const proceduresWithPayment = patient.procedures
-                                            .filter(filterCalculableProcedures)
+                                            .filter((proc: any) => 
+                                              isMedicalProcedure(proc.procedure_code) && 
+                                              shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+                                            )
+                                            .sort((a: any, b: any) => {
+                                              // Ordenar por sequence primeiro, depois por valor (decrescente)
+                                              const sa = typeof a.sequence === 'number' ? a.sequence : 9999;
+                                              const sb = typeof b.sequence === 'number' ? b.sequence : 9999;
+                                              if (sa !== sb) return sa - sb;
+                                              const va = typeof a.value_reais === 'number' ? a.value_reais : 0;
+                                              const vb = typeof b.value_reais === 'number' ? b.value_reais : 0;
+                                              return vb - va;
+                                            })
                                             .map((proc: any) => ({
                                               procedure_code: proc.procedure_code,
                                               procedure_description: proc.procedure_description,
                                               value_reais: proc.value_reais || 0,
+                                              cbo: proc.cbo,
                                             }));
                                           
-                                          const isGenSurg2 = /cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || '')
+                                          // ✅ CORREÇÃO: Usar MESMA lógica do relatório para isGenSurg
+                                          const isGenSurg2 = /cirurg/i.test(doctor.doctor_info.name || '') || (/cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || ''))
                                           const useHon2 = shouldUseHonForHospital(doctor.doctor_info.name, hospitalId, isGenSurg2)
                                           const paymentResult = useHon2
                                             ? calculateHonPayments(proceduresWithPayment)
