@@ -1239,7 +1239,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             const vb = typeof b.value_reais === 'number' ? b.value_reais : 0
             return vb - va
           })
-        const labels = medicalForDisplay.slice(0, 2).map((m: any) => {
+        // ✅ CORREÇÃO: Mostrar TODOS os procedimentos contemplados (não apenas 2)
+        const labels = medicalForDisplay.map((m: any) => {
           const code = m.procedure_code || ''
           const digits = code.replace(/\D/g, '')
           const descFallback2 = code && sigtapMap ? ((sigtapMap.get(code) || sigtapMap.get(digits) || '') as string) : ''
@@ -1318,6 +1319,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               )
           repasseValue = paymentResult.totalPayment || 0
           totalRepasse += repasseValue
+          
+          // 🔍 DEBUG: Log detalhado para verificar cálculo
+          if (name.includes('CICERO') || proceduresWithPayment.length >= 3) {
+            console.log(`🔍 [DEBUG RELATÓRIO] Paciente: ${name}`)
+            console.log(`   📋 Procedimentos: ${proceduresWithPayment.map(p => p.procedure_code).join(', ')}`)
+            console.log(`   💰 Valor calculado: R$ ${repasseValue.toFixed(2)}`)
+            console.log(`   📝 Regra aplicada: ${paymentResult.appliedRule || 'N/A'}`)
+            paymentResult.procedures.forEach((p, i) => {
+              console.log(`   [${i+1}] ${p.procedure_code}: R$ ${p.calculatedPayment.toFixed(2)} - ${p.paymentRule}`)
+            })
+          }
         }
         if (!excludeZeros || repasseValue > 0) {
           patientsWithPayment++

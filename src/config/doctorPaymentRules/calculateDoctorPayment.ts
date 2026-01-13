@@ -25,16 +25,43 @@ import { calculateUroHonPaymentsSync, loadUroHonMap, getUroHonMapSync } from './
 import { calculateOtoHonPaymentsSync, loadOtoHonMap } from './importers/otoXlsx'
 import { calculateOtoSaoJoseHonPaymentsSync, loadOtoSaoJoseHonMap } from './importers/otoSaoJoseXlsx'
 import { calculateVasHonPaymentsSync, loadVasHonMap } from './importers/vasXlsx'
-import { HOSPITAL_SAO_JOSE_RULES } from './hospitals/hospitalSaoJose'
 
-// VBA-first: não usamos regras TS de hospitais; apenas mapas das planilhas
+// ================================================================
+// IMPORTAÇÃO DE REGRAS DE TODOS OS HOSPITAIS
+// ================================================================
+import { HOSPITAL_SAO_JOSE_RULES } from './hospitals/hospitalSaoJose'
+import { TORAO_TOKUDA_RULES } from './hospitals/toraoTokuda'
+import { HOSPITAL_18_DEZEMBRO_RULES } from './hospitals/hospital18Dezembro'
+import { HOSPITAL_JUAREZ_BARRETO_RULES } from './hospitals/hospitalJuarezBarreto'
+import { HOSPITAL_MATERNIDADE_FRG_RULES } from './hospitals/hospitalMaternidadeFrg'
+import { HOSPITAL_NOSSA_SENHORA_APARECIDA_RULES } from './hospitals/hospitalNossaSenhoraAparecida'
+import { HOSPITAL_SANTA_ALICE_RULES } from './hospitals/hospitalSantaAlice'
 
 // ================================================================
 // CONSOLIDAR REGRAS DE TODOS OS HOSPITAIS
 // ================================================================
 
 export const ALL_HOSPITAL_RULES: Record<string, HospitalRules> = {
-  HOSPITAL_MUNICIPAL_SAO_JOSE: HOSPITAL_SAO_JOSE_RULES
+  // Hospital Municipal São José - Colombo
+  HOSPITAL_MUNICIPAL_SAO_JOSE: HOSPITAL_SAO_JOSE_RULES,
+  
+  // Torao Tokuda - Apucarana
+  TORAO_TOKUDA_APUCARANA: TORAO_TOKUDA_RULES,
+  
+  // Hospital 18 de Dezembro - Arapoti
+  HOSPITAL_18_DEZEMBRO_ARAPOTI: HOSPITAL_18_DEZEMBRO_RULES,
+  
+  // Hospital Juarez Barreto de Macedo
+  HOSPITAL_MUNICIPAL_JUAREZ_BARRETO_MACEDO: HOSPITAL_JUAREZ_BARRETO_RULES,
+  
+  // Hospital Maternidade Nossa Senhora Aparecida - FRG
+  HOSPITAL_MATERNIDADE_NOSSA_SENHORA_APARECIDA_FRG: HOSPITAL_MATERNIDADE_FRG_RULES,
+  
+  // Hospital Nossa Senhora Aparecida - Foz do Iguaçu
+  HOSPITAL_NOSSA_SENHORA_APARECIDA_FOZ: HOSPITAL_NOSSA_SENHORA_APARECIDA_RULES,
+  
+  // Hospital Municipal Santa Alice
+  HOSPITAL_MUNICIPAL_SANTA_ALICE: HOSPITAL_SANTA_ALICE_RULES
 };
 
 // Inicializar cache automaticamente
@@ -64,21 +91,35 @@ export function calculateDoctorPayment(
   console.log(`   👤 Nome do médico (uppercase): "${doctorNameUpper}"`);
   console.log(`   📋 Regime: VBA-first (sem regras TS)`);
 
-  // Sem casos especiais por hospital/médico
-
-  // Particionar procedimentos por especialidade, aplicar apenas regras das planilhas
-
   const isSaoJose = hospitalKey === 'HOSPITAL_MUNICIPAL_SAO_JOSE'
 
-  // 🧩 REGRAS ESPECÍFICAS POR PROFISSIONAL (HOSPITAL SÃO JOSÉ)
-  const hasOtoCodesInProcedures = procedures.some(p => {
-    const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code
-    return /^04\.04\./.test(code)
-  })
-  if (isSaoJose && hasOtoCodesInProcedures) {
+  // ================================================================
+  // 🧩 PRIORIDADE 1: REGRAS ESPECÍFICAS POR MÉDICO/HOSPITAL
+  // Verifica se o médico tem regras específicas cadastradas para o hospital
+  // ================================================================
+  {
     const hospitalRules = ALL_HOSPITAL_RULES[hospitalKey] || {}
     const indiv = hospitalRules[doctorNameUpper]
-    if (indiv && (indiv.rules?.length || indiv.multipleRules?.length || indiv.multipleRule)) {
+    
+    // Se o médico tem regras específicas (individuais ou múltiplas), aplicar
+    if (indiv && (indiv.rules?.length || indiv.multipleRules?.length || indiv.multipleRule || indiv.fixedPaymentRule)) {
+      console.log(`   ✅ Encontrou regras específicas para ${doctorNameUpper} em ${hospitalKey}`)
+      
+      // Verificar se é pagamento fixo mensal
+      if (indiv.fixedPaymentRule) {
+        console.log(`   💰 Pagamento fixo: R$ ${indiv.fixedPaymentRule.amount}`)
+        return {
+          procedures: procedures.map(p => ({
+            ...p,
+            calculatedPayment: 0,
+            paymentRule: indiv.fixedPaymentRule?.description || 'Pagamento fixo',
+            isSpecialRule: true
+          })),
+          totalPayment: indiv.fixedPaymentRule.amount,
+          appliedRule: `Pagamento Fixo - ${hospitalKey}: ${indiv.fixedPaymentRule.description}`
+        }
+      }
+      
       const paidCodes = new Set<string>()
       let pos = 0
       const normalize = (c: string) => c.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || c
@@ -93,10 +134,10 @@ export function calculateDoctorPayment(
         paymentRule: 'Sem regra específica',
         isSpecialRule: true
       }))
+      
       // Aplicar regras múltiplas (preferência)
       let comboApplied = false
       const applyCombo = (codes: string[], value: number, desc: string) => {
-        // aplicar no primeiro código da combinação, zerar os demais
         const firstIdx = out.findIndex(o => codes.includes(normalize(o.procedure_code)) && o.cbo !== '225151')
         if (firstIdx >= 0) {
           out[firstIdx] = { ...out[firstIdx], calculatedPayment: value, paymentRule: desc, isSpecialRule: true }
@@ -104,11 +145,15 @@ export function calculateDoctorPayment(
           comboApplied = true
         }
       }
+      
       if (indiv.multipleRules && indiv.multipleRules.length > 0) {
-        for (const mr of indiv.multipleRules) {
+        // Ordenar por maior número de códigos para priorizar combinações maiores
+        const sortedMultipleRules = [...indiv.multipleRules].sort((a, b) => b.codes.length - a.codes.length)
+        for (const mr of sortedMultipleRules) {
           const allPresent = mr.codes.every(c => performedSet.has(c))
           if (allPresent) {
             applyCombo(mr.codes.map(normalize), mr.totalValue, mr.description || 'Regra múltipla (total)')
+            break // Aplicar apenas a primeira combinação encontrada
           }
         }
       } else if (indiv.multipleRule && indiv.multipleRule.codes?.length) {
@@ -117,11 +162,13 @@ export function calculateDoctorPayment(
           applyCombo(indiv.multipleRule.codes.map(normalize), indiv.multipleRule.totalValue, indiv.multipleRule.description || 'Regra múltipla (total)')
         }
       }
+      
       // Aplicar regras individuais com valores por posição
       const ruleByCode = new Map<string, typeof indiv.rules[number]>()
       for (const r of (indiv.rules || [])) {
         ruleByCode.set(r.procedureCode, r)
       }
+      
       out = out.map((p) => {
         const code = normalize(p.procedure_code)
         const isDup = paidCodes.has(code)
@@ -140,14 +187,20 @@ export function calculateDoctorPayment(
         total += base
         return { ...p, calculatedPayment: base, paymentRule: r.description || `Regra específica (pos ${idx+1})`, isSpecialRule: true }
       })
+      
       if (comboApplied) {
         total = out.reduce((s, o) => s + (o.calculatedPayment || 0), 0)
       }
+      
       if (total > 0) {
         return { procedures: out, totalPayment: total, appliedRule: `Regras específicas - ${hospitalKey}` }
       }
     }
   }
+  
+  // ================================================================
+  // 🧩 PRIORIDADE 2: REGRAS POR ESPECIALIDADE (PLANILHAS VBA)
+  // ================================================================
 
   {
     const norm = (c: string) => c.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || c

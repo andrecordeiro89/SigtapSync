@@ -68,6 +68,11 @@ export const HOSPITAL_MAPPINGS: HospitalMapping[] = [
     id: '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b',
     key: 'HOSPITAL_SM_SANTA_MARIA',
     name: 'Hospital SM - Santa Maria'
+  },
+  {
+    id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+    key: 'TORAO_TOKUDA_APUCARANA',
+    name: 'Hospital Torao Tokuda - Apucarana'
   }
 ];
 

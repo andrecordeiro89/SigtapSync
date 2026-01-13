@@ -689,7 +689,8 @@ export const HOSPITAL_18_DEZEMBRO_RULES: HospitalRules = {
         procedureCode: '04.09.02.007-9',
         standardValue: 250.00,
         secondaryValue: 150.00,
-        description: 'MEATOTOMIA SIMPLES - R$ 250 (Principal) / R$ 150 (Secundário)'
+        tertiaryValue: 175.00,
+        description: 'MEATOTOMIA SIMPLES - R$ 250 (Principal) / R$ 150 (Secundário) / R$ 175 (Terciário)'
       },
       {
         procedureCode: '04.09.03.004-0',
