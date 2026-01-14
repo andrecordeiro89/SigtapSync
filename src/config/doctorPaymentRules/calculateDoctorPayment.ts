@@ -25,6 +25,8 @@ import { calculateUroHonPaymentsSync, loadUroHonMap, getUroHonMapSync } from './
 import { calculateOtoHonPaymentsSync, loadOtoHonMap } from './importers/otoXlsx'
 import { calculateOtoSaoJoseHonPaymentsSync, loadOtoSaoJoseHonMap } from './importers/otoSaoJoseXlsx'
 import { calculateVasHonPaymentsSync, loadVasHonMap } from './importers/vasXlsx'
+import { calculateOrtHonPaymentsSync, loadOrtHonMap, getOrtHonMapSync } from './importers/ortXlsx'
+import { calculateOrtJsonPaymentsSync, loadOrtJsonMap, getOrtJsonMapSync } from './importers/ortJson'
 
 // ================================================================
 // IMPORTAÇÃO DE REGRAS DE TODOS OS HOSPITAIS
@@ -291,6 +293,31 @@ export function calculateDoctorPayment(
     const resVas = calculateVasHonPaymentsSync(procedures);
     if (resVas) return resVas;
     void loadVasHonMap();
+  }
+  
+  {
+    if (hospitalKey !== 'HOSPITAL_NOSSA_SENHORA_APARECIDA_FOZ') {
+      const ortJsonMap = getOrtJsonMapSync();
+      const hasJsonMatch = procedures.some(p => {
+        const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
+        return !!ortJsonMap?.has(code);
+      });
+      if (hasJsonMatch) {
+        const resOrtJson = calculateOrtJsonPaymentsSync(procedures);
+        if (resOrtJson) return resOrtJson;
+        void loadOrtJsonMap();
+      }
+      const ortMap = getOrtHonMapSync();
+      const hasOrtMatch = procedures.some(p => {
+        const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
+        return !!ortMap?.has(code);
+      });
+      if (hasOrtMatch) {
+        const resOrt = calculateOrtHonPaymentsSync(procedures);
+        if (resOrt) return resOrt;
+        void loadOrtHonMap();
+      }
+    }
   }
 
   // ✅ Regra parametrizada por XLSX Ginecologia e Obstetrícia

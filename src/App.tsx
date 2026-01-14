@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import LoginForm from './components/auth/LoginForm';
 import Index from "./pages/Index";
+import DebugDoctor from "./components/DebugDoctor";
 import NotFound from "./pages/NotFound";
 import { Button } from "./components/ui/button";
 import { Card, CardContent } from "./components/ui/card";
@@ -31,11 +32,15 @@ function AppContent() {
       const { loadOtoHonMap } = await import('./config/doctorPaymentRules/importers/otoXlsx');
       const { loadOtoSaoJoseHonMap } = await import('./config/doctorPaymentRules/importers/otoSaoJoseXlsx');
       const { loadVasHonMap } = await import('./config/doctorPaymentRules/importers/vasXlsx');
+      const { loadOrtHonMap } = await import('./config/doctorPaymentRules/importers/ortXlsx');
+      const { loadOrtJsonMap } = await import('./config/doctorPaymentRules/importers/ortJson');
       loadGynHonMap();
       loadUroHonMap();
       loadOtoHonMap();
       loadOtoSaoJoseHonMap();
       loadVasHonMap();
+      loadOrtHonMap();
+      loadOrtJsonMap();
     })();
   }, []);
 
@@ -134,6 +139,7 @@ function AppContent() {
       <ProtectedRoute>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/debug-doctor" element={<DebugDoctor />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </ProtectedRoute>

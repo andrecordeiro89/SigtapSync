@@ -1,0 +1,146 @@
+[
+    {
+        "codigo": "04.08.05.089-6",
+        "descricao": "TRATAMENTO CIRÚRGICO DE ROTURA DO MENISCO COM MENISCECTOMIA PARCIAL / TOTAL",
+        "HON1": 750,
+        "HON2": 300,
+        "HON3": 300,
+        "HON4": 300,
+        "HON5": 300
+    },
+    {
+        "codigo": "04.08.05.016-0",
+        "descricao": "RECONSTRUÇÃO LIGAMENTAR INTRA-ARTICULAR DO JOELHO (CRUZADO ANTERIOR)",
+        "HON1": 900,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.08.05.006-3",
+        "descricao": "ARTROPLASTIA TOTAL PRIMARIA DO JOELHO",
+        "HON1": 2000,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.08.04.009-2",
+        "descricao": "ARTROPLASTIA TOTAL PRIMARIA DO QUADRIL NÃO CIMENTADA / HÍBRIDA",
+        "HON1": 2500,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.08.01.014-2",
+        "descricao": "REPARO DE ROTURA DO MANGUITO ROTADOR (INCLUI PROCEDIMENTOS DESCOMPRESSIVOS)",
+        "HON1": 500,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.08.06.071-9",
+        "descricao": "VIDEOARTROSC OPIA",
+        "HON1": 400,
+        "HON2": 400,
+        "HON3": 400,
+        "HON4": 400,
+        "HON5": 400
+    },
+    {
+        "codigo": "04.08.01.021-5",
+        "descricao": "TRATAMENTO CIRÚRGICO DE LUXAÇÃO RECIDIVANTE / HABITUAL DE ARTICULAÇÃO ESCAPULO- UMERAL",
+        "HON1": 500,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.03.02.012-3",
+        "descricao": "TRATAMENTO CIRURGICO DE SINDROME COMPRESSIVA EM TUNEL OSTEO-FIBROSO AO NIVEL DO CARPO",
+        "HON1": 450,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.08.02.032-6",
+        "descricao": "TRATAMENTO CIRÚRGICO DE DEDO EM GATILHO",
+        "HON1": 450,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.08.06.044-1",
+        "descricao": "TENÓLISE",
+        "HON1": 450,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.03.02.005-0",
+        "descricao": "MICRONEUROLISE DE NERVO PERIFERICO",
+        "HON1": 450,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.08.02.055-5",
+        "descricao": "TRATAMENTO CIRÚRGICO DE PSEUDARTROSE / RETARDO DE CONSOLIDAÇÃO / PERDA ÓSSEA DA MÃO",
+        "HON1": 450,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.03.02.013-1",
+        "descricao": "TRATAMENTO MICROCIRÚRGICO DE TUMOR DE NERVO PERIFÉRICO / NEUROMA",
+        "HON1": 450,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.08.02.061-0",
+        "descricao": "TRATAMENTO CIRÚRGICO DE ROTURA / DESINSERÇÃO / ARRANCAMENTO CAPSULOTENO-LIGAMENTAR NA MÃO",
+        "HON1": 450,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.08.02.030-0",
+        "descricao": "TENOSINOVECTOMIA EM MEMBRO SUPERIOR",
+        "HON1": 450,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.08.06.035-2",
+        "descricao": "RETIRADA DE FIO OU PINO INTRA-ÓSSEO",
+        "HON1": 500,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    }
+]

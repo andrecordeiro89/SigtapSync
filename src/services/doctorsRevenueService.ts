@@ -9,7 +9,7 @@
  */
 
 import { supabase } from '../lib/supabase';
-import { calculateDoctorPayment, calculateFixedPayment, calculatePercentagePayment } from '../config/doctorPaymentRules'
+import { calculateDoctorPayment, calculateFixedPayment, calculatePercentagePayment, ALL_HOSPITAL_RULES } from '../config/doctorPaymentRules'
 
 // ================================================================
 // TIPOS E INTERFACES
@@ -417,6 +417,157 @@ export class DoctorsRevenueService {
         totalCalculatedPayment
       },
       samplePatients
+    };
+  }
+
+  static listFixedPaymentDoctors(): Array<{
+    doctorName: string;
+    hospitalKey: string;
+    amount: number;
+    description: string;
+  }> {
+    const out: Array<{ doctorName: string; hospitalKey: string; amount: number; description: string }> = [];
+    const rules = ALL_HOSPITAL_RULES as Record<string, Record<string, any>>;
+    Object.entries(rules).forEach(([hospitalKey, hospitalRules]) => {
+      Object.entries(hospitalRules).forEach(([doctorName, rule]: [string, any]) => {
+        if (rule?.fixedPaymentRule && typeof rule.fixedPaymentRule.amount === 'number') {
+          out.push({
+            doctorName,
+            hospitalKey,
+            amount: rule.fixedPaymentRule.amount,
+            description: rule.fixedPaymentRule.description || 'Pagamento fixo'
+          });
+        }
+      });
+    });
+    return out;
+  }
+  
+  static async debugDoctorPaymentsPeriod(params: {
+    doctorName: string;
+    doctorCns: string;
+    hospitalId: string;
+    from: string;
+    to: string;
+  }): Promise<{
+    doctorName: string;
+    hospitalId: string;
+    period: { from: string; to: string };
+    totals: { totalAIHs: number; totalProcedures04: number; totalCalculatedPayment: number };
+    aihrs: Array<{
+      aihId: string;
+      aihNumber: string;
+      dischargeDate?: string;
+      patientId: string;
+      patientName: string;
+      appliedRule: string;
+      totalPayment: number;
+      honAssignments: Array<{ code: string; position: number; payment: number }>;
+      ignoredCodes: string[];
+    }>;
+  }> {
+    const fromISO = new Date(params.from);
+    const toISO = new Date(params.to);
+    const toExclusive = new Date(toISO.getFullYear(), toISO.getMonth(), toISO.getDate() + 1);
+    let aihQuery = supabase
+      .from('aihs')
+      .select(`
+        id,
+        aih_number,
+        patient_id,
+        hospital_id,
+        discharge_date,
+        cns_responsavel,
+        patients!inner (
+          id,
+          name
+        )
+      `)
+      .eq('cns_responsavel', params.doctorCns)
+      .eq('hospital_id', params.hospitalId)
+      .gte('discharge_date', fromISO.toISOString())
+      .lt('discharge_date', toExclusive.toISOString());
+    const { data: aihs } = await aihQuery;
+    const aihrs: Array<{
+      aihId: string;
+      aihNumber: string;
+      dischargeDate?: string;
+      patientId: string;
+      patientName: string;
+      appliedRule: string;
+      totalPayment: number;
+      honAssignments: Array<{ code: string; position: number; payment: number }>;
+      ignoredCodes: string[];
+    }> = [];
+    let totalProcedures04 = 0;
+    let totalCalculatedPayment = 0;
+    if (aihs && aihs.length > 0) {
+      for (const a of aihs) {
+        const { data: procs } = await supabase
+          .from('procedure_records')
+          .select('procedure_code, value_cents, professional_cbo, sequencia, procedure_date')
+          .eq('aih_id', a.id)
+          .order('sequencia', { ascending: true })
+          .order('procedure_date', { ascending: true });
+        const mapped = (procs || []).map(p => ({
+          procedure_code: p.procedure_code,
+          value_reais: (p.value_cents || 0) / 100,
+          cbo: p.professional_cbo,
+          sequence: typeof p.sequencia === 'number' ? p.sequencia : undefined
+        }));
+        const payRes = calculateDoctorPayment(params.doctorName, mapped as any, params.hospitalId);
+        const honAssignments: Array<{ code: string; position: number; payment: number }> = [];
+        const ignoredCodes: string[] = [];
+        // Derivar posições e valores aplicados
+        let pos = 0;
+        const medicalSorted = mapped
+          .filter(p => /^04\./.test(String(p.procedure_code)) && p.cbo !== '225151')
+          .sort((a: any, b: any) => {
+            const sa = typeof a.sequence === 'number' ? a.sequence : 9999;
+            const sb = typeof b.sequence === 'number' ? b.sequence : 9999;
+            if (sa !== sb) return sa - sb;
+            const va = typeof a.value_reais === 'number' ? a.value_reais : 0;
+            const vb = typeof b.value_reais === 'number' ? b.value_reais : 0;
+            return vb - va;
+          });
+        const paymentsByCode = new Map<string, number>();
+        payRes.procedures.forEach(pr => {
+          paymentsByCode.set(pr.procedure_code, pr.calculatedPayment || 0);
+        });
+        for (const m of medicalSorted) {
+          const pay = paymentsByCode.get(m.procedure_code) || 0;
+          if (pay > 0) {
+            honAssignments.push({ code: m.procedure_code, position: pos + 1, payment: pay });
+            pos++;
+          } else {
+            ignoredCodes.push(m.procedure_code);
+          }
+        }
+        totalProcedures04 += medicalSorted.length;
+        totalCalculatedPayment += payRes.totalPayment || 0;
+        aihrs.push({
+          aihId: a.id,
+          aihNumber: a.aih_number,
+          dischargeDate: a.discharge_date as any,
+          patientId: (a.patients as any)?.id,
+          patientName: (a.patients as any)?.name || '',
+          appliedRule: payRes.appliedRule,
+          totalPayment: payRes.totalPayment || 0,
+          honAssignments,
+          ignoredCodes
+        });
+      }
+    }
+    return {
+      doctorName: params.doctorName,
+      hospitalId: params.hospitalId,
+      period: { from: params.from, to: params.to },
+      totals: {
+        totalAIHs: aihs?.length || 0,
+        totalProcedures04,
+        totalCalculatedPayment
+      },
+      aihrs
     };
   }
   

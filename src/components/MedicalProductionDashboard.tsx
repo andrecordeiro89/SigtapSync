@@ -4445,22 +4445,20 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                 </div>
                                 <span className="text-xl font-black text-black">
                                   {formatCurrency((() => {
-                                    // ✅ BEST PRACTICE: Usar valor pré-calculado de calculateDoctorStats
-                                    // Evita recálculo no render e garante consistência
-                                    // doctorStats.calculatedPaymentValue já contempla:
-                                    // 1. TODOS os pacientes do médico
-                                    // 2. Hierarquia correta: Fixo → Percentual → Individual
-                                    // 3. Exclusão de anestesistas 04.xxx
-                                    // 4. Aplicação das regras de pagamento específicas
-                                    
-                                    const paymentValue = doctorStats.calculatedPaymentValue || doctorStats.medicalProceduresValue || 0;
-                                    
-                                    // 🔍 LOG para verificação
-                                    if (paymentValue > 0) {
-                                      console.log(`💰 [CARD] ${doctor.doctor_info.name}: R$ ${paymentValue.toFixed(2)} (fonte: doctorStats)`);
+                                    const hospitalId = doctor.hospitals?.[0]?.hospital_id;
+                                    const fixedCalc = calculateFixedPayment(doctor.doctor_info.name, hospitalId);
+                                    if (fixedCalc.hasFixedRule) {
+                                      return fixedCalc.calculatedPayment;
                                     }
-                                    
-                                    return paymentValue;
+                                    const percentageCalc = calculatePercentagePayment(doctor.doctor_info.name, doctorStats.totalValue, hospitalId);
+                                    if (percentageCalc.hasPercentageRule) {
+                                      return percentageCalc.calculatedPayment;
+                                    }
+                                    const fallback = doctorStats.calculatedPaymentValue || doctorStats.medicalProceduresValue || 0;
+                                    if (fallback > 0) {
+                                      console.log(`💰 [CARD] ${doctor.doctor_info.name}: R$ ${fallback.toFixed(2)} (fallback regras por procedimento)`);
+                                    }
+                                    return fallback;
                                   })())}
                                 </span>
                               </div>
