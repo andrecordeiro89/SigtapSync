@@ -93,6 +93,36 @@ export function calculateDoctorPayment(
 
   const isSaoJose = hospitalKey === 'HOSPITAL_MUNICIPAL_SAO_JOSE'
 
+  if (doctorNameUpper.includes('HUMBERTO MOREIRA')) {
+    const norm = (c: string) => c.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || c
+    const target = new Set([
+      '04.04.01.048-2',
+      '04.04.01.041-5',
+      '04.04.01.002-4',
+      '04.04.01.001-6',
+      '04.04.01.003-2'
+    ])
+    const performed = procedures
+      .filter(p => p.cbo !== '225151')
+      .map(p => norm(p.procedure_code))
+      .filter(c => target.has(c))
+    const count = new Set(performed).size
+    const total = count >= 2 ? 800 : count === 1 ? 650 : 0
+    const out = procedures.map(p => ({
+      ...p,
+      calculatedPayment: 0,
+      paymentRule: count >= 2 ? 'Regra HUMBERTO: 800' : count === 1 ? 'Regra HUMBERTO: 650' : 'Sem regra',
+      isSpecialRule: true
+    }))
+    if (total > 0) {
+      const idx = out.findIndex(o => target.has(norm(o.procedure_code)) && o.cbo !== '225151')
+      if (idx >= 0) {
+        out[idx] = { ...out[idx], calculatedPayment: total }
+      }
+      return { procedures: out, totalPayment: total, appliedRule: 'HUMBERTO 650/800' }
+    }
+  }
+
   // ================================================================
   // 🧩 PRIORIDADE 1: REGRAS ESPECÍFICAS POR MÉDICO/HOSPITAL
   // Verifica se o médico tem regras específicas cadastradas para o hospital

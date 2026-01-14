@@ -313,6 +313,113 @@ export class DoctorsRevenueService {
     }
   }
   
+  static async getDoctorPaymentDiagnostics(params: {
+    doctorName: string;
+    doctorCns: string;
+    hospitalId?: string;
+    sinceMonths?: number;
+  }): Promise<{
+    fixedPayment: ReturnType<typeof calculateFixedPayment>;
+    percentagePayment: ReturnType<typeof calculatePercentagePayment>;
+    hasIndividualRules: boolean;
+    unruledProcedures: ReturnType<typeof import('../config/doctorPaymentRules').checkUnruledProcedures>;
+    totals: { totalAIHs: number; totalProcedures04: number; totalCalculatedPayment: number };
+    samplePatients: Array<{
+      patientId: string;
+      patientName: string;
+      aihId: string;
+      aihNumber: string;
+      procedureCodes04: string[];
+      calculatedPayment: number;
+      appliedRule: string;
+    }>;
+  }> {
+    const sinceMonths = typeof params.sinceMonths === 'number' && params.sinceMonths > 0 ? params.sinceMonths : 12;
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - sinceMonths);
+    let aihQuery = supabase
+      .from('aihs')
+      .select(`
+        id,
+        aih_number,
+        patient_id,
+        hospital_id,
+        admission_date,
+        patients!inner (
+          id,
+          name
+        )
+      `)
+      .eq('cns_responsavel', params.doctorCns)
+      .gte('admission_date', cutoff.toISOString());
+    if (params.hospitalId) {
+      aihQuery = aihQuery.eq('hospital_id', params.hospitalId);
+    }
+    const { data: aihs } = await aihQuery;
+    const samplePatients: Array<{
+      patientId: string;
+      patientName: string;
+      aihId: string;
+      aihNumber: string;
+      procedureCodes04: string[];
+      calculatedPayment: number;
+      appliedRule: string;
+    }> = [];
+    let allCodes04: string[] = [];
+    let totalProcedures04 = 0;
+    let totalCalculatedPayment = 0;
+    if (aihs && aihs.length > 0) {
+      for (const a of aihs) {
+        const { data: procs } = await supabase
+          .from('procedure_records')
+          .select('procedure_code, value_cents, professional_cbo, sequencia, procedure_date')
+          .eq('aih_id', a.id)
+          .ilike('procedure_code', '04%')
+          .order('sequencia', { ascending: true })
+          .order('procedure_date', { ascending: true });
+        const mapped = (procs || []).map(p => ({
+          procedure_code: p.procedure_code,
+          value_reais: (p.value_cents || 0) / 100,
+          cbo: p.professional_cbo
+        }));
+        const calc = calculateDoctorPayment(params.doctorName, mapped as any, params.hospitalId);
+        const baseSum = mapped.reduce((s, p) => s + (p.value_reais || 0), 0);
+        const perc = calculatePercentagePayment(params.doctorName, baseSum, params.hospitalId);
+        const chosenTotal = perc.hasPercentageRule ? perc.calculatedPayment : calc.totalPayment;
+        totalProcedures04 += mapped.length;
+        totalCalculatedPayment += chosenTotal;
+        samplePatients.push({
+          patientId: (a.patients as any)?.id,
+          patientName: (a.patients as any)?.name || '',
+          aihId: a.id,
+          aihNumber: a.aih_number,
+          procedureCodes04: mapped.map(m => m.procedure_code),
+          calculatedPayment: chosenTotal,
+          appliedRule: perc.hasPercentageRule ? perc.appliedRule : calc.appliedRule
+        });
+        allCodes04.push(...mapped.map(m => m.procedure_code));
+      }
+    }
+    const fixed = calculateFixedPayment(params.doctorName, params.hospitalId);
+    const percGlobalBase = totalProcedures04 > 0 ? samplePatients.reduce((s, p) => s + p.calculatedPayment, 0) : 0;
+    const percGlobal = calculatePercentagePayment(params.doctorName, percGlobalBase, params.hospitalId);
+    const { hasIndividualPaymentRules, checkUnruledProcedures } = await import('../config/doctorPaymentRules');
+    const hasInd = hasIndividualPaymentRules(params.doctorName, params.hospitalId);
+    const unruled = checkUnruledProcedures(params.doctorName, Array.from(new Set(allCodes04)), params.hospitalId);
+    return {
+      fixedPayment: fixed,
+      percentagePayment: percGlobal,
+      hasIndividualRules: hasInd,
+      unruledProcedures: unruled,
+      totals: {
+        totalAIHs: aihs?.length || 0,
+        totalProcedures04,
+        totalCalculatedPayment
+      },
+      samplePatients
+    };
+  }
+  
   /**
    * 📊 OBTER MÉDICOS AGREGADOS COM FATURAMENTO
    * Retorna lista de médicos sem duplicação + múltiplos hospitais agrupados
