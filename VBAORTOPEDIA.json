@@ -142,5 +142,23 @@
         "HON3": 0,
         "HON4": 0,
         "HON5": 0
+    },
+    {
+        "codigo": "04.08.02.056-3",
+        "descricao": "TRATAMENTO CIRÚRGICO DE PSEUDARTROSE / RETARDO DE CONSOLIDAÇÃO / PERDA ÓSSEA DO ANTEBRAÇO",
+        "HON1": 450,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
+    },
+    {
+        "codigo": "04.03.02.011-5",
+        "descricao": "TRATAMENTO CIRÚRGICO DE NEUROPATIA COMPRESSIVA COM OU SEM MICROCIRÚRGIA",
+        "HON1": 450,
+        "HON2": 0,
+        "HON3": 0,
+        "HON4": 0,
+        "HON5": 0
     }
 ]
