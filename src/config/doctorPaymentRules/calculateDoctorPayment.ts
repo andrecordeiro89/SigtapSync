@@ -296,6 +296,22 @@ export function calculateDoctorPayment(
   }
   
   {
+    const norm = (c: string) => c.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || c
+    const target = '04.03.02.002-6'
+    const idx = procedures.findIndex(o => norm(o.procedure_code) === target && o.cbo !== '225151')
+    if (idx >= 0) {
+      const out = procedures.map(p => ({
+        ...p,
+        calculatedPayment: 0,
+        paymentRule: 'Sem regra específica',
+        isSpecialRule: true
+      }))
+      out[idx] = { ...out[idx], calculatedPayment: 450, paymentRule: 'ORTOPEDIA HON (fixo HON1)', isSpecialRule: true }
+      return { procedures: out, totalPayment: 450, appliedRule: 'Regra global ORT 04.03.02.002-6 HON1=450' }
+    }
+  }
+
+  {
     if (hospitalKey !== 'HOSPITAL_NOSSA_SENHORA_APARECIDA_FOZ') {
       const ortJsonMap = getOrtJsonMapSync();
       const hasJsonMatch = procedures.some(p => {
