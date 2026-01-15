@@ -34,6 +34,7 @@ function AppContent() {
       const { loadVasHonMap } = await import('./config/doctorPaymentRules/importers/vasXlsx');
       const { loadOrtHonMap } = await import('./config/doctorPaymentRules/importers/ortXlsx');
       const { loadOrtJsonMap } = await import('./config/doctorPaymentRules/importers/ortJson');
+      const { loadFozOrtJsonMap } = await import('./config/doctorPaymentRules/importers/ortFozJson');
       loadGynHonMap();
       loadUroHonMap();
       loadOtoHonMap();
@@ -41,6 +42,7 @@ function AppContent() {
       loadVasHonMap();
       loadOrtHonMap();
       loadOrtJsonMap();
+      loadFozOrtJsonMap();
     })();
   }, []);
 

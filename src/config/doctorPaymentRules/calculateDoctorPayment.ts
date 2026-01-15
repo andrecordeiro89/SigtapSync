@@ -27,6 +27,7 @@ import { calculateOtoSaoJoseHonPaymentsSync, loadOtoSaoJoseHonMap } from './impo
 import { calculateVasHonPaymentsSync, loadVasHonMap } from './importers/vasXlsx'
 import { calculateOrtHonPaymentsSync, loadOrtHonMap, getOrtHonMapSync } from './importers/ortXlsx'
 import { calculateOrtJsonPaymentsSync, loadOrtJsonMap, getOrtJsonMapSync } from './importers/ortJson'
+import { calculateFozOrtJsonPaymentsSync, loadFozOrtJsonMap, getFozOrtJsonMapSync } from './importers/ortFozJson'
 
 // ================================================================
 // IMPORTAÇÃO DE REGRAS DE TODOS OS HOSPITAIS
@@ -294,7 +295,22 @@ export function calculateDoctorPayment(
     if (resVas) return resVas;
     void loadVasHonMap();
   }
-  
+
+  {
+    if (hospitalKey === 'HOSPITAL_NOSSA_SENHORA_APARECIDA_FOZ') {
+      const fozMap = getFozOrtJsonMapSync();
+      const hasFozJsonMatch = procedures.some(p => {
+        const code = p.procedure_code.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || p.procedure_code;
+        return !!fozMap?.has(code);
+      });
+      if (hasFozJsonMatch) {
+        const resFozOrtJson = calculateFozOrtJsonPaymentsSync(procedures);
+        if (resFozOrtJson) return resFozOrtJson;
+        void loadFozOrtJsonMap();
+      }
+    }
+  }
+
   {
     const norm = (c: string) => c.match(/^([\d]{2}\.[\d]{2}\.[\d]{2}\.[\d]{3}-[\d])/)?.[1] || c
     const target = '04.03.02.002-6'
