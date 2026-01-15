@@ -151,6 +151,47 @@ const CIRURGIA_GERAL_FOZ_RULES: Omit<DoctorPaymentRule, 'doctorName'> = {
       standardValue: 1000.00,
       description: 'HISTERECTOMIA TOTAL - R$ 1.000,00'
     }
+    ,
+    {
+      procedureCode: '04.08.04.007-6',
+      standardValue: 2500.00,
+      secondaryValue: 0,
+      tertiaryValue: 0,
+      quaternaryValue: 0,
+      description: 'ARTROPLASTIA DE REVISÃO/RECONSTRUÇÃO DO QUADRIL - R$ 2.500,00 (somente principal)'
+    },
+    {
+      procedureCode: '04.08.02.040-7',
+      standardValue: 450.00,
+      secondaryValue: 0,
+      tertiaryValue: 0,
+      quaternaryValue: 0,
+      description: 'FRATURA DISTAL ANTEBRAÇO - R$ 450,00 (somente principal)'
+    },
+    {
+      procedureCode: '04.03.02.010-7',
+      standardValue: 450.00,
+      secondaryValue: 0,
+      tertiaryValue: 0,
+      quaternaryValue: 0,
+      description: 'TRANSPOSIÇÃO DO NERVO CUBITAL - R$ 450,00 (somente principal)'
+    },
+    {
+      procedureCode: '04.08.02.003-2',
+      standardValue: 450.00,
+      secondaryValue: 0,
+      tertiaryValue: 0,
+      quaternaryValue: 0,
+      description: 'ARTRODESE MÉDIAS/GRANDES ARTICULAÇÕES MS - R$ 450,00 (somente principal)'
+    },
+    {
+      procedureCode: '04.08.06.014-0',
+      standardValue: 450.00,
+      secondaryValue: 0,
+      tertiaryValue: 0,
+      quaternaryValue: 0,
+      description: 'FASCIECTOMIA - R$ 450,00 (somente principal)'
+    }
   ],
   multipleRules: [
     { codes: ['04.07.03.002-6', '04.07.04.018-8'], totalValue: 1200.00, description: 'COLECISTECTOMIA + LIBERAÇÃO DE ADERÊNCIAS - R$ 1.200,00' },

@@ -101,8 +101,29 @@ export const calculateFozOrtJsonPaymentsSync = (procedures: ProcedurePaymentInfo
       const vb = typeof b.value_reais === 'number' ? b.value_reais : 0
       return vb - va
     })
+  const presentCodes = new Set(medicalSorted.map(p => normalizeCode(p.procedure_code)))
+  const allowVideoShoulder = presentCodes.has('04.08.01.014-2')
+  if (presentCodes.has('04.08.04.007-6')) {
+    let total = 0
+    const out: Array<ProcedurePaymentInfo & { calculatedPayment: number; paymentRule: string; isSpecialRule: boolean }> = procedures.map(p => ({
+      ...p,
+      calculatedPayment: 0,
+      paymentRule: 'Sem regra HON Ortopedia (FOZ)',
+      isSpecialRule: true
+    }))
+    const hon = map.get('04.08.04.007-6') || null
+    const originalIdx = out.findIndex(o => normalizeCode(o.procedure_code) === '04.08.04.007-6' && o.cbo !== '225151')
+    if (hon && originalIdx >= 0) {
+      const base = hon.hon1
+      total += base
+      out[originalIdx] = { ...out[originalIdx], calculatedPayment: base, paymentRule: 'ORTOPEDIA FOZ QUADRIL REVISÃO (exclusivo)', isSpecialRule: true }
+    }
+    return { procedures: out, totalPayment: total, appliedRule: 'JSON Ortopedia FOZ HON exclusivo 04.08.04.007-6' }
+  }
   let total = 0
   let pos = 0
+  const exclusiveKneeCodes = new Set<string>(['04.08.05.089-6','04.08.05.016-0'])
+  let kneePaid = false
   const out: Array<ProcedurePaymentInfo & { calculatedPayment: number; paymentRule: string; isSpecialRule: boolean }> = procedures.map(p => ({
     ...p,
     calculatedPayment: 0,
@@ -112,19 +133,35 @@ export const calculateFozOrtJsonPaymentsSync = (procedures: ProcedurePaymentInfo
   for (let i = 0; i < medicalSorted.length; i++) {
     const proc = medicalSorted[i]
     const codeNorm = normalizeCode(proc.procedure_code)
+    if (codeNorm === '04.08.06.071-9' && !allowVideoShoulder) {
+      continue
+    }
     const hon = map.get(codeNorm) || null
     const idx = pos
     if (hon) {
-      pos++
-      const base =
-        idx <= 0 ? hon.hon1 :
-        idx === 1 ? hon.hon2 :
-        idx === 2 ? hon.hon3 :
-        idx === 3 ? hon.hon4 :
-        hon.hon5
+      let base = 0
+      let displayRule = `ORTOPEDIA FOZ HON (pos ${idx+1})`
+      if (exclusiveKneeCodes.has(codeNorm)) {
+        if (kneePaid) {
+          base = 0
+          displayRule = 'ORTOPEDIA FOZ EXCLUSIVO (joelho): somente primeiro considerado'
+        } else {
+          base = hon.hon1
+          displayRule = 'ORTOPEDIA FOZ JOELHO (principal)'
+          kneePaid = true
+          pos++
+        }
+      } else {
+        pos++
+        base =
+          idx <= 0 ? hon.hon1 :
+          idx === 1 ? hon.hon2 :
+          idx === 2 ? hon.hon3 :
+          idx === 3 ? hon.hon4 :
+          hon.hon5
+      }
       total += base
       const originalIdx = out.findIndex(o => normalizeCode(o.procedure_code) === codeNorm && o.cbo !== '225151' && o.calculatedPayment === 0)
-      const displayRule = `ORTOPEDIA FOZ HON (pos ${idx+1})`
       if (originalIdx >= 0) {
         out[originalIdx] = { ...out[originalIdx], calculatedPayment: base, paymentRule: displayRule, isSpecialRule: true }
       }

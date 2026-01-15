@@ -210,7 +210,8 @@ const CIRURGIA_VASCULAR_FRG_RULES: Omit<DoctorPaymentRule, 'doctorName'> = {
 // ================================================================
 const ORTOPEDIA_QUADRIL_FRG_RULES: Omit<DoctorPaymentRule, 'doctorName'> = {
   rules: [
-    { procedureCode: '04.08.04.009-2', standardValue: 2500.00, description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO QUADRIL NÃO CIMENTADA/HÍBRIDA - R$ 2.500,00' }
+    { procedureCode: '04.08.04.009-2', standardValue: 2500.00, description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO QUADRIL NÃO CIMENTADA/HÍBRIDA - R$ 2.500,00' },
+    { procedureCode: '04.08.04.007-6', standardValue: 2500.00, description: 'ARTROPLASTIA DE REVISÃO/RECONSTRUÇÃO DO QUADRIL - R$ 2.500,00' }
   ]
 };
 

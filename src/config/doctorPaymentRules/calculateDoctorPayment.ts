@@ -201,6 +201,23 @@ export function calculateDoctorPayment(
       for (const r of (indiv.rules || [])) {
         ruleByCode.set(r.procedureCode, r)
       }
+      {
+        const exclusiveCode = '04.08.04.007-6'
+        if (hospitalKey === 'HOSPITAL_MATERNIDADE_NOSSA_SENHORA_APARECIDA_FRG' && performedSet.has(exclusiveCode)) {
+          const outExclusive = procedures.map(p => ({
+            ...p,
+            calculatedPayment: 0,
+            paymentRule: 'Sem regra específica',
+            isSpecialRule: true
+          }))
+          const idxExclusive = outExclusive.findIndex(o => normalize(o.procedure_code) === exclusiveCode && o.cbo !== '225151')
+          const valExclusive = ruleByCode.get(exclusiveCode)?.standardValue ?? 2500
+          if (idxExclusive >= 0) {
+            outExclusive[idxExclusive] = { ...outExclusive[idxExclusive], calculatedPayment: valExclusive, paymentRule: 'FRG QUADRIL REVISÃO (exclusivo)', isSpecialRule: true }
+            return { procedures: outExclusive, totalPayment: valExclusive, appliedRule: 'Exclusivo FRG 04.08.04.007-6' }
+          }
+        }
+      }
       
       out = out.map((p) => {
         const code = normalize(p.procedure_code)
