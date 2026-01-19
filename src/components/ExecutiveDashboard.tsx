@@ -24,6 +24,7 @@ import {
   CheckCircle,
   Clock,
   Activity,
+  Loader2,
   Stethoscope,
   Award,
   ChevronLeft,
@@ -353,6 +354,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const itemsPerPage = 10;
   const [dischargeFrom, setDischargeFrom] = useState<string>('');
   const [dischargeTo, setDischargeTo] = useState<string>('');
+  const [inputDischargeFrom, setInputDischargeFrom] = useState<string>('');
+  const [inputDischargeTo, setInputDischargeTo] = useState<string>('');
   // Removido: consolidado de todos os hospitais — fonte única: tabela AIHs filtrada por hospital
   // const [showReportGenerator, setShowReportGenerator] = useState(false);
   
@@ -408,6 +411,20 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     totalValue: number;
     medicalPaymentTotal: number;
   } | null>(null);
+  const [pendingLoads, setPendingLoads] = useState(0);
+  const startLoad = () => setPendingLoads(v => v + 1);
+  const endLoad = () => setPendingLoads(v => Math.max(0, v - 1));
+  const isGlobalLoading = pendingLoads > 0;
+  useEffect(() => {
+    const onStart = () => startLoad();
+    const onEnd = () => endLoad();
+    window.addEventListener('mpd:loading-start', onStart);
+    window.addEventListener('mpd:loading-end', onEnd);
+    return () => {
+      window.removeEventListener('mpd:loading-start', onStart);
+      window.removeEventListener('mpd:loading-end', onEnd);
+    };
+  }, []);
   
 
 
@@ -713,7 +730,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const loadExecutiveData = async () => {
     if (!hasExecutiveAccess) return;
     
-    setIsLoading(true);
+    startLoad();
     try {
       console.log('📊 Carregando dados executivos reais...');
       
@@ -947,7 +964,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       console.error('❌ Erro ao carregar dados executivos:', error);
       toast.error('Erro ao carregar dados do dashboard executivo: ' + (error as Error).message);
     } finally {
-      setIsLoading(false);
+      endLoad();
     }
   };
 
@@ -961,6 +978,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   useEffect(() => {
     (async () => {
       if (!hasExecutiveAccess) return;
+      startLoad();
       try {
         const rawCare = String(filterCareCharacter || '').trim();
         const careNormalized = rawCare === '01' ? '1' : rawCare === '02' ? '2' : (rawCare === 'all' ? null : rawCare || null);
@@ -1001,7 +1019,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       } catch (e) {
         console.warn('⚠️ Erro RPC get_aih_count (exec):', e);
         setAihDbCount(null);
-      }
+      } finally { endLoad(); }
     })();
   }, [hasExecutiveAccess, selectedHospitals, selectedCompetency, filterCareCharacter, dischargeFrom, dischargeTo]);
 
@@ -1014,6 +1032,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   useEffect(() => {
     (async () => {
       if (!hasExecutiveAccess) return;
+      startLoad();
       try {
         const rawCare = String(filterCareCharacter || '').trim();
         const careNormalized = rawCare === '01' ? '1' : rawCare === '02' ? '2' : (rawCare === 'all' ? null : rawCare || null);
@@ -1063,7 +1082,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         }
       } catch {
         setAihKpi(null);
-      }
+      } finally { endLoad(); }
     })();
   }, [hasExecutiveAccess, selectedHospitals, selectedCompetency, filterCareCharacter, dischargeFrom, dischargeTo]);
 
@@ -1082,6 +1101,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   useEffect(() => {
     (async () => {
       if (!hasExecutiveAccess) return;
+      startLoad();
       try {
         const rawCare = String(filterCareCharacter || '').trim();
         const careNormalized = rawCare === '01' ? '1' : rawCare === '02' ? '2' : (rawCare === 'all' ? null : rawCare || null);
@@ -1112,7 +1132,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         }
       } catch {
         setFinancialKpis(null);
-      }
+      } finally { endLoad(); }
     })();
   }, [hasExecutiveAccess, selectedHospitals, selectedCompetency, filterCareCharacter, dischargeFrom, dischargeTo]);
 
@@ -1193,6 +1213,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       }
     })();
   }, [selectedHospitals]);
+  useEffect(() => {
+    setInputDischargeFrom(dischargeFrom || '');
+    setInputDischargeTo(dischargeTo || '');
+  }, [dischargeFrom, dischargeTo]);
 
   // Access Control Render
   if (!hasExecutiveAccess) {
@@ -1285,7 +1309,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl">
-              <Filter className="h-6 w-6 text-black" />
+              {isGlobalLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+              ) : (
+                <Filter className="h-6 w-6 text-black" />
+              )}
             </div>
             <div>
               <h3 className="text-2xl font-bold text-black">Filtros de Produção Médica</h3>
@@ -1298,7 +1326,11 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 AIHs (Registros Únicos)
               </div>
               <div className="text-xl font-black text-black">
-                {medicalProductionStats ? (medicalProductionStats.totalAIHs || 0) : '...'}
+                {isGlobalLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                ) : (
+                  medicalProductionStats ? (medicalProductionStats.totalAIHs || 0) : '...'
+                )}
               </div>
             </div>
             {financialKpis && (
@@ -1308,7 +1340,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     Valor Total SIGTAP
                   </div>
                   <div className="text-[13px] font-black text-black">
-                    {formatCurrency(financialKpis.sigtapTotalValue)}
+                    {isGlobalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : formatCurrency(financialKpis.sigtapTotalValue)}
                   </div>
                 </div>
                 <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
@@ -1316,7 +1348,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     Incrementos
                   </div>
                   <div className="text-[13px] font-black text-black">
-                    {formatCurrency(financialKpis.incrementTotal)}
+                    {isGlobalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : formatCurrency(financialKpis.incrementTotal)}
                   </div>
                 </div>
                 <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
@@ -1324,7 +1356,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     Inc. Eletivo
                   </div>
                   <div className="text-[13px] font-black text-black">
-                    {formatCurrency(financialKpis.incrementElective)}
+                    {isGlobalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : formatCurrency(financialKpis.incrementElective)}
                   </div>
                 </div>
                 <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
@@ -1332,7 +1364,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     Inc. Urgência
                   </div>
                   <div className="text-[13px] font-black text-black">
-                    {formatCurrency(financialKpis.incrementUrgency)}
+                    {isGlobalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : formatCurrency(financialKpis.incrementUrgency)}
                   </div>
                 </div>
                 <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
@@ -1340,7 +1372,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     Valor Total
                   </div>
                   <div className="text-[13px] font-black text-black">
-                    {formatCurrency(financialKpis.totalValue)}
+                    {isGlobalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : formatCurrency(financialKpis.totalValue)}
                   </div>
                 </div>
                 <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
@@ -1348,7 +1380,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     Pagamento Médico Total
                   </div>
                   <div className="text-[13px] font-black text-black">
-                    {formatCurrency(financialKpis.medicalPaymentTotal)}
+                    {isGlobalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : formatCurrency(financialKpis.medicalPaymentTotal)}
                   </div>
                 </div>
               </div>
@@ -1505,6 +1537,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     placeholder="Nome, CNS, CRM..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    disabled={isGlobalLoading}
                     className="pl-10 h-10 border-2 border-gray-200 focus:border-black focus:ring-0 text-sm rounded-lg bg-white hover:border-gray-300 transition-colors"
                   />
                   {searchTerm && (
@@ -1531,6 +1564,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     placeholder="Nome do paciente..."
                     value={patientSearchTerm}
                     onChange={(e) => setPatientSearchTerm(e.target.value)}
+                    disabled={isGlobalLoading}
                     className="pl-10 h-10 border-2 border-gray-200 focus:border-black focus:ring-0 text-sm rounded-lg bg-white hover:border-gray-300 transition-colors"
                   />
                   {patientSearchTerm && (
@@ -1559,6 +1593,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       setSelectedHospitals(value === 'all' ? ['all'] : [value]);
                       setActiveHospitalTab(value === 'all' ? null : value);
                     }}
+                    disabled={isGlobalLoading}
                     className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
                   >
                     <option value="all">Todos os Hospitais</option>
@@ -1593,6 +1628,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <select
                     value={selectedCompetency}
                     onChange={(e) => setSelectedCompetency(e.target.value)}
+                    disabled={isGlobalLoading}
                     className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
                   >
                     <option value="all">Todas</option>
@@ -1624,6 +1660,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <select
                     value={filterCareCharacter}
                     onChange={(e) => setFilterCareCharacter(e.target.value as 'all' | '1' | '2')}
+                    disabled={isGlobalLoading}
                     className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
                   >
                     <option value="all">Todos</option>
@@ -1649,8 +1686,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 </label>
                 <input
                   type="date"
-                  value={dischargeFrom}
-                  onChange={(e) => setDischargeFrom(e.target.value)}
+                  value={inputDischargeFrom}
+                  onChange={(e) => setInputDischargeFrom(e.target.value)}
+                  onBlur={() => setDischargeFrom(inputDischargeFrom || '')}
+                    disabled={isGlobalLoading}
                   className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
                 />
               </div>
@@ -1663,13 +1702,19 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 <div className="flex items-center gap-2">
                   <input
                     type="date"
-                    value={dischargeTo}
-                    onChange={(e) => setDischargeTo(e.target.value)}
+                    value={inputDischargeTo}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setInputDischargeTo(v);
+                      setDischargeFrom(inputDischargeFrom || '');
+                      setDischargeTo(v || '');
+                    }}
+                    disabled={isGlobalLoading}
                     className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
                   />
                   {(dischargeFrom || dischargeTo) && (
                     <button
-                      onClick={() => { setDischargeFrom(''); setDischargeTo(''); }}
+                      onClick={() => { setInputDischargeFrom(''); setInputDischargeTo(''); setDischargeFrom(''); setDischargeTo(''); }}
                       className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0"
                       title="Limpar filtro de alta"
                     >
@@ -1741,6 +1786,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white w-auto min-w-[160px]"
                   onClick={() => window.dispatchEvent(new Event('mpd:report-general'))}
                   title="Gerar relatório geral de pacientes"
+                  disabled={isGlobalLoading}
                 >
                   <FileSpreadsheet className="h-4 w-4" />
                   Relatório Geral
@@ -1751,6 +1797,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white w-auto min-w-[160px]"
                   onClick={() => window.dispatchEvent(new Event('mpd:report-conference'))}
                   title="Gerar relatório de conferência de pacientes"
+                  disabled={isGlobalLoading}
                 >
                   <FileSpreadsheet className="h-4 w-4" />
                   Conferência

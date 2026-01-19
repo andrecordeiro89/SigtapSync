@@ -2018,6 +2018,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       if (!user) return;
       try {
         setIsLoading(true);
+        try { window.dispatchEvent(new Event('mpd:loading-start')) } catch {}
         // Guardar estado inicial vazio quando fonte SIH está ativa sem filtros
         const isRemoteInitial = useSihSource && (
           !selectedHospitals || selectedHospitals.length === 0 || selectedHospitals.includes('all')
@@ -2026,6 +2027,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           setDoctors([]);
           setFilteredDoctors([]);
           setIsLoading(false);
+          try { window.dispatchEvent(new Event('mpd:loading-end')) } catch {}
           return;
         }
         
@@ -2137,6 +2139,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         toast.error('Erro ao carregar dados dos médicos');
       } finally {
         setIsLoading(false);
+        try { window.dispatchEvent(new Event('mpd:loading-end')) } catch {}
       }
     };
 
