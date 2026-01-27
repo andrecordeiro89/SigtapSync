@@ -1,10 +1,10 @@
 import { supabase } from '../lib/supabase';
-import { 
-  MedicalDoctor, 
-  DoctorStats, 
-  HospitalMedicalStats, 
+import {
+  MedicalDoctor,
+  DoctorStats,
+  HospitalMedicalStats,
   MedicalSpecialty,
-  MedicalFilters 
+  MedicalFilters
 } from '../types';
 
 // ===== INTERFACES ESPECÍFICAS PARA CRUD =====
@@ -66,9 +66,8 @@ export class DoctorsCrudService {
   static async getAllDoctors(filters?: MedicalFilters): Promise<CrudResult<MedicalDoctor[]>> {
     try {
       console.log('🩺 [REAL] Buscando TODOS os médicos de TODOS os hospitais usando tabela doctor_hospital...');
-      
+
       // 1. BUSCAR TODOS OS MÉDICOS COM SUAS ASSOCIAÇÕES HOSPITALARES
-      // 🚫 FILTRO: Excluir especialidade "03 - Clínico" da visualização
       let mainQuery = supabase
         .from('doctor_hospital')
         .select(`
@@ -93,8 +92,7 @@ export class DoctorsCrudService {
             name,
             cnpj
           )
-        `)
-        .neq('doctors.specialty', '03 - Clínico');
+        `);
 
       // Aplicar filtros se necessário
       if (filters?.isActive !== undefined) {
@@ -154,7 +152,7 @@ export class DoctorsCrudService {
       effectiveRows.forEach(record => {
         const doctor = record.doctors as any;
         const hospital = record.hospitals as any;
-        
+
         if (!doctor || !doctor.cns) return;
 
         const existingDoctor = doctorsMap.get(doctor.cns);
@@ -194,8 +192,8 @@ export class DoctorsCrudService {
 
       // Aplicar filtros de especialidade
       if (filters?.specialties && filters.specialties.length > 0) {
-        doctors = doctors.filter(doc => 
-          filters.specialties!.some(specialty => 
+        doctors = doctors.filter(doc =>
+          filters.specialties!.some(specialty =>
             doc.speciality?.toLowerCase().includes(specialty.toLowerCase())
           )
         );
@@ -250,39 +248,63 @@ export class DoctorsCrudService {
         .order('doctor_cns');
 
       if (baseErr) {
+        console.error('❌ Erro na query doctor_hospital:', baseErr);
         return { success: false, error: baseErr.message };
       }
       const rows = baseRows || [];
+      console.log('🐛 DEBUG - Total de linhas retornadas de doctor_hospital:', rows.length);
+
+      // 🐛 DEBUG: Mostrar primeiras 5 linhas para verificar estrutura
+      console.log('🐛 DEBUG - Primeiras 5 linhas:', rows.slice(0, 5));
+
+      // 🐛 DEBUG: Buscar por doctor_id específico também
+      const marioById = rows.find((r: any) => r.doctor_id === '5f6d15b1-d82e-4c9b-9449-6b90f0d3f163');
+      console.log('🐛 DEBUG - Busca por doctor_id 5f6d15b1...:', marioById ? 'ENCONTRADO' : 'NÃO ENCONTRADO', marioById);
+
       if (rows.length === 0) {
         return { success: true, data: [], message: 'Sem vínculos médico-hospital' };
       }
 
       // 2) Carregar mapas auxiliares (opcional) para enriquecer nomes
       const doctorCnsSet = Array.from(new Set(rows.map(r => r.doctor_cns).filter(Boolean)));
+      const doctorIdSet = Array.from(new Set(rows.map(r => r.doctor_id).filter(Boolean)));
       const hospitalIdSet = Array.from(new Set(rows.map(r => r.hospital_id).filter(Boolean)));
 
-      const [{ data: doctors }, { data: hospitals }] = await Promise.all([
-        supabase.from('doctors').select('id,cns,crm,name,specialty').in('cns', doctorCnsSet).neq('specialty', '03 - Clínico'),
+      // � CORREÇÃO: Buscar médicos tanto por CNS quanto por ID para cobrir registros sem CNS
+      const [doctorsByCnsResult, doctorsByIdResult, hospitalsResult] = await Promise.all([
+        doctorCnsSet.length > 0
+          ? supabase.from('doctors').select('id,cns,crm,name,specialty').in('cns', doctorCnsSet)
+          : Promise.resolve({ data: [] }),
+        doctorIdSet.length > 0
+          ? supabase.from('doctors').select('id,cns,crm,name,specialty').in('id', doctorIdSet)
+          : Promise.resolve({ data: [] }),
         supabase.from('hospitals').select('id,name').in('id', hospitalIdSet)
       ]);
 
-      const byCns = new Map<string, any>((doctors || []).map(d => [d.cns, d]));
-      const byHosp = new Map<string, any>((hospitals || []).map(h => [h.id, h]));
+      const doctors = doctorsByCnsResult.data || [];
+      const doctorsById = doctorsByIdResult.data || [];
+      const hospitals = hospitalsResult.data || [];
+
+      // Criar mapas para lookup rápido
+      const byCns = new Map<string, any>(doctors.map(d => [d.cns, d]));
+      const byId = new Map<string, any>(doctorsById.map(d => [d.id, d]));
+      const byHosp = new Map<string, any>(hospitals.map(h => [h.id, h]));
 
       // 3) Mapear cada linha para um registro exibível (1:1)
       const result: MedicalDoctor[] = rows.map((r: any) => {
-        const d = byCns.get(r.doctor_cns);
+        // 🔧 CORREÇÃO: Tentar buscar por CNS primeiro, depois por ID
+        const d = byCns.get(r.doctor_cns) || byId.get(r.doctor_id);
         const h = byHosp.get(r.hospital_id);
         return {
-          id: d?.id || `${r.doctor_cns || 'NO_CNS'}::${r.hospital_id || 'NO_HOSP'}`,
-          cns: r.doctor_cns || '',
+          id: d?.id || r.doctor_id || `${r.doctor_cns || 'NO_CNS'}::${r.hospital_id || 'NO_HOSP'}`,
+          cns: d?.cns || r.doctor_cns || '',
           crm: d?.crm || '',
           name: d?.name || r.doctor_cns || 'Médico não identificado',
           speciality: d?.specialty || '',
           hospitalId: r.hospital_id || '',
           hospitalName: h?.name || r.hospital_id || 'Hospital não identificado',
           hospitals: [h?.name || r.hospital_id || 'Hospital não identificado'],
-          isActive: r.is_primary_hospital != null ? r.is_primary_hospital : true,
+          isActive: r.is_active !== false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         } as MedicalDoctor;
@@ -307,7 +329,6 @@ export class DoctorsCrudService {
         .from('doctor_hospital_info')
         .select('*')
         .eq('doctor_id', id)
-        .neq('doctor_specialty', '03 - Clínico') // 🚫 Excluir especialidade "03 - Clínico"
         .single();
 
       if (error) {
@@ -360,8 +381,7 @@ export class DoctorsCrudService {
 
       let query = supabase
         .from('doctor_hospital_info')
-        .select('*')
-        .neq('doctor_specialty', '03 - Clínico'); // 🚫 Excluir especialidade "03 - Clínico"
+        .select('*');
 
       // Aplicar filtros
       if (filters?.hospitalIds && filters.hospitalIds.length > 0) {
@@ -504,8 +524,8 @@ export class DoctorsCrudService {
    * Atualiza dados do médico
    */
   static async updateDoctor(
-    doctorId: string, 
-    updateData: DoctorUpdateData, 
+    doctorId: string,
+    updateData: DoctorUpdateData,
     userId?: string,
     canEditCNS: boolean = false
   ): Promise<CrudResult<MedicalDoctor>> {
@@ -585,7 +605,7 @@ export class DoctorsCrudService {
 
       const { error } = await supabase
         .from('doctors')
-        .update({ 
+        .update({
           is_active: false,
           updated_by: userId
         })
@@ -811,7 +831,7 @@ export class DoctorsCrudService {
 
       // Agrupar por hospital e calcular estatísticas
       const hospitalMap = new Map<string, HospitalMedicalStats>();
-      
+
       (data || []).forEach(row => {
         const hospitalId = row.hospital_id;
         if (!hospitalMap.has(hospitalId)) {
@@ -827,7 +847,7 @@ export class DoctorsCrudService {
             doctorDistribution: []
           });
         }
-        
+
         const hospital = hospitalMap.get(hospitalId)!;
         hospital.totalDoctors += 1;
       });

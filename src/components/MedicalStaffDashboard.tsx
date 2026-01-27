@@ -9,10 +9,10 @@ import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
-import { 
-  Stethoscope, 
-  Users, 
-  Building2, 
+import {
+  Stethoscope,
+  Users,
+  Building2,
   Search,
   Trash2,
   DollarSign,
@@ -55,7 +55,7 @@ import {
 import { getSpecialtyColor, getSpecialtyIcon } from '../utils/specialtyColors';
 import { useAuth } from '../contexts/AuthContext';
 import { DoctorsCrudService } from '../services/doctorsCrudService';
-import { 
+import {
   MedicalDoctor,
   MedicalSpecialty,
   HospitalMedicalStats
@@ -81,35 +81,35 @@ interface MedicalStaffDashboardProps {
 
 const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className }) => {
   const { user, isDirector, isAdmin, isCoordinator, isTI, hasPermission } = useAuth();
-  
+
   // Estados
   const [isLoading, setIsLoading] = useState(false);
   const [doctors, setDoctors] = useState<MedicalDoctor[]>([]);
   const [specialties, setSpecialties] = useState<MedicalSpecialty[]>([]);
   const [hospitalStats, setHospitalStats] = useState<HospitalMedicalStats[]>([]);
   // Estados para observações e expansão
-  const [doctorObservations, setDoctorObservations] = useState<{[key: string]: string}>({});
+  const [doctorObservations, setDoctorObservations] = useState<{ [key: string]: string }>({});
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  
+
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHospital, setSelectedHospital] = useState<string>('all');
   const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
-  
+
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 30;
 
-  
+
   // Estados de controle removidos - não mais necessários
 
   // Verificar acesso
   const hasAccess = isDirector() || isAdmin() || isCoordinator() || isTI() || hasPermission('medical_management');
 
   // 🆕 Estados derivados para listas de filtros
-  const [availableHospitals, setAvailableHospitals] = useState<{id: string, name: string}[]>([]);
+  const [availableHospitals, setAvailableHospitals] = useState<{ id: string, name: string }[]>([]);
   const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
-  
+
   // 🆕 Estado para debounce da busca
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
@@ -146,7 +146,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     setIsLoading(true);
     try {
       console.log('🩺 Carregando dados médicos com filtros aplicados...');
-      
+
       // 🔍 APLICAR APENAS BUSCA TEXTUAL NO BACKEND (dropdowns filtram no frontend)
       const filters = {
         searchTerm: debouncedSearchTerm.trim() || undefined,
@@ -165,11 +165,18 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
       if (doctorsResult.success) {
         setDoctors(doctorsResult.data || []);
         console.log('✅ Médicos carregados:', doctorsResult.data?.length);
-        
+
+        // 🐛 DEBUG: Buscar médico específico
+        const marioSergio = doctorsResult.data?.find(d =>
+          d.cns === '709205275913636' ||
+          d.name?.includes('MARIO SERGIO')
+        );
+        console.log('🔍 DEBUG MARIO SERGIO:', marioSergio ? marioSergio : 'NÃO ENCONTRADO nos dados retornados');
+
         // 🔧 EXTRAIR HOSPITAIS E ESPECIALIDADES DOS DADOS REAIS
         const uniqueHospitals = new Set<string>();
         const uniqueSpecialties = new Set<string>();
-        
+
         doctorsResult.data?.forEach(doctor => {
           // Coletar hospitais únicos
           if (doctor.hospitals && doctor.hospitals.length > 0) {
@@ -177,20 +184,20 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
           } else if (doctor.hospitalName) {
             uniqueHospitals.add(doctor.hospitalName);
           }
-          
+
           // Coletar especialidades únicas
           if (doctor.speciality) {
             uniqueSpecialties.add(doctor.speciality);
           }
         });
-        
+
         // Atualizar listas de filtros
         const hospitalsList = Array.from(uniqueHospitals).map(name => ({ id: name, name })).sort((a, b) => a.name.localeCompare(b.name));
         const specialtiesList = Array.from(uniqueSpecialties).sort();
-        
+
         setAvailableHospitals(hospitalsList);
         setAvailableSpecialties(specialtiesList);
-        
+
         console.log(`📋 Filtros disponíveis: ${uniqueHospitals.size} hospitais, ${uniqueSpecialties.size} especialidades`);
       }
 
@@ -222,7 +229,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
 
   // Agrupar médicos e filtrar com proteção contra erros
   const filteredDoctors = React.useMemo(() => {
-    
+
     try {
       if (!doctors || !Array.isArray(doctors)) {
         return [];
@@ -235,22 +242,22 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
           const doctorCrm = doctor?.crm || '';
           const doctorSpecialty = doctor?.speciality || '';
 
-          const matchesSearch = !searchTerm || 
+          const matchesSearch = !searchTerm ||
             doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             doctorCrm.toLowerCase().includes(searchTerm.toLowerCase()) ||
             doctorSpecialty.toLowerCase().includes(searchTerm.toLowerCase());
-          
+
           // 🏥 FILTRO DE HOSPITAL - Verifica se médico atende no hospital selecionado
           const matchesHospital = selectedHospital === 'all' || (doctor.hospitalName === selectedHospital);
-          
+
           // 🩺 FILTRO DE ESPECIALIDADE
-          const matchesSpecialty = selectedSpecialty === 'all' || 
+          const matchesSpecialty = selectedSpecialty === 'all' ||
             doctorSpecialty === selectedSpecialty;
-          
+
           const passes = matchesSearch && matchesHospital && matchesSpecialty;
-          
+
           // Médico passou na filtragem
-          
+
           return passes;
         } catch (filterError) {
           console.warn('⚠️ Erro ao filtrar médico:', doctor, filterError);
@@ -285,7 +292,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     setSelectedHospital('all');
     setSelectedSpecialty('all');
     setCurrentPage(1); // Reset para primeira página
-    
+
     toast({
       title: "Filtros limpos",
       description: "Todos os filtros foram removidos"
@@ -463,7 +470,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
         headStyles: { fillColor: [41, 128, 185], textColor: [255, 255, 255], fontStyle: 'bold' },
       });
 
-      const fileName = `Relatorio_SUS_Corpo_Medico_${new Date().toISOString().slice(0,19).replace(/[-:T]/g,'')}.pdf`;
+      const fileName = `Relatorio_SUS_Corpo_Medico_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.pdf`;
       doc.save(fileName);
 
       toast({
@@ -484,7 +491,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
   const handleExportExcel = async () => {
     try {
       console.log('📊 Iniciando exportação Excel...');
-      
+
       // Usar exatamente o que está na tela (filtros e ordenação aplicados)
       const rows = (sortedDoctorRows || []).map(({ doctor: d, hospital }) => ({
         'Nome': d.name || 'Médico não informado',
@@ -523,7 +530,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
       XLSX.utils.book_append_sheet(wb, ws, 'Corpo Médico');
 
       // Gerar nome do arquivo
-      const timestamp = new Date().toISOString().slice(0,19).replace(/[-:T]/g,'');
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
       const fileName = `Relatorio_SUS_Corpo_Medico_${timestamp}.xlsx`;
 
       // Salvar arquivo
@@ -551,7 +558,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
     // Lista de cores vibrantes e bem contrastadas para hospitais
     const colors = [
       'bg-blue-100 border-blue-300 text-blue-800',
-      'bg-green-100 border-green-300 text-green-800', 
+      'bg-green-100 border-green-300 text-green-800',
       'bg-purple-100 border-purple-300 text-purple-800',
       'bg-orange-100 border-orange-300 text-orange-800',
       'bg-pink-100 border-pink-300 text-pink-800',
@@ -563,7 +570,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
       'bg-lime-100 border-lime-300 text-lime-800',
       'bg-rose-100 border-rose-300 text-rose-800'
     ];
-    
+
     // Gera um índice baseado no hash do nome do hospital
     let hash = 0;
     for (let i = 0; i < hospitalName.length; i++) {
@@ -571,7 +578,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Converte para 32bit integer
     }
-    
+
     return colors[Math.abs(hash) % colors.length];
   };
 
@@ -615,7 +622,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             Gestão completa dos profissionais médicos
           </p>
         </div>
-        
+
         <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
           <Database className="h-3 w-3 mr-1" />
           Dados Reais
@@ -746,9 +753,9 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 <Building2 className="h-4 w-4" />
                 Hospital
               </Label>
-              <Select 
-                value={selectedHospital} 
-                onValueChange={setSelectedHospital} 
+              <Select
+                value={selectedHospital}
+                onValueChange={setSelectedHospital}
                 disabled={isLoading}
               >
                 <SelectTrigger>
@@ -778,9 +785,9 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 <Stethoscope className="h-4 w-4" />
                 Especialidade
               </Label>
-              <Select 
-                value={selectedSpecialty} 
-                onValueChange={setSelectedSpecialty} 
+              <Select
+                value={selectedSpecialty}
+                onValueChange={setSelectedSpecialty}
                 disabled={isLoading}
               >
                 <SelectTrigger>
@@ -845,7 +852,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 </Badge>
               )}
             </div>
-            
+
             {/* CONTROLES DE PAGINAÇÃO NO CABEÇALHO */}
             {totalPages > 1 && (
               <div className="flex items-center gap-1">
@@ -859,7 +866,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 >
                   <ChevronsLeft className="h-3 w-3" />
                 </Button>
-                
+
                 {/* Página anterior */}
                 <Button
                   variant="outline"
@@ -870,7 +877,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 >
                   <ChevronLeft className="h-3 w-3" />
                 </Button>
-                
+
                 {/* Números das páginas (versão compacta) */}
                 <div className="flex items-center gap-1">
                   {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
@@ -884,7 +891,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                     } else {
                       pageNumber = currentPage - 1 + i;
                     }
-                    
+
                     return (
                       <Button
                         key={pageNumber}
@@ -898,7 +905,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                     );
                   })}
                 </div>
-                
+
                 {/* Próxima página */}
                 <Button
                   variant="outline"
@@ -909,7 +916,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
                 >
                   <ChevronRight className="h-3 w-3" />
                 </Button>
-                
+
                 {/* Última página */}
                 <Button
                   variant="outline"
@@ -924,7 +931,7 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
             )}
           </div>
         </div>
-        
+
         {isLoading ? (
           <div className="p-4 space-y-2">
             {[...Array(5)].map((_, i) => (
@@ -940,265 +947,265 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
         ) : (
           <div className="overflow-x-auto">
             <Table>
-                <TableHeader>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12"></TableHead>
+                  <TableHead>Profissional</TableHead>
+                  <TableHead>Especialidade</TableHead>
+                  <TableHead>Hospital</TableHead>
+                  <TableHead className="w-24 text-center">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {currentDoctors.length === 0 ? (
                   <TableRow>
-                    <TableHead className="w-12"></TableHead>
-                    <TableHead>Profissional</TableHead>
-                    <TableHead>Especialidade</TableHead>
-                    <TableHead>Hospital</TableHead>
-                    <TableHead className="w-24 text-center">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {currentDoctors.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-12">
-                        <div className="flex flex-col items-center justify-center text-gray-500">
-                          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                            <Users className="h-8 w-8 text-slate-400" />
-                          </div>
-                          <p className="text-lg font-medium mb-2 text-gray-700">Nenhum médico encontrado</p>
-                          <p className="text-sm mb-6 text-gray-500 max-w-md">
-                            {filteredDoctors.length === 0 
-                              ? (searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') 
-                                ? 'Nenhum médico corresponde aos filtros aplicados. Tente ajustar os critérios de busca.' 
-                                : 'Ainda não há médicos cadastrados no sistema.'
-                              : `Mostrando ${currentDoctors.length} de ${filteredDoctors.length} médicos encontrados.`}
-                          </p>
-                          {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') && (
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={handleClearFilters}
-                              className="flex items-center gap-2 border-slate-300 text-slate-600 hover:bg-slate-50"
-                            >
-                              <X className="h-4 w-4" />
-                              Limpar Filtros
-                            </Button>
-                          )}
+                    <TableCell colSpan={5} className="text-center py-12">
+                      <div className="flex flex-col items-center justify-center text-gray-500">
+                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                          <Users className="h-8 w-8 text-slate-400" />
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    currentDoctors.map(({ doctor, hospital }) => {
-                      try {
-                        // Proteção adicional contra dados inválidos
-                        if (!doctor || !doctor.id) {
-                          console.warn('⚠️ Médico com dados inválidos:', doctor);
-                          return null;
-                        }
-                    
-                    const isExpanded = expandedRows.has(doctor.id);
-                    
-                    return (
-                      <React.Fragment key={`${doctor.id}::${doctor.hospitalName || ''}`}>
-                        <TableRow className={isExpanded ? 'bg-slate-50' : 'hover:bg-gray-50'}>
-                          <TableCell className="w-12">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => toggleRowExpansion(doctor.id)}
-                              className="h-8 w-8 p-0 hover:bg-gray-100"
-                            >
-                              {isExpanded ? (
-                                <ChevronUp className="h-4 w-4 text-gray-600" />
-                              ) : (
-                                <ChevronDown className="h-4 w-4 text-gray-600" />
-                              )}
-                            </Button>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                                <User className="h-5 w-5 text-slate-600" />
-                              </div>
-                              <div>
-                                <div className="font-medium text-gray-900">{doctor.name}</div>
-                                <div className="text-sm text-gray-500">CNS: {doctor.cns}</div>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {doctor.speciality ? (
-                              <Badge
-                                variant="secondary"
-                                className="text-xs px-3 py-1 bg-slate-100 text-slate-700 border-slate-200 font-medium"
+                        <p className="text-lg font-medium mb-2 text-gray-700">Nenhum médico encontrado</p>
+                        <p className="text-sm mb-6 text-gray-500 max-w-md">
+                          {filteredDoctors.length === 0
+                            ? (searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all')
+                              ? 'Nenhum médico corresponde aos filtros aplicados. Tente ajustar os critérios de busca.'
+                              : 'Ainda não há médicos cadastrados no sistema.'
+                            : `Mostrando ${currentDoctors.length} de ${filteredDoctors.length} médicos encontrados.`}
+                        </p>
+                        {(searchTerm || selectedHospital !== 'all' || selectedSpecialty !== 'all') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleClearFilters}
+                            className="flex items-center gap-2 border-slate-300 text-slate-600 hover:bg-slate-50"
+                          >
+                            <X className="h-4 w-4" />
+                            Limpar Filtros
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  currentDoctors.map(({ doctor, hospital }) => {
+                    try {
+                      // Proteção adicional contra dados inválidos
+                      if (!doctor || !doctor.id) {
+                        console.warn('⚠️ Médico com dados inválidos:', doctor);
+                        return null;
+                      }
+
+                      const isExpanded = expandedRows.has(doctor.id);
+
+                      return (
+                        <React.Fragment key={`${doctor.id}::${doctor.hospitalName || ''}`}>
+                          <TableRow className={isExpanded ? 'bg-slate-50' : 'hover:bg-gray-50'}>
+                            <TableCell className="w-12">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleRowExpansion(doctor.id)}
+                                className="h-8 w-8 p-0 hover:bg-gray-100"
                               >
-                                <span className="mr-1">{getSpecialtyIcon(doctor.speciality)}</span>
-                                {doctor.speciality}
-                              </Badge>
-                            ) : (
-                              <span className="text-sm text-gray-400">Não informado</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm font-medium text-gray-700">{hospital || 'Não informado'}</div>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDoctorToDelete(doctor);
-                                setIsDeleteAlertOpen(true);
-                              }}
-                              className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 text-gray-500"
-                              title="Excluir médico"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                        {isExpanded && (
-                          <TableRow>
-                            <TableCell colSpan={5} className="bg-slate-50 border-t">
-                              <div className="py-4 space-y-3">
-                                <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                                  <MessageSquare className="h-4 w-4 text-slate-600" />
-                                  Observações sobre o profissional
+                                {isExpanded ? (
+                                  <ChevronUp className="h-4 w-4 text-gray-600" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4 text-gray-600" />
+                                )}
+                              </Button>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                                  <User className="h-5 w-5 text-slate-600" />
                                 </div>
-                                
-                                <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
-                                  <Textarea
-                                    placeholder="Adicione observações sobre este profissional..."
-                                    value={doctorObservations[doctor.id] || ''}
-                                    onChange={(e) => {
-                                      setDoctorObservations(prev => ({
-                                        ...prev,
-                                        [doctor.id]: e.target.value
-                                      }));
-                                    }}
-                                    className="min-h-[80px] resize-none border-slate-200 focus:border-slate-400 focus:ring-slate-400"
-                                  />
-                                  
-                                  <div className="flex justify-end gap-2 mt-3">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => {
-                                        setDoctorObservations(prev => {
-                                          const newObs = { ...prev };
-                                          delete newObs[doctor.id];
-                                          return newObs;
-                                        });
-                                      }}
-                                      className="border-slate-300 text-slate-600 hover:bg-slate-50"
-                                    >
-                                      <X className="h-4 w-4 mr-1" />
-                                      Limpar
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => handleUpdateDoctorNote(doctor.id, doctorObservations[doctor.id] || '')}
-                                      className="bg-slate-700 hover:bg-slate-800 text-white"
-                                    >
-                                      <Save className="h-4 w-4 mr-1" />
-                                      Salvar
-                                    </Button>
-                                  </div>
+                                <div>
+                                  <div className="font-medium text-gray-900">{doctor.name}</div>
+                                  <div className="text-sm text-gray-500">CNS: {doctor.cns}</div>
                                 </div>
                               </div>
                             </TableCell>
+                            <TableCell>
+                              {doctor.speciality ? (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs px-3 py-1 bg-slate-100 text-slate-700 border-slate-200 font-medium"
+                                >
+                                  <span className="mr-1">{getSpecialtyIcon(doctor.speciality)}</span>
+                                  {doctor.speciality}
+                                </Badge>
+                              ) : (
+                                <span className="text-sm text-gray-400">Não informado</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm font-medium text-gray-700">{hospital || 'Não informado'}</div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDoctorToDelete(doctor);
+                                  setIsDeleteAlertOpen(true);
+                                }}
+                                className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 text-gray-500"
+                                title="Excluir médico"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
-                        )}
-                      </React.Fragment>
-                    );
-                      } catch (renderError) {
-                        console.error('❌ Erro ao renderizar médico:', doctor, renderError);
-                        return null;
-                      }
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-          
-          {/* CONTROLES DE PAGINAÇÃO */}
-          {totalPages > 1 && (
-            <div className="p-4 border-t bg-gray-50">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  Mostrando {startIndex + 1} a {Math.min(endIndex, sortedDoctorRows.length)} de {sortedDoctorRows.length} vínculos
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  {/* Primeira página */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(1)}
-                    disabled={currentPage === 1}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ChevronsLeft className="h-4 w-4" />
-                  </Button>
-                  
-                  {/* Página anterior */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePreviousPage}
-                    disabled={currentPage === 1}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  
-                  {/* Números das páginas */}
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      let pageNumber;
-                      if (totalPages <= 5) {
-                        pageNumber = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNumber = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNumber = totalPages - 4 + i;
-                      } else {
-                        pageNumber = currentPage - 2 + i;
-                      }
-                      
-                      return (
-                        <Button
-                          key={pageNumber}
-                          variant={currentPage === pageNumber ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handlePageChange(pageNumber)}
-                          className="h-8 w-8 p-0"
-                        >
-                          {pageNumber}
-                        </Button>
+                          {isExpanded && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="bg-slate-50 border-t">
+                                <div className="py-4 space-y-3">
+                                  <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                                    <MessageSquare className="h-4 w-4 text-slate-600" />
+                                    Observações sobre o profissional
+                                  </div>
+
+                                  <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
+                                    <Textarea
+                                      placeholder="Adicione observações sobre este profissional..."
+                                      value={doctorObservations[doctor.id] || ''}
+                                      onChange={(e) => {
+                                        setDoctorObservations(prev => ({
+                                          ...prev,
+                                          [doctor.id]: e.target.value
+                                        }));
+                                      }}
+                                      className="min-h-[80px] resize-none border-slate-200 focus:border-slate-400 focus:ring-slate-400"
+                                    />
+
+                                    <div className="flex justify-end gap-2 mt-3">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setDoctorObservations(prev => {
+                                            const newObs = { ...prev };
+                                            delete newObs[doctor.id];
+                                            return newObs;
+                                          });
+                                        }}
+                                        className="border-slate-300 text-slate-600 hover:bg-slate-50"
+                                      >
+                                        <X className="h-4 w-4 mr-1" />
+                                        Limpar
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleUpdateDoctorNote(doctor.id, doctorObservations[doctor.id] || '')}
+                                        className="bg-slate-700 hover:bg-slate-800 text-white"
+                                      >
+                                        <Save className="h-4 w-4 mr-1" />
+                                        Salvar
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
                       );
-                    })}
-                  </div>
-                  
-                  {/* Próxima página */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleNextPage}
-                    disabled={currentPage === totalPages}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  
-                  {/* Última página */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(totalPages)}
-                    disabled={currentPage === totalPages}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ChevronsRight className="h-4 w-4" />
-                  </Button>
+                    } catch (renderError) {
+                      console.error('❌ Erro ao renderizar médico:', doctor, renderError);
+                      return null;
+                    }
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* CONTROLES DE PAGINAÇÃO */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Mostrando {startIndex + 1} a {Math.min(endIndex, sortedDoctorRows.length)} de {sortedDoctorRows.length} vínculos
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Primeira página */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(1)}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+
+                {/* Página anterior */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousPage}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                {/* Números das páginas */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNumber;
+                    if (totalPages <= 5) {
+                      pageNumber = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNumber = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNumber = totalPages - 4 + i;
+                    } else {
+                      pageNumber = currentPage - 2 + i;
+                    }
+
+                    return (
+                      <Button
+                        key={pageNumber}
+                        variant={currentPage === pageNumber ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(pageNumber)}
+                        className="h-8 w-8 p-0"
+                      >
+                        {pageNumber}
+                      </Button>
+                    );
+                  })}
                 </div>
+
+                {/* Próxima página */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+
+                {/* Última página */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-          )}
+          </div>
+        )}
       </div>
 
       {/* ALERT DIALOG DE CONFIRMAÇÃO DE EXCLUSÃO */}

@@ -25,7 +25,7 @@ const Landing: React.FC<LandingProps> = ({ onNavigate }) => {
                 <span className="text-sm md:text-base text-neutral-700">Regulação Médica</span>
               </div>
             </div>
-            
+
           </div>
         </section>
         <section className="max-w-7xl mx-auto mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
