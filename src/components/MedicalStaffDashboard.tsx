@@ -240,11 +240,13 @@ const MedicalStaffDashboard: React.FC<MedicalStaffDashboardProps> = ({ className
           // Proteção contra campos undefined/null
           const doctorName = doctor?.name || '';
           const doctorCrm = doctor?.crm || '';
+          const doctorCns = doctor?.cns || '';
           const doctorSpecialty = doctor?.speciality || '';
 
           const matchesSearch = !searchTerm ||
             doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             doctorCrm.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            doctorCns.toLowerCase().includes(searchTerm.toLowerCase()) ||
             doctorSpecialty.toLowerCase().includes(searchTerm.toLowerCase());
 
           // 🏥 FILTRO DE HOSPITAL - Verifica se médico atende no hospital selecionado
