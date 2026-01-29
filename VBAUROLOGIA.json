@@ -1,0 +1,554 @@
+[
+  {
+    "Procedimentos": "04.01.02.004-5 EXCISÃO E ENXERTO DE PELE (HEMANGIOMA, NEVUS OU TUMOR )",
+    "HON1": 250,
+    "HON2": 200.0,
+    "HON3": 175,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.01.02.005-3 EXCISÃO E SUTURA DE LESAO NA PELE C/ PLÁSTICA EM Z OU ROTAÇÃO DE RETALHO",
+    "HON1": 150,
+    "HON2": 112.5,
+    "HON3": 90,
+    "HON4": 75,
+    "HON5": 75
+  },
+  {
+    "Procedimentos": "04.01.02.010-0 EXTIRPAÇÃOE SUPRESSÃO DE LESÃO DE PELE E DE TECIDO CELULAR SUBCUTÂNEO",
+    "HON1": 250,
+    "HON2": 187.5,
+    "HON3": 150,
+    "HON4": 125,
+    "HON5": 125
+  },
+  {
+    "Procedimentos": "04.06.02.054-0 TRATAMENTO CIRÚRGICO DE LESÕES VASCULARES TRAUMÁTICAS DO ABDÔMEN",
+    "HON1": 800,
+    "HON2": 600.0,
+    "HON3": 480,
+    "HON4": 400,
+    "HON5": 400
+  },
+  {
+    "Procedimentos": "04.07.04.001-3 DRENAGEM DE ABSCESSO PÉLVICO",
+    "HON1": 300,
+    "HON2": 225.0,
+    "HON3": 180,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.07.04.003-0 DRENAGEM DE HEMATOMA / ABSCESSO PRE-PERITONEAL",
+    "HON1": 150,
+    "HON2": 112.5,
+    "HON3": 90,
+    "HON4": 75,
+    "HON5": 75
+  },
+  {
+    "Procedimentos": "04.07.04.009-9 HERNIOPLASTIA INGUINAL (BILATERAL)",
+    "HON1": 700,
+    "HON2": 300.0,
+    "HON3": 300,
+    "HON4": 300,
+    "HON5": 300
+  },
+  {
+    "Procedimentos": "04.07.04.010-2 HERNIOPLASTIA INGUINAL / CRURAL (UNILATERAL)",
+    "HON1": 700,
+    "HON2": 300.0,
+    "HON3": 300,
+    "HON4": 300,
+    "HON5": 300
+  },
+  {
+    "Procedimentos": "04.08.06.031-0 RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES",
+    "HON1": 250,
+    "HON2": 200.0,
+    "HON3": 175,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.01.002-2 CISTECTOMIA PARCIAL",
+    "HON1": 250,
+    "HON2": 200.0,
+    "HON3": 175,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.01.006-5 CISTOLITOTOMIA E/OU RETIRADA DE CORPO ESTRANHO DA BEXIGA",
+    "HON1": 600,
+    "HON2": 375.0,
+    "HON3": 300,
+    "HON4": 250,
+    "HON5": 250
+  },
+  {
+    "Procedimentos": "04.09.01.008-1 CISTORRAFIA",
+    "HON1": 250,
+    "HON2": 200.0,
+    "HON3": 175,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.01.009-0 CISTOSTOMIA",
+    "HON1": 250,
+    "HON2": 200.0,
+    "HON3": 175,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.01.013-8 DRENAGEM DE ABSCESSO RENAL / PERI-RENAL",
+    "HON1": 200,
+    "HON2": 150.0,
+    "HON3": 120,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.01.014-6 EXTRAÇÃO ENDOSCÓPICA DE CÁLCULO EM PELVE RENAL",
+    "HON1": 300,
+    "HON2": 300.0,
+    "HON3": 300,
+    "HON4": 300,
+    "HON5": 300
+  },
+  {
+    "Procedimentos": "04.09.01.017-0 INSTALAÇÃO ENDOSCÓPICA DE CATETER DUPLO J",
+    "HON1": 250,
+    "HON2": 100.0,
+    "HON3": 100,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.01.018-9 LITOTRIPSIA",
+    "HON1": 1000,
+    "HON2": 200.0,
+    "HON3": 200,
+    "HON4": 200,
+    "HON5": 200
+  },
+  {
+    "Procedimentos": "04.09.01.020-0 NEFRECTOMIA PARCIAL",
+    "HON1": 1000,
+    "HON2": 700.0,
+    "HON3": 500,
+    "HON4": 300,
+    "HON5": 300
+  },
+  {
+    "Procedimentos": "04.09.01.021-9 NEFRECTOMIA TOTAL",
+    "HON1": 1200,
+    "HON2": 800.0,
+    "HON3": 600,
+    "HON4": 400,
+    "HON5": 400
+  },
+  {
+    "Procedimentos": "04.09.01.022-7 NEFROLITOTOMIA",
+    "HON1": 900,
+    "HON2": 600.0,
+    "HON3": 400,
+    "HON4": 250,
+    "HON5": 250
+  },
+  {
+    "Procedimentos": "04.09.01.023-5 NEFROLITOTOMIA PERCUTÂNEA",
+    "HON1": 1000,
+    "HON2": 750.0,
+    "HON3": 600,
+    "HON4": 500,
+    "HON5": 500
+  },
+  {
+    "Procedimentos": "04.09.01.028-6 NEFROSTOMIA COM OU SEM DRENAGEM",
+    "HON1": 300,
+    "HON2": 225.0,
+    "HON3": 180,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.01.029-4 NEFROSTOMIA PERCUTÂNEA",
+    "HON1": 400,
+    "HON2": 300.0,
+    "HON3": 240,
+    "HON4": 200,
+    "HON5": 200
+  },
+  {
+    "Procedimentos": "04.09.01.031-6 PIELOLITOTOMIA",
+    "HON1": 100,
+    "HON2": 100.0,
+    "HON3": 100,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.01.032-4 PIELOPLASTIA",
+    "HON1": 700,
+    "HON2": 350.0,
+    "HON3": 300,
+    "HON4": 200,
+    "HON5": 200
+  },
+  {
+    "Procedimentos": "04.09.01.034-0 PIELOTOMIA",
+    "HON1": 100,
+    "HON2": 100.0,
+    "HON3": 100,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.01.036-7 RESSECÇÃO DO COLOVESICAL / TUMOR VESICAL A CÉU ABERTO",
+    "HON1": 400,
+    "HON2": 300.0,
+    "HON3": 240,
+    "HON4": 200,
+    "HON5": 200
+  },
+  {
+    "Procedimentos": "04.09.01.037-5 RESSECÇÃO ENDOSCÓPICADA EXTREMIDADE DISTAL DO URETER",
+    "HON1": 150,
+    "HON2": 112.5,
+    "HON3": 90,
+    "HON4": 75,
+    "HON5": 75
+  },
+  {
+    "Procedimentos": "04.09.01.038-3 RESSECCAO ENDOSCOPICA DE LESÃO VESICAL",
+    "HON1": 200,
+    "HON2": 200.0,
+    "HON3": 200,
+    "HON4": 200,
+    "HON5": 200
+  },
+  {
+    "Procedimentos": "04.09.01.051-0 TRATAMENTO CIRÚRGICO DE URETEROCELE",
+    "HON1": 200,
+    "HON2": 150.0,
+    "HON3": 120,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.01.052-9 URETERECTOMIA",
+    "HON1": 300,
+    "HON2": 250.0,
+    "HON3": 200,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.01.053-7 URETEROCISTONEOSTOMIA",
+    "HON1": 300,
+    "HON2": 250.0,
+    "HON3": 200,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.01.056-1 URETEROLITOTOMIA",
+    "HON1": 250,
+    "HON2": 200.0,
+    "HON3": 175,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.01.057-0 URETEROPLASTIA",
+    "HON1": 500,
+    "HON2": 375.0,
+    "HON3": 300,
+    "HON4": 250,
+    "HON5": 250
+  },
+  {
+    "Procedimentos": "04.09.01.059-6 URETEROLITOTRIPSIA TRANSURETEROSCÓPICA",
+    "HON1": 900,
+    "HON2": 200.0,
+    "HON3": 200,
+    "HON4": 200,
+    "HON5": 200
+  },
+  {
+    "Procedimentos": "04.09.02.007-9 MEATOTOMIA SIMPLES",
+    "HON1": 250,
+    "HON2": 200.0,
+    "HON3": 175,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.02.008-7 RESSECÇÃO DE CARÚNCULAURETRAL.",
+    "HON1": 100,
+    "HON2": 75.0,
+    "HON3": 60,
+    "HON4": 50,
+    "HON5": 50
+  },
+  {
+    "Procedimentos": "04.09.02.009-5 RESSECCAO DE PROLAPSO DA MUCOSA DA URETRA",
+    "HON1": 100,
+    "HON2": 75.0,
+    "HON3": 60,
+    "HON4": 50,
+    "HON5": 50
+  },
+  {
+    "Procedimentos": "04.09.02.010-9 RESSECÇÃO E FECHAMENTO DE FÍSTULA URETRAL",
+    "HON1": 300,
+    "HON2": 225.0,
+    "HON3": 180,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.02.012-5 URETROPLASTIA (RESSECÇÃO DE CORDA)",
+    "HON1": 100,
+    "HON2": 75.0,
+    "HON3": 60,
+    "HON4": 50,
+    "HON5": 50
+  },
+  {
+    "Procedimentos": "04.09.02.013-3 URETROPLASTIA AUTÓGENA",
+    "HON1": 1000,
+    "HON2": 750.0,
+    "HON3": 600,
+    "HON4": 500,
+    "HON5": 500
+  },
+  {
+    "Procedimentos": "04.09.02.015-0 URETRORRAFIA",
+    "HON1": 100,
+    "HON2": 50.0,
+    "HON3": 50,
+    "HON4": 50,
+    "HON5": 50
+  },
+  {
+    "Procedimentos": "04.09.02.016-8 URETROSTOMIA PERINEAL / CUTÂNEA / EXTERNA",
+    "HON1": 150,
+    "HON2": 112.5,
+    "HON3": 90,
+    "HON4": 75,
+    "HON5": 75
+  },
+  {
+    "Procedimentos": "04.09.02.017-6 URETROTOMIA INTERNA",
+    "HON1": 250,
+    "HON2": 200.0,
+    "HON3": 175,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.03.002-3 PROSTATECTOMIA SUPRAPÚBICA",
+    "HON1": 1000,
+    "HON2": 300.0,
+    "HON3": 250,
+    "HON4": 200,
+    "HON5": 200
+  },
+  {
+    "Procedimentos": "04.09.03.004-0 RESSECÇÃO ENDOSCÓPICA DE PRÓSTATA",
+    "HON1": 1000,
+    "HON2": 300.0,
+    "HON3": 250,
+    "HON4": 200,
+    "HON5": 200
+  },
+  {
+    "Procedimentos": "04.09.04.001-0 DRENAGEM DE ABSCESSO DA BOLSA ESCROTAL",
+    "HON1": 200,
+    "HON2": 150.0,
+    "HON3": 120,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.04.003-7 EPIDIDIMECTOMIA",
+    "HON1": 200,
+    "HON2": 150.0,
+    "HON3": 120,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.04.005-3 ESPERMATOCELECTOMIA",
+    "HON1": 200,
+    "HON2": 150.0,
+    "HON3": 120,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.04.007-0 EXÈRESE DE CISTO DE EPIDÍDIMO",
+    "HON1": 200,
+    "HON2": 150.0,
+    "HON3": 120,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.04.008-8 EXÉRESE DE LESÃO DO CORDÃO ESPERMÁTICO",
+    "HON1": 100,
+    "HON2": 75.0,
+    "HON3": 60,
+    "HON4": 50,
+    "HON5": 50
+  },
+  {
+    "Procedimentos": "04.09.04.009-6 EXPLORACAO CIRURGICA DA BOLSA ESCROTAL",
+    "HON1": 100,
+    "HON2": 100.0,
+    "HON3": 100,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.04.012-6 ORQUIDOPEXIA BILATERAL",
+    "HON1": 450,
+    "HON2": 337.5,
+    "HON3": 270,
+    "HON4": 225,
+    "HON5": 225
+  },
+  {
+    "Procedimentos": "04.09.04.013-4 ORQUIDOPEXIA UNILATERAL",
+    "HON1": 400,
+    "HON2": 300.0,
+    "HON3": 240,
+    "HON4": 200,
+    "HON5": 200
+  },
+  {
+    "Procedimentos": "04.09.04.016-9 ORQUIECTOMIA UNILATERAL",
+    "HON1": 500,
+    "HON2": 250.0,
+    "HON3": 200,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.04.017-7 PLÁSTICA DA BOLSAESCROTAL",
+    "HON1": 200,
+    "HON2": 150.0,
+    "HON3": 120,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.04.018-5 REPARAÇÃO E OPERAÇÃO PLÁSTICA DO TESTÍCULO",
+    "HON1": 200,
+    "HON2": 150.0,
+    "HON3": 120,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.04.019-3 RESSECÇÃO PARCIAL DABOLSA ESCROTAL",
+    "HON1": 200,
+    "HON2": 150.0,
+    "HON3": 120,
+    "HON4": 100,
+    "HON5": 100
+  },
+  {
+    "Procedimentos": "04.09.04.021-5 TRATAMENTO CIRÚRGICO DE HIDROCELE",
+    "HON1": 300,
+    "HON2": 225.0,
+    "HON3": 180,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.04.023-1 TRATAMENTO CIRÚRGICO DE VARICOCELE",
+    "HON1": 250,
+    "HON2": 200.0,
+    "HON3": 175,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.04.024-0 VASECTOMIA",
+    "HON1": 450,
+    "HON2": 337.5,
+    "HON3": 270,
+    "HON4": 225,
+    "HON5": 225
+  },
+  {
+    "Procedimentos": "04.09.05.003-2 CORRECAO DE HIPOSPADIA (1º TEMPO)",
+    "HON1": 300,
+    "HON2": 225.0,
+    "HON3": 180,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.05.007-5 PLASTICA TOTAL DO PENIS",
+    "HON1": 500,
+    "HON2": 375.0,
+    "HON3": 300,
+    "HON4": 250,
+    "HON5": 250
+  },
+  {
+    "Procedimentos": "04.09.05.008-3 POSTECTOMIA",
+    "HON1": 250,
+    "HON2": 187.5,
+    "HON3": 150,
+    "HON4": 125,
+    "HON5": 125
+  },
+  {
+    "Procedimentos": "04.09.07.005-0 COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR",
+    "HON1": 600,
+    "HON2": 450.0,
+    "HON3": 360,
+    "HON4": 300,
+    "HON5": 300
+  },
+  {
+    "Procedimentos": "04.09.07.014-9 EXERESE DE CISTO VAGINAL",
+    "HON1": 250,
+    "HON2": 200.0,
+    "HON3": 175,
+    "HON4": 150,
+    "HON5": 150
+  },
+  {
+    "Procedimentos": "04.09.07.025-4 TRATAMENTO CIRURGICO DE FISTULA VESICO-VAGINAL",
+    "HON1": 800,
+    "HON2": 600.0,
+    "HON3": 480,
+    "HON4": 400,
+    "HON5": 400
+  },
+  {
+    "Procedimentos": "04.09.07.027-0 TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL",
+    "HON1": 450,
+    "HON2": 337.5,
+    "HON3": 270,
+    "HON4": 225,
+    "HON5": 225
+  },
+  {
+    "Procedimentos": "04.15.04.002-7 DEBRIDAMENTO DE FASCEITE NECROTIZANTE",
+    "HON1": 400,
+    "HON2": 300.0,
+    "HON3": 240,
+    "HON4": 200,
+    "HON5": 200
+  }
+]

@@ -29,6 +29,7 @@ function AppContent() {
     (async () => {
       const { loadGynHonMap } = await import('./config/doctorPaymentRules/importers/gynXlsx');
       const { loadUroHonMap } = await import('./config/doctorPaymentRules/importers/uroXlsx');
+      const { loadUroJsonMap } = await import('./config/doctorPaymentRules/importers/uroJson');
       const { loadOtoHonMap } = await import('./config/doctorPaymentRules/importers/otoXlsx');
       const { loadOtoSaoJoseHonMap } = await import('./config/doctorPaymentRules/importers/otoSaoJoseXlsx');
       const { loadVasHonMap } = await import('./config/doctorPaymentRules/importers/vasXlsx');
@@ -37,6 +38,7 @@ function AppContent() {
       const { loadFozOrtJsonMap } = await import('./config/doctorPaymentRules/importers/ortFozJson');
       loadGynHonMap();
       loadUroHonMap();
+      loadUroJsonMap();
       loadOtoHonMap();
       loadOtoSaoJoseHonMap();
       loadVasHonMap();
@@ -70,25 +72,25 @@ function AppContent() {
   const handleEmergencyReset = async () => {
     try {
       toast.loading('🧹 Resetando sessão...');
-      
+
       // Limpar localStorage
       localStorage.clear();
-      
+
       // Limpar sessionStorage
       sessionStorage.clear();
-      
+
       // Limpar cookies
-      document.cookie.split(";").forEach(function(c) { 
-        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+      document.cookie.split(";").forEach(function (c) {
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
       });
-      
+
       toast.success('✅ Sessão resetada! Recarregando...');
-      
+
       // Recarregar a página após 1 segundo
       setTimeout(() => {
         window.location.reload();
       }, 1000);
-      
+
     } catch (error) {
       console.error('Erro no reset:', error);
       toast.error('❌ Erro no reset. Tente recarregar a página manualmente (F5)');
@@ -104,7 +106,7 @@ function AppContent() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
             <p className="text-gray-600">Verificando autenticação...</p>
             <p className="text-sm text-gray-500">Tempo: {loadingTime}s</p>
-            
+
             {showResetOption && (
               <div className="mt-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
                 <div className="flex items-center justify-center mb-2">
@@ -114,9 +116,9 @@ function AppContent() {
                 <p className="text-sm text-orange-700 mb-3">
                   Se o sistema não carregar, clique no botão abaixo para resetar a sessão.
                 </p>
-                <Button 
+                <Button
                   onClick={handleEmergencyReset}
-                  variant="outline" 
+                  variant="outline"
                   className="border-orange-300 text-orange-700 hover:bg-orange-100"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />

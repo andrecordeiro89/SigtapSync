@@ -22,7 +22,7 @@ const extractCode = (cell: string): string => {
   if (m) return m[1]
   const digits = s.replace(/[^0-9]/g, '')
   if (digits.length >= 10) {
-    const code = `${digits.slice(0,2)}.${digits.slice(2,4)}.${digits.slice(4,6)}.${digits.slice(6,9)}-${digits.slice(9,10)}`
+    const code = `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4, 6)}.${digits.slice(6, 9)}-${digits.slice(9, 10)}`
     return code
   }
   return s
@@ -55,7 +55,7 @@ export const loadUroHonMap = async (): Promise<Map<string, HonValues>> => {
             resolvedUrl = u
             break
           }
-        } catch {}
+        } catch { }
       }
       if (!buf) {
         URO_HON_MAP = new Map()
@@ -138,27 +138,24 @@ export const calculateUroHonPaymentsSync = (procedures: ProcedurePaymentInfo[]):
     const idx = (isExcluded || isDuplicate) ? -1 : pos
     const hon = map.get(codeNorm) || null
     if (!(isExcluded || isDuplicate) && hon) pos++
-    const base =
-      codeNorm === '04.09.01.017-0'
-        ? (idx <= 0 ? 250 : 100)
-        : !hon
-          ? 0
-          : idx <= 0
-            ? hon.hon1
-            : idx === 1
-              ? hon.hon2
-              : idx === 2
-                ? hon.hon3
-                : idx === 3
-                  ? hon.hon4
-                  : hon.hon5
+    const base = !hon
+      ? 0
+      : idx <= 0
+        ? hon.hon1
+        : idx === 1
+          ? hon.hon2
+          : idx === 2
+            ? hon.hon3
+            : idx === 3
+              ? hon.hon4
+              : hon.hon5
     const pay = (isExcluded || isDuplicate) ? 0 : base
     if (!isExcluded && !isDuplicate && hon) paidCodes.add(codeNorm)
     total += pay
     return {
       ...p,
       calculatedPayment: pay,
-      paymentRule: isDuplicate ? 'Duplicado (não pago)' : (hon ? `UROLOGIA HON (pos ${idx+1})` : 'Sem regra HON para código'),
+      paymentRule: isDuplicate ? 'Duplicado (não pago)' : (hon ? `UROLOGIA HON (pos ${idx + 1})` : 'Sem regra HON para código'),
       isSpecialRule: true
     }
   })

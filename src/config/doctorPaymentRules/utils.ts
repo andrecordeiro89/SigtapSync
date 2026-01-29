@@ -6,8 +6,8 @@
  * ================================================================
  */
 
-import type { 
-  DoctorPaymentRule, 
+import type {
+  DoctorPaymentRule,
   ProcedurePaymentInfo,
   CalculatedPaymentResult,
   FixedPaymentResult,
@@ -81,7 +81,7 @@ export const HOSPITAL_MAPPINGS: HospitalMapping[] = [
 // ================================================================
 
 export function detectHospitalFromContext(
-  doctorName: string, 
+  doctorName: string,
   hospitalId?: string,
   allHospitalRules?: Record<string, Record<string, DoctorPaymentRule>>
 ): string {
@@ -91,15 +91,15 @@ export function detectHospitalFromContext(
     if (mapping) {
       return mapping.key;
     }
-    
+
     console.warn(`⚠️ Hospital ID não reconhecido: ${hospitalId}`);
     return 'TORAO_TOKUDA_APUCARANA';
   }
-  
+
   // Prioridade 2+: Verificar se médico existe em cada hospital
   if (allHospitalRules) {
     const doctorUpper = doctorName.toUpperCase();
-    
+
     // Buscar em ordem de prioridade
     const hospitalKeys = [
       'HOSPITAL_NOSSA_SENHORA_APARECIDA_FOZ',
@@ -110,14 +110,14 @@ export function detectHospitalFromContext(
       'HOSPITAL_MUNICIPAL_SANTA_ALICE',
       'TORAO_TOKUDA_APUCARANA'
     ];
-    
+
     for (const key of hospitalKeys) {
       if (allHospitalRules[key]?.[doctorUpper]) {
         return key;
       }
     }
   }
-  
+
   // Fallback: Torao Tokuda (compatibilidade)
   return 'TORAO_TOKUDA_APUCARANA';
 }
@@ -144,7 +144,7 @@ export function initializeRulesCache(
   Object.entries(allHospitalRules).forEach(([hospitalKey, hospitalRules]) => {
     Object.entries(hospitalRules).forEach(([doctorName, rule]) => {
       const cacheKey = `${doctorName}::${hospitalKey}`;
-      
+
       // Indexar regras fixas
       if (rule.fixedPaymentRule) {
         FIXED_RULES_CACHE!.set(cacheKey, {
@@ -201,14 +201,14 @@ export function calculateFixedPayment(
   // Busca O(1) no cache
   const hospitalKey = detectHospitalFromContext(doctorName, hospitalId, allHospitalRules);
   const cacheKey = `${doctorName.toUpperCase()}::${hospitalKey}`;
-  
+
   let rule = FIXED_RULES_CACHE?.get(cacheKey);
-  
+
   // Fallback: buscar sem hospital APENAS se hospitalId NÃO foi fornecido
   if (!rule && !hospitalId) {
     rule = FIXED_RULES_CACHE?.get(doctorName.toUpperCase());
   }
-  
+
   if (!rule) {
     return {
       calculatedPayment: 0,
@@ -242,14 +242,14 @@ export function calculatePercentagePayment(
   // Busca O(1) no cache
   const hospitalKey = detectHospitalFromContext(doctorName, hospitalId, allHospitalRules);
   const cacheKey = `${doctorName.toUpperCase()}::${hospitalKey}`;
-  
+
   let rule = PERCENTAGE_RULES_CACHE?.get(cacheKey);
-  
+
   // Fallback: buscar sem hospital APENAS se hospitalId NÃO foi fornecido
   if (!rule && !hospitalId) {
     rule = PERCENTAGE_RULES_CACHE?.get(doctorName.toUpperCase());
   }
-  
+
   if (!rule) {
     return {
       calculatedPayment: 0,
@@ -259,7 +259,7 @@ export function calculatePercentagePayment(
   }
 
   const calculatedPayment = (totalValue * rule.percentage) / 100;
-  
+
   return {
     calculatedPayment,
     appliedRule: `${rule.description} (${rule.percentage}% de R$ ${totalValue.toFixed(2)} = R$ ${calculatedPayment.toFixed(2)})`,
@@ -272,7 +272,7 @@ export function calculatePercentagePayment(
 // ================================================================
 
 export function hasIndividualPaymentRules(
-  doctorName: string, 
+  doctorName: string,
   hospitalId?: string,
   allHospitalRules?: Record<string, Record<string, DoctorPaymentRule>>
 ): boolean {
@@ -290,37 +290,37 @@ export function isFixedMonthlyPayment(
   const hospitalKey = detectHospitalFromContext(doctorName, hospitalId, allHospitalRules);
   const hospitalRules = allHospitalRules?.[hospitalKey];
   const rule = hospitalRules?.[doctorName.toUpperCase()];
-  
+
   if (!rule?.fixedPaymentRule) {
     return false;
   }
-  
+
   const fixedAmount = rule.fixedPaymentRule.amount;
   const description = rule.fixedPaymentRule.description.toLowerCase();
-  
+
   const isMensalByDescription = description.includes('mensal');
   const isMensalByAmount = fixedAmount > 10000;
-  
+
   return isMensalByDescription || isMensalByAmount;
 }
 
 export function getDoctorRuleProcedureCodes(
-  doctorName: string, 
+  doctorName: string,
   hospitalId?: string,
   allHospitalRules?: Record<string, Record<string, DoctorPaymentRule>>
 ): string[] {
   const hospitalKey = detectHospitalFromContext(doctorName, hospitalId, allHospitalRules);
   const hospitalRules = allHospitalRules?.[hospitalKey];
   const rule = hospitalRules?.[doctorName.toUpperCase()];
-  
+
   if (!rule) return [];
-  
+
   const codes = new Set<string>();
-  
+
   rule.rules?.forEach(r => codes.add(r.procedureCode));
   rule.multipleRule?.codes?.forEach(c => codes.add(c));
   rule.multipleRules?.forEach(mr => mr.codes.forEach(c => codes.add(c)));
-  
+
   return Array.from(codes);
 }
 
@@ -339,10 +339,10 @@ export function checkUnruledProcedures(
       totalUnruled: 0
     };
   }
-  
+
   // Obter códigos com regras definidas
   const ruledCodes = new Set(getDoctorRuleProcedureCodes(doctorName, hospitalId, allHospitalRules));
-  
+
   // Filtrar apenas procedimentos médicos (04.xxx) que NÃO têm regras
   const unruledProcedures = performedProcedureCodes
     .filter(code => {
@@ -351,7 +351,7 @@ export function checkUnruledProcedures(
       const hasNoRule = !ruledCodes.has(cleanCode);
       return isMedical && hasNoRule;
     });
-  
+
   return {
     hasUnruledProcedures: unruledProcedures.length > 0,
     unruledProcedures: Array.from(new Set(unruledProcedures)),
