@@ -19,7 +19,6 @@ import {
   initializeRulesCache,
   formatCurrency
 } from './utils';
-import { DISCRIMINATE_PROCEDURE_PAYMENTS } from '../system';
 import { getHonValuesForCode, calculateHonByPosition, calculateHonPayments } from './importers/honCsv'
 import { calculateGynHonPaymentsSync, loadGynHonMap, getGynHonMapSync } from './importers/gynXlsx'
 import { calculateUroHonPaymentsSync, loadUroHonMap, getUroHonMapSync } from './importers/uroXlsx'
@@ -170,79 +169,39 @@ export function calculateDoctorPayment(
         isSpecialRule: true
       }))
 
+      // Aplicar regras múltiplas (preferência)
+      let comboApplied = false
+      const applyCombo = (codes: string[], value: number, desc: string) => {
+        const firstIdx = out.findIndex(o => codes.includes(normalize(o.procedure_code)) && o.cbo !== '225151')
+        if (firstIdx >= 0) {
+          out[firstIdx] = { ...out[firstIdx], calculatedPayment: value, paymentRule: desc, isSpecialRule: true }
+          codes.forEach(c => paidCodes.add(c))
+          comboApplied = true
+        }
+      }
+
+      if (indiv.multipleRules && indiv.multipleRules.length > 0) {
+        // Ordenar por maior número de códigos para priorizar combinações maiores
+        const sortedMultipleRules = [...indiv.multipleRules].sort((a, b) => b.codes.length - a.codes.length)
+        for (const mr of sortedMultipleRules) {
+          const allPresent = mr.codes.every(c => performedSet.has(c))
+          if (allPresent) {
+            applyCombo(mr.codes.map(normalize), mr.totalValue, mr.description || 'Regra múltipla (total)')
+            break // Aplicar apenas a primeira combinação encontrada
+          }
+        }
+      } else if (indiv.multipleRule && indiv.multipleRule.codes?.length) {
+        const allPresent = indiv.multipleRule.codes.every(c => performedSet.has(c))
+        if (allPresent) {
+          applyCombo(indiv.multipleRule.codes.map(normalize), indiv.multipleRule.totalValue, indiv.multipleRule.description || 'Regra múltipla (total)')
+        }
+      }
+
       // Aplicar regras individuais com valores por posição
       const ruleByCode = new Map<string, typeof indiv.rules[number]>()
       for (const r of (indiv.rules || [])) {
         ruleByCode.set(r.procedureCode, r)
       }
-
-      const applyComboConsolidated = (codes: string[], value: number, desc: string) => {
-        const firstIdx = out.findIndex(o => codes.includes(normalize(o.procedure_code)) && o.cbo !== '225151')
-        if (firstIdx >= 0) {
-          out[firstIdx] = { ...out[firstIdx], calculatedPayment: value, paymentRule: desc, isSpecialRule: true }
-          codes.forEach(c => paidCodes.add(c))
-        }
-      }
-
-      const distributeCombo = (codes: string[], value: number, desc: string) => {
-        const codeToIndex = new Map<string, number>()
-        for (const c of codes) {
-          if (codeToIndex.has(c)) continue
-          const idx = out.findIndex(o => normalize(o.procedure_code) === c && o.cbo !== '225151')
-          if (idx >= 0) codeToIndex.set(c, idx)
-        }
-        const indices = [...codeToIndex.values()]
-        if (indices.length === 0) return
-        const totalCents = Math.round(value * 100)
-        const centsEach = Math.floor(totalCents / indices.length)
-        let used = 0
-        indices.forEach((idx, i) => {
-          const cents = i === indices.length - 1 ? (totalCents - used) : centsEach
-          used += centsEach
-          out[idx] = { ...out[idx], calculatedPayment: cents / 100, paymentRule: desc, isSpecialRule: true }
-        })
-        codes.forEach(c => paidCodes.add(c))
-      }
-
-      const hasMeaningfulIndividualValue = (code: string) => {
-        const r = ruleByCode.get(code)
-        if (!r) return false
-        const std = r.standardValue ?? 0
-        const sec = r.secondaryValue ?? 0
-        const ter = r.tertiaryValue ?? 0
-        const qua = r.quaternaryValue ?? 0
-        return (std + sec + ter + qua) > 0
-      }
-
-      const tryApplyComboRules = () => {
-        const considerCombo = (codesRaw: string[], totalValue: number, desc: string) => {
-          const codes = codesRaw.map(normalize)
-          const allPresent = codes.every(c => performedSet.has(c))
-          if (!allPresent) return false
-
-          if (!DISCRIMINATE_PROCEDURE_PAYMENTS) {
-            applyComboConsolidated(codes, totalValue, desc)
-            return true
-          }
-
-          const needsCombo = codes.some(c => !hasMeaningfulIndividualValue(c))
-          if (!needsCombo) return false
-
-          distributeCombo(codes, totalValue, desc)
-          return true
-        }
-
-        if (indiv.multipleRules && indiv.multipleRules.length > 0) {
-          const sortedMultipleRules = [...indiv.multipleRules].sort((a, b) => b.codes.length - a.codes.length)
-          for (const mr of sortedMultipleRules) {
-            if (considerCombo(mr.codes, mr.totalValue, mr.description || 'Regra múltipla (total)')) return
-          }
-        } else if (indiv.multipleRule && indiv.multipleRule.codes?.length) {
-          considerCombo(indiv.multipleRule.codes, indiv.multipleRule.totalValue, indiv.multipleRule.description || 'Regra múltipla (total)')
-        }
-      }
-
-      tryApplyComboRules()
       {
         const exclusiveCode = '04.08.04.007-6'
         if (hospitalKey === 'HOSPITAL_MATERNIDADE_NOSSA_SENHORA_APARECIDA_FRG' && performedSet.has(exclusiveCode)) {
@@ -284,6 +243,10 @@ export function calculateDoctorPayment(
         total += base
         return { ...p, calculatedPayment: base, paymentRule: r.description || `Regra específica (pos ${idx + 1})`, isSpecialRule: true }
       })
+
+      if (comboApplied) {
+        total = out.reduce((s, o) => s + (o.calculatedPayment || 0), 0)
+      }
 
       if (total > 0) {
         return { procedures: out, totalPayment: total, appliedRule: `Regras específicas - ${hospitalKey}` }
