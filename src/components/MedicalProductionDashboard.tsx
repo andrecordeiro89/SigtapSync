@@ -411,7 +411,8 @@ const calculateDoctorStats = (
         procedure_code: proc.procedure_code,
         procedure_description: proc.procedure_description,
         value_reais: proc.value_reais || 0,
-        cbo: proc.cbo
+        cbo: proc.cbo,
+        sequence: proc.sequence
       }));
     if (patientMedicalProcedures.length > 0) {
       const isGeneralSurgery = /cirurg/i.test(doctorData.doctor_info.name || '') || (/cirurg/i.test(doctorData.doctor_info.specialty || '') && /geral/i.test(doctorData.doctor_info.specialty || ''))
@@ -1343,6 +1344,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             procedure_description: proc.procedure_description,
             value_reais: proc.value_reais || 0,
             cbo: proc.cbo,
+            sequence: proc.sequence,
           }))
         let repasseValue = 0
         if (proceduresWithPayment.length > 0) {
@@ -1976,6 +1978,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               procedure_code: proc.procedure_code,
               procedure_description: proc.procedure_description,
               procedure_date: proc.procedure_date,
+              sequence: (proc as any).sequencia ?? (proc as any).sequence,
               value_reais: (proc.value_charged || proc.total_value || 0) / 100, // Converter centavos para reais
               value_cents: proc.value_charged || proc.total_value || 0,
               approval_status: proc.billing_status || 'pending',
@@ -2404,6 +2407,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           procedure_description: proc.procedure_description,
           value_reais: proc.value_reais || 0,
           cbo: proc.cbo,
+          sequence: proc.sequence,
         }));
 
       if (proceduresWithPayment.length > 0) {
@@ -2467,8 +2471,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           const doctorName = doctor.doctor_info?.name || ''
           const isGenSurg = /cirurg/i.test(doctorName) || (/cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || ''))
           const paymentResult = (shouldUseHonForHospital(doctorName, hospitalId, !!isGenSurg)
-            ? calculateHonPayments(medicalSorted.map((proc: any) => ({ procedure_code: proc.procedure_code, value_reais: proc.value_reais || 0, cbo: proc.cbo })))
-            : calculateDoctorPayment(doctorName, medicalSorted.map((proc: any) => ({ procedure_code: proc.procedure_code, value_reais: proc.value_reais || 0, cbo: proc.cbo })), hospitalId))
+            ? calculateHonPayments(medicalSorted.map((proc: any) => ({ procedure_code: proc.procedure_code, value_reais: proc.value_reais || 0, cbo: proc.cbo, sequence: proc.sequence })))
+            : calculateDoctorPayment(doctorName, medicalSorted.map((proc: any) => ({ procedure_code: proc.procedure_code, value_reais: proc.value_reais || 0, cbo: proc.cbo, sequence: proc.sequence })), hospitalId))
           repasseValue = paymentResult.totalPayment || 0
         }
         if (repasseValue === 0) {
@@ -4903,6 +4907,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                 procedure_description: proc.procedure_description,
                                                 value_reais: proc.value_reais || 0,
                                                 cbo: proc.cbo,
+                                                sequence: proc.sequence,
                                               }));
 
                                             let repasseValue = 0;
@@ -5972,6 +5977,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                     procedure_description: proc.procedure_description,
                                                     value_reais: proc.value_reais || 0,
                                                     cbo: proc.cbo,
+                                                    sequence: proc.sequence,
                                                   }));
 
                                                 // ✅ CORREÇÃO: Usar MESMA lógica do relatório para isGenSurg
@@ -6537,7 +6543,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                                       procedure_code: proc.procedure_code,
                                                                       procedure_description: proc.procedure_description,
                                                                       value_reais: proc.value_reais || 0,
-                                                                      cbo: proc.cbo
+                                                                      cbo: proc.cbo,
+                                                                      sequence: (proc as any).sequence
                                                                     }))}
                                                                   hospitalId={getDoctorContextualHospitalId(doctor)}
                                                                   className="mt-5"

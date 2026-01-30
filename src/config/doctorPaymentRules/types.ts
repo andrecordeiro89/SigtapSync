@@ -64,6 +64,7 @@ export interface ProcedurePaymentInfo {
   procedure_description?: string;
   value_reais: number;
   cbo?: string;
+  sequence?: number;
   calculatedPayment?: number;
   paymentRule?: string;
   isSpecialRule?: boolean;

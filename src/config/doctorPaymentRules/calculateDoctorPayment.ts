@@ -222,18 +222,19 @@ export function calculateDoctorPayment(
 
       out = out.map((p) => {
         const code = normalize(p.procedure_code)
+        const r = ruleByCode.get(code)
+        const shouldCountPos = p.cbo !== '225151' && !!r
+        if (shouldCountPos) pos++
         if ((p as any).calculatedPayment > 0) {
           paidCodes.add(code)
           total += (p as any).calculatedPayment || 0
           return { ...p, isSpecialRule: true } as any
         }
         const isDup = paidCodes.has(code)
-        const r = ruleByCode.get(code)
         if (p.cbo === '225151' || isDup || !r) {
           return { ...p, calculatedPayment: 0, paymentRule: isDup ? 'Duplicado (não pago)' : 'Sem regra específica', isSpecialRule: true }
         }
-        const idx = pos
-        pos++
+        const idx = pos - 1
         const base =
           idx <= 0 ? (r.standardValue ?? 0) :
             idx === 1 ? (r.secondaryValue ?? r.standardValue ?? 0) :
@@ -401,4 +402,3 @@ export function calculateDoctorPayment(
     appliedRule: processedCsv.appliedRule
   };
 }
-

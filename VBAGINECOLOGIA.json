@@ -1,0 +1,281 @@
+[
+  {
+    "Código do Procedimento":"04.09.06.013-5",
+    "Nome do Procedimento":"HISTERECTOMIA TOTAL",
+    "HON1":1000,
+    "HON2":750.0,
+    "HON3":600,
+    "HON4":500,
+    "HON5":500
+  },
+  {
+    "Código do Procedimento":"04.09.06.012-7",
+    "Nome do Procedimento":"HISTERECTOMIA SUBTOTAL",
+    "HON1":750,
+    "HON2":562.5,
+    "HON3":450,
+    "HON4":375,
+    "HON5":375
+  },
+  {
+    "Código do Procedimento":"04.09.06.011-9",
+    "Nome do Procedimento":"HISTERECTOMIA C\/ ANEXECTOMIA (UNI \/ BILATERAL)",
+    "HON1":1200,
+    "HON2":900.0,
+    "HON3":720,
+    "HON4":600,
+    "HON5":600
+  },
+  {
+    "Código do Procedimento":"04.09.06.021-6",
+    "Nome do Procedimento":"OOFORECTOMIA \/ OOFOROPLASTIA",
+    "HON1":700,
+    "HON2":525.0,
+    "HON3":420,
+    "HON4":350,
+    "HON5":350
+  },
+  {
+    "Código do Procedimento":"04.09.06.023-2",
+    "Nome do Procedimento":"SALPINGECTOMIA UNI \/ BILATERAL",
+    "HON1":250,
+    "HON2":187.5,
+    "HON3":150,
+    "HON4":125,
+    "HON5":125
+  },
+  {
+    "Código do Procedimento":"04.09.06.018-6",
+    "Nome do Procedimento":"LAQUEADURA TUBARIA",
+    "HON1":600,
+    "HON2":450.0,
+    "HON3":360,
+    "HON4":300,
+    "HON5":300
+  },
+  {
+    "Código do Procedimento":"04.09.07.027-0",
+    "Nome do Procedimento":"TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL",
+    "HON1":450,
+    "HON2":250.0,
+    "HON3":200,
+    "HON4":180,
+    "HON5":180
+  },
+  {
+    "Código do Procedimento":"04.09.07.006-8",
+    "Nome do Procedimento":"COLPOPERINEOPLASTIA POSTERIOR",
+    "HON1":450,
+    "HON2":337.5,
+    "HON3":360,
+    "HON4":225,
+    "HON5":225
+  },
+  {
+    "Código do Procedimento":"04.09.07.005-0",
+    "Nome do Procedimento":"COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR",
+    "HON1":600,
+    "HON2":450.0,
+    "HON3":360,
+    "HON4":300,
+    "HON5":300
+  },
+  {
+    "Código do Procedimento":"04.09.06.004-6",
+    "Nome do Procedimento":"CURETAGEM SEMIOTICA C\/ OU S\/ DILATACAO DO COLO DO UTERO",
+    "HON1":250,
+    "HON2":187.5,
+    "HON3":150,
+    "HON4":125,
+    "HON5":125
+  },
+  {
+    "Código do Procedimento":"04.09.07.026-2",
+    "Nome do Procedimento":"TRATAMENTO CIRURGICO DE HIPERTROFIA DOS PEQUENOS LABIOS",
+    "HON1":250,
+    "HON2":187.5,
+    "HON3":150,
+    "HON4":125,
+    "HON5":125
+  },
+  {
+    "Código do Procedimento":"04.08.06.031-0",
+    "Nome do Procedimento":"RESSECÇÃO SIMPLES DE TUMOR ÓSSEO \/ DE PARTES MOLES",
+    "HON1":250,
+    "HON2":187.5,
+    "HON3":150,
+    "HON4":125,
+    "HON5":125
+  },
+  {
+    "Código do Procedimento":"04.09.07.015-7",
+    "Nome do Procedimento":"EXERESE DE GLÂNDULA DE BARTHOLIN \/ SKENE",
+    "HON1":250,
+    "HON2":187.5,
+    "HON3":150,
+    "HON4":125,
+    "HON5":125
+  },
+  {
+    "Código do Procedimento":"04.09.07.003-3",
+    "Nome do Procedimento":"- COLPOCLEISE (CIRURGIA DE LE FORT)",
+    "HON1":250,
+    "HON2":187.5,
+    "HON3":150,
+    "HON4":125,
+    "HON5":125
+  },
+  {
+    "Código do Procedimento":"04.09.07.014-9",
+    "Nome do Procedimento":"EXERESE DE CISTO VAGINAL",
+    "HON1":300,
+    "HON2":225.0,
+    "HON3":180,
+    "HON4":125,
+    "HON5":125
+  },
+  {
+    "Código do Procedimento":"04.09.06.019-4",
+    "Nome do Procedimento":"- MIOMECTOMIA",
+    "HON1":550,
+    "HON2":412.5,
+    "HON3":330,
+    "HON4":275,
+    "HON5":275
+  },
+  {
+    "Código do Procedimento":"04.09.06.022-4",
+    "Nome do Procedimento":"RESSECCAO DE VARIZES PELVICAS",
+    "HON1":100,
+    "HON2":100.0,
+    "HON3":100,
+    "HON4":100,
+    "HON5":100
+  },
+  {
+    "Código do Procedimento":"04.07.04.018-8",
+    "Nome do Procedimento":"LIBERAÇÃO DE ADERÊNCIAS INTESTINAIS",
+    "HON1":300,
+    "HON2":300.0,
+    "HON3":300,
+    "HON4":300,
+    "HON5":300
+  },
+  {
+    "Código do Procedimento":"04.09.07.009-2",
+    "Nome do Procedimento":"- COLPORRAFIA NAO OBSTETRICA",
+    "HON1":100,
+    "HON2":100.0,
+    "HON3":100,
+    "HON4":100,
+    "HON5":100
+  },
+  {
+    "Código do Procedimento":"04.01.02.010-0",
+    "Nome do Procedimento":"EXTIRPAÇÃOE SUPRESSÃO DE LESÃO DE PELE E DE TECIDO CELULAR SUBCUTÂNEO",
+    "HON1":150,
+    "HON2":100.0,
+    "HON3":80,
+    "HON4":50,
+    "HON5":50
+  },
+  {
+    "Código do Procedimento":"04.11.01.007-7",
+    "Nome do Procedimento":"SUTURA DE LACERACOES DE TRAJETO PELVICO",
+    "HON1":100,
+    "HON2":75.0,
+    "HON3":60,
+    "HON4":50,
+    "HON5":50
+  },
+  {
+    "Código do Procedimento":"04.09.06.002-0",
+    "Nome do Procedimento":"COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR C\/ AMPUTACAO DE COLO",
+    "HON1":450,
+    "HON2":337.5,
+    "HON3":360,
+    "HON4":225,
+    "HON5":225
+  },
+  {
+    "Código do Procedimento":"04.09.07.009-2",
+    "Nome do Procedimento":"COLPORRAFIA NAO OBSTETRICA",
+    "HON1":200,
+    "HON2":150.0,
+    "HON3":120,
+    "HON4":100,
+    "HON5":100
+  },
+  {
+    "Código do Procedimento":"04.09.06.019-4",
+    "Nome do Procedimento":"MIOMECTOMIA",
+    "HON1":500,
+    "HON2":375.0,
+    "HON3":300,
+    "HON4":250,
+    "HON5":250
+  },
+  {
+    "Código do Procedimento":"04.09.07.007-6",
+    "Nome do Procedimento":"COLPOPERINEORRAFIA NAO OBSTETRICA",
+    "HON1":300,
+    "HON2":225.0,
+    "HON3":180,
+    "HON4":150,
+    "HON5":150
+  },
+  {
+    "Código do Procedimento":"04.09.07.019-0",
+    "Nome do Procedimento":"MARSUPIALIZACAO DE GLÂNDULA DE BARTOLIN",
+    "HON1":150,
+    "HON2":112.5,
+    "HON3":90,
+    "HON4":75,
+    "HON5":75
+  },
+  {
+    "Código do Procedimento":"04.09.07.003-3",
+    "Nome do Procedimento":"COLPOCLEISE (CIRURGIA DE LE FORT)",
+    "HON1":250,
+    "HON2":187.5,
+    "HON3":150,
+    "HON4":125,
+    "HON5":125
+  },
+  {
+    "Código do Procedimento":"04.09.06.010-0",
+    "Nome do Procedimento":"HISTERECTOMIA (POR VIA VAGINAL)",
+    "HON1":600,
+    "HON2":550.0,
+    "HON3":360,
+    "HON4":300,
+    "HON5":300
+  },
+  {
+    "Código do Procedimento":"04.09.06.003-8",
+    "Nome do Procedimento":"EXCISÃO TIPO 3 DO COLO UTERINO",
+    "HON1":300,
+    "HON2":225.0,
+    "HON3":180,
+    "HON4":150,
+    "HON5":150
+  },
+  {
+    "Código do Procedimento":"04.08.06.020-4",
+    "Nome do Procedimento":"REINSERÇÃO MUSCULAR",
+    "HON1":150,
+    "HON2":112.5,
+    "HON3":90,
+    "HON4":75,
+    "HON5":75
+  },
+  {
+    "Código do Procedimento":"04.09.02.015-0",
+    "Nome do Procedimento":"URETRORRAFIA",
+    "HON1":150,
+    "HON2":112.5,
+    "HON3":90,
+    "HON4":75,
+    "HON5":75
+  }
+]
