@@ -402,15 +402,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [proceduresData, setProceduresData] = useState<AIHBillingByProcedure[]>([]);
   const [includeAnesthesia, setIncludeAnesthesia] = useState<boolean>(true);
   const [aihDbCount, setAihDbCount] = useState<number | null>(null);
-  const [aihKpi, setAihKpi] = useState<{ totalAIHs: number; totalRevenue: number; averageTicket: number; approvalRate: number } | null>(null);
-  const [financialKpis, setFinancialKpis] = useState<{
-    sigtapTotalValue: number;
-    incrementTotal: number;
-    incrementElective: number;
-    incrementUrgency: number;
-    totalValue: number;
-    medicalPaymentTotal: number;
-  } | null>(null);
+  const [aihKpi, setAihKpi] = useState<{ totalAIHs: number; totalRevenue: number; averageTicket: number } | null>(null);
   const [pendingLoads, setPendingLoads] = useState(0);
   const startLoad = () => setPendingLoads(v => v + 1);
   const endLoad = () => setPendingLoads(v => Math.max(0, v - 1));
@@ -1051,14 +1043,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
           setAihKpi({
             totalAIHs: Number(row.total_aihs || 0),
             totalRevenue: Number(row.total_value || 0),
-            averageTicket: Number(row.average_ticket || 0),
-            approvalRate: Number(row.approval_rate || 0)
+            averageTicket: Number(row.average_ticket || 0)
           });
         } else {
           try {
             let query = supabase
               .from('aihs')
-              .select('id, calculated_total_value, approval_status, hospital_id, competencia, care_character, discharge_date');
+              .select('id, calculated_total_value, hospital_id, competencia, care_character, discharge_date');
             if (hospitalIds) query = query.in('hospital_id', hospitalIds as any);
             const comp = (selectedCompetency && selectedCompetency !== 'all' && selectedCompetency.trim() !== '') ? selectedCompetency.trim() : null;
             if (comp) query = query.eq('competencia', comp);
@@ -1072,9 +1063,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               const totalAIHs = rows.length;
               const totalRevenue = rows.reduce((sum: number, r: any) => sum + (Number(r.calculated_total_value || 0)), 0);
               const averageTicket = totalAIHs > 0 ? totalRevenue / totalAIHs : 0;
-              const approved = rows.filter((r: any) => String(r.approval_status || '').toLowerCase() === 'approved').length;
-              const approvalRate = totalAIHs > 0 ? (approved / totalAIHs) * 100 : 0;
-              setAihKpi({ totalAIHs, totalRevenue, averageTicket, approvalRate });
+              setAihKpi({ totalAIHs, totalRevenue, averageTicket });
             }
           } catch {
             setAihKpi(null);
@@ -1092,49 +1081,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         ...prev,
         totalAIHs: aihKpi.totalAIHs,
         totalRevenue: aihKpi.totalRevenue,
-        averageTicket: aihKpi.averageTicket,
-        approvalRate: aihKpi.approvalRate
+        averageTicket: aihKpi.averageTicket
       }));
     }
   }, [aihKpi]);
-
-  useEffect(() => {
-    (async () => {
-      if (!hasExecutiveAccess) return;
-      startLoad();
-      try {
-        const rawCare = String(filterCareCharacter || '').trim();
-        const careNormalized = rawCare === '01' ? '1' : rawCare === '02' ? '2' : (rawCare === 'all' ? null : rawCare || null);
-        const hospitalIds = (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) ? selectedHospitals : null;
-        const { data, error } = await supabase.rpc('get_aih_financial_kpis', {
-          hospital_ids: hospitalIds,
-          competencia: (selectedCompetency && selectedCompetency !== 'all' && selectedCompetency.trim() !== '') ? selectedCompetency.trim() : null,
-          care_character: careNormalized,
-          discharge_from: dischargeFrom || null,
-          discharge_to: dischargeTo || null,
-          doctor_name: null,
-          patient_name: null,
-          match_statuses: ['approved', 'matched', 'manual'],
-          billing_statuses: ['paid', 'approved']
-        });
-        if (!error && Array.isArray(data) && data.length > 0) {
-          const row: any = data[0];
-          setFinancialKpis({
-            sigtapTotalValue: Number(row.sigtap_total_value || 0),
-            incrementTotal: Number(row.increment_total || 0),
-            incrementElective: Number(row.increment_elective || 0),
-            incrementUrgency: Number(row.increment_urgency || 0),
-            totalValue: Number(row.total_value || 0),
-            medicalPaymentTotal: Number(row.medical_payment_total || 0)
-          });
-        } else {
-          setFinancialKpis(null);
-        }
-      } catch {
-        setFinancialKpis(null);
-      } finally { endLoad(); }
-    })();
-  }, [hasExecutiveAccess, selectedHospitals, selectedCompetency, filterCareCharacter, dischargeFrom, dischargeTo]);
 
   // ✅ Carregar competências disponíveis do campo `competencia` da tabela `aihs`
   // ✅ CORREÇÃO: Implementar paginação para buscar TODAS as competências (sem limite de 1000)
@@ -1333,58 +1283,6 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 )}
               </div>
             </div>
-            {financialKpis && (
-              <div className="flex items-center gap-2">
-                <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
-                  <div className="text-[9px] font-semibold text-black uppercase tracking-wide">
-                    Valor Total SIGTAP
-                  </div>
-                  <div className="text-[13px] font-black text-black">
-                    {isGlobalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : formatCurrency(financialKpis.sigtapTotalValue)}
-                  </div>
-                </div>
-                <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
-                  <div className="text-[9px] font-semibold text-black uppercase tracking-wide">
-                    Incrementos
-                  </div>
-                  <div className="text-[13px] font-black text-black">
-                    {isGlobalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : formatCurrency(financialKpis.incrementTotal)}
-                  </div>
-                </div>
-                <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
-                  <div className="text-[9px] font-semibold text-black uppercase tracking-wide">
-                    Inc. Eletivo
-                  </div>
-                  <div className="text-[13px] font-black text-black">
-                    {isGlobalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : formatCurrency(financialKpis.incrementElective)}
-                  </div>
-                </div>
-                <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
-                  <div className="text-[9px] font-semibold text-black uppercase tracking-wide">
-                    Inc. Urgência
-                  </div>
-                  <div className="text-[13px] font-black text-black">
-                    {isGlobalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : formatCurrency(financialKpis.incrementUrgency)}
-                  </div>
-                </div>
-                <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
-                  <div className="text-[9px] font-semibold text-black uppercase tracking-wide">
-                    Valor Total
-                  </div>
-                  <div className="text-[13px] font-black text-black">
-                    {isGlobalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : formatCurrency(financialKpis.totalValue)}
-                  </div>
-                </div>
-                <div className="rounded-xl px-3 py-2.5 border border-gray-200 bg-white">
-                  <div className="text-[9px] font-semibold text-black uppercase tracking-wide">
-                    Pagamento Médico Total
-                  </div>
-                  <div className="text-[13px] font-black text-black">
-                    {isGlobalLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : formatCurrency(financialKpis.medicalPaymentTotal)}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
               </div>
             </div>
