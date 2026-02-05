@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx'
+// import * as XLSX from 'xlsx'
 
 type HonValues = { hon1: number; hon2: number; hon3: number; hon4: number; hon5: number }
 
@@ -32,8 +32,7 @@ let OTO_SJ_HON_MAP: Map<string, HonValues> | null = null
 let initPromise: Promise<Map<string, HonValues>> | null = null
 
 const candidateUrls: string[] = [
-  '/VBA%20OTORRINO%20HOSPITAL%20MUNICIPAL%20S%C3%83O%20JOSE.xlsx',
-  '/VBA OTORRINO HOSPITAL MUNICIPAL SÃO JOSE.xlsx'
+  '/VBA_OTORRINO_HOSPITAL_MUNICIPAL_SAO_JOSE.json'
 ]
 let resolvedUrl: string | undefined = candidateUrls[0]
 
@@ -47,62 +46,44 @@ export const loadOtoSaoJoseHonMap = async (): Promise<Map<string, HonValues>> =>
         OTO_SJ_HON_MAP = new Map()
         return OTO_SJ_HON_MAP
       }
-      let buf: ArrayBuffer | null = null
+      
+      let data: any = null
       for (const u of candidateUrls) {
         try {
           const res = await fetch(`${u}?t=${Date.now()}`)
           if (res.ok) {
-            buf = await res.arrayBuffer()
+            data = await res.json()
             resolvedUrl = u
             break
           }
         } catch {}
       }
-      if (!buf) {
+
+      if (!data || !data.Planilha1 || !Array.isArray(data.Planilha1)) {
+        console.warn('Falha ao carregar ou estruturar JSON Otorrino São José', data)
         OTO_SJ_HON_MAP = new Map()
         return OTO_SJ_HON_MAP
       }
-      const wb = XLSX.read(buf, { type: 'array', cellDates: false })
-      const wsName = wb.SheetNames[0]
-      const ws = wb.Sheets[wsName]
-      const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][]
+
+      const rows = data.Planilha1
       const map = new Map<string, HonValues>()
-      if (rows.length < 2) {
-        OTO_SJ_HON_MAP = map
-        return map
-      }
-      const headers = (rows[0] || []).map((h: any) => String(h || '').toUpperCase().trim())
-      const idxCode = headers.findIndex(h => /(CODIGO|C[ÓO]DIGO|PROCEDIMENTO(S)?)/i.test(h))
-      const idxHon1 = headers.findIndex(h => /^HON[\s-]?1$/i.test(h))
-      const idxHon2 = headers.findIndex(h => /^HON[\s-]?2$/i.test(h))
-      const idxHon3 = headers.findIndex(h => /^HON[\s-]?3$/i.test(h))
-      const idxHon4 = headers.findIndex(h => /^HON[\s-]?4$/i.test(h))
-      const idxHon5 = headers.findIndex(h => /^HON[\s-]?5$/i.test(h))
-      const codeIndex = idxCode >= 0 ? idxCode : 0
-      const h1 = idxHon1 >= 0 ? idxHon1 : -1
-      const h2 = idxHon2 >= 0 ? idxHon2 : -1
-      const h3 = idxHon3 >= 0 ? idxHon3 : -1
-      const h4 = idxHon4 >= 0 ? idxHon4 : -1
-      const h5 = idxHon5 >= 0 ? idxHon5 : -1
-      for (const row of rows.slice(1)) {
-        if (!row || row.length < codeIndex + 1) continue
-        const code = extractCode(String(row[codeIndex] || ''))
+      
+      for (const row of rows) {
+        if (!row || !row.Codigo) continue
+        const code = extractCode(String(row.Codigo))
         if (!code) continue
-        const raw1 = h1 >= 0 ? row[h1] : undefined
-        const raw2 = h2 >= 0 ? row[h2] : undefined
-        const raw3 = h3 >= 0 ? row[h3] : undefined
-        const raw4 = h4 >= 0 ? row[h4] : undefined
-        const raw5 = h5 >= 0 ? row[h5] : undefined
-        const hon1 = raw1 != null && String(raw1).trim() !== '' ? toNumber(raw1) : 0
-        const hon2 = (h2 < 0 || raw2 == null || String(raw2).trim() === '') ? hon1 : toNumber(raw2)
-        const hon3 = (h3 < 0 || raw3 == null || String(raw3).trim() === '') ? hon1 : toNumber(raw3)
-        const hon4 = (h4 < 0 || raw4 == null || String(raw4).trim() === '') ? hon1 : toNumber(raw4)
-        const hon5 = (h5 < 0 || raw5 == null || String(raw5).trim() === '') ? hon1 : toNumber(raw5)
-        map.set(code, { hon1, hon2, hon3, hon4, hon5 })
+        
+        const hon1 = toNumber(row.HON1)
+        // O JSON novo tem apenas HON1, assumimos que replica para os outros ou é unico
+        // Pela estrutura vista, só tem HON1. Vamos replicar para evitar zeros se a logica depender de hon2..5
+        const val = hon1
+        
+        map.set(code, { hon1: val, hon2: val, hon3: val, hon4: val, hon5: val })
       }
       OTO_SJ_HON_MAP = map
       return map
-    } catch {
+    } catch (err) {
+      console.error('Erro ao carregar JSON Otorrino SJ', err)
       OTO_SJ_HON_MAP = new Map()
       return OTO_SJ_HON_MAP
     }
@@ -181,7 +162,9 @@ export const calculateOtoSaoJoseHonPaymentsSync = (procedures: ProcedurePaymentI
   })
   const comboCount = presentComboKeys.size
   if (comboCount > 0) {
-    const target = comboCount >= 2 ? 800 : 650
+    // Nova regra baseada no JSON atualizado (VBA_OTORRINO_HOSPITAL_MUNICIPAL_SAO_JOSE.json)
+    // O valor é fixo em 700 tanto para procedimentos individuais quanto para combos.
+    const target = 700
     let otherSum = 0
     out.forEach(o => {
       const codeNorm = o.procedure_code.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)?.[1] || o.procedure_code
@@ -191,9 +174,14 @@ export const calculateOtoSaoJoseHonPaymentsSync = (procedures: ProcedurePaymentI
     })
     const leadPay = Math.max(0, target - otherSum)
     comboIndices.forEach((idx, j) => {
-      out[idx] = { ...out[idx], calculatedPayment: j === 0 ? leadPay : 0, paymentRule: comboCount >= 2 ? 'OTORRINO COMBO (teto 800)' : 'OTORRINO HON1 (teto 650)', isSpecialRule: true }
+      out[idx] = { 
+        ...out[idx], 
+        calculatedPayment: j === 0 ? leadPay : 0, 
+        paymentRule: comboCount >= 2 ? 'OTORRINO COMBO (teto 700)' : 'OTORRINO HON1 (teto 700)', 
+        isSpecialRule: true 
+      }
     })
     total = out.reduce((s, o) => s + (o.calculatedPayment || 0), 0)
   }
-  return { procedures: out, totalPayment: total, appliedRule: 'XLSX Otorrino São José HON1..HON5' }
+  return { procedures: out, totalPayment: total, appliedRule: 'JSON Otorrino São José (Fixo 700)' }
 }

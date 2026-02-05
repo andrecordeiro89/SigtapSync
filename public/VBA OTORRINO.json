@@ -1,0 +1,30 @@
+[
+  {
+    "PROCEDIMENTOS": "04.04.01.048-2  SEPTOPLASTIA",
+    "HON1": 650
+  },
+  {
+    "PROCEDIMENTOS": "04.04.01.041-5  TURBINECTOMIA",
+    "HON1": 650
+  },
+  {
+    "PROCEDIMENTOS": "04.04.01.002-4  AMIGDALECTOMIA",
+    "HON1": 650
+  },
+  {
+    "PROCEDIMENTOS": "04.04.01.001-6  ADENOIDECTOMIA",
+    "HON1": 650
+  },
+  {
+    "PROCEDIMENTOS": "04.04.01.003-2  ADENOAMIGDALECTOMIA",
+    "HON1": 650
+  },
+  {
+    "PROCEDIMENTOS": null,
+    "HON1": null
+  },
+  {
+    "PROCEDIMENTOS": "Combinação de dois ou mais entre os códigos acima (não soma valores individuais)",
+    "HON1": 800
+  }
+]

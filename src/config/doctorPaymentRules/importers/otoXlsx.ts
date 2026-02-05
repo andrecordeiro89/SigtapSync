@@ -32,6 +32,7 @@ let OTO_HON_MAP: Map<string, HonValues> | null = null
 let initPromise: Promise<Map<string, HonValues>> | null = null
 
 const candidateUrls: string[] = [
+  '/VBA OTORRINO.json',
   '/VBA%20OTORRINO.xlsx',
   '/VBA OTORRINO.xlsx'
 ]
@@ -46,21 +47,64 @@ export const loadOtoHonMap = async (): Promise<Map<string, HonValues>> => {
         OTO_HON_MAP = new Map()
         return OTO_HON_MAP
       }
+      
+      // Tentativa de carregar JSON primeiro se a URL apontar para JSON ou for genérica
+      // Vamos iterar e tentar processar de acordo com o tipo
+      
+      let data: any = null
+      let isJson = false
       let buf: ArrayBuffer | null = null
+
       for (const u of candidateUrls) {
         try {
           const res = await fetch(`${u}?t=${Date.now()}`)
           if (res.ok) {
-            buf = await res.arrayBuffer()
-            resolvedUrl = u
-            break
+            if (u.toLowerCase().endsWith('.json')) {
+              data = await res.json()
+              isJson = true
+              resolvedUrl = u
+              break
+            } else {
+              buf = await res.arrayBuffer()
+              resolvedUrl = u
+              break
+            }
           }
         } catch {}
       }
+
+      const jsonMap = new Map<string, HonValues>()
+
+      if (isJson && Array.isArray(data)) {
+        // Processar JSON
+        // Estrutura esperada: [{ "PROCEDIMENTOS": "cod desc", "HON1": 650 }, ...]
+        for (const row of data) {
+          if (!row) continue
+          // Chaves podem variar (case sensitive?), vamos normalizar ou tentar acesso direto
+          const proc = row['PROCEDIMENTOS'] || row['Procedimentos'] || row['procedimentos']
+          if (!proc) continue
+          
+          const code = extractCode(String(proc))
+          if (!code) continue
+
+          const h1 = toNumber(row['HON1'] || row['Hon1'] || row['hon1'])
+          const h2 = toNumber(row['HON2'] || row['Hon2'] || row['hon2']) || h1
+          const h3 = toNumber(row['HON3'] || row['Hon3'] || row['hon3']) || h1
+          const h4 = toNumber(row['HON4'] || row['Hon4'] || row['hon4']) || h1
+          const h5 = toNumber(row['HON5'] || row['Hon5'] || row['hon5']) || h1
+          
+          jsonMap.set(code, { hon1: h1, hon2: h2, hon3: h3, hon4: h4, hon5: h5 })
+        }
+        OTO_HON_MAP = jsonMap
+        return jsonMap
+      }
+
       if (!buf) {
         OTO_HON_MAP = new Map()
         return OTO_HON_MAP
       }
+      
+      // Processamento legado de XLSX
       const wb = XLSX.read(buf, { type: 'array', cellDates: false })
       const wsName = wb.SheetNames[0]
       const ws = wb.Sheets[wsName]

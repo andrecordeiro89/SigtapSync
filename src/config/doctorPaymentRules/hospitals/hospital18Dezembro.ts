@@ -648,10 +648,11 @@ export const HOSPITAL_18_DEZEMBRO_RULES: HospitalRules = {
       }
     ],
     multipleRule: {
-      codes: ['04.04.01.048-2', '04.04.01.041-5', '04.04.01.002-4', '04.04.01.001-6', '04.04.01.003-2'],
+      codes: ['04.04.01.048-2', '04.04.01.041-5', '04.04.01.001-6',],
       totalValue: 800.00,
       description: 'DOIS OU MAIS PROCEDIMENTOS ORL - R$ 800,00 TOTAL (não soma)'
-    }
+    },        
+
   },
 
   // ================================================================

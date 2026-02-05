@@ -1,0 +1,39 @@
+{
+  "Planilha1": [
+    {
+      "Codigo": "04.04.01.048-2",
+      "Descricao": "Septoplastia ",
+      "HON1": 700
+    },
+    {
+      "Codigo": "04.04.01.041-5",
+      "Descricao": "Turbinectomia ",
+      "HON1": 700
+    },
+    {
+      "Codigo": "04.04.01.002-4",
+      "Descricao": "Amigdalectomia ",
+      "HON1": 700
+    },
+    {
+      "Codigo": "04.04.01.001-6",
+      "Descricao": "Adenoidectomia ",
+      "HON1": 700
+    },
+    {
+      "Codigo": "04.04.01.003-2",
+      "Descricao": "Adenoamigdalectomia",
+      "HON1": 700
+    },
+    {
+      "Codigo": "04.04.01.048-2",
+      "Descricao": "Septoplastia + 04.04.01.041-5 - Turbinectomia",
+      "HON1": 700
+    },
+    {
+      "Codigo": null,
+      "Descricao": "Combinação de dois ou mais entre os códigos acima (não soma valores individuais)",
+      "HON1": 700
+    }
+  ]
+}

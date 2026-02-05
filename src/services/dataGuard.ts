@@ -9,10 +9,16 @@ export async function hasAihsData(params?: { hospitalIds?: string[]; startDateIS
     if (params?.startDateISO) q = q.gte('admission_date', params.startDateISO);
     if (params?.endDateISO) q = q.lte('admission_date', params.endDateISO);
     const { data, error } = await q;
-    if (error) return false;
+    if (error) {
+      // Se houver erro (ex: abort, network), assumimos que PODE ter dados para não bloquear a UI com "zero"
+      // As queries principais farão o trabalho pesado e tratarão erros reais
+      console.warn('⚠️ hasAihsData check failed, assuming data exists:', error);
+      return true; 
+    }
     return Array.isArray(data) && data.length > 0;
-  } catch {
-    return false;
+  } catch (err) {
+    console.warn('⚠️ hasAihsData exception, assuming data exists:', err);
+    return true;
   }
 }
 
@@ -25,10 +31,14 @@ export async function hasProcedureRecordsData(params?: { hospitalIds?: string[];
     if (params?.startDateISO) q = q.gte('procedure_date', params.startDateISO);
     if (params?.endDateISO) q = q.lte('procedure_date', params.endDateISO);
     const { data, error } = await q;
-    if (error) return false;
+    if (error) {
+      console.warn('⚠️ hasProcedureRecordsData check failed, assuming data exists:', error);
+      return true;
+    }
     return Array.isArray(data) && data.length > 0;
-  } catch {
-    return false;
+  } catch (err) {
+    console.warn('⚠️ hasProcedureRecordsData exception, assuming data exists:', err);
+    return true;
   }
 }
 
@@ -39,9 +49,13 @@ export async function hasPatientsData(hospitalIds?: string[]): Promise<boolean> 
       q = q.in('hospital_id', hospitalIds);
     }
     const { data, error } = await q;
-    if (error) return false;
+    if (error) {
+      console.warn('⚠️ hasPatientsData check failed, assuming data exists:', error);
+      return true;
+    }
     return Array.isArray(data) && data.length > 0;
-  } catch {
-    return false;
+  } catch (err) {
+    console.warn('⚠️ hasPatientsData exception, assuming data exists:', err);
+    return true;
   }
 }
