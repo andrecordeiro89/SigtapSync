@@ -67,15 +67,48 @@ export const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
   // ================================================================
   // CÁLCULO PRINCIPAL
   // ================================================================
-  const result = useCsvHon ? calculateHonPayments(procedures) : calculateDoctorPayment(doctorName, procedures, hospitalId);
+  const normalizedForRepasse = (() => {
+    const list = Array.isArray(procedures) ? procedures : [];
+    if (list.length === 0) return [] as Array<ProcedurePaymentInfo & { __dup04?: boolean }>;
+
+    const seen04 = new Set<string>();
+    return list.map((p) => {
+      const rawCode = (p.procedure_code || '').toString();
+      const codeOnly = rawCode.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)?.[1] || rawCode;
+      const digits = codeOnly.replace(/\D/g, '');
+      const is04 = digits.startsWith('04');
+      if (!is04 || digits.length === 0) return { ...p, __dup04: false };
+      if (seen04.has(digits)) {
+        return { ...p, cbo: '225151', __dup04: true };
+      }
+      seen04.add(digits);
+      return { ...p, __dup04: false };
+    });
+  })();
+
+  const resultRaw = useCsvHon ? calculateHonPayments(normalizedForRepasse as any) : calculateDoctorPayment(doctorName, normalizedForRepasse as any, hospitalId);
+  const result = {
+    ...resultRaw,
+    procedures: (resultRaw.procedures || []).map((p: any) => {
+      if (p?.__dup04) {
+        return {
+          ...p,
+          calculatedPayment: 0,
+          paymentRule: 'Duplicado 04.* (excluído)',
+          isSpecialRule: true
+        };
+      }
+      return p;
+    })
+  };
   
   // Cálculos auxiliares
   const fixedResult = calculateFixedPayment(doctorName, hospitalId);
-  const totalOriginal = procedures.reduce((sum, p) => sum + (p.value_reais || 0), 0);
+  const totalOriginal = normalizedForRepasse.reduce((sum: number, p: any) => sum + (p.value_reais || 0), 0);
   const percentageResult = calculatePercentagePayment(doctorName, totalOriginal, hospitalId);
   const unruledCheck = checkUnruledProcedures(
     doctorName,
-    procedures.map(p => p.procedure_code),
+    normalizedForRepasse.map((p: any) => p.procedure_code),
     hospitalId
   );
 

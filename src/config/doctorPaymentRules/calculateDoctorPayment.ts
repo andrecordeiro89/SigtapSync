@@ -73,6 +73,54 @@ initializeRulesCache(ALL_HOSPITAL_RULES);
 
 // Debug desativado no modo enxuto
 
+const normalize04DigitsKey = (procedureCode: string): string => {
+  const raw = (procedureCode || '').toString().trim()
+  const codeOnly = raw.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)?.[1] || raw
+  return codeOnly.replace(/\D/g, '')
+}
+
+const applyDuplicate04First = (procedures: ProcedurePaymentInfo[]): ProcedurePaymentInfo[] => {
+  const list = Array.isArray(procedures) ? procedures : []
+  if (list.length === 0) return []
+
+  const groups = new Map<string, Array<{ idx: number; p: ProcedurePaymentInfo }>>()
+  list.forEach((p, idx) => {
+    const key = String((p as any).aih_id || (p as any).aihId || '__single__')
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push({ idx, p })
+  })
+
+  const out = [...list]
+
+  for (const [, rows] of groups) {
+    const ordered = [...rows].sort((a, b) => {
+      const sa = typeof (a.p as any).sequence === 'number' && Number.isFinite((a.p as any).sequence) ? (a.p as any).sequence : Number.POSITIVE_INFINITY
+      const sb = typeof (b.p as any).sequence === 'number' && Number.isFinite((b.p as any).sequence) ? (b.p as any).sequence : Number.POSITIVE_INFINITY
+      if (sa !== sb) return sa - sb
+      return a.idx - b.idx
+    })
+
+    const by04 = new Map<string, Array<{ idx: number; p: ProcedurePaymentInfo; cbo: string }>>()
+    for (const row of ordered) {
+      const digits = normalize04DigitsKey(row.p.procedure_code)
+      if (!digits || !digits.startsWith('04')) continue
+      const cbo = String((row.p as any).cbo || '').trim()
+      if (!by04.has(digits)) by04.set(digits, [])
+      by04.get(digits)!.push({ idx: row.idx, p: row.p, cbo })
+    }
+
+    for (const [, sameCode] of by04) {
+      if (sameCode.length <= 1) continue
+      const keep = sameCode.find(x => x.cbo && x.cbo !== '225151' && x.cbo !== '000000') ?? sameCode[0]
+      for (const x of sameCode) {
+        if (x.idx !== keep.idx) out[x.idx] = { ...x.p, cbo: '225151' }
+      }
+    }
+  }
+
+  return out
+}
+
 // ================================================================
 // FUNÇÃO PRINCIPAL: CALCULAR PAGAMENTO MÉDICO
 // ================================================================
@@ -82,6 +130,7 @@ export function calculateDoctorPayment(
   procedures: ProcedurePaymentInfo[],
   hospitalId?: string
 ): CalculatedPaymentResult {
+  procedures = applyDuplicate04First(procedures)
   console.log(`\n🔍 [CÁLCULO] Iniciando cálculo para ${doctorName}`);
   console.log(`   📋 Total de procedimentos: ${procedures.length}`);
   console.log(`   🏥 Hospital ID: ${hospitalId || 'não fornecido'}`);

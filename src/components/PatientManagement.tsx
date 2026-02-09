@@ -21,7 +21,7 @@ import { CareCharacterUtils } from '../config/careCharacterCodes';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { filterCalculableProcedures } from '../utils/anesthetistLogic';
+import { getCalculableProcedures } from '../utils/anesthetistLogic';
 import { sumProceduresBaseReais } from '@/utils/valueHelpers';
 import { isLikelyProcedureString, sanitizePatientName } from '@/utils/patientName';
 import { PatientService } from '@/services/supabaseService';
@@ -567,9 +567,11 @@ const PatientManagement = () => {
   // 🎯 NOVA FUNÇÃO: Recalcular valor total da AIH baseado nos procedimentos ativos
   const recalculateAIHTotal = (aihId: string, procedures: any[]) => {
     // 🎯 CALCULAR APENAS PROCEDIMENTOS ATIVOS/APROVADOS E EXCLUINDO ANESTESISTAS SEM VALOR
-    const activeProcedures = procedures.filter(proc => 
-      (proc.match_status === 'matched' || proc.match_status === 'manual') &&
-      filterCalculableProcedures({ cbo: proc.professional_cbo, procedure_code: proc.procedure_code })
+    const activeRows = procedures.filter(proc =>
+      (proc.match_status === 'matched' || proc.match_status === 'manual')
+    );
+    const activeProcedures = getCalculableProcedures(
+      activeRows.map(p => ({ ...p, aih_id: p.aih_id || aihId, sequence: p.sequencia ?? p.sequence }))
     );
     
     // Somar em CENTAVOS a partir de uma base robusta em REAIS
@@ -2318,9 +2320,11 @@ const PatientManagement = () => {
                               </div>
                               <div className="flex items-center justify-between text-xs">
                                 {(() => {
-                                  const approved = (proceduresData[item.id] || []).filter(
-                                    p => (p.match_status === 'matched' || p.match_status === 'manual') &&
-                                         filterCalculableProcedures({ cbo: p.professional_cbo, procedure_code: p.procedure_code })
+                                  const allActive = (proceduresData[item.id] || []).filter(
+                                    p => (p.match_status === 'matched' || p.match_status === 'manual')
+                                  );
+                                  const approved = getCalculableProcedures(
+                                    allActive.map((p: any) => ({ ...p, aih_id: p.aih_id || item.id, sequence: p.sequencia ?? p.sequence }))
                                   );
                                   const approvedValue = approved.reduce((sum, p) => {
                                     const qty = p.quantity ?? 1;
@@ -2342,9 +2346,6 @@ const PatientManagement = () => {
                                         <span className="text-gray-500">Total:</span>
                                         {(() => {
                                           // Valor COM anestesistas: inclui todos os procedimentos aprovados/manual/matched
-                                          const allActive = (proceduresData[item.id] || []).filter(
-                                            p => (p.match_status === 'matched' || p.match_status === 'manual')
-                                          );
                                           const totalWithAnest = allActive.reduce((sum: number, p: any) => {
                                             const charged = p.value_charged && p.value_charged > 0 ? p.value_charged : null; // centavos
                                             if (charged !== null) return sum + charged;

@@ -1017,55 +1017,5 @@ export const HOSPITAL_18_DEZEMBRO_RULES: HospitalRules = {
       }
     ]
   },
-
-  // ================================================================
-  // 10. BRUNO BOSIO DA SILVA - ORTOPEDIA
-  // Especialidade: Ombro/Manguito Rotador
-  // Última atualização: 21/11/2025
-  // Obs: No Hospital São José tem valor fixo R$ 40.000,00
-  //      No Hospital 18 de Dezembro trabalha com regras por procedimento
-  // ================================================================
-  'BRUNO BOSIO DA SILVA': {
-    doctorName: 'BRUNO BOSIO DA SILVA',
-    rules: [
-      {
-        procedureCode: '04.08.01.014-2',
-        standardValue: 900.00,
-        description: 'REPARO ROTURA MANGUITO ROTADOR (INCLUI PROC. DESCOMPRESSIVOS) - R$ 900,00'
-      },
-      {
-        procedureCode: '04.08.06.071-9',
-        standardValue: 900.00,
-        description: 'VIDEOARTROSCOPIA - R$ 900,00'
-      },
-      {
-        procedureCode: '04.08.01.021-5',
-        standardValue: 0,
-        description: 'TRATAMENTO CIRÚRGICO LUXAÇÃO RECIDIVANTE/HABITUAL (valor em regra múltipla)'
-      },
-      {
-        procedureCode: '04.08.06.053-0',
-        standardValue: 0,
-        description: 'TRANSPOSIÇÃO/TRANSFERÊNCIA MIOTENDINOSA (valor em regra múltipla)'
-      },
-      {
-        procedureCode: '04.08.06.046-8',
-        standardValue: 0,
-        description: 'TENOMIOTOMIA/DESINSERÇÃO (valor em regra múltipla)'
-      }
-    ],
-    multipleRules: [
-      {
-        codes: ['04.08.01.014-2', '04.08.06.071-9'],
-        totalValue: 900.00,
-        description: 'REPARO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00 TOTAL'
-      },
-      {
-        codes: ['04.08.01.021-5', '04.08.06.053-0', '04.08.06.046-8'],
-        totalValue: 500.00,
-        description: 'TRAT. LUXAÇÃO RECIDIVANTE + TRANSPOSIÇÃO + TENOMIOTOMIA - R$ 500,00 TOTAL'
-      }
-    ]
-  }
 };
 

@@ -71,9 +71,36 @@ export const calculateHonPayments = (procedures: ProcedurePaymentInfo[]): Calcul
   let total = 0
   let pos = 0
   const paidCodes = new Set<string>()
-  const out = procedures.map(p => {
+  const dup04KeepIndex = (() => {
+    const by = new Map<string, number[]>()
+    const normalize04Digits = (code: string): string => {
+      const raw = (code || '').toString().trim()
+      const codeOnly = raw.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)?.[1] || raw
+      return codeOnly.replace(/\D/g, '')
+    }
+    procedures.forEach((p, idx) => {
+      const digits = normalize04Digits(p.procedure_code || '')
+      if (!digits || !digits.startsWith('04')) return
+      if (!by.has(digits)) by.set(digits, [])
+      by.get(digits)!.push(idx)
+    })
+    const keep = new Map<string, number>()
+    for (const [digits, idxs] of by) {
+      if (idxs.length <= 1) continue
+      const pick = idxs.find(i => {
+        const cbo = String((procedures[i] as any)?.cbo || '').trim()
+        return cbo && cbo !== '225151' && cbo !== '000000'
+      }) ?? idxs[0]
+      keep.set(digits, pick)
+    }
+    return keep
+  })()
+  const out = procedures.map((p, i) => {
     const codeNorm = p.procedure_code.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)?.[1] || p.procedure_code
-    const isExcluded = p.cbo === '000000' || p.cbo === '225151'
+    const digits = codeNorm.replace(/\D/g, '')
+    const keepIdx = dup04KeepIndex.get(digits)
+    const isDup04 = typeof keepIdx === 'number' && keepIdx !== i
+    const isExcluded = p.cbo === '000000' || p.cbo === '225151' || isDup04
     const isDuplicate = paidCodes.has(codeNorm)
     const idx = (isExcluded || isDuplicate) ? -1 : pos
     if (!(isExcluded || isDuplicate)) pos++
@@ -94,7 +121,7 @@ export const calculateHonPayments = (procedures: ProcedurePaymentInfo[]): Calcul
     return {
       ...p,
       calculatedPayment: pay,
-      paymentRule: isDuplicate ? 'Duplicado (não pago)' : (hon ? `CSV HON (pos ${idx+1})` : 'Sem regra HON para código'),
+      paymentRule: isDup04 ? 'Duplicado 04.* (excluído)' : (isDuplicate ? 'Duplicado (não pago)' : (hon ? `CSV HON (pos ${idx+1})` : 'Sem regra HON para código')),
       isSpecialRule: true
     }
   })

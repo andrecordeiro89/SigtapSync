@@ -236,9 +236,25 @@ export class DoctorsHierarchyV2Service {
             participation: isAnesthetist04 ? 'Anestesia (qtd)' : 'Responsável',
           } as ProcedureDetail & { is_anesthetist_04?: boolean; quantity?: number };
         });
-        patient.procedures = mapped.sort((a: any, b: any) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime());
-        patient.total_procedures = patient.procedures.length;
-        patient.approved_procedures = patient.procedures.filter(pp => pp.approved).length;
+        const { getCalculableProcedures } = await import('../utils/anesthetistLogic');
+        const calculableRaw = getCalculableProcedures(mapped as any);
+        const calculableIdSet = new Set(
+          (calculableRaw as any[]).map(p => String((p as any).procedure_id ?? '')).filter(Boolean)
+        );
+
+        const mappedAdjusted = (mapped as any[]).map(pp => {
+          const id = String(pp.procedure_id ?? '');
+          if (id && calculableIdSet.has(id)) return pp;
+          if (pp.is_anesthetist_04 === true) return pp;
+          const code = String(pp.procedure_code || '').trim();
+          if (!code.startsWith('04')) return pp;
+          return { ...pp, value_cents: 0, value_reais: 0, participation: 'Anestesia (qtd)' };
+        });
+
+        patient.procedures = mappedAdjusted.sort((a: any, b: any) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime());
+        (patient as any).calculable_procedures = getCalculableProcedures(patient.procedures as any);
+        patient.total_procedures = (patient as any).calculable_procedures.length;
+        patient.approved_procedures = (patient as any).calculable_procedures.filter((pp: any) => pp.approved).length;
         // 🆕 Resolver Nome Comum (ex.: "A+A") baseado nos códigos e na especialidade do médico
         try {
           const codes = patient.procedures.map(pp => pp.procedure_code).filter(Boolean);

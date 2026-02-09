@@ -18,6 +18,17 @@ export const isAnesthetist = (cbo?: string): boolean => {
   return cbo === '225151';
 };
 
+const normalizeCbo = (cbo?: string): string => (cbo ?? '').toString().trim();
+
+const is04ProcedureCode = (procedureCode?: string): boolean => {
+  const code = (procedureCode ?? '').toString().trim();
+  return code.startsWith('04');
+};
+
+const normalizeProcedureCodeKey = (procedureCode?: string): string => {
+  return (procedureCode ?? '').toString().replace(/\D/g, '');
+};
+
 /**
  * Verifica se um procedimento deve ser calculado para anestesista
  * @param cbo - Código CBO do profissional
@@ -62,6 +73,83 @@ export const shouldCalculateAnesthetistProcedure = (cbo?: string, procedureCode?
   
   // Para outros códigos de anestesista, não calcular por segurança
   return false;
+};
+
+export const shouldExcludeImplicitAnesthetistDuplicate04 = (
+  current: { cbo?: string; procedure_code?: string } | null | undefined,
+  firstOfSameCode: { cbo?: string; procedure_code?: string } | null | undefined
+): boolean => {
+  if (!current || !firstOfSameCode) return false;
+  const code = (current.procedure_code ?? '').toString().trim();
+  if (!is04ProcedureCode(code)) return false;
+  const key = normalizeProcedureCodeKey(code);
+  if (!key) return false;
+  const firstKey = normalizeProcedureCodeKey(firstOfSameCode.procedure_code);
+  if (!firstKey || firstKey !== key) return false;
+  return true;
+};
+
+export const getCalculableProcedures = <T extends {
+  procedure_code?: string;
+  cbo?: string;
+  professional_cbo?: string;  
+  aih_id?: string;
+  sequence?: number;
+}>(procedures: T[]): T[] => {
+  const list = Array.isArray(procedures) ? procedures : [];
+  if (list.length === 0) return [];
+
+  const groups = new Map<string, Array<{ idx: number; p: T }>>();
+  list.forEach((p, idx) => {
+    const k = (p.aih_id ?? '__single__').toString();
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k)!.push({ idx, p });
+  });
+
+  const excluded = new Set<number>();
+
+  for (const [, rows] of groups) {
+    const ordered = [...rows].sort((a, b) => {
+      const sa = typeof a.p.sequence === 'number' && Number.isFinite(a.p.sequence) ? a.p.sequence : Number.POSITIVE_INFINITY;
+      const sb = typeof b.p.sequence === 'number' && Number.isFinite(b.p.sequence) ? b.p.sequence : Number.POSITIVE_INFINITY;
+      if (sa !== sb) return sa - sb;
+      return a.idx - b.idx;
+    });
+
+    const by04Code = new Map<string, Array<{ idx: number; cbo: string; code: string }>>();
+    for (const row of ordered) {
+      const proc = row.p;
+      const cbo = normalizeCbo(proc.cbo ?? proc.professional_cbo);
+      const code = (proc.procedure_code ?? '').toString().trim();
+      if (!is04ProcedureCode(code)) continue;
+      const key = normalizeProcedureCodeKey(code);
+      if (!key) continue;
+      if (!by04Code.has(key)) by04Code.set(key, []);
+      by04Code.get(key)!.push({ idx: row.idx, cbo, code });
+    }
+
+    for (const [, list04] of by04Code) {
+      if (list04.length <= 1) continue;
+      const keep = list04.find((x) => x.cbo && x.cbo !== '225151') ?? list04[0];
+      for (const x of list04) {
+        if (x.idx !== keep.idx) excluded.add(x.idx);
+      }
+    }
+
+    for (const row of ordered) {
+      if (excluded.has(row.idx)) continue;
+      const proc = row.p;
+      const cbo = normalizeCbo(proc.cbo ?? proc.professional_cbo);
+      const code = (proc.procedure_code ?? '').toString().trim();
+
+      const anesthetistAllowed = shouldCalculateAnesthetistProcedure(cbo, code);
+      if (!anesthetistAllowed) {
+        excluded.add(row.idx);
+      }
+    }
+  }
+
+  return list.filter((_, idx) => !excluded.has(idx));
 };
 
 /**

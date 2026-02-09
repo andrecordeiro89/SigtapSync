@@ -1,5 +1,5 @@
 import { DoctorsHierarchyV2Service } from './doctorsHierarchyV2'
-import { shouldCalculateAnesthetistProcedure } from '../utils/anesthetistLogic'
+import { getCalculableProcedures } from '../utils/anesthetistLogic'
 import {
   calculateDoctorPayment,
   calculatePercentagePayment,
@@ -42,8 +42,8 @@ export interface DoctorPatientReport {
 
 /**
  * Gera relatório por médico: Pacientes atendidos, valor da AIH e valor a receber por paciente conforme regras.
- * - Usa TODOS os procedimentos associados (hierarquia V2 já não filtra nada)
- * - Cálculo sobre procedimentos 04.* não-anestesia (exceto cesariana), conforme shouldCalculateAnesthetistProcedure
+ * - Usa procedimentos calculáveis (exclui anestesia e duplicidades 04.*)
+ * - Cálculo sobre procedimentos 04.* relevantes para repasse médico
  * - Precedência de regras: percentual (se existir) substitui regras individuais/combinações
  */
 export async function getDoctorPatientReport(
@@ -140,13 +140,10 @@ export async function getDoctorPatientReport(
 
     const aihTotalReais = Number(patient.total_value_reais || 0)
 
-    // Selecionar procedimentos 04.* relevantes para cálculo (exclui anestesista 04.xxx)
-    const procedures04: ProcedurePaymentInfo[] = (patient.procedures || [])
-      .filter((proc: any) => {
-        const code = (proc.procedure_code || '').toString()
-        const include = code.startsWith('04') && shouldCalculateAnesthetistProcedure(proc.cbo || proc.professional_cbo, code)
-        return include
-      })
+    const baseProcedures: any[] = (patient as any).calculable_procedures || getCalculableProcedures((patient.procedures || []) as any)
+
+    const procedures04: ProcedurePaymentInfo[] = baseProcedures
+      .filter((proc: any) => (proc.procedure_code || '').toString().startsWith('04'))
       .map((proc: any) => ({
         procedure_code: proc.procedure_code,
         procedure_description: proc.procedure_description,

@@ -16,7 +16,7 @@ import {
   Shield,
   AlertCircle
 } from 'lucide-react';
-import { filterCalculableProcedures } from '@/utils/anesthetistLogic';
+import { getCalculableProcedures } from '@/utils/anesthetistLogic';
 import { sumProceduresBaseReais } from '@/utils/valueHelpers';
 
 interface ProcedureData {
@@ -61,8 +61,10 @@ const AIHExecutiveSummary = ({ aih, onRefresh, className = "" }: AIHExecutiveSum
     
     // Totais (centavos)
     // 1) Sem anestesistas: mesmos critérios do PatientManagement (matched/manual + filtro calculável)
-    const activeForCalc = procedures.filter(p => (p.match_status === 'approved' || p.match_status === 'matched' || p.match_status === 'manual'))
-      .filter(p => filterCalculableProcedures({ cbo: (p as any).professional_cbo, procedure_code: p.procedure_code }));
+    const activeRows = procedures.filter(p => (p.match_status === 'approved' || p.match_status === 'matched' || p.match_status === 'manual'));
+    const activeForCalc = getCalculableProcedures(
+      activeRows.map((p: any) => ({ ...p, aih_id: (aih as any).id, procedure_code: p.procedure_code, professional_cbo: p.professional_cbo, sequence: p.procedure_sequence }))
+    );
     const totalSemAnestReais = sumProceduresBaseReais(activeForCalc);
     const totalSemAnest = Math.round(totalSemAnestReais * 100);
 

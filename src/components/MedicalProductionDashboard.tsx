@@ -56,7 +56,8 @@ import { CareCharacterUtils } from '../config/careCharacterCodes';
 import {
   shouldCalculateAnesthetistProcedure,
   getAnesthetistProcedureType,
-  filterCalculableProcedures
+  filterCalculableProcedures,
+  getCalculableProcedures
 } from '../utils/anesthetistLogic';
 import { calculateHonPayments } from '../config/doctorPaymentRules/importers/honCsv'
 import ReportGenerator from './ReportGenerator';
@@ -300,10 +301,17 @@ const calculateDoctorStats = (
   // 🆕 CALCULAR valores específicos dos procedimentos médicos ("04") COM REGRAS DE PAGAMENTO
   // 🚫 EXCLUIR ANESTESISTAS 04.xxx dos procedimentos médicos (03.xxx são permitidos)
   const medicalProceduresCount = patientsForStats.reduce((sum, patient) =>
-    sum + patient.procedures.filter(proc =>
-      isMedicalProcedure(proc.procedure_code) &&
-      shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
-    ).length, 0
+    sum + (() => {
+      const aihKey = (patient as any).aih_id || normalizeAihNumber((patient as any)?.aih_info?.aih_number) || '__single__'
+      const baseProcedures = (patient as any).calculable_procedures || getCalculableProcedures(
+        ((patient.procedures || []) as any[]).map((proc: any) => ({
+          ...proc,
+          aih_id: proc.aih_id || aihKey,
+          sequence: proc.sequence ?? proc.sequencia ?? proc.procedure_sequence
+        }))
+      )
+      return (baseProcedures as any[]).filter(proc => isMedicalProcedure(proc.procedure_code)).length
+    })(), 0
   );
 
   // 🆕 CALCULAR QUANTIDADE DE PROCEDIMENTOS DE ANESTESISTAS INICIADOS EM '04' POR MÉDICO
@@ -364,12 +372,19 @@ const calculateDoctorStats = (
 
   // Calcular valor original de todos os procedimentos médicos (🚫 EXCLUINDO ANESTESISTAS 04.xxx)
   medicalProceduresValue = patientsForStats.reduce((sum, patient) =>
-    sum + patient.procedures
-      .filter(proc =>
-        isMedicalProcedure(proc.procedure_code) &&
-        shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
+    sum + (() => {
+      const aihKey = (patient as any).aih_id || normalizeAihNumber((patient as any)?.aih_info?.aih_number) || '__single__'
+      const baseProcedures = (patient as any).calculable_procedures || getCalculableProcedures(
+        ((patient.procedures || []) as any[]).map((proc: any) => ({
+          ...proc,
+          aih_id: proc.aih_id || aihKey,
+          sequence: proc.sequence ?? proc.sequencia ?? proc.procedure_sequence
+        }))
       )
-      .reduce((procSum, proc) => procSum + (proc.value_reais || 0), 0), 0
+      return (baseProcedures as any[])
+        .filter(proc => isMedicalProcedure(proc.procedure_code))
+        .reduce((procSum: number, proc: any) => procSum + (proc.value_reais || 0), 0)
+    })(), 0
   );
 
   // 🎯 CALCULAR INCREMENTO OPERA PARANÁ (acréscimo ao valor base das AIHs)
@@ -379,7 +394,13 @@ const calculateDoctorStats = (
   const operaParanaIncrement = doctorCovered
     ? patientsForStats.reduce((acc, patient) =>
       acc + computeIncrementForProcedures(
-        (((patient as any).calculable_procedures) || patient.procedures.filter(filterCalculableProcedures)) as any,
+        ((((patient as any).calculable_procedures) || getCalculableProcedures(
+          ((patient.procedures || []) as any[]).map((proc: any) => ({
+            ...proc,
+            aih_id: proc.aih_id || ((patient as any).aih_id || normalizeAihNumber((patient as any)?.aih_info?.aih_number) || '__single__'),
+            sequence: proc.sequence ?? proc.sequencia ?? proc.procedure_sequence
+          }))
+        )) as any),
         (patient as any)?.aih_info?.care_character,
         doctorData.doctor_info.name,
         hospitalId
@@ -393,11 +414,16 @@ const calculateDoctorStats = (
   // - Usar patient.procedures diretamente (não calculable_procedures)
   // - Ordenar por sequence e valor (igual ao card)
   calculatedPaymentValue = patientsForStats.reduce((totalSum, patient) => {
-    const patientMedicalProcedures = (patient.procedures || [])
-      .filter((proc: any) =>
-        isMedicalProcedure(proc.procedure_code) &&
-        shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
-      )
+    const aihKey = (patient as any).aih_id || normalizeAihNumber((patient as any)?.aih_info?.aih_number) || '__single__'
+    const baseProcedures = (patient as any).calculable_procedures || getCalculableProcedures(
+      ((patient.procedures || []) as any[]).map((proc: any) => ({
+        ...proc,
+        aih_id: proc.aih_id || aihKey,
+        sequence: proc.sequence ?? proc.sequencia ?? proc.procedure_sequence
+      }))
+    )
+    const patientMedicalProcedures = (baseProcedures as any[])
+      .filter((proc: any) => isMedicalProcedure(proc.procedure_code))
       .sort((a: any, b: any) => {
         // Ordenar por sequence primeiro, depois por valor (decrescente) - IGUAL AO CARD
         const sa = typeof a.sequence === 'number' ? a.sequence : 9999;
@@ -1325,11 +1351,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
         // ✅ CORREÇÃO FINAL: Usar p.procedures diretamente (IGUAL ao card do paciente)
         // O card usa patient.procedures, então o relatório deve usar p.procedures
-        const proceduresWithPayment = (p.procedures || [])
-          .filter((proc: any) =>
-            isMedicalProcedure(proc.procedure_code) &&
-            shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
-          )
+        const aihKey = (p as any).aih_id || normalizeAihNumber(p?.aih_info?.aih_number) || '__single__'
+        const baseProcedures = (p as any).calculable_procedures || getCalculableProcedures(
+          ((p.procedures || []) as any[]).map((proc: any) => ({
+            ...proc,
+            aih_id: proc.aih_id || aihKey,
+            sequence: proc.sequence ?? proc.sequencia ?? proc.procedure_sequence
+          }))
+        )
+        const proceduresWithPayment = (baseProcedures as any[])
+          .filter((proc: any) => isMedicalProcedure(proc.procedure_code))
           .sort((a: any, b: any) => {
             // Ordenar por sequence primeiro, depois por valor (decrescente)
             const sa = typeof a.sequence === 'number' ? a.sequence : 9999;
@@ -2400,8 +2431,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
     // Contar pacientes com pagamento = 0
     (doctor.patients || []).forEach((patient) => {
-      const proceduresWithPayment = patient.procedures
-        .filter(filterCalculableProcedures)
+      const aihKey = (patient as any).aih_id || normalizeAihNumber((patient as any)?.aih_info?.aih_number) || '__single__'
+      const baseProcedures = (patient as any).calculable_procedures || getCalculableProcedures(
+        ((patient.procedures || []) as any[]).map((proc: any) => ({
+          ...proc,
+          aih_id: proc.aih_id || aihKey,
+          sequence: proc.sequence ?? proc.sequencia ?? proc.procedure_sequence
+        }))
+      )
+      const proceduresWithPayment = (baseProcedures as any[])
+        .filter((proc: any) => isMedicalProcedure(proc.procedure_code))
         .map((proc: any) => ({
           procedure_code: proc.procedure_code,
           procedure_description: proc.procedure_description,
@@ -2447,9 +2486,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const discharge = parseISODateToLocal(dischargeISO)
         let name = p?.patient_info?.name || 'Paciente'
         const procsAll = p.procedures || []
-        const calculable = (p as any).calculable_procedures || procsAll.filter(filterCalculableProcedures)
-        const medicalSorted = calculable
-          .filter((x: any) => isMedicalProcedure(x.procedure_code) && shouldCalculateAnesthetistProcedure(x.cbo, x.procedure_code))
+        const aihKey = (p as any).aih_id || normalizeAihNumber(p?.aih_info?.aih_number) || '__single__'
+        const calculable = (p as any).calculable_procedures || getCalculableProcedures(
+          (procsAll as any[]).map((x: any) => ({ ...x, aih_id: x.aih_id || aihKey, sequence: x.sequence ?? x.sequencia ?? x.procedure_sequence }))
+        )
+        const medicalSorted = (calculable as any[])
+          .filter((x: any) => isMedicalProcedure(x.procedure_code))
           .sort((a: any, b: any) => {
             const sa = typeof a.sequence === 'number' ? a.sequence : 9999
             const sb = typeof b.sequence === 'number' ? b.sequence : 9999
@@ -4888,11 +4930,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                             // ✅ NOVO: Calcular valor de repasse (mesma lógica do card)
                                             // ⚠️ CORREÇÃO: Usar MESMO filtro do card (apenas códigos 04.xxx)
                                             // ✅ CORREÇÃO 2: Ordenar procedimentos por sequence e valor (igual ao card)
-                                            const proceduresWithPayment = p.procedures
-                                              .filter((proc: any) =>
-                                                isMedicalProcedure(proc.procedure_code) &&
-                                                shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
-                                              )
+                                            const aihKey = (p as any).aih_id || normalizeAihNumber(p?.aih_info?.aih_number) || '__single__'
+                                            const baseProcedures = (p as any).calculable_procedures || getCalculableProcedures(
+                                              ((p.procedures || []) as any[]).map((proc: any) => ({
+                                                ...proc,
+                                                aih_id: proc.aih_id || aihKey,
+                                                sequence: proc.sequence ?? proc.sequencia ?? proc.procedure_sequence
+                                              }))
+                                            )
+                                            const proceduresWithPayment = (baseProcedures as any[])
+                                              .filter((proc: any) => isMedicalProcedure(proc.procedure_code))
                                               .sort((a: any, b: any) => {
                                                 // Ordenar por sequence primeiro, depois por valor (decrescente)
                                                 const sa = typeof a.sequence === 'number' ? a.sequence : 9999;
@@ -5958,11 +6005,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                               } else {
                                                 // ✅ CORREÇÃO: Usar MESMO filtro do relatório e stats (04.xxx + anestesista)
                                                 // ✅ CORREÇÃO 2: Ordenar procedimentos por sequence e valor (igual ao relatório)
-                                                const proceduresWithPayment = patient.procedures
-                                                  .filter((proc: any) =>
-                                                    isMedicalProcedure(proc.procedure_code) &&
-                                                    shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
-                                                  )
+                                                const aihKey = (patient as any).aih_id || normalizeAihNumber((patient as any)?.aih_info?.aih_number) || '__single__'
+                                                const baseProcedures = (patient as any).calculable_procedures || getCalculableProcedures(
+                                                  ((patient.procedures || []) as any[]).map((proc: any) => ({
+                                                    ...proc,
+                                                    aih_id: proc.aih_id || aihKey,
+                                                    sequence: proc.sequence ?? proc.sequencia ?? proc.procedure_sequence
+                                                  }))
+                                                )
+                                                const proceduresWithPayment = (baseProcedures as any[])
+                                                  .filter((proc: any) => isMedicalProcedure(proc.procedure_code))
                                                   .sort((a: any, b: any) => {
                                                     // Ordenar por sequence primeiro, depois por valor (decrescente)
                                                     const sa = typeof a.sequence === 'number' ? a.sequence : 9999;

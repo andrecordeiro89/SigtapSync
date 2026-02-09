@@ -18,7 +18,7 @@ import { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayme
 import { ptBR } from 'date-fns/locale';
 import { ProcedureRecordsService } from '@/services/simplifiedProcedureService';
 import { isMedicalProcedure } from '@/config/susCalculationRules';
-import { shouldCalculateAnesthetistProcedure } from '../utils/anesthetistLogic';
+import { getCalculableProcedures } from '../utils/anesthetistLogic';
 import { getDoctorPatientReport, type DoctorPatientReport } from '@/services/doctorReportService';
 import { exportAnesthesiaExcel } from '@/services/exportService';
 
@@ -724,13 +724,20 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     const avgTicket = totalAIHs > 0 ? totalValue / totalAIHs : 0;
     
     // Calcular procedimentos médicos (código '04')
-    const medicalProcedures = doctorData.patients.flatMap(patient => 
-      patient.procedures.filter(proc => 
-        proc.procedure_code && 
-        proc.procedure_code.startsWith('04') && 
-        shouldCalculateAnesthetistProcedure(proc.cbo, proc.procedure_code)
-      )
-    );
+    const medicalProcedures = doctorData.patients.flatMap(patient => {
+      const aihKey = (patient as any).aih_id || (patient as any)?.aih_info?.aih_number || '__single__';
+      const calculable = (patient as any).calculable_procedures || getCalculableProcedures(
+        ((patient.procedures || []) as any[]).map((proc: any) => ({
+          ...proc,
+          aih_id: proc.aih_id || aihKey,
+          sequence: proc.sequence ?? proc.sequencia ?? proc.procedure_sequence
+        }))
+      );
+      return (calculable as any[]).filter(proc =>
+        proc.procedure_code &&
+        proc.procedure_code.startsWith('04')
+      );
+    });
     
     const medicalProceduresCount = medicalProcedures.length;
     const medicalProceduresValue = medicalProcedures.reduce((sum, proc) => sum + (proc.value_reais || 0), 0);

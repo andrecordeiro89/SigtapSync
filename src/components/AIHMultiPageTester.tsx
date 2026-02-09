@@ -59,7 +59,8 @@ import {
 
 import { 
   shouldCalculateAnesthetistProcedure, 
-  getAnesthetistProcedureType 
+  getAnesthetistProcedureType,
+  getCalculableProcedures
 } from '../utils/anesthetistLogic';
 
 import { CareCharacterUtils } from '../config/careCharacterCodes';
@@ -391,10 +392,25 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
 
   // 🆕 FUNÇÃO SIMPLIFICADA: Calcular totais considerando quantidade (valores já corretos)
   const calculateTotalsWithQuantity = (aih: AIHComplete): AIHComplete => {
-    // ✅ Os valores já estão corretos, só preciso recalcular o total geral (EXCLUINDO ANESTESISTAS 04.xxx)
-    const valorTotal = aih.procedimentos
-      .filter(p => p.aceitar !== false && shouldCalculateAnesthetistProcedure(p.cbo, p.procedimento)) // 🚫 EXCLUIR ANESTESISTAS 04.xxx
-      .reduce((sum, proc) => sum + (proc.valorCalculado || 0), 0);
+    const ativos = aih.procedimentos.filter(p => p.aceitar !== false);
+    const calculaveis = getCalculableProcedures(
+      ativos.map((p: any, idx: number) => ({
+        ...p,
+        __idx: idx,
+        procedure_code: p.procedimento,
+        cbo: p.cbo,
+        professional_cbo: p.cbo,
+        aih_id: '__single__',
+        sequence: p.sequencia
+      }))
+    ) as any[];
+
+    const allowedIdx = new Set<number>(calculaveis.map(p => Number(p.__idx)).filter(n => Number.isFinite(n)));
+
+    const valorTotal = ativos.reduce((sum, proc: any, idx: number) => {
+      if (!allowedIdx.has(idx)) return sum;
+      return sum + (proc.valorCalculado || 0);
+    }, 0);
     
     return {
       ...aih,
@@ -416,11 +432,37 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
     console.log('🏥 Regra Especial Detectada:', regraEspecialPrincipal ? regraEspecialPrincipal.procedureName : 'Nenhuma');
     console.log('⚠️  IMPORTANTE: SA (Serviços Ambulatoriais) NÃO É FATURADO EM AIH');
     
+    const calculaveis = getCalculableProcedures(
+      procedimentos.map((p: any, idx: number) => ({
+        ...p,
+        __idx: idx,
+        procedure_code: p.procedimento,
+        cbo: p.cbo,
+        professional_cbo: p.cbo,
+        aih_id: '__single__',
+        sequence: p.sequencia
+      }))
+    ) as any[];
+    const allowedIdx = new Set<number>(calculaveis.map(p => Number(p.__idx)).filter(n => Number.isFinite(n)));
+
     // 🚫 PRIMEIRO: SEPARAR ANESTESISTAS (NÃO RECEBEM NENHUMA REGRA)
     const anestesistas: ProcedureAIH[] = [];
     const procedimentosParaRegras: ProcedureAIH[] = [];
     
-    procedimentos.forEach(proc => {
+    procedimentos.forEach((proc: any, idx: number) => {
+      if (!allowedIdx.has(idx)) {
+        anestesistas.push({
+          ...proc,
+          isAnesthesiaProcedure: true,
+          porcentagemSUS: 0,
+          valorCalculado: 0,
+          valorOriginal: 0,
+          valorCalculadoSH: 0,
+          valorCalculadoSP: 0,
+          regraEspecial: '🚫 Duplicidade 04 - Excluído do cálculo'
+        });
+        return;
+      }
       if (proc.isAnesthesiaProcedure) {
         // ✅ ANESTESISTAS: EXTRAIR COM VALORES NORMAIS PARA CONTROLE MANUAL
         const valorTotalSigtap = proc.sigtapProcedure?.valueHosp || 0;
