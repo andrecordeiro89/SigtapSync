@@ -1576,13 +1576,55 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {aihCompleta.procedimentos
-                  // ✅ REMOVIDO: .filter(filterOutAnesthesia) - Agora mostra TODOS os procedimentos
-                  .map((procedure) => (
+                {(() => {
+                  const normalize04Key = (raw: unknown): string => {
+                    const s = String(raw ?? '').trim()
+                    const code = s.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)?.[1] || s
+                    return code.replace(/\D/g, '')
+                  }
+                  const issueBySeq = new Map<number, 'missing' | 'wrong'>()
+                  const groups = new Map<string, Array<{ seq: number; cbo: string }>>()
+                  for (const p of (aihCompleta.procedimentos || []) as any[]) {
+                    const code = String(p?.procedimento || '').trim()
+                    if (!code.startsWith('04')) continue
+                    const key = normalize04Key(code)
+                    if (!key || !key.startsWith('04')) continue
+                    const seq = Number(p?.sequencia ?? 0)
+                    if (!Number.isFinite(seq) || seq <= 0) continue
+                    const cboRaw = String(p?.cbo || '').trim()
+                    const cboDigits = cboRaw.replace(/\D/g, '')
+                    const cbo = cboDigits
+                    if (!groups.has(key)) groups.set(key, [])
+                    groups.get(key)!.push({ seq, cbo })
+                  }
+                  for (const [, list] of groups) {
+                    if (list.length <= 1) continue
+                    const keep = list.find((x) => x.seq === 1) ?? list.reduce((best, cur) => (cur.seq < best.seq ? cur : best), list[0])
+                    for (const item of list) {
+                      if (item.seq === keep.seq) continue
+                      if (!item.cbo || item.cbo.length !== 6 || item.cbo === '000000' || item.cbo === '0') {
+                        issueBySeq.set(item.seq, 'missing')
+                      } else if (item.cbo !== '225151') {
+                        issueBySeq.set(item.seq, 'wrong')
+                      }
+                    }
+                  }
+
+                  return aihCompleta.procedimentos
+                    .map((procedure) => {
+                      const dupIssue = issueBySeq.get(procedure.sequencia as any)
+                      const forceAnesthetist04 = dupIssue === 'missing' || dupIssue === 'wrong'
+                      const effectiveCbo = forceAnesthetist04
+                        ? '225151'
+                        : ((procedure as any).cbo || (procedure as any).professional_cbo)
+                      return { procedure, dupIssue, forceAnesthetist04, effectiveCbo }
+                    })
+                    // ✅ REMOVIDO: .filter(filterOutAnesthesia) - Agora mostra TODOS os procedimentos
+                    .map(({ procedure, dupIssue, forceAnesthetist04, effectiveCbo }) => (
                   <React.Fragment key={procedure.sequencia}>
                     <TableRow 
                       className={`hover:bg-gray-50 ${
-                        (procedure.isAnesthesiaProcedure && !shouldCalculateAnesthetistProcedure(procedure.cbo, procedure.procedimento))
+                        (forceAnesthetist04 || (procedure.isAnesthesiaProcedure && !shouldCalculateAnesthetistProcedure(effectiveCbo, procedure.procedimento)))
                           ? 'border-l-4 border-red-500 bg-red-50' // 🚫 Vermelho apenas quando NÃO calculável
                           : ''
                       }`}
@@ -1598,6 +1640,16 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                             {procedure.sequencia === 1 && (
                               <Badge variant="default" className="text-xs bg-green-600 text-white px-2 py-0.5">
                                 Principal
+                              </Badge>
+                            )}
+                            {dupIssue === 'missing' && (
+                              <Badge variant="default" className="text-xs bg-red-600 text-white px-2 py-0.5">
+                                CBO Anestesista Ausente
+                              </Badge>
+                            )}
+                            {dupIssue === 'wrong' && (
+                              <Badge variant="default" className="text-xs bg-red-600 text-white px-2 py-0.5">
+                                CBO Anestesista Incorreto
                               </Badge>
                             )}
                           </div>
@@ -1689,7 +1741,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                       <TableCell>
                         {/* COLUNA VALORES - LÓGICA REFINADA PARA ANESTESISTAS */}
                         {(() => {
-                          const anesthetistInfo = getAnesthetistProcedureType((procedure as any).cbo || (procedure as any).professional_cbo, procedure.procedimento);
+                          const anesthetistInfo = getAnesthetistProcedureType(effectiveCbo, procedure.procedimento);
                           
                           if (anesthetistInfo.isAnesthetist && !anesthetistInfo.shouldCalculate) {
                             // 🚫 ANESTESISTA 04.xxx: Não exibir valores, apenas controle
@@ -2213,7 +2265,8 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                       </TableRow>
                     )}
                   </React.Fragment>
-                ))}
+                ))
+                })()}
               </TableBody>
             </Table>
           </div>
