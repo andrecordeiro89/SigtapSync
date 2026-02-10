@@ -1582,8 +1582,20 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                     const code = s.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)?.[1] || s
                     return code.replace(/\D/g, '')
                   }
+                  const normalizeParticipationCode = (raw: unknown): string => {
+                    const digits = String(raw ?? '').replace(/\D/g, '')
+                    if (!digits) return ''
+                    const n = digits.length >= 2 ? digits.slice(-2) : digits.padStart(2, '0')
+                    return n
+                  }
+                  const normalizeCboDigits = (raw: unknown): string => {
+                    return String(raw ?? '').trim().replace(/\D/g, '')
+                  }
+                  const isMissingCbo = (digits: string): boolean => {
+                    return !digits || digits.length !== 6 || digits === '000000' || digits === '0'
+                  }
                   const issueBySeq = new Map<number, 'missing' | 'wrong'>()
-                  const groups = new Map<string, Array<{ seq: number; cbo: string }>>()
+                  const groups = new Map<string, Array<{ seq: number; cbo: string; partCode: string }>>()
                   for (const p of (aihCompleta.procedimentos || []) as any[]) {
                     const code = String(p?.procedimento || '').trim()
                     if (!code.startsWith('04')) continue
@@ -1591,43 +1603,66 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                     if (!key || !key.startsWith('04')) continue
                     const seq = Number(p?.sequencia ?? 0)
                     if (!Number.isFinite(seq) || seq <= 0) continue
-                    const cboRaw = String(p?.cbo || '').trim()
-                    const cboDigits = cboRaw.replace(/\D/g, '')
-                    const cbo = cboDigits
+                    const cbo = normalizeCboDigits(p?.cbo)
+                    const partCode = normalizeParticipationCode(p?.participacao)
                     if (!groups.has(key)) groups.set(key, [])
-                    groups.get(key)!.push({ seq, cbo })
+                    groups.get(key)!.push({ seq, cbo, partCode })
                   }
                   for (const [, list] of groups) {
                     if (list.length <= 1) continue
                     const keep = list.find((x) => x.seq === 1) ?? list.reduce((best, cur) => (cur.seq < best.seq ? cur : best), list[0])
                     for (const item of list) {
                       if (item.seq === keep.seq) continue
-                      if (!item.cbo || item.cbo.length !== 6 || item.cbo === '000000' || item.cbo === '0') {
+                      if (isMissingCbo(item.cbo)) {
                         issueBySeq.set(item.seq, 'missing')
                       } else if (item.cbo !== '225151') {
                         issueBySeq.set(item.seq, 'wrong')
                       }
                     }
                   }
+                  for (const p of (aihCompleta.procedimentos || []) as any[]) {
+                    const seq = Number(p?.sequencia ?? 0)
+                    if (!Number.isFinite(seq) || seq <= 0) continue
+                    const partCode = normalizeParticipationCode(p?.participacao)
+                    const code = String(p?.procedimento || '').trim()
+                    if (!code.startsWith('04')) continue
+                    if (partCode !== '04') continue
+                    const cbo = normalizeCboDigits(p?.cbo)
+                    const existing = issueBySeq.get(seq)
+                    if (isMissingCbo(cbo)) {
+                      issueBySeq.set(seq, 'missing')
+                    } else if (cbo !== '225151' && existing !== 'missing') {
+                      issueBySeq.set(seq, 'wrong')
+                    }
+                  }
 
                   return aihCompleta.procedimentos
                     .map((procedure) => {
                       const dupIssue = issueBySeq.get(procedure.sequencia as any)
-                      const forceAnesthetist04 = dupIssue === 'missing' || dupIssue === 'wrong'
-                      const effectiveCbo = forceAnesthetist04
+                      const partCode = normalizeParticipationCode((procedure as any).participacao)
+                      const procCode = String((procedure as any).procedimento || '').trim()
+                      const is04Procedure = procCode.startsWith('04')
+                      const isAnesthetist = is04Procedure && partCode === '04'
+                      const isFirstSurgeon = is04Procedure && partCode === '01'
+                      const effectiveCbo = (isAnesthetist || dupIssue === 'missing' || dupIssue === 'wrong')
                         ? '225151'
                         : ((procedure as any).cbo || (procedure as any).professional_cbo)
-                      return { procedure, dupIssue, forceAnesthetist04, effectiveCbo }
+                      const rowClass = (() => {
+                        if (dupIssue === 'missing' || dupIssue === 'wrong') return 'border-l-4 border-red-500 bg-red-50'
+                        if (isAnesthetist) return 'border-l-4 border-emerald-500 bg-emerald-50'
+                        if (isFirstSurgeon) return 'border-l-4 border-blue-500 bg-blue-50'
+                        if (procedure.isAnesthesiaProcedure && !shouldCalculateAnesthetistProcedure(effectiveCbo, procedure.procedimento)) {
+                          return 'border-l-4 border-red-500 bg-red-50'
+                        }
+                        return ''
+                      })()
+                      return { procedure, dupIssue, partCode, isAnesthetist, isFirstSurgeon, effectiveCbo, rowClass }
                     })
                     // ✅ REMOVIDO: .filter(filterOutAnesthesia) - Agora mostra TODOS os procedimentos
-                    .map(({ procedure, dupIssue, forceAnesthetist04, effectiveCbo }) => (
+                    .map(({ procedure, dupIssue, partCode, isAnesthetist, isFirstSurgeon, effectiveCbo, rowClass }) => (
                   <React.Fragment key={procedure.sequencia}>
                     <TableRow 
-                      className={`hover:bg-gray-50 ${
-                        (forceAnesthetist04 || (procedure.isAnesthesiaProcedure && !shouldCalculateAnesthetistProcedure(effectiveCbo, procedure.procedimento)))
-                          ? 'border-l-4 border-red-500 bg-red-50' // 🚫 Vermelho apenas quando NÃO calculável
-                          : ''
-                      }`}
+                      className={`hover:bg-gray-50 ${rowClass}`}
                     >
                       <TableCell className="font-medium text-center">{procedure.sequencia}</TableCell>
                       <TableCell className="font-mono text-sm">{procedure.procedimento}</TableCell>
@@ -1640,6 +1675,16 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                             {procedure.sequencia === 1 && (
                               <Badge variant="default" className="text-xs bg-green-600 text-white px-2 py-0.5">
                                 Principal
+                              </Badge>
+                            )}
+                            {isFirstSurgeon && (
+                              <Badge variant="default" className="text-xs bg-blue-600 text-white px-2 py-0.5">
+                                1º Cirurgião
+                              </Badge>
+                            )}
+                            {isAnesthetist && !(dupIssue === 'missing' || dupIssue === 'wrong') && (
+                              <Badge variant="default" className="text-xs bg-emerald-600 text-white px-2 py-0.5">
+                                Anestesista
                               </Badge>
                             )}
                             {dupIssue === 'missing' && (
@@ -1743,8 +1788,36 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                         {(() => {
                           const anesthetistInfo = getAnesthetistProcedureType(effectiveCbo, procedure.procedimento);
                           
+                          if (String((procedure as any).procedimento || '').trim().startsWith('04') && partCode === '04') {
+                            const isIssue = dupIssue === 'missing' || dupIssue === 'wrong'
+                            const badgeText = isIssue
+                              ? (dupIssue === 'missing' ? 'CBO Anestesista Ausente' : 'CBO Anestesista Incorreto')
+                              : 'Anestesista'
+                            const badgeClass = isIssue
+                              ? 'bg-red-100 text-red-700 border-red-300'
+                              : 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                            const textClass = isIssue ? 'text-red-600' : 'text-emerald-700'
+                            const subTextClass = isIssue ? 'text-red-500' : 'text-emerald-600'
+                            return (
+                              <div className="text-center py-4">
+                                <div className="flex flex-col items-center gap-2">
+                                  <Badge variant="outline" className={`${badgeClass} text-xs px-3 py-1`}>
+                                    {badgeText}
+                                  </Badge>
+                                  <div className={`text-sm font-medium ${textClass}`}>
+                                    Qtd: {procedure.quantity || 1}
+                                  </div>
+                                  {anesthetistInfo.message ? (
+                                    <div className={`text-xs ${subTextClass}`}>
+                                      {anesthetistInfo.message}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            );
+                          }
+
                           if (anesthetistInfo.isAnesthetist && !anesthetistInfo.shouldCalculate) {
-                            // 🚫 ANESTESISTA 04.xxx: Não exibir valores, apenas controle
                             return (
                               <div className="text-center py-4">
                                 <div className="flex flex-col items-center gap-2">
@@ -2524,7 +2597,11 @@ const AIHMultiPageTester = () => {
             // 1) Nível do procedimento
             const cboProc = String((p as any)?.cbo || (p as any)?.professional_cbo || '').trim();
             if (cboProc === '225151') return true;
-            const partProc = String((p as any)?.participacao || (p as any)?.participation || '').toLowerCase();
+            const partProcRaw = String((p as any)?.participacao || (p as any)?.participation || '');
+            const partProcDigits = partProcRaw.replace(/\D/g, '');
+            const partProcCode = partProcDigits ? partProcDigits.padStart(2, '0') : '';
+            if (partProcCode === '04') return true;
+            const partProc = partProcRaw.toLowerCase();
             if (partProc.includes('anestesista') || partProc.includes('anestesia') || partProc.includes('anest')) return true;
 
             // 2) Nível do profissional (lista profissionais extraída do PDF)
@@ -2532,7 +2609,11 @@ const AIHMultiPageTester = () => {
             for (const pr of list) {
               const cbo = String((pr as any)?.cbo || '').trim();
               if (cbo === '225151') return true;
-              const part = String((pr as any)?.participacao || (pr as any)?.participation || '').toLowerCase();
+              const partRaw = String((pr as any)?.participacao || (pr as any)?.participation || '');
+              const partDigits = partRaw.replace(/\D/g, '');
+              const partCode = partDigits ? partDigits.padStart(2, '0') : '';
+              if (partCode === '04') return true;
+              const part = partRaw.toLowerCase();
               if (part.includes('anestesista') || part.includes('anestesia') || part.includes('anest')) return true;
               // Varredura robusta: checar quaisquer campos string do profissional
               for (const key of Object.keys(pr || {})) {

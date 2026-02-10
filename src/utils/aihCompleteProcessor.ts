@@ -558,7 +558,7 @@ export class AIHCompleteProcessor {
                 procedimento: codigo,
                 documentoProfissional: contextData.documento || '',
                 cbo: contextData.cbo || '',
-                participacao: contextData.participacao || '1',
+                participacao: this.parseParticipationField(contextData.participacao || ''),
                 cnes: contextData.cnes || '',
                 aceitar: true,
                 data: contextData.data || '',
@@ -672,11 +672,13 @@ export class AIHCompleteProcessor {
     const cboMatch = context.match(/\b(\d{4,6})\b/);
     const dataMatch = context.match(/(\d{2}\/\d{2}\/\d{4})/);
     const cnesMatch = context.match(/\b(\d{7,8})\b/);
+
+    const participacao = this.extractParticipationFromContext(context, codigo);
     
     return {
       documento: documentoMatch ? documentoMatch[1] : '',
       cbo: cboMatch ? cboMatch[1] : '',
-      participacao: '1', // Padrão
+      participacao,
       cnes: cnesMatch ? cnesMatch[1] : '',
       data: dataMatch ? dataMatch[1] : ''
     };
@@ -917,6 +919,72 @@ export class AIHCompleteProcessor {
     
     // Limpar espaços
     const cleaned = rawValue.trim();
+
+    const normalize = (s: string): string => {
+      try {
+        return s
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '')
+          .toLowerCase()
+          .trim();
+      } catch {
+        return (s || '').toLowerCase().trim();
+      }
+    };
+
+    const romanToNumber = (roman: string): number | null => {
+      const map: Record<string, number> = { I: 1, V: 5, X: 10 };
+      const s = (roman || '').toUpperCase().replace(/[^IVX]/g, '');
+      if (!s) return null;
+      let total = 0;
+      let prev = 0;
+      for (let i = s.length - 1; i >= 0; i--) {
+        const v = map[s[i]] || 0;
+        if (v < prev) total -= v;
+        else total += v;
+        prev = v;
+      }
+      return total > 0 ? total : null;
+    };
+
+    const format2 = (n: number): string => String(n).padStart(2, '0');
+
+    const mapLabelToCode = (text: string): string => {
+      const t = normalize(text);
+      if (!t) return '';
+
+      if (t.includes('anest')) return '04';
+      if (t.includes('instrument')) return '08';
+      if (t.includes('perfusion')) return '09';
+      if (t.includes('outros')) return '10';
+
+      const hasAux = t.includes('aux');
+      const hasCir = t.includes('cirurg');
+
+      const ordMatch = t.match(/(?:^|\s)(\d{1,2})\s*(?:o|º|°)?(?:\s+)?(cirurg|aux)/);
+      const romanMatch = t.match(/(?:^|\s)([ivx]+)\s*(?:o|º|°)?(?:\s+)?(cirurg|aux)/i);
+
+      const ord = ordMatch ? parseInt(ordMatch[1], 10) : (romanMatch ? (romanToNumber(romanMatch[1]) ?? 0) : 0);
+
+      if (hasCir) {
+        if (ord === 2) return '02';
+        if (ord === 3) return '03';
+        return '01';
+      }
+
+      if (hasAux) {
+        if (ord === 2) return '06';
+        if (ord === 3) return '07';
+        return '05';
+      }
+
+      return '';
+    };
+
+    {
+      const code = mapLabelToCode(cleaned);
+      if (code) return code;
+    }
     
     // 🎯 NOVA LÓGICA: Se contém letras (texto), preservar como está
     if (/[a-zA-ZáéíóúâêîôûàèìòùçãõüÁÉÍÓÚÂÊÎÔÛÀÈÌÒÙÇÃÕÜ]/.test(cleaned)) {
@@ -930,7 +998,7 @@ export class AIHCompleteProcessor {
     const numberMatch = cleaned.match(/^(\d+)[°º]?$/);
     if (numberMatch) {
       const number = parseInt(numberMatch[1]);
-      const formatted = number.toString().padStart(2, '0');
+      const formatted = format2(number);
       console.log(`   ✅ Número detectado: ${number} → ${formatted}`);
       return formatted;
     }
@@ -1025,6 +1093,17 @@ export class AIHCompleteProcessor {
         console.log(`   🎯 Participação encontrada no índice ${i}: "${part}"`);
         return i;
       }
+      try {
+        const t = part
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '')
+          .toLowerCase()
+          .trim();
+        if (t.includes('anest') || t.includes('cirurg') || t.includes('aux') || t.includes('instrument') || t.includes('perfusion') || t.includes('outros')) {
+          console.log(`   🎯 Participação textual encontrada no índice ${i}: "${part}"`);
+          return i;
+        }
+      } catch {}
     }
     return -1;
   }
@@ -1099,10 +1178,37 @@ export class AIHCompleteProcessor {
     const procedureIndex = text.indexOf(codigo);
     if (procedureIndex >= 0) {
       const afterCode = text.substring(procedureIndex + codigo.length);
-      const participationMatch = afterCode.match(/([1-9])[°º]?/);
-      return participationMatch ? participationMatch[1] : '1';
+      const normalized = (() => {
+        try {
+          return afterCode
+            .normalize('NFD')
+            .replace(/\p{Diacritic}/gu, '')
+            .toLowerCase()
+            .trim();
+        } catch {
+          return (afterCode || '').toLowerCase().trim();
+        }
+      })();
+      if (!normalized) return '';
+      if (normalized.includes('anestesista') || normalized.includes('anestesiologista') || normalized.includes('anestesiol')) return '04';
+      if (normalized.includes('instrumentador') || normalized.includes('instrument')) return '08';
+      if (normalized.includes('perfusionista') || normalized.includes('perfusion')) return '09';
+      if (normalized.includes('outros')) return '10';
+      if (/(^|\s)(\d|i{1,3}|iv|v|vi{0,3}|ix|x)\s*(o|º|°)?\s*cirurgiao/.test(normalized) || normalized.includes('cirurgiao')) {
+        const m = normalized.match(/(^|\s)(\d)\s*(o|º|°)?\s*cirurgiao/);
+        if (m?.[2] === '2') return '02';
+        if (m?.[2] === '3') return '03';
+        return '01';
+      }
+      if (/(^|\s)(\d|i{1,3}|iv|v|vi{0,3}|ix|x)\s*(o|º|°)?\s*auxiliar/.test(normalized) || normalized.includes('auxiliar')) {
+        const m = normalized.match(/(^|\s)(\d)\s*(o|º|°)?\s*auxiliar/);
+        if (m?.[2] === '2') return '06';
+        if (m?.[2] === '3') return '07';
+        return '05';
+      }
+      return '';
     }
-    return '1';
+    return '';
   }
 
   /**
@@ -1133,6 +1239,10 @@ export class AIHCompleteProcessor {
     if (!participacao && !line) {
       return false;
     }
+
+    const partDigits = String(participacao || '').replace(/\D/g, '');
+    const partCode = partDigits ? partDigits.padStart(2, '0') : '';
+    const isAnesthesiaByCode = partCode === '04';
     
     // 📋 TERMOS DE ANESTESIA - Incluindo procedimentos legítimos como cesariana
     const anesthesiaTerms = [
@@ -1172,7 +1282,7 @@ export class AIHCompleteProcessor {
       lineLower.includes(term)
     );
     
-    const isAnesthesia = isAnesthesiaByParticipacao || isAnesthesiaByLine;
+    const isAnesthesia = isAnesthesiaByCode || isAnesthesiaByParticipacao || isAnesthesiaByLine;
     
     // 📝 LOG para auditoria
     if (isAnesthesia) {
@@ -1215,7 +1325,7 @@ export class AIHCompleteProcessor {
           procedimento: codigo,
           documentoProfissional: contextData.documento || '',
           cbo: contextData.cbo || '',
-          participacao: contextData.participacao || '1',
+          participacao: this.parseParticipationField(contextData.participacao || ''),
           cnes: contextData.cnes || '',
           aceitar: true,
           data: contextData.data || '',
