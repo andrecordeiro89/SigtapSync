@@ -1423,17 +1423,34 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         }
       })
 
+      const normalizeSortText = (s: unknown): string => {
+        return (s ?? '')
+          .toString()
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '')
+          .trim()
+          .toUpperCase()
+      }
+      const parseBrCurrency = (s: unknown): number => {
+        const raw = (s ?? '').toString()
+        const cleaned = raw
+          .replace(/[^\d,.-]/g, '')
+          .replace(/\./g, '')
+          .replace(/,/, '.')
+        const n = Number(cleaned)
+        return Number.isFinite(n) ? n : 0
+      }
       tableData.sort((a, b) => {
-        const dateA = a[5] as string
-        const dateB = b[5] as string
-        if (!dateA && !dateB) return 0
-        if (!dateA) return 1
-        if (!dateB) return -1
-        const partsA = dateA.split('/')
-        const partsB = dateB.split('/')
-        const da = partsA.length === 3 ? new Date(parseInt(partsA[2]), parseInt(partsA[1]) - 1, parseInt(partsA[0])) : new Date(0)
-        const db = partsB.length === 3 ? new Date(parseInt(partsB[2]), parseInt(partsB[1]) - 1, parseInt(partsB[0])) : new Date(0)
-        return db.getTime() - da.getTime()
+        const repA = parseBrCurrency(a[6])
+        const repB = parseBrCurrency(b[6])
+        if (repA !== repB) return repB - repA
+        const procA = normalizeSortText(a[4])
+        const procB = normalizeSortText(b[4])
+        const procCmp = procA.localeCompare(procB, 'pt-BR')
+        if (procCmp !== 0) return procCmp
+        const nameA = normalizeSortText(a[3])
+        const nameB = normalizeSortText(b[3])
+        return nameA.localeCompare(nameB, 'pt-BR')
       })
       tableData.forEach((row, idx) => { row[0] = String(idx + 1) })
 

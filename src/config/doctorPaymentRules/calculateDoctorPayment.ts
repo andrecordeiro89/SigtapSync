@@ -79,6 +79,17 @@ const normalize04DigitsKey = (procedureCode: string): string => {
   return codeOnly.replace(/\D/g, '')
 }
 
+const parseSequence = (raw: unknown): number | undefined => {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+  if (typeof raw === 'string') {
+    const s = raw.trim()
+    if (!s) return undefined
+    const n = Number(s)
+    if (Number.isFinite(n)) return n
+  }
+  return undefined
+}
+
 const applyDuplicate04First = (procedures: ProcedurePaymentInfo[]): ProcedurePaymentInfo[] => {
   const list = Array.isArray(procedures) ? procedures : []
   if (list.length === 0) return []
@@ -94,24 +105,35 @@ const applyDuplicate04First = (procedures: ProcedurePaymentInfo[]): ProcedurePay
 
   for (const [, rows] of groups) {
     const ordered = [...rows].sort((a, b) => {
-      const sa = typeof (a.p as any).sequence === 'number' && Number.isFinite((a.p as any).sequence) ? (a.p as any).sequence : Number.POSITIVE_INFINITY
-      const sb = typeof (b.p as any).sequence === 'number' && Number.isFinite((b.p as any).sequence) ? (b.p as any).sequence : Number.POSITIVE_INFINITY
+      const saRaw = parseSequence((a.p as any).sequence)
+      const sbRaw = parseSequence((b.p as any).sequence)
+      const sa = typeof saRaw === 'number' ? saRaw : Number.POSITIVE_INFINITY
+      const sb = typeof sbRaw === 'number' ? sbRaw : Number.POSITIVE_INFINITY
       if (sa !== sb) return sa - sb
       return a.idx - b.idx
     })
 
-    const by04 = new Map<string, Array<{ idx: number; p: ProcedurePaymentInfo; cbo: string }>>()
+    const by04 = new Map<string, Array<{ idx: number; p: ProcedurePaymentInfo; cbo: string; seq?: number }>>()
     for (const row of ordered) {
       const digits = normalize04DigitsKey(row.p.procedure_code)
       if (!digits || !digits.startsWith('04')) continue
       const cbo = String((row.p as any).cbo || '').trim()
+      const seq = parseSequence((row.p as any).sequence)
       if (!by04.has(digits)) by04.set(digits, [])
-      by04.get(digits)!.push({ idx: row.idx, p: row.p, cbo })
+      by04.get(digits)!.push({ idx: row.idx, p: row.p, cbo, seq })
     }
 
     for (const [, sameCode] of by04) {
       if (sameCode.length <= 1) continue
-      const keep = sameCode.find(x => x.cbo && x.cbo !== '225151' && x.cbo !== '000000') ?? sameCode[0]
+      const keep =
+        sameCode.find(x => x.seq === 1) ??
+        sameCode.find(x => x.cbo && x.cbo !== '225151' && x.cbo !== '000000') ??
+        sameCode.reduce((best, cur) => {
+          const bs = typeof best.seq === 'number' ? best.seq : Number.POSITIVE_INFINITY
+          const cs = typeof cur.seq === 'number' ? cur.seq : Number.POSITIVE_INFINITY
+          if (cs !== bs) return cs < bs ? cur : best
+          return best
+        }, sameCode[0])
       for (const x of sameCode) {
         if (x.idx !== keep.idx) out[x.idx] = { ...x.p, cbo: '225151' }
       }

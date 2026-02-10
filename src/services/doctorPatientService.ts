@@ -512,9 +512,11 @@ export class DoctorPatientService {
           if (!code.startsWith('04')) return pp;
           return {
             ...pp,
+            cbo: '225151',
             value_cents: 0,
             value_reais: 0,
             participation: 'Anestesia (qtd)',
+            is_anesthetist_04: true,
           };
         });
 

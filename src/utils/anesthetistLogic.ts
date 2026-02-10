@@ -29,6 +29,17 @@ const normalizeProcedureCodeKey = (procedureCode?: string): string => {
   return (procedureCode ?? '').toString().replace(/\D/g, '');
 };
 
+const parseSequence = (raw: unknown): number | undefined => {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (typeof raw === 'string') {
+    const s = raw.trim();
+    if (!s) return undefined;
+    const n = Number(s);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+};
+
 /**
  * Verifica se um procedimento deve ser calculado para anestesista
  * @param cbo - Código CBO do profissional
@@ -110,13 +121,15 @@ export const getCalculableProcedures = <T extends {
 
   for (const [, rows] of groups) {
     const ordered = [...rows].sort((a, b) => {
-      const sa = typeof a.p.sequence === 'number' && Number.isFinite(a.p.sequence) ? a.p.sequence : Number.POSITIVE_INFINITY;
-      const sb = typeof b.p.sequence === 'number' && Number.isFinite(b.p.sequence) ? b.p.sequence : Number.POSITIVE_INFINITY;
+      const saRaw = parseSequence((a.p as any).sequence);
+      const sbRaw = parseSequence((b.p as any).sequence);
+      const sa = typeof saRaw === 'number' ? saRaw : Number.POSITIVE_INFINITY;
+      const sb = typeof sbRaw === 'number' ? sbRaw : Number.POSITIVE_INFINITY;
       if (sa !== sb) return sa - sb;
       return a.idx - b.idx;
     });
 
-    const by04Code = new Map<string, Array<{ idx: number; cbo: string; code: string }>>();
+    const by04Code = new Map<string, Array<{ idx: number; cbo: string; code: string; seq?: number }>>();
     for (const row of ordered) {
       const proc = row.p;
       const cbo = normalizeCbo(proc.cbo ?? proc.professional_cbo);
@@ -125,12 +138,20 @@ export const getCalculableProcedures = <T extends {
       const key = normalizeProcedureCodeKey(code);
       if (!key) continue;
       if (!by04Code.has(key)) by04Code.set(key, []);
-      by04Code.get(key)!.push({ idx: row.idx, cbo, code });
+      by04Code.get(key)!.push({ idx: row.idx, cbo, code, seq: parseSequence((proc as any).sequence) });
     }
 
     for (const [, list04] of by04Code) {
       if (list04.length <= 1) continue;
-      const keep = list04.find((x) => x.cbo && x.cbo !== '225151') ?? list04[0];
+      const keep =
+        list04.find((x) => x.seq === 1) ??
+        list04.find((x) => x.cbo && x.cbo !== '225151') ??
+        list04.reduce((best, cur) => {
+          const bs = typeof best.seq === 'number' ? best.seq : Number.POSITIVE_INFINITY;
+          const cs = typeof cur.seq === 'number' ? cur.seq : Number.POSITIVE_INFINITY;
+          if (cs !== bs) return cs < bs ? cur : best;
+          return best;
+        }, list04[0]);
       for (const x of list04) {
         if (x.idx !== keep.idx) excluded.add(x.idx);
       }

@@ -248,7 +248,7 @@ export class DoctorsHierarchyV2Service {
           if (pp.is_anesthetist_04 === true) return pp;
           const code = String(pp.procedure_code || '').trim();
           if (!code.startsWith('04')) return pp;
-          return { ...pp, value_cents: 0, value_reais: 0, participation: 'Anestesia (qtd)' };
+          return { ...pp, cbo: '225151', value_cents: 0, value_reais: 0, participation: 'Anestesia (qtd)', is_anesthetist_04: true };
         });
 
         patient.procedures = mappedAdjusted.sort((a: any, b: any) => new Date(b.procedure_date).getTime() - new Date(a.procedure_date).getTime());

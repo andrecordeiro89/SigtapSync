@@ -1220,6 +1220,33 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     dateToISO?: string
   ): Promise<void> => {
     const wb = XLSX.utils.book_new();
+    const normalizeSortText = (s: unknown): string => {
+      return (s ?? '')
+        .toString()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .trim()
+        .toUpperCase();
+    };
+    const getProceduresLabel = (item: DoctorPatientReport['items'][number]): string => {
+      const list = Array.isArray(item.procedures04) ? item.procedures04 : [];
+      const parts = list
+        .map((p) => (p?.procedure_description || p?.procedure_code || '').toString().trim())
+        .filter(Boolean);
+      return parts.join(' + ');
+    };
+    const sortedItems = [...(report.items || [])].sort((a, b) => {
+      const aVal = Number(a.doctorReceivableReais || 0);
+      const bVal = Number(b.doctorReceivableReais || 0);
+      if (aVal !== bVal) return bVal - aVal;
+      const aProc = normalizeSortText(getProceduresLabel(a));
+      const bProc = normalizeSortText(getProceduresLabel(b));
+      const procCmp = aProc.localeCompare(bProc, 'pt-BR');
+      if (procCmp !== 0) return procCmp;
+      const aName = normalizeSortText(a.patientName || '');
+      const bName = normalizeSortText(b.patientName || '');
+      return aName.localeCompare(bName, 'pt-BR');
+    });
 
     // Aba Resumo
     const summaryRows: Array<Array<string | number>> = [];
@@ -1266,13 +1293,14 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo');
 
     // Aba Pacientes
-    const header = ['#', 'Nome do Paciente', 'Prontuário', 'Nº AIH', 'Especialidade de Atendimento', 'Data Alta (SUS)', 'Valor Total', 'Valor Médico'];
-    const body = report.items.map((item, idx) => {
+    const header = ['#', 'Nome do Paciente', 'Procedimentos', 'Prontuário', 'Nº AIH', 'Especialidade de Atendimento', 'Data Alta (SUS)', 'Valor Total', 'Valor Médico'];
+    const body = sortedItems.map((item, idx) => {
       const d = item.dischargeDateISO || item.admissionDateISO;
       const dLabel = d ? format(new Date(d), 'dd/MM/yyyy') : '';
       return [
         idx + 1,
         item.patientName || 'Nome não informado',
+        getProceduresLabel(item) || '-',
         item.medicalRecord || '-',
         item.aihNumber || '',
         item.aihCareSpecialty || '',
@@ -1286,6 +1314,7 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     (wsPatients as any)['!cols'] = [
       { wch: 5 },
       { wch: 40 },
+      { wch: 60 },
       { wch: 16 },
       { wch: 18 },
       { wch: 16 },
@@ -1308,6 +1337,33 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
   ): Promise<void> => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const normalizeSortText = (s: unknown): string => {
+      return (s ?? '')
+        .toString()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .trim()
+        .toUpperCase();
+    };
+    const getProceduresLabel = (item: DoctorPatientReport['items'][number]): string => {
+      const list = Array.isArray(item.procedures04) ? item.procedures04 : [];
+      const parts = list
+        .map((p) => (p?.procedure_description || p?.procedure_code || '').toString().trim())
+        .filter(Boolean);
+      return parts.join(' + ');
+    };
+    const sortedItems = [...(report.items || [])].sort((a, b) => {
+      const aVal = Number(a.doctorReceivableReais || 0);
+      const bVal = Number(b.doctorReceivableReais || 0);
+      if (aVal !== bVal) return bVal - aVal;
+      const aProc = normalizeSortText(getProceduresLabel(a));
+      const bProc = normalizeSortText(getProceduresLabel(b));
+      const procCmp = aProc.localeCompare(bProc, 'pt-BR');
+      if (procCmp !== 0) return procCmp;
+      const aName = normalizeSortText(a.patientName || '');
+      const bName = normalizeSortText(b.patientName || '');
+      return aName.localeCompare(bName, 'pt-BR');
+    });
 
     // Cabeçalho
     doc.setFontSize(20);
@@ -1357,26 +1413,28 @@ const ReportGenerator: React.FC<ReportGeneratorProps> = ({ onClose, preset }) =>
     doc.setTextColor(0, 0, 0);
     doc.text('LISTA DE PACIENTES - VALORES CALCULADOS:', 20, 95);
 
-    const tableData = report.items.map((item, index) => [
+    const tableData = sortedItems.map((item, index) => [
       (index + 1).toString(),
       item.patientName || 'Nome não informado',
+      getProceduresLabel(item) || '—',
       item.dischargeDateISO ? format(new Date(item.dischargeDateISO), 'dd/MM/yyyy') : (item.admissionDateISO ? format(new Date(item.admissionDateISO), 'dd/MM/yyyy') : '—'),
       formatCurrency(item.aihTotalReais),
       formatCurrency(item.doctorReceivableReais),
     ]);
 
     autoTable(doc, {
-      head: [['#', 'Nome do Paciente', 'Data Alta (SUS)', 'Valor Total', 'Valor Médico']],
+      head: [['#', 'Nome do Paciente', 'Procedimentos', 'Data Alta (SUS)', 'Valor Total', 'Valor Médico']],
       body: tableData,
       startY: 105,
       headStyles: { fillColor: [41, 128, 185] },
-      styles: { fontSize: 9 },
+      styles: { fontSize: 8, cellPadding: 1, overflow: 'linebreak' as any },
       columnStyles: {
-        0: { cellWidth: 15 },
-        1: { cellWidth: 70 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 35 },
-        4: { cellWidth: 35 },
+        0: { cellWidth: 10 },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 45 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 25, halign: 'right' },
+        5: { cellWidth: 25, halign: 'right' },
       },
     });
 

@@ -78,6 +78,16 @@ export const calculateHonPayments = (procedures: ProcedurePaymentInfo[]): Calcul
       const codeOnly = raw.match(/^(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/)?.[1] || raw
       return codeOnly.replace(/\D/g, '')
     }
+    const parseSequence = (raw: unknown): number | undefined => {
+      if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+      if (typeof raw === 'string') {
+        const s = raw.trim()
+        if (!s) return undefined
+        const n = Number(s)
+        if (Number.isFinite(n)) return n
+      }
+      return undefined
+    }
     procedures.forEach((p, idx) => {
       const digits = normalize04Digits(p.procedure_code || '')
       if (!digits || !digits.startsWith('04')) return
@@ -88,6 +98,9 @@ export const calculateHonPayments = (procedures: ProcedurePaymentInfo[]): Calcul
     for (const [digits, idxs] of by) {
       if (idxs.length <= 1) continue
       const pick = idxs.find(i => {
+        const seq = parseSequence((procedures[i] as any)?.sequence)
+        return seq === 1
+      }) ?? idxs.find(i => {
         const cbo = String((procedures[i] as any)?.cbo || '').trim()
         return cbo && cbo !== '225151' && cbo !== '000000'
       }) ?? idxs[0]
