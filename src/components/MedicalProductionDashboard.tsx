@@ -2058,16 +2058,60 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       doc.text(`Comp.: ${compHeader}  |  Caráter: ${careHeader}  |  Gerado em: ${dataGeracao}`, 20, yPosition)
       yPosition += 6
       doc.text(`Base: ${relateReportA}  |  Comparado: ${relateReportB}`, 20, yPosition)
-      yPosition += 6
+      yPosition += 10
 
-      const totalBase = bodyOrdered.length
-      const matched = bodyOrdered.filter((r: any) => String(r?.[7] || '') === 'Sim').length
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(0, 102, 0)
-      doc.text(`Matches: ${matched}/${totalBase}`, 20, yPosition)
-      yPosition += 6
+      const parseBrCurrency = (s: unknown): number => {
+        const raw = (s ?? '').toString()
+        const cleaned = raw
+          .replace(/[^\d,.-]/g, '')
+          .replace(/\./g, '')
+          .replace(/,/, '.')
+        const n = Number(cleaned)
+        return Number.isFinite(n) ? n : 0
+      }
 
-      const startY = yPosition + 6
+      const totalPatients = bodyOrdered.length
+      const totalValue = bodyOrdered.reduce((sum: number, r: any) => sum + parseBrCurrency(r?.[6]), 0)
+      const consolidatedRows = bodyOrdered.filter((r: any) => String(r?.[7] || '') === 'Sim')
+      const pendingRows = bodyOrdered.filter((r: any) => String(r?.[7] || '') !== 'Sim')
+      const consolidatedPatients = consolidatedRows.length
+      const pendingPatients = pendingRows.length
+      const consolidatedValue = consolidatedRows.reduce((sum: number, r: any) => sum + parseBrCurrency(r?.[6]), 0)
+      const pendingValue = pendingRows.reduce((sum: number, r: any) => sum + parseBrCurrency(r?.[6]), 0)
+
+      doc.setDrawColor(200, 200, 200)
+      doc.setLineWidth(0.5)
+      doc.line(20, yPosition - 4, pageWidth - 20, yPosition - 4)
+
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      const leftLabels = ['Pacientes Totais:', 'Pacientes Consolidados:', 'Pacientes Pendentes:']
+      const leftValueX = 20 + Math.max(...leftLabels.map(l => doc.getTextWidth(l))) + 8
+
+      const drawMetricLine = (y: number, leftLabel: string, leftValue: string, rightLabel: string, rightValue: string) => {
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(60, 60, 60)
+        doc.text(leftLabel, 20, y)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(0, 51, 102)
+        doc.text(leftValue, leftValueX, y)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(60, 60, 60)
+        doc.text(rightLabel, pageWidth - 90, y)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(0, 102, 0)
+        doc.text(rightValue, pageWidth - 20, y, { align: 'right' })
+      }
+
+      const metricY1 = yPosition + 6
+      drawMetricLine(metricY1, 'Pacientes Totais:', String(totalPatients), 'Valor Total:', formatCurrency(totalValue))
+      const metricY2 = metricY1 + 8
+      drawMetricLine(metricY2, 'Pacientes Consolidados:', String(consolidatedPatients), 'Valor Consolidado:', formatCurrency(consolidatedValue))
+      const metricY3 = metricY2 + 8
+      drawMetricLine(metricY3, 'Pacientes Pendentes:', String(pendingPatients), 'Valor Pendente:', formatCurrency(pendingValue))
+
+      const startY = metricY3 + 10
       autoTable(doc, {
         head: [['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Valor de Repasse', 'Match']],
         body: bodyOrdered,
@@ -7391,12 +7435,12 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           if (!open) setRelateDoctor(null)
         }}
       >
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Comparar relatórios</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="text-sm text-gray-700">
+            <div className="text-base text-gray-700">
               <div className="font-semibold">
                 Médico:{' '}
                 <span className="text-gray-900">
@@ -7407,7 +7451,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             </div>
             <div className="grid gap-3">
               <div>
-                <div className="text-xs text-gray-600 mb-1">Relatorio Base</div>
+                <div className="text-sm text-gray-700 mb-1">Relatorio Base</div>
                 <Select
                   value={relateReportA}
                   onValueChange={(v) => {
@@ -7431,7 +7475,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 </Select>
               </div>
               <div>
-                <div className="text-xs text-gray-600 mb-1">Relatorio Alvo</div>
+                <div className="text-sm text-gray-700 mb-1">Relatorio Alvo</div>
                 <Select value={relateReportB} onValueChange={setRelateReportB}>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione" />
@@ -7446,8 +7490,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       ))}
                   </SelectContent>
                 </Select>
-                <div className="mt-2 text-xs text-red-600">
-                  Obs.: o PDF usa as linhas do Relatório Base como fonte principal (não faz união dos dois relatórios)
+                <div className="mt-3 text-sm text-red-600">
+                  Obs.: o PDF usa as linhas do Relatório Base como fonte principal (não faz união dos dois relatórios).
                 </div>
               </div>
             </div>
