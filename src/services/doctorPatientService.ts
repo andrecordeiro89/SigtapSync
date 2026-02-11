@@ -464,6 +464,8 @@ export class DoctorPatientService {
         const mapped = procs.map((p: any) => {
           const code = p.procedure_code || '';
           const cbo = p.professional_cbo || '';
+          const storedParticipation = String(p.participacao || p.participation || '').trim();
+          const is04Procedure = typeof code === 'string' && code.startsWith('04');
           
           // 🚀 OTIMIZAÇÃO #4: Pré-calcular se é anestesista 04.xxx (exceto cesariana)
           const isAnesthetist04 = cbo === '225151' && 
@@ -491,7 +493,7 @@ export class DoctorPatientService {
             complexity: p.complexity,
             professional_name: p.professional_name,
             cbo,
-            participation: isAnesthetist04 ? 'Anestesia (qtd)' : 'Responsável',
+            participation: isAnesthetist04 ? 'Anestesia (qtd)' : (is04Procedure ? storedParticipation : 'Responsável'),
             registration_instrument: p.sigtap_procedures?.registration_instrument || '-', // ✅ SIGTAP JOIN
             is_anesthetist_04: isAnesthetist04 // 🚀 Flag pré-calculada
           };
@@ -825,7 +827,9 @@ export class DoctorPatientService {
                 complexity: p.complexity,
                 professional_name: p.professional_name,
                 cbo: p.professional_cbo,
-                participation: 'Responsável'
+                participation: String(p.procedure_code || '').startsWith('04')
+                  ? String((p as any).participacao || (p as any).participation || '').trim()
+                  : 'Responsável'
               }));
               
               // Enriquecer descrições com SIGTAP quando necessário

@@ -53,6 +53,7 @@ import ProcedurePatientDiagnostic from './ProcedurePatientDiagnostic';
 import CleuezaDebugComponent from './CleuezaDebugComponent';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
 import { CareCharacterUtils } from '../config/careCharacterCodes';
+import { getParticipationInfo } from '../config/participationCodes';
 import {
   shouldCalculateAnesthetistProcedure,
   getAnesthetistProcedureType,
@@ -82,6 +83,18 @@ const isMedicalProcedure = (procedureCode: string): boolean => {
   // Verifica se o código inicia com '04'
   const code = procedureCode.toString().trim();
   return code.startsWith('04');
+};
+
+const formatParticipationLabel = (raw: unknown): string => {
+  const base = String(raw ?? '').trim();
+  if (!base) return '';
+  if (/[a-zA-ZáéíóúâêîôûàèìòùçãõüÁÉÍÓÚÂÊÎÔÛÀÈÌÒÙÇÃÕÜ]/.test(base)) return base;
+  const digits = base.replace(/\D/g, '');
+  if (!digits) return base;
+  const normalized = digits.padStart(2, '0').slice(-2);
+  const info = getParticipationInfo(normalized);
+  if (!info) return base;
+  return `${base} (${info.description})`;
 };
 const formatCurrency = (value: number | null | undefined): string => {
   if (value == null || isNaN(value)) return 'R$ 0,00';
@@ -816,6 +829,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const approvedSetRef = useRef<Set<string>>(new Set())
   const approvalCompetenciaByAihRef = useRef<Map<string, string>>(new Map())
   const [selectedDoctorForReport, setSelectedDoctorForReport] = useState<any>(null)
+  const [relateOpen, setRelateOpen] = useState<boolean>(false)
+  const [relateDoctor, setRelateDoctor] = useState<any>(null)
+  const [relateReportA, setRelateReportA] = useState<string>('Relatório Pacientes')
+  const [relateReportB, setRelateReportB] = useState<string>('Relatório Pacientes Simplificado')
+  const [relateLoading, setRelateLoading] = useState<boolean>(false)
   const [sihRemoteTotals, setSihRemoteTotals] = useState<{ totalValue: number; totalAIHs: number; source: string } | null>(null)
   const generateGeneralPatientsReport = async () => {
     try {
@@ -1183,8 +1201,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
   }
 
-  const generateSimplifiedReport = async (doctor: any, approvedOnly: boolean, excludeZeros?: boolean) => {
+  const generateSimplifiedReport = async (
+    doctor: any,
+    approvedOnly: boolean,
+    excludeZeros?: boolean,
+    options?: { forceSihSource?: boolean; sourceLabelOverride?: 'TABWIN' | 'GSUS' }
+  ) => {
     try {
+      const sihMode = typeof options?.forceSihSource === 'boolean' ? options.forceSihSource : useSihSource
       let logoBase64 = null as string | null
       try {
         const response = await fetch('/CIS Sem fundo.jpg')
@@ -1211,7 +1235,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
       // Mapear nomes de pacientes quando fonte remota está ativa (join local AIH→patients)
       let nameByAih = new Map<string, string>()
-      if (useSihSource) {
+      if (sihMode) {
         try {
           const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
           let q = supabase
@@ -1474,7 +1498,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       const pageHeight = doc.internal.pageSize.getHeight()
       // Fonte do relatório (topo)
       try {
-        const sourceLabel = useSihSource ? 'TABWIN' : 'GSUS'
+        const sourceLabel = options?.sourceLabelOverride ?? (sihMode ? 'TABWIN' : 'GSUS')
         doc.setFontSize(10)
         doc.setFont('helvetica', 'bold')
         doc.setTextColor(80, 80, 80)
@@ -1600,6 +1624,488 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     } catch (err) {
       console.error('Erro ao exportar Relatório Simplificado (PDF):', err)
       toast.error('Erro ao gerar relatório PDF')
+    }
+  }
+
+  const generateSimplifiedReportFromSih = async (doctor: any, excludeZeros?: boolean) => {
+    try {
+      if (!remoteConfigured) {
+        toast.error('Fonte SIH remota não configurada')
+        return
+      }
+      const hospitalIds =
+        selectedHospitals && !selectedHospitals.includes('all')
+          ? selectedHospitals
+          : undefined
+      const competenciaFilter =
+        selectedCompetencia &&
+        selectedCompetencia !== 'all' &&
+        selectedCompetencia.trim()
+          ? selectedCompetencia.trim()
+          : undefined
+      const careFilter =
+        filterCareCharacter && filterCareCharacter !== 'all'
+          ? filterCareCharacter
+          : undefined
+
+      const loadOptions: any = {
+        hospitalIds,
+        competencia: competenciaFilter
+      }
+      if (careFilter) loadOptions.filterCareCharacter = careFilter
+      if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
+        loadOptions.dischargeDateRange = {
+          from: dischargeDateRange.from,
+          to: dischargeDateRange.to
+        }
+      }
+
+      const { SihApiAdapter } = await import('../services/sihApiAdapter')
+      const remoteDocs = await SihApiAdapter.getDoctorsWithPatients(loadOptions)
+      if (!remoteDocs || remoteDocs.length === 0) {
+        toast.warning('Nenhum dado encontrado na fonte SIH para os filtros atuais')
+        return
+      }
+
+      const targetCns = String(doctor?.doctor_info?.cns || '').trim()
+      const targetName = String(doctor?.doctor_info?.name || '').trim().toLowerCase()
+
+      let remoteDoc =
+        targetCns &&
+        remoteDocs.find(
+          (d: any) => String(d?.doctor_info?.cns || '').trim() === targetCns
+        )
+
+      if (!remoteDoc) {
+        remoteDoc = remoteDocs.find(
+          (d: any) =>
+            String(d?.doctor_info?.name || '').trim().toLowerCase() ===
+            targetName
+        )
+      }
+
+      if (!remoteDoc) {
+        toast.warning(
+          'Nenhum dado remoto SIH encontrado para este médico com os filtros atuais'
+        )
+        return
+      }
+
+      await generateSimplifiedReport(remoteDoc, false, excludeZeros, { forceSihSource: true, sourceLabelOverride: 'TABWIN' })
+    } catch (err) {
+      console.error('Erro ao gerar relatório simplificado SIH:', err)
+      toast.error('Erro ao gerar relatório SIH')
+    }
+  }
+
+  const relateReportOptions = [
+    'Relatório Pacientes',
+    'Relatório Pacientes Simplificado',
+    'Relatório Pacientes Simplificado (SIH RD)',
+    'Relatório Simplificado (Sem Zeros)'
+  ] as const
+
+  const normalizeAihKey = (s: unknown): string => {
+    return String(s ?? '').replace(/\D/g, '').replace(/^0+/, '')
+  }
+
+  const loadRemoteDoctorForCard = async (doctor: any) => {
+    if (!remoteConfigured) return null
+
+    const hospitalIds =
+      selectedHospitals && !selectedHospitals.includes('all')
+        ? selectedHospitals
+        : undefined
+    const competenciaFilter =
+      selectedCompetencia &&
+      selectedCompetencia !== 'all' &&
+      selectedCompetencia.trim()
+        ? selectedCompetencia.trim()
+        : undefined
+    const careFilter =
+      filterCareCharacter && filterCareCharacter !== 'all'
+        ? filterCareCharacter
+        : undefined
+
+    const loadOptions: any = {
+      hospitalIds,
+      competencia: competenciaFilter
+    }
+    if (careFilter) loadOptions.filterCareCharacter = careFilter
+    if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
+      loadOptions.dischargeDateRange = {
+        from: dischargeDateRange.from,
+        to: dischargeDateRange.to
+      }
+    }
+
+    const { SihApiAdapter } = await import('../services/sihApiAdapter')
+    const remoteDocs = await SihApiAdapter.getDoctorsWithPatients(loadOptions)
+    if (!remoteDocs || remoteDocs.length === 0) return null
+
+    const targetCns = String(doctor?.doctor_info?.cns || '').trim()
+    const targetName = String(doctor?.doctor_info?.name || '').trim().toLowerCase()
+
+    let remoteDoc =
+      targetCns &&
+      remoteDocs.find(
+        (d: any) => String(d?.doctor_info?.cns || '').trim() === targetCns
+      )
+
+    if (!remoteDoc) {
+      remoteDoc = remoteDocs.find(
+        (d: any) =>
+          String(d?.doctor_info?.name || '').trim().toLowerCase() === targetName
+      )
+    }
+
+    return remoteDoc || null
+  }
+
+  const buildSimplifiedTableData = async (
+    doctor: any,
+    excludeZeros: boolean,
+    sihMode: boolean
+  ): Promise<{ tableData: Array<Array<string>>; totalRepasse: number }> => {
+    const doctorName = doctor?.doctor_info?.name || ''
+    const hospitalId = doctor?.hospitals?.[0]?.hospital_id
+
+    const tableData: Array<Array<string>> = []
+    let totalRepasse = 0
+
+    let nameByAih = new Map<string, string>()
+    if (sihMode) {
+      try {
+        let q = supabase
+          .from('aihs')
+          .select('aih_number, hospital_id, discharge_date, competencia, patients(name)')
+        if (hospitalId) q = q.eq('hospital_id', hospitalId)
+        if (selectedCompetencia && selectedCompetencia !== 'all') q = q.eq('competencia', selectedCompetencia)
+        if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
+          const from = dischargeDateRange.from || undefined
+          const to = dischargeDateRange.to || undefined
+          const endExclusive = to ? new Date(to) : undefined
+          if (endExclusive) endExclusive.setDate(endExclusive.getDate() + 1)
+          if (from) q = q.gte('discharge_date', from)
+          if (endExclusive) q = q.lt('discharge_date', endExclusive.toISOString().slice(0, 10))
+          q = q.not('discharge_date', 'is', null)
+        }
+        const { data: rows } = await q
+        ;(rows || []).forEach((r: any) => {
+          const key = normalizeAihKey(String(r.aih_number || ''))
+          const nm = String(r?.patients?.name || '')
+          if (key && nm) nameByAih.set(key, nm)
+        })
+      } catch { }
+    }
+
+    const patientsDedup = dedupPatientsByAIH(doctor.patients || [])
+    patientsDedup.forEach((p: any) => {
+      const aihNumber = normalizeAihKey(String(p?.aih_info?.aih_number || '').trim())
+      const medicalRecord = p.patient_info?.medical_record || '-'
+      let name = p.patient_info?.name || ''
+      if (!name || name === 'Nome não disponível' || name === 'Paciente') {
+        const candidate = nameByAih.get(aihNumber)
+        name = candidate || (name || 'Paciente')
+      }
+
+      const procsAll = p.procedures || []
+      const calculable = (p as any).calculable_procedures || procsAll.filter(filterCalculableProcedures)
+
+      const mainCandidates = calculable.filter((proc: any) => (typeof proc.registration_instrument === 'string' ? proc.registration_instrument.includes('03') : false) && (proc.cbo !== '225151'))
+      let mainProc = mainCandidates.length > 0 ? mainCandidates[0] : null
+      if (!mainProc) {
+        const seqSorted = calculable.filter((x: any) => x.cbo !== '225151' && typeof x.sequence === 'number').sort((a: any, b: any) => (a.sequence || 9999) - (b.sequence || 9999))
+        mainProc = seqSorted[0] || null
+      }
+      if (!mainProc) {
+        mainProc = calculable.filter((x: any) => x.cbo !== '225151').reduce((max: any, proc: any) => {
+          const v = typeof proc.value_reais === 'number' ? proc.value_reais : 0
+          const mv = typeof (max && max.value_reais) === 'number' ? max.value_reais : -1
+          return v > mv ? proc : max
+        }, null as any)
+      }
+      const mainCode = mainProc?.procedure_code || ''
+      const mainCodeDigits = mainCode.replace(/\D/g, '')
+      const descFallback = mainCode && sigtapMap ? ((sigtapMap.get(mainCode) || sigtapMap.get(mainCodeDigits) || '') as string) : ''
+      const mainProcDesc = ((mainProc?.procedure_description || mainProc?.sigtap_description || descFallback || '') as string).trim()
+
+      const medicalForDisplay = calculable
+        .filter((x: any) => isMedicalProcedure(x.procedure_code) && shouldCalculateAnesthetistProcedure(x.cbo, x.procedure_code))
+        .sort((a: any, b: any) => {
+          const sa = typeof a.sequence === 'number' ? a.sequence : 9999
+          const sb = typeof b.sequence === 'number' ? b.sequence : 9999
+          if (sa !== sb) return sa - sb
+          const va = typeof a.value_reais === 'number' ? a.value_reais : 0
+          const vb = typeof b.value_reais === 'number' ? b.value_reais : 0
+          return vb - va
+        })
+
+      const labels = medicalForDisplay.map((m: any) => {
+        const code = m.procedure_code || ''
+        const digits = code.replace(/\D/g, '')
+        const descFallback2 = code && sigtapMap ? ((sigtapMap.get(code) || sigtapMap.get(digits) || '') as string) : ''
+        const desc = ((m.procedure_description || m.sigtap_description || descFallback2 || '') as string).trim()
+        return desc || (code ? `Procedimento ${code}` : 'Procedimento')
+      })
+      const proceduresDisplay = labels.length > 0 ? labels.join(' + ') : (mainProcDesc || (mainCode ? `Procedimento ${mainCode}` : 'Sem procedimento principal'))
+
+      const dischargeISO = p?.aih_info?.discharge_date || ''
+      const dischargeLabel = parseISODateToLocal(dischargeISO)
+
+      if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
+        try {
+          const d = dischargeISO ? new Date(dischargeISO) : null
+          const start = dischargeDateRange.from ? new Date(dischargeDateRange.from) : null
+          const end = dischargeDateRange.to ? new Date(dischargeDateRange.to) : null
+          const endExclusive = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1) : null
+          if (d) {
+            if (start && d < new Date(start.getFullYear(), start.getMonth(), start.getDate())) return
+            if (endExclusive && d >= endExclusive) return
+          }
+        } catch { }
+      }
+
+      const aihKey = (p as any).aih_id || normalizeAihNumber(p?.aih_info?.aih_number) || '__single__'
+      const baseProcedures = (p as any).calculable_procedures || getCalculableProcedures(
+        ((p.procedures || []) as any[]).map((proc: any) => ({
+          ...proc,
+          aih_id: proc.aih_id || aihKey,
+          sequence: proc.sequence ?? proc.sequencia ?? proc.procedure_sequence
+        }))
+      )
+      const proceduresWithPayment = (baseProcedures as any[])
+        .filter((proc: any) => isMedicalProcedure(proc.procedure_code))
+        .sort((a: any, b: any) => {
+          const sa = typeof a.sequence === 'number' ? a.sequence : 9999
+          const sb = typeof b.sequence === 'number' ? b.sequence : 9999
+          if (sa !== sb) return sa - sb
+          const va = typeof a.value_reais === 'number' ? a.value_reais : 0
+          const vb = typeof b.value_reais === 'number' ? b.value_reais : 0
+          return vb - va
+        })
+        .map((proc: any) => ({
+          procedure_code: proc.procedure_code,
+          procedure_description: proc.procedure_description,
+          value_reais: proc.value_reais || 0,
+          cbo: proc.cbo,
+          sequence: proc.sequence,
+        }))
+
+      let repasseValue = 0
+      if (proceduresWithPayment.length > 0) {
+        const isMonthly = isFixedMonthlyPayment(doctorName, hospitalId, ALL_HOSPITAL_RULES)
+        const isGenSurg = /cirurg/i.test(doctorName) || (/cirurg/i.test(doctor?.doctor_info?.specialty || '') && /geral/i.test(doctor?.doctor_info?.specialty || ''))
+        const useHon = shouldUseHonForHospital(doctorName, hospitalId, !!isGenSurg)
+        const paymentResult = useHon
+          ? calculateHonPayments(proceduresWithPayment)
+          : calculateDoctorPayment(
+            doctorName,
+            proceduresWithPayment,
+            hospitalId
+          )
+        repasseValue = isMonthly ? 0 : (paymentResult.totalPayment || 0)
+      }
+
+      if (!excludeZeros || repasseValue > 0) {
+        totalRepasse += repasseValue
+        tableData.push([
+          '',
+          medicalRecord,
+          aihNumber || '-',
+          name,
+          proceduresDisplay,
+          dischargeLabel,
+          formatCurrency(repasseValue)
+        ])
+      }
+    })
+
+    const normalizeSortText = (s: unknown): string => {
+      return (s ?? '')
+        .toString()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .trim()
+        .toUpperCase()
+    }
+    const parseBrCurrency = (s: unknown): number => {
+      const raw = (s ?? '').toString()
+      const cleaned = raw
+        .replace(/[^\d,.-]/g, '')
+        .replace(/\./g, '')
+        .replace(/,/, '.')
+      const n = Number(cleaned)
+      return Number.isFinite(n) ? n : 0
+    }
+    tableData.sort((a, b) => {
+      const repA = parseBrCurrency(a[6])
+      const repB = parseBrCurrency(b[6])
+      if (repA !== repB) return repB - repA
+      const procA = normalizeSortText(a[4])
+      const procB = normalizeSortText(b[4])
+      const procCmp = procA.localeCompare(procB, 'pt-BR')
+      if (procCmp !== 0) return procCmp
+      const nameA = normalizeSortText(a[3])
+      const nameB = normalizeSortText(b[3])
+      return nameA.localeCompare(nameB, 'pt-BR')
+    })
+    tableData.forEach((row, idx) => { row[0] = String(idx + 1) })
+
+    return { tableData, totalRepasse }
+  }
+
+  const buildRelateDataset = async (doctor: any, reportLabel: string) => {
+    if (reportLabel === 'Relatório Pacientes Simplificado (SIH RD)') {
+      const remoteDoc = await loadRemoteDoctorForCard(doctor)
+      if (!remoteDoc) throw new Error('Nenhum dado remoto SIH encontrado')
+      return buildSimplifiedTableData(remoteDoc, false, true)
+    }
+    if (reportLabel === 'Relatório Simplificado (Sem Zeros)') {
+      return buildSimplifiedTableData(doctor, true, Boolean(useSihSource))
+    }
+    if (reportLabel === 'Relatório Pacientes Simplificado') {
+      return buildSimplifiedTableData(doctor, false, Boolean(useSihSource))
+    }
+    return buildSimplifiedTableData(doctor, false, false)
+  }
+
+  const handleRelateConfirm = async () => {
+    const doctor = relateDoctor
+    if (!doctor) return
+    if (!relateReportA || !relateReportB || relateReportA === relateReportB) return
+
+    setRelateLoading(true)
+    try {
+      if ((relateReportA === 'Relatório Pacientes Simplificado (SIH RD)' || relateReportB === 'Relatório Pacientes Simplificado (SIH RD)') && !remoteConfigured) {
+        toast.error('Fonte SIH remota não configurada')
+        return
+      }
+
+      const [base, other] = await Promise.all([
+        buildRelateDataset(doctor, relateReportA),
+        buildRelateDataset(doctor, relateReportB)
+      ])
+
+      const otherSet = new Set(
+        (other.tableData || [])
+          .map((r: any) => normalizeAihKey(r?.[2]))
+          .filter(Boolean)
+      )
+
+      const body = (base.tableData || []).map((r: any) => {
+        const key = normalizeAihKey(r?.[2])
+        const match = key && otherSet.has(key) ? 'Sim' : 'Não'
+        return [...r, match]
+      })
+
+      const bodyOrdered = [
+        ...body.filter((r: any) => String(r?.[7] || '') === 'Sim'),
+        ...body.filter((r: any) => String(r?.[7] || '') !== 'Sim')
+      ].map((r: any, idx: number) => {
+        const next = [...r]
+        next[0] = String(idx + 1)
+        return next
+      })
+
+      let logoBase64 = null as string | null
+      try {
+        const response = await fetch('/CIS Sem fundo.jpg')
+        const blob = await response.blob()
+        logoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.readAsDataURL(blob)
+        })
+      } catch { }
+
+      const doctorName = doctor?.doctor_info?.name || ''
+      const hospitalName = doctor?.hospitals?.[0]?.hospital_name || 'Hospital não identificado'
+
+      const doc = new jsPDF('landscape')
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+
+      let yPosition = 20
+      if (logoBase64) {
+        const logoWidth = 40
+        const logoHeight = 20
+        const logoX = 20
+        const logoY = 8
+        doc.addImage(logoBase64, 'JPEG', logoX, logoY, logoWidth, logoHeight)
+        yPosition = logoY + logoHeight + 10
+      }
+
+      doc.setFontSize(16)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(0, 51, 102)
+      doc.text('RELATÓRIO RELACIONADO - MÉDICO', pageWidth / 2, yPosition, { align: 'center' })
+      yPosition += 10
+
+      const careHeader = (filterCareCharacter && filterCareCharacter !== 'all')
+        ? CareCharacterUtils.formatForDisplay(filterCareCharacter, false)
+        : 'TODOS'
+      const compHeader = (selectedCompetencia && selectedCompetencia !== 'all')
+        ? formatCompetencia(selectedCompetencia)
+        : 'TODAS'
+      const dataGeracao = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      doc.text(`Médico: ${doctorName}  |  Hospital: ${hospitalName}`, 20, yPosition)
+      yPosition += 6
+      doc.text(`Comp.: ${compHeader}  |  Caráter: ${careHeader}  |  Gerado em: ${dataGeracao}`, 20, yPosition)
+      yPosition += 6
+      doc.text(`Base: ${relateReportA}  |  Comparado: ${relateReportB}`, 20, yPosition)
+      yPosition += 6
+
+      const totalBase = bodyOrdered.length
+      const matched = bodyOrdered.filter((r: any) => String(r?.[7] || '') === 'Sim').length
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(0, 102, 0)
+      doc.text(`Matches: ${matched}/${totalBase}`, 20, yPosition)
+      yPosition += 6
+
+      const startY = yPosition + 6
+      autoTable(doc, {
+        head: [['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Valor de Repasse', 'Match']],
+        body: bodyOrdered,
+        startY,
+        theme: 'striped',
+        tableWidth: 'auto',
+        headStyles: { fillColor: [0, 51, 102], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 2 },
+        bodyStyles: { fontSize: 8, textColor: [50, 50, 50], cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 'auto', halign: 'center' },
+          1: { cellWidth: 'auto', halign: 'center' },
+          2: { cellWidth: 'auto', halign: 'center' },
+          3: { cellWidth: 'auto', halign: 'left' },
+          4: { cellWidth: 'auto', halign: 'left', fontSize: 7 },
+          5: { cellWidth: 'auto', halign: 'center' },
+          6: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] },
+          7: { cellWidth: 'auto', halign: 'center', fontStyle: 'bold' }
+        },
+        styles: { overflow: 'linebreak', cellPadding: 2, fontSize: 8 },
+        margin: { left: 20, right: 20 },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+      })
+
+      const footerY = pageHeight - 15
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(120, 120, 120)
+      doc.text('CIS - Centro Integrado em Saúde', pageWidth / 2, footerY, { align: 'center' })
+
+      const fileName = `Relatorio_Relacionado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`
+      doc.save(fileName)
+      toast.success('Relatório relacionado gerado com sucesso!')
+      setRelateOpen(false)
+    } catch (err) {
+      console.error('Erro ao gerar relatório relacionado:', err)
+      toast.error('Erro ao gerar relatório relacionado')
+    } finally {
+      setRelateLoading(false)
     }
   }
 
@@ -5204,12 +5710,37 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                       type="button"
                                       onClick={async (e) => {
                                         e.stopPropagation();
+                                        await generateSimplifiedReportFromSih(doctor, false);
+                                      }}
+                                      className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white shadow-sm h-9 px-3 rounded-md text-sm w-auto min-w-[200px]"
+                                    >
+                                      <FileSpreadsheet className="h-4 w-4" />
+                                      Relatório Pacientes Simplificado (SIH RD)
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
                                         await generateSimplifiedReport(doctor, false, true);
                                       }}
                                       className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white shadow-sm h-9 px-3 rounded-md text-sm w-auto min-w-[200px]"
                                     >
                                       <FileSpreadsheet className="h-4 w-4" />
                                       Relatório Simplificado (Sem Zeros)
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setRelateDoctor(doctor);
+                                        setRelateReportA('Relatório Pacientes');
+                                        setRelateReportB('Relatório Pacientes Simplificado');
+                                        setRelateOpen(true);
+                                      }}
+                                      className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-9 px-3 rounded-md text-sm w-auto min-w-[200px]"
+                                    >
+                                      <FileSpreadsheet className="h-4 w-4" />
+                                      Comparar Relatórios
                                     </Button>
                                     {false && (<>
                                       {/* 📋 PROTOCOLO DE ATENDIMENTO APROVADO */}
@@ -6539,10 +7070,32 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                                                 <span className="text-slate-500 font-medium uppercase tracking-wide">CBO:</span>
                                                                                 <Badge
                                                                                   variant="outline"
-                                                                                  className={`ml-2 text-[10px] ${procedure.cbo === '225151' ? 'bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white border-0' : 'bg-slate-100 text-slate-700 border-slate-300'}`}
+                                                                                  className={`ml-2 text-[10px] ${isMedical04
+                                                                                    ? (procedure.cbo === '225151'
+                                                                                      ? 'bg-emerald-600 text-white border-0'
+                                                                                      : 'bg-blue-600 text-white border-0')
+                                                                                    : 'bg-slate-100 text-slate-700 border-slate-300'
+                                                                                    }`}
                                                                                 >
                                                                                   {procedure.cbo}
                                                                                 </Badge>
+                                                                                {isMedical04 && procedure.cbo === '225151' && (
+                                                                                  <Badge variant="outline" className="ml-2 text-[10px] bg-emerald-600 text-white border-0">
+                                                                                    Anestesista
+                                                                                  </Badge>
+                                                                                )}
+                                                                                {(() => {
+                                                                                  const cboDigits = String(procedure.cbo || '').replace(/\D/g, '')
+                                                                                  const validCbo = cboDigits.length === 6 && cboDigits !== '225151'
+                                                                                  const partDigits = String((procedure as any).participation || '').replace(/\D/g, '')
+                                                                                  const partCode = partDigits ? partDigits.padStart(2, '0').slice(-2) : ''
+                                                                                  if (!isMedical04 || !validCbo || partCode !== '01') return null
+                                                                                  return (
+                                                                                    <Badge variant="outline" className="ml-2 text-[10px] bg-blue-600 text-white border-0">
+                                                                                      1º Cirurgião
+                                                                                    </Badge>
+                                                                                  )
+                                                                                })()}
                                                                               </div>
                                                                             )}
 
@@ -6574,12 +7127,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                                             )}
 
                                                                             {/* PARTICIPAÇÃO */}
-                                                                            {procedure.participation && (
-                                                                              <div>
-                                                                                <span className="text-slate-500 font-medium uppercase tracking-wide">Participação:</span>
-                                                                                <span className="ml-2 text-slate-900">{procedure.participation}</span>
-                                                                              </div>
-                                                                            )}
+                                                                            <div>
+                                                                              <span className="text-slate-500 font-medium uppercase tracking-wide">Participação:</span>
+                                                                              <span className="ml-2 text-slate-900">
+                                                                                {isMedicalProcedure(String((procedure as any).procedure_code || ''))
+                                                                                  ? (formatParticipationLabel(procedure.participation) || 'null')
+                                                                                  : 'null'}
+                                                                              </span>
+                                                                            </div>
 
                                                                             {/* COMPLEXIDADE */}
                                                                             {procedure.complexity && (
@@ -6826,6 +7381,89 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 </div>
               </>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={relateOpen}
+        onOpenChange={(open) => {
+          setRelateOpen(open)
+          if (!open) setRelateDoctor(null)
+        }}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Comparar relatórios</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-gray-700">
+              <div className="font-semibold">
+                Médico:{' '}
+                <span className="text-gray-900">
+                  {relateDoctor?.doctor_info?.name || '—'}
+                </span>
+              </div>
+              <div>Hospital: {relateDoctor?.hospitals?.[0]?.hospital_name || '—'}</div>
+            </div>
+            <div className="grid gap-3">
+              <div>
+                <div className="text-xs text-gray-600 mb-1">Relatorio Base</div>
+                <Select
+                  value={relateReportA}
+                  onValueChange={(v) => {
+                    setRelateReportA(v)
+                    if (v === relateReportB) {
+                      const next = (Array.from(relateReportOptions) as string[]).find(x => x !== v) || ''
+                      setRelateReportB(next)
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Array.from(relateReportOptions) as string[]).map((opt) => (
+                      <SelectItem key={opt} value={opt}>
+                        {opt}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <div className="text-xs text-gray-600 mb-1">Relatorio Alvo</div>
+                <Select value={relateReportB} onValueChange={setRelateReportB}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Array.from(relateReportOptions) as string[])
+                      .filter((opt) => opt !== relateReportA)
+                      .map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <div className="mt-2 text-xs text-red-600">
+                  Obs.: o PDF usa as linhas do Relatório Base como fonte principal (não faz união dos dois relatórios)
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setRelateOpen(false)} disabled={relateLoading}>
+                Cancelar
+              </Button>
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={handleRelateConfirm}
+                disabled={relateLoading || !relateReportA || !relateReportB || relateReportA === relateReportB}
+              >
+                {relateLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Gerar PDF
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

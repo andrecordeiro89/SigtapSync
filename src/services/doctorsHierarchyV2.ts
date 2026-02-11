@@ -214,7 +214,9 @@ export class DoctorsHierarchyV2Service {
         const mapped: ProcedureDetail[] = procs.map((p: any) => {
           const code = p.procedure_code || '';
           const cbo = p.professional_cbo || '';
+          const is04Procedure = typeof code === 'string' && code.startsWith('04');
           const isAnesthetist04 = cbo === '225151' && typeof code === 'string' && code.startsWith('04') && code !== '04.17.01.001-0';
+          const storedParticipation = String(p.participacao || p.participation || '').trim();
           const rawCents = typeof p.total_value === 'number' ? p.total_value : 0;
           const value_cents = isAnesthetist04 ? 0 : rawCents;
           return {
@@ -233,7 +235,7 @@ export class DoctorsHierarchyV2Service {
             complexity: p.complexity,
             professional_name: p.professional_name,
             cbo,
-            participation: isAnesthetist04 ? 'Anestesia (qtd)' : 'Responsável',
+            participation: isAnesthetist04 ? 'Anestesia (qtd)' : (is04Procedure ? storedParticipation : 'Responsável'),
           } as ProcedureDetail & { is_anesthetist_04?: boolean; quantity?: number };
         });
         const { getCalculableProcedures } = await import('../utils/anesthetistLogic');

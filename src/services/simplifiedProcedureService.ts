@@ -33,6 +33,7 @@ export interface ProcedureRecord {
   professional_cbo?: string;
   professional_cns?: string;
   professional_name?: string;
+  participacao?: string;
   
   // Billing and Status
   billing_status?: string;
@@ -106,6 +107,7 @@ export class ProcedureRecordsService {
           professional_cbo,
           professional_cns,
           professional_name,
+          participacao,
           billing_status,
           billing_date,
           match_status,
@@ -208,6 +210,7 @@ export class ProcedureRecordsService {
           professional_cbo,
           professional_cns,
           professional_name,
+          participacao,
           billing_status,
           billing_date,
           match_status,
@@ -315,6 +318,7 @@ export class ProcedureRecordsService {
             sequencia,
             professional_name,
             professional_cbo,
+            participacao,
             sigtap_procedures!procedure_records_procedure_id_fkey (
               registration_instrument
             )
