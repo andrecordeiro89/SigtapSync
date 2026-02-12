@@ -250,16 +250,28 @@ export class AIHProcessorOptimized {
       cnsAutorizador: this.cleanCNS(data.cnsAutorizador),
       cnsSolicitante: this.cleanCNS(data.cnsSolicitante),
       cnsResponsavel: this.cleanCNS(data.cnsResponsavel),
+      aihAnterior: '',
+      aihPosterior: '',
       
       // Identificação do paciente
       prontuario: data.prontuario || '',
       nomePaciente: data.nomePaciente,
+      cns: this.cleanCNS(data.cns),
       nascimento: this.convertDate(data.nascimento),
       sexo: gender,
       nacionalidade: data.nacionalidade || 'BRASIL',
+      racaCor: '',
+      tipoDocumento: '',
+      documento: '',
       nomeResponsavel: data.nomeResponsavel,
       nomeMae: data.nomeMae,
       endereco: this.buildFullAddress(data),
+      numero: data.numero || '',
+      complemento: data.complemento || '',
+      bairro: data.bairro || '',
+      municipio: data.municipio || '',
+      uf: data.uf || '',
+      cep: data.cep || '',
       telefone: this.cleanPhone(data.telefone),
       
       // Dados da internação

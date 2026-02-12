@@ -834,6 +834,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [relateReportA, setRelateReportA] = useState<string>('Relatório Pacientes')
   const [relateReportB, setRelateReportB] = useState<string>('Relatório Pacientes Simplificado')
   const [relateLoading, setRelateLoading] = useState<boolean>(false)
+  const [valueConferenceOpen, setValueConferenceOpen] = useState<boolean>(false)
+  const [valueConferenceDoctor, setValueConferenceDoctor] = useState<any>(null)
+  const [valueConferenceLoading, setValueConferenceLoading] = useState<boolean>(false)
   const [sihRemoteTotals, setSihRemoteTotals] = useState<{ totalValue: number; totalAIHs: number; source: string } | null>(null)
   const generateGeneralPatientsReport = async () => {
     try {
@@ -1968,6 +1971,460 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       return buildSimplifiedTableData(doctor, false, Boolean(useSihSource))
     }
     return buildSimplifiedTableData(doctor, false, false)
+  }
+
+  const buildValueConferenceBaseDataset = async (
+    doctor: any
+  ): Promise<{ tableData: Array<Array<string>>; totalAih: number }> => {
+    const tableData: Array<Array<string>> = []
+    let totalAih = 0
+
+    const patientsDedup = dedupPatientsByAIH(doctor.patients || [])
+    patientsDedup.forEach((p: any) => {
+      const aihNumber = normalizeAihKey(String(p?.aih_info?.aih_number || '').trim())
+      const name = p.patient_info?.name || 'Paciente'
+
+      const procsAll = p.procedures || []
+      const calculable = (p as any).calculable_procedures || procsAll.filter(filterCalculableProcedures)
+
+      const medicalForDisplay = calculable
+        .filter((x: any) => isMedicalProcedure(x.procedure_code) && shouldCalculateAnesthetistProcedure(x.cbo, x.procedure_code))
+        .sort((a: any, b: any) => {
+          const sa = typeof a.sequence === 'number' ? a.sequence : 9999
+          const sb = typeof b.sequence === 'number' ? b.sequence : 9999
+          if (sa !== sb) return sa - sb
+          const va = typeof a.value_reais === 'number' ? a.value_reais : 0
+          const vb = typeof b.value_reais === 'number' ? b.value_reais : 0
+          return vb - va
+        })
+
+      const labels = medicalForDisplay.map((m: any) => {
+        const code = m.procedure_code || ''
+        const digits = code.replace(/\D/g, '')
+        const descFallback2 = code && sigtapMap ? ((sigtapMap.get(code) || sigtapMap.get(digits) || '') as string) : ''
+        const desc = ((m.procedure_description || m.sigtap_description || descFallback2 || '') as string).trim()
+        return desc || (code ? `Procedimento ${code}` : 'Procedimento')
+      })
+      const proceduresDisplay = labels.length > 0 ? labels.join(' + ') : 'Sem procedimentos'
+
+      const dischargeISO = p?.aih_info?.discharge_date || ''
+      const dischargeLabel = parseISODateToLocal(dischargeISO)
+
+      if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
+        try {
+          const d = dischargeISO ? new Date(dischargeISO) : null
+          const start = dischargeDateRange.from ? new Date(dischargeDateRange.from) : null
+          const end = dischargeDateRange.to ? new Date(dischargeDateRange.to) : null
+          const endExclusive = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1) : null
+          if (d) {
+            if (start && d < new Date(start.getFullYear(), start.getMonth(), start.getDate())) return
+            if (endExclusive && d >= endExclusive) return
+          }
+        } catch { }
+      }
+
+      const localTotal = Number((p as any).total_value_reais || 0)
+      totalAih += localTotal
+
+      tableData.push([
+        '',
+        aihNumber || '-',
+        name,
+        proceduresDisplay,
+        dischargeLabel,
+        formatCurrency(localTotal)
+      ])
+    })
+
+    const parseBrCurrency = (s: unknown): number => {
+      const raw = (s ?? '').toString()
+      const cleaned = raw
+        .replace(/[^\d,.-]/g, '')
+        .replace(/\./g, '')
+        .replace(/,/, '.')
+      const n = Number(cleaned)
+      return Number.isFinite(n) ? n : 0
+    }
+
+    tableData.sort((a, b) => parseBrCurrency(b[5]) - parseBrCurrency(a[5]))
+    tableData.forEach((row, idx) => { row[0] = String(idx + 1) })
+
+    return { tableData, totalAih }
+  }
+
+  const handleValueConferenceCompare = async () => {
+    const doctor = valueConferenceDoctor
+    if (!doctor) return
+
+    setValueConferenceLoading(true)
+    try {
+      if (!remoteConfigured) {
+        toast.error('Fonte SIH remota não configurada')
+        return
+      }
+
+      const hospitalId = doctor?.hospitals?.[0]?.hospital_id
+      const hospital = availableHospitals.find(h => h.id === hospitalId)
+      const cnes = (hospital as any)?.cnes ? String((hospital as any).cnes) : ''
+      if (!cnes) {
+        toast.error('Hospital sem CNES configurado para consulta no SIH RD')
+        return
+      }
+
+      const base = await buildValueConferenceBaseDataset(doctor)
+      const normalizeAih = (s: unknown) => String(s ?? '').replace(/\D/g, '').replace(/^0+/, '')
+
+      let month: number | undefined
+      let year: number | undefined
+      if (selectedCompetencia && selectedCompetencia !== 'all') {
+        const raw = selectedCompetencia.trim()
+        if (/^\d{6}$/.test(raw)) {
+          year = parseInt(raw.slice(0, 4), 10)
+          month = parseInt(raw.slice(4, 6), 10)
+        } else {
+          const mDash = raw.match(/^(\d{4})-(\d{2})/)
+          const mSlash = raw.match(/^(\d{2})\/(\d{4})$/)
+          if (mDash) { year = parseInt(mDash[1], 10); month = parseInt(mDash[2], 10) }
+          else if (mSlash) { month = parseInt(mSlash[1], 10); year = parseInt(mSlash[2], 10) }
+        }
+      }
+
+      const remoteMap = new Map<string, number>()
+      const careFilter = (filterCareCharacter && filterCareCharacter !== 'all') ? filterCareCharacter : undefined
+      const carIntValue = careFilter ? (careFilter === '1' ? '01' : careFilter === '2' ? '02' : String(careFilter)) : undefined
+
+      if (typeof month === 'number' && typeof year === 'number') {
+        let q = supabaseSih
+          .from('sih_rd')
+          .select('n_aih,val_tot')
+          .eq('cnes', cnes)
+          .eq('mes_cmpt', month)
+          .eq('ano_cmpt', year)
+        if (carIntValue) q = q.eq('car_int', carIntValue)
+        if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
+          const from = dischargeDateRange.from || undefined
+          const to = dischargeDateRange.to || undefined
+          const endExclusive = to ? new Date(to) : undefined
+          if (endExclusive) endExclusive.setDate(endExclusive.getDate() + 1)
+          if (from) q = q.gte('dt_saida', from)
+          if (endExclusive) q = q.lt('dt_saida', endExclusive.toISOString().slice(0, 10))
+          q = q.not('dt_saida', 'is', null)
+        }
+        const { data: rdRows, error } = await q
+        if (error) throw error
+        for (const r of rdRows || []) {
+          const key = normalizeAih((r as any).n_aih)
+          if (!key) continue
+          const val = Number((r as any).val_tot || 0)
+          const prev = remoteMap.get(key)
+          remoteMap.set(key, typeof prev === 'number' ? Math.max(prev, val) : val)
+        }
+      } else {
+        const baseKeys = Array.from(new Set((base.tableData || []).map(r => normalizeAih(r?.[1])).filter(Boolean)))
+        const candidates = Array.from(new Set(baseKeys.flatMap(k => {
+          const padded = k.length < 13 ? k.padStart(13, '0') : k
+          return [k, padded]
+        }))).filter(Boolean)
+        const chunkSize = 80
+        for (let i = 0; i < candidates.length; i += chunkSize) {
+          const ch = candidates.slice(i, i + chunkSize)
+          let q = supabaseSih
+            .from('sih_rd')
+            .select('n_aih,val_tot')
+            .eq('cnes', cnes)
+            .in('n_aih', ch)
+          if (carIntValue) q = q.eq('car_int', carIntValue)
+          if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
+            const from = dischargeDateRange.from || undefined
+            const to = dischargeDateRange.to || undefined
+            const endExclusive = to ? new Date(to) : undefined
+            if (endExclusive) endExclusive.setDate(endExclusive.getDate() + 1)
+            if (from) q = q.gte('dt_saida', from)
+            if (endExclusive) q = q.lt('dt_saida', endExclusive.toISOString().slice(0, 10))
+            q = q.not('dt_saida', 'is', null)
+          }
+          const { data: rdRows } = await q
+          for (const r of rdRows || []) {
+            const key = normalizeAih((r as any).n_aih)
+            if (!key) continue
+            const val = Number((r as any).val_tot || 0)
+            const prev = remoteMap.get(key)
+            remoteMap.set(key, typeof prev === 'number' ? Math.max(prev, val) : val)
+          }
+        }
+      }
+
+      const parseBrCurrency = (s: unknown): number => {
+        const raw = (s ?? '').toString()
+        const cleaned = raw
+          .replace(/[^\d,.-]/g, '')
+          .replace(/\./g, '')
+          .replace(/,/, '.')
+        const n = Number(cleaned)
+        return Number.isFinite(n) ? n : 0
+      }
+
+      const formatSignedCurrency = (n: number): string => {
+        const abs = Math.abs(n)
+        if (n > 0) return `+ ${formatCurrency(abs)}`
+        if (n < 0) return `- ${formatCurrency(abs)}`
+        return formatCurrency(0)
+      }
+
+      const body = (base.tableData || []).map((r: any) => {
+        const key = normalizeAih(r?.[1])
+        const localVal = parseBrCurrency(r?.[5])
+        const remoteVal = key ? (remoteMap.get(key) ?? null) : null
+        const remoteLabel = typeof remoteVal === 'number' ? formatCurrency(remoteVal) : '—'
+        const divergentVal = typeof remoteVal === 'number' ? (remoteVal - localVal) : null
+        const divergentLabel = typeof divergentVal === 'number' ? formatSignedCurrency(divergentVal) : '—'
+        return [...r, remoteLabel, divergentLabel]
+      })
+
+      const normalizeSortText = (s: unknown): string => {
+        return (s ?? '')
+          .toString()
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '')
+          .trim()
+          .toUpperCase()
+      }
+      const bodyOrdered = [...body]
+        .sort((a: any, b: any) => {
+          const procA = normalizeSortText(a?.[3])
+          const procB = normalizeSortText(b?.[3])
+          const cmp = procA.localeCompare(procB, 'pt-BR')
+          if (cmp !== 0) return cmp
+          const nameA = normalizeSortText(a?.[2])
+          const nameB = normalizeSortText(b?.[2])
+          return nameA.localeCompare(nameB, 'pt-BR')
+        })
+        .map((r: any, idx: number) => {
+          const next = [...r]
+          next[0] = String(idx + 1)
+          return next
+        })
+
+      const totalPatients = bodyOrdered.length
+      const totalLocal = bodyOrdered.reduce((sum: number, r: any) => sum + parseBrCurrency(r?.[5]), 0)
+      const totalRemote = bodyOrdered.reduce((sum: number, r: any) => sum + parseBrCurrency(r?.[6]), 0)
+      const totalDivergent = totalRemote - totalLocal
+      const totalNegative = bodyOrdered.reduce((sum: number, r: any) => {
+        const v = parseBrCurrency(r?.[7])
+        return v < 0 ? (sum + v) : sum
+      }, 0)
+      const totalPositive = bodyOrdered.reduce((sum: number, r: any) => {
+        const v = parseBrCurrency(r?.[7])
+        return v > 0 ? (sum + v) : sum
+      }, 0)
+      const matched = bodyOrdered.filter((r: any) => String(r?.[6] || '') !== '—')
+      const pending = bodyOrdered.filter((r: any) => String(r?.[6] || '') === '—')
+
+      let logoBase64 = null as string | null
+      try {
+        const response = await fetch('/CIS Sem fundo.jpg')
+        const blob = await response.blob()
+        logoBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.readAsDataURL(blob)
+        })
+      } catch { }
+
+      const doctorName = doctor?.doctor_info?.name || ''
+      const hospitalName = doctor?.hospitals?.[0]?.hospital_name || 'Hospital não identificado'
+
+      const doc = new jsPDF('landscape')
+      const pageWidth = doc.internal.pageSize.getWidth()
+
+      let yPosition = 20
+      if (logoBase64) {
+        const logoWidth = 40
+        const logoHeight = 20
+        const logoX = 20
+        const logoY = 8
+        doc.addImage(logoBase64, 'JPEG', logoX, logoY, logoWidth, logoHeight)
+        yPosition = logoY + logoHeight + 10
+      }
+
+      doc.setFontSize(16)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(0, 51, 102)
+      doc.text('CONFERÊNCIA DE VALORES - AIH', pageWidth / 2, yPosition, { align: 'center' })
+      yPosition += 10
+
+      const careHeader = (filterCareCharacter && filterCareCharacter !== 'all')
+        ? CareCharacterUtils.formatForDisplay(filterCareCharacter, false)
+        : 'TODOS'
+      const compHeader = (selectedCompetencia && selectedCompetencia !== 'all')
+        ? formatCompetencia(selectedCompetencia)
+        : 'TODAS'
+      const dataGeracao = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      doc.text(`Médico: ${doctorName}  |  Hospital: ${hospitalName}`, 20, yPosition)
+      yPosition += 6
+      doc.text(`Comp.: ${compHeader}  |  Caráter: ${careHeader}  |  Gerado em: ${dataGeracao}`, 20, yPosition)
+      yPosition += 8
+
+      doc.setDrawColor(200, 200, 200)
+      doc.setLineWidth(0.5)
+      doc.line(20, yPosition - 4, pageWidth - 20, yPosition - 4)
+
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      const leftLabels = ['Pacientes Totais:', 'Pacientes Consolidados:', 'Pacientes Pendentes:']
+      const leftValueX = 20 + Math.max(...leftLabels.map(l => doc.getTextWidth(l))) + 8
+
+      const colorBlue: [number, number, number] = [0, 51, 102]
+      const colorGreen: [number, number, number] = [0, 102, 0]
+      const colorRed: [number, number, number] = [180, 0, 0]
+      const colorGrey: [number, number, number] = [90, 90, 90]
+
+      const drawMetricLine = (
+        y: number,
+        leftLabel: string,
+        leftValue: string,
+        leftValueColor: [number, number, number],
+        rightLabel: string,
+        rightValue: string,
+        rightValueColor: [number, number, number]
+      ) => {
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(60, 60, 60)
+        doc.text(leftLabel, 20, y)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(leftValueColor[0], leftValueColor[1], leftValueColor[2])
+        doc.text(leftValue, leftValueX, y)
+        if (rightLabel && rightValue) {
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(60, 60, 60)
+          doc.text(rightLabel, pageWidth - 110, y)
+          doc.setFont('helvetica', 'bold')
+          doc.setTextColor(rightValueColor[0], rightValueColor[1], rightValueColor[2])
+          doc.text(rightValue, pageWidth - 20, y, { align: 'right' })
+        }
+      }
+
+      const metricY1 = yPosition + 6
+      drawMetricLine(metricY1, 'Pacientes Totais:', String(totalPatients), colorBlue, 'Valor Total Negativo:', formatSignedCurrency(totalNegative), colorRed)
+      const metricY2 = metricY1 + 8
+      drawMetricLine(metricY2, 'Pacientes Consolidados:', String(matched.length), colorGrey, 'Valor Total Positivo:', formatSignedCurrency(totalPositive), colorGreen)
+      const metricY3 = metricY2 + 8
+      drawMetricLine(metricY3, 'Pacientes Pendentes:', String(pending.length), colorRed, '', '', colorGrey)
+
+      const diffRelColor: [number, number, number] =
+        totalDivergent > 0 ? colorGreen : totalDivergent < 0 ? colorRed : colorGrey
+      const midLines: Array<{ label: string; value: string; color: [number, number, number] }> = [
+        { label: 'Total AIH (Local):', value: formatCurrency(totalLocal), color: colorBlue },
+        { label: 'Total Recebido (RD):', value: formatCurrency(totalRemote), color: colorGrey },
+        { label: 'Diferença Relativa:', value: formatSignedCurrency(totalDivergent), color: diffRelColor }
+      ]
+      doc.setFontSize(10)
+      const midMaxLabel = Math.max(...midLines.map(l => doc.getTextWidth(l.label)))
+      const midMaxValue = Math.max(...midLines.map(l => doc.getTextWidth(l.value)))
+      const midBlockWidth = midMaxLabel + 8 + midMaxValue
+      const midX = (pageWidth / 2) - (midBlockWidth / 2)
+      const midValueX = midX + midMaxLabel + 8
+
+      const drawMidLine = (y: number, label: string, value: string, valueColor: [number, number, number]) => {
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(60, 60, 60)
+        doc.text(label, midX, y)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(valueColor[0], valueColor[1], valueColor[2])
+        doc.text(value, midValueX + midMaxValue, y, { align: 'right' })
+      }
+      drawMidLine(metricY1, midLines[0].label, midLines[0].value, midLines[0].color)
+      drawMidLine(metricY2, midLines[1].label, midLines[1].value, midLines[1].color)
+      drawMidLine(metricY3, midLines[2].label, midLines[2].value, midLines[2].color)
+
+      const startY = metricY3 + 10
+      autoTable(doc, {
+        head: [['#', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Valor Total da AIH', 'Valor Recebido da AIH', 'Valor Divergente']],
+        body: bodyOrdered,
+        startY,
+        theme: 'striped',
+        tableWidth: pageWidth - 20,
+        headStyles: {
+          fillColor: [0, 51, 102],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 9,
+          halign: 'center',
+          cellPadding: 2
+        },
+        bodyStyles: {
+          fontSize: 8,
+          textColor: [50, 50, 50],
+          cellPadding: 2
+        },
+        columnStyles: {
+          0: { cellWidth: 8, halign: 'center' },
+          1: { cellWidth: 24, halign: 'center' },
+          2: { cellWidth: 36, halign: 'left' },
+          3: { cellWidth: 115, halign: 'left', fontSize: 7 },
+          4: { cellWidth: 20, halign: 'center' },
+          5: { cellWidth: 22, halign: 'right', fontStyle: 'bold', textColor: [0, 51, 102] },
+          6: { cellWidth: 22, halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] },
+          7: { cellWidth: 22, halign: 'right', fontStyle: 'bold' }
+        },
+        didParseCell: (d: any) => {
+          try {
+            if (d.section !== 'body') return
+            const col = Number(d.column?.index)
+            const cellText = Array.isArray(d.cell?.text) ? d.cell.text.join(' ') : String(d.cell?.text ?? d.cell?.raw ?? '')
+            const txt = String(cellText || '').trim()
+            if (col === 6) {
+              if (!txt || txt === '—') {
+                d.cell.styles.textColor = [90, 90, 90]
+                d.cell.styles.fontStyle = 'normal'
+              } else {
+                d.cell.styles.textColor = [0, 102, 0]
+              }
+              return
+            }
+            if (col === 7) {
+              if (!txt || txt === '—') {
+                d.cell.styles.textColor = [90, 90, 90]
+                d.cell.styles.fontStyle = 'normal'
+                return
+              }
+              const v = parseBrCurrency(txt)
+              if (Math.abs(v) < 0.005) {
+                d.cell.styles.textColor = [90, 90, 90]
+              } else if (v > 0) {
+                d.cell.styles.textColor = [0, 102, 0]
+              } else {
+                d.cell.styles.textColor = [180, 0, 0]
+              }
+            }
+          } catch { }
+        },
+        styles: {
+          overflow: 'linebreak',
+          cellPadding: 2,
+          fontSize: 8
+        },
+        margin: { left: 10, right: 10 },
+        alternateRowStyles: {
+          fillColor: [245, 245, 245]
+        }
+      })
+
+      const fileName = `Conferencia_Valores_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`
+      doc.save(fileName)
+      toast.success('Relatório de conferência gerado com sucesso!')
+      setValueConferenceOpen(false)
+    } catch (err) {
+      console.error('Erro ao gerar conferência de valores:', err)
+      toast.error('Erro ao gerar conferência de valores')
+    } finally {
+      setValueConferenceLoading(false)
+    }
   }
 
   const handleRelateConfirm = async () => {
@@ -5786,6 +6243,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                       <FileSpreadsheet className="h-4 w-4" />
                                       Comparar Relatórios
                                     </Button>
+                                    <Button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setValueConferenceDoctor(doctor)
+                                        setValueConferenceOpen(true)
+                                      }}
+                                      className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-3 rounded-md text-sm w-auto min-w-[200px]"
+                                    >
+                                      <FileSpreadsheet className="h-4 w-4" />
+                                      Conferência Valores
+                                    </Button>
                                     {false && (<>
                                       {/* 📋 PROTOCOLO DE ATENDIMENTO APROVADO */}
                                       <Button
@@ -7506,6 +7975,47 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
               >
                 {relateLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Gerar PDF
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={valueConferenceOpen}
+        onOpenChange={(open) => {
+          setValueConferenceOpen(open)
+          if (!open) setValueConferenceDoctor(null)
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Conferência Valores</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-base text-gray-700">
+              <div className="font-semibold">
+                Médico:{' '}
+                <span className="text-gray-900">
+                  {valueConferenceDoctor?.doctor_info?.name || '—'}
+                </span>
+              </div>
+              <div>Hospital: {valueConferenceDoctor?.hospitals?.[0]?.hospital_name || '—'}</div>
+              <div className="mt-2 text-sm text-gray-600">
+                Relatório Base: Relatório Pacientes Simplificado (Valor total da AIH)
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setValueConferenceOpen(false)} disabled={valueConferenceLoading}>
+                Cancelar
+              </Button>
+              <Button
+                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                onClick={handleValueConferenceCompare}
+                disabled={valueConferenceLoading || !valueConferenceDoctor}
+              >
+                {valueConferenceLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Comparar valores com Consolidado
               </Button>
             </div>
           </div>

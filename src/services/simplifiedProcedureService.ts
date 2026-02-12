@@ -305,6 +305,7 @@ export class ProcedureRecordsService {
             id,
             hospital_id,
             patient_id,
+            procedure_id,
             aih_id,
             procedure_date,
             procedure_code,
@@ -319,6 +320,7 @@ export class ProcedureRecordsService {
             professional_name,
             professional_cbo,
             participacao,
+            created_at,
             sigtap_procedures!procedure_records_procedure_id_fkey (
               registration_instrument
             )

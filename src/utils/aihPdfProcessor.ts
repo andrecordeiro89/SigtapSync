@@ -60,6 +60,14 @@ interface AIHPDFData {
   procedimentoEspecial: string;
   valorDiaria: string;
   observacoesFaturamento: string;
+
+  procedimentos?: Array<{
+    profissionais?: Array<{
+      cbo?: string;
+      participacao?: string;
+      participation?: string;
+    }>;
+  }>;
 }
 
 export class AIHPDFProcessor {
@@ -100,7 +108,7 @@ export class AIHPDFProcessor {
       // ✅ Fallback extra: re-extrair nome do paciente se vier vazio ou parecer cabeçalho
       try {
         if (!aih.nomePaciente || /procedimento\s+solicitado/i.test(aih.nomePaciente)) {
-          const fallback = text.match(/Prontuário[:\s]*\d+\s*-\s*([^C\n\r]+?)(?=\s+CNS)/i);
+          const fallback = firstPageText.match(/Prontuário[:\s]*\d+\s*-\s*([^C\n\r]+?)(?=\s+CNS)/i);
           if (fallback && fallback[1]) {
             const rawName = fallback[1].trim();
             const { sanitizePatientName } = await import('./patientName');
@@ -702,13 +710,19 @@ export class AIHPDFProcessor {
 
     // 🔎 Marcação de anestesista: primeiro pelo CBO 225151, depois pela Participação contendo "Anestesista" (ou equivalências)
     try {
-      const hasAnesthetistByCBO = (data.procedimentos || []).some(p => (p as any)?.profissionais?.some((pr: any) => String(pr?.cbo || '').trim() === '225151'));
+      const hasAnesthetistByCBO = (data.procedimentos || []).some(p =>
+        (p.profissionais || []).some(pr => String(pr.cbo || '').trim() === '225151')
+      );
       if (!hasAnesthetistByCBO) {
         const participationTextIncludesAnest = (txt: string) => {
           const v = (txt || '').toLowerCase();
           return v.includes('anestesista') || v.includes('anestesia') || v.includes('anest');
         };
-        const hasAnesthetistByParticipation = (data.procedimentos || []).some(p => (p as any)?.profissionais?.some((pr: any) => participationTextIncludesAnest(String(pr?.participacao || pr?.participation || ''))));
+        const hasAnesthetistByParticipation = (data.procedimentos || []).some(p =>
+          (p.profissionais || []).some(pr =>
+            participationTextIncludesAnest(String(pr.participacao || pr.participation || ''))
+          )
+        );
         (aih as any).hasAnesthetist = hasAnesthetistByParticipation;
       } else {
         (aih as any).hasAnesthetist = true;
