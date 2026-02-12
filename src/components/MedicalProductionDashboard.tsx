@@ -2217,6 +2217,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const v = parseBrCurrency(r?.[7])
         return v > 0 ? (sum + v) : sum
       }, 0)
+      const diffPositiveNegative = totalPositive + totalNegative
       const matched = bodyOrdered.filter((r: any) => String(r?.[6] || '') !== '—')
       const pending = bodyOrdered.filter((r: any) => String(r?.[6] || '') === '—')
 
@@ -2314,13 +2315,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       const metricY2 = metricY1 + 8
       drawMetricLine(metricY2, 'Pacientes Consolidados:', String(matched.length), colorGrey, 'Valor Total Positivo:', formatSignedCurrency(totalPositive), colorGreen)
       const metricY3 = metricY2 + 8
-      drawMetricLine(metricY3, 'Pacientes Pendentes:', String(pending.length), colorRed, '', '', colorGrey)
+      const colorBlueLight: [number, number, number] = [0, 102, 204]
+      const diffPosNegColor: [number, number, number] =
+        diffPositiveNegative > 0 ? colorBlueLight : diffPositiveNegative < 0 ? colorRed : colorGrey
+      drawMetricLine(metricY3, 'Pacientes Pendentes:', String(pending.length), colorRed, 'Diferença Positvo/Negativo:', formatSignedCurrency(diffPositiveNegative), diffPosNegColor)
 
       const diffRelColor: [number, number, number] =
         totalDivergent > 0 ? colorGreen : totalDivergent < 0 ? colorRed : colorGrey
       const midLines: Array<{ label: string; value: string; color: [number, number, number] }> = [
-        { label: 'Total AIH (Local):', value: formatCurrency(totalLocal), color: colorBlue },
-        { label: 'Total Recebido (RD):', value: formatCurrency(totalRemote), color: colorGrey },
+        { label: 'Total AIH Seca (GSUS):', value: formatCurrency(totalLocal), color: colorBlue },
+        { label: 'Total Recebido (Tabwin):', value: formatCurrency(totalRemote), color: colorGrey },
         { label: 'Diferença Relativa:', value: formatSignedCurrency(totalDivergent), color: diffRelColor }
       ]
       doc.setFontSize(10)
