@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import ImportWizard from './ImportWizard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -51,6 +51,7 @@ import { CareCharacterUtils } from '../config/careCharacterCodes';
 import { exportAnesthesiaExcel } from '../services/exportService';
 // import ReportGenerator from './ReportGenerator';
 // import ExecutiveDateFilters from './ExecutiveDateFilters';
+import TabwinConferenceDialog from './TabwinConferenceDialog';
 
 // ✅ FUNÇÃO OTIMIZADA PARA FORMATAR VALORES MONETÁRIOS
 const formatCurrency = (value: number | null | undefined): string => {
@@ -403,6 +404,15 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [includeAnesthesia, setIncludeAnesthesia] = useState<boolean>(true);
   const [aihDbCount, setAihDbCount] = useState<number | null>(null);
   const [aihKpi, setAihKpi] = useState<{ totalAIHs: number; totalRevenue: number; averageTicket: number } | null>(null);
+  const [tabwinOpen, setTabwinOpen] = useState(false);
+  const [filtersApplied, setFiltersApplied] = useState(false);
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
+  const [appliedPatientSearchTerm, setAppliedPatientSearchTerm] = useState('');
+  const [appliedSelectedHospitals, setAppliedSelectedHospitals] = useState<string[]>(['all']);
+  const [appliedSelectedCompetency, setAppliedSelectedCompetency] = useState('all');
+  const [appliedFilterCareCharacter, setAppliedFilterCareCharacter] = useState<'all' | '1' | '2'>('all');
+  const [appliedDischargeFrom, setAppliedDischargeFrom] = useState<string>('');
+  const [appliedDischargeTo, setAppliedDischargeTo] = useState<string>('');
   const [pendingLoads, setPendingLoads] = useState(0);
   const startLoad = () => setPendingLoads(v => v + 1);
   const endLoad = () => setPendingLoads(v => Math.max(0, v - 1));
@@ -546,6 +556,69 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     dt.setHours(23,59,59,999);
     return dt.toISOString();
   };
+
+  const endOfMonthISO = (isoDate: string): string => {
+    const m = String(isoDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!m) return '';
+    const year = Number(m[1]);
+    const month = Number(m[2]);
+    if (!year || !month) return '';
+    const end = new Date(year, month, 0);
+    const y = end.getFullYear();
+    const mm = String(end.getMonth() + 1).padStart(2, '0');
+    const dd = String(end.getDate()).padStart(2, '0');
+    return `${y}-${mm}-${dd}`;
+  };
+
+  const applyFilters = () => {
+    setAppliedSearchTerm(searchTerm);
+    setAppliedPatientSearchTerm(patientSearchTerm);
+    setAppliedSelectedHospitals(selectedHospitals);
+    setAppliedSelectedCompetency(selectedCompetency);
+    setAppliedFilterCareCharacter(filterCareCharacter);
+    setAppliedDischargeFrom(dischargeFrom);
+    setAppliedDischargeTo(dischargeTo);
+    setFiltersApplied(true);
+  };
+
+  const filtersDirty = useMemo(() => {
+    if (!filtersApplied) return false;
+    const pendingKey = JSON.stringify({
+      searchTerm,
+      patientSearchTerm,
+      selectedHospitals,
+      selectedCompetency,
+      filterCareCharacter,
+      dischargeFrom,
+      dischargeTo
+    });
+    const appliedKey = JSON.stringify({
+      searchTerm: appliedSearchTerm,
+      patientSearchTerm: appliedPatientSearchTerm,
+      selectedHospitals: appliedSelectedHospitals,
+      selectedCompetency: appliedSelectedCompetency,
+      filterCareCharacter: appliedFilterCareCharacter,
+      dischargeFrom: appliedDischargeFrom,
+      dischargeTo: appliedDischargeTo
+    });
+    return pendingKey !== appliedKey;
+  }, [
+    filtersApplied,
+    searchTerm,
+    patientSearchTerm,
+    selectedHospitals,
+    selectedCompetency,
+    filterCareCharacter,
+    dischargeFrom,
+    dischargeTo,
+    appliedSearchTerm,
+    appliedPatientSearchTerm,
+    appliedSelectedHospitals,
+    appliedSelectedCompetency,
+    appliedFilterCareCharacter,
+    appliedDischargeFrom,
+    appliedDischargeTo
+  ]);
 
   const handleAnesthetistsReport = async () => {
     try {
@@ -1414,6 +1487,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <button
                     onClick={() => setShowViewsWarning(false)}
                     className="text-yellow-600 hover:text-yellow-800 flex-shrink-0"
+                    type="button"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -1443,6 +1517,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       onClick={() => setSearchTerm('')}
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-5 h-5 flex items-center justify-center text-xs"
                       title="Limpar busca"
+                      type="button"
                     >
                       ✕
                     </button>
@@ -1470,6 +1545,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       onClick={() => setPatientSearchTerm('')}
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-5 h-5 flex items-center justify-center text-xs"
                       title="Limpar busca de paciente"
+                      type="button"
                     >
                       ✕
                     </button>
@@ -1509,6 +1585,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       }}
                       className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0"
                       title="Limpar filtro de hospital"
+                      type="button"
                     >
                       ✕
                     </button>
@@ -1541,6 +1618,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       onClick={() => setSelectedCompetency('all')}
                       className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0"
                       title="Limpar filtro de competência de aprovação"
+                      type="button"
                     >
                       ✕
                     </button>
@@ -1570,6 +1648,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       onClick={() => setFilterCareCharacter('all')}
                       className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0"
                       title="Limpar filtro de caráter de atendimento"
+                      type="button"
                     >
                       ✕
                     </button>
@@ -1580,12 +1659,21 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               <div>
                 <label className="flex items-center gap-2 text-xs font-bold text-black uppercase tracking-wide mb-2">
                   <Calendar className="h-3.5 w-3.5 text-black" />
-                  Alta (Início)
+                  Início
                 </label>
                 <input
                   type="date"
                   value={inputDischargeFrom}
-                  onChange={(e) => setInputDischargeFrom(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setInputDischargeFrom(v);
+                    if (v) {
+                      const end = endOfMonthISO(v);
+                      if (end) setInputDischargeTo(end);
+                    } else {
+                      setInputDischargeTo('');
+                    }
+                  }}
                   onBlur={() => setDischargeFrom(inputDischargeFrom || '')}
                     disabled={isGlobalLoading}
                   className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
@@ -1595,7 +1683,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               <div>
                 <label className="flex items-center gap-2 text-xs font-bold text-black uppercase tracking-wide mb-2">
                   <Calendar className="h-3.5 w-3.5 text-black" />
-                  Alta (Fim)
+                  Fim
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -1604,9 +1692,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                     onChange={(e) => {
                       const v = e.target.value;
                       setInputDischargeTo(v);
-                      setDischargeFrom(inputDischargeFrom || '');
-                      setDischargeTo(v || '');
                     }}
+                    onBlur={() => setDischargeTo(inputDischargeTo || '')}
                     disabled={isGlobalLoading}
                     className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
                   />
@@ -1615,6 +1702,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       onClick={() => { setInputDischargeFrom(''); setInputDischargeTo(''); setDischargeFrom(''); setDischargeTo(''); }}
                       className="text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-xs flex-shrink-0"
                       title="Limpar filtro de alta"
+                      type="button"
                     >
                       ✕
                     </button>
@@ -1677,14 +1765,16 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             )}
 
             <div className="pt-4 border-t border-gray-100">
-              <div className="flex flex-wrap gap-2 items-center">
+              <div className="flex flex-wrap gap-2 items-center justify-between">
+                <div className="flex flex-wrap gap-2 items-center">
                 <Button
                   variant="default"
                   size="sm"
                   className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white w-auto min-w-[160px]"
                   onClick={() => window.dispatchEvent(new Event('mpd:report-general'))}
                   title="Gerar relatório geral de pacientes"
-                  disabled={isGlobalLoading}
+                  disabled={isGlobalLoading || !filtersApplied || filtersDirty}
+                  type="button"
                 >
                   <FileSpreadsheet className="h-4 w-4" />
                   Relatório Geral
@@ -1695,10 +1785,35 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white w-auto min-w-[160px]"
                   onClick={() => window.dispatchEvent(new Event('mpd:report-conference'))}
                   title="Gerar relatório de conferência de pacientes"
-                  disabled={isGlobalLoading}
+                  disabled={isGlobalLoading || !filtersApplied || filtersDirty}
+                  type="button"
                 >
                   <FileSpreadsheet className="h-4 w-4" />
                   Conferência
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white w-auto min-w-[200px]"
+                  onClick={() => setTabwinOpen(true)}
+                  title="Conferência Tabwin (SIH)"
+                  disabled={isGlobalLoading}
+                  type="button"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Conferência Tabwin
+                </Button>
+                </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="inline-flex items-center gap-2 bg-black hover:bg-gray-900 text-white w-auto min-w-[180px]"
+                  onClick={applyFilters}
+                  title="Aplicar filtros e carregar dados"
+                  disabled={isGlobalLoading}
+                  type="button"
+                >
+                  Aplicar Filtros
                 </Button>
                 {false && (
                   <Button
@@ -1746,15 +1861,32 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
         {/* TAB: MÉDICOS */}
         <TabsContent value="doctors" className="space-y-6">
-          <MedicalProductionDashboard 
-            onStatsUpdate={updateMedicalProductionStats}
-            selectedHospitals={selectedHospitals}
-            searchTerm={searchTerm}
-            patientSearchTerm={patientSearchTerm}
-            selectedCompetencia={selectedCompetency}
-            filterCareCharacter={filterCareCharacter}
-            dischargeDateRange={{ from: dischargeFrom || undefined, to: dischargeTo || undefined }}
-          />
+          {!filtersApplied ? (
+            <div className="w-full bg-white border-2 border-gray-200 rounded-lg p-10 flex items-center justify-center">
+              <div className="text-center text-black font-semibold text-2xl">
+                Selecione os Filtros primeiro e depois Aplique para receber os dados
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filtersDirty && (
+                <div className="w-full bg-white border-2 border-black rounded-lg p-4 flex items-center justify-center">
+                  <div className="text-center text-black font-semibold text-xl">
+                    Filtros alterados. Clique em Aplicar Filtros para atualizar os dados.
+                  </div>
+                </div>
+              )}
+              <MedicalProductionDashboard 
+                onStatsUpdate={updateMedicalProductionStats}
+                selectedHospitals={appliedSelectedHospitals}
+                searchTerm={appliedSearchTerm}
+                patientSearchTerm={appliedPatientSearchTerm}
+                selectedCompetencia={appliedSelectedCompetency}
+                filterCareCharacter={appliedFilterCareCharacter}
+                dischargeDateRange={{ from: appliedDischargeFrom || undefined, to: appliedDischargeTo || undefined }}
+              />
+            </div>
+          )}
           {/* ⚠️ NOTA: onStatsUpdate agora apenas atualiza activeDoctors, não afeta faturamento/AIHs */}
         </TabsContent>
 
@@ -1776,6 +1908,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       
       {/* Gerador de Relatórios removido com a aba */}
     </div>
+    <TabwinConferenceDialog open={tabwinOpen} onOpenChange={setTabwinOpen} />
     {importOpen && (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
         <div className="bg-white rounded shadow-xl w-full max-w-4xl">
