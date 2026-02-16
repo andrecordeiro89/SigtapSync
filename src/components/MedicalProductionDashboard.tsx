@@ -737,6 +737,7 @@ interface MedicalProductionDashboardProps {
   selectedCompetencia?: string; // ✅ NOVO: Filtro de competência
   filterCareCharacter?: 'all' | '1' | '2';
   dischargeDateRange?: { from?: string; to?: string };
+  selectedSpecialties?: string[]; // ✅ NOVO: Filtro de especialidades
 }
 
 // ✅ COMPONENTE PRINCIPAL - SIMPLIFICADO
@@ -747,7 +748,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   patientSearchTerm = '',
   selectedCompetencia = 'all',
   filterCareCharacter = 'all'
-  , dischargeDateRange
+  , dischargeDateRange,
+  selectedSpecialties
 }) => {
   const useDebounced = <T,>(value: T, delay: number) => {
     const [debounced, setDebounced] = useState<T>(value);
@@ -3424,7 +3426,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       console.log(`🔍 [FILTRO PACIENTE] Resultado: ${filtered.length} médicos com pacientes correspondentes`);
     }
 
-    // ✅ REMOVIDO: Filtros de especialidade médica e especialidade de atendimento
+    // ✅ REINTEGRADO: Filtro de especialidade médica
+    if (selectedSpecialties && selectedSpecialties.length > 0) {
+      filtered = filtered.filter(doctor => {
+        const docSpec = (doctor.doctor_info?.specialty || '').trim();
+        return selectedSpecialties.includes(docSpec);
+      });
+    }
 
     // ✅ SIMPLIFICADO: Filtro de competência removido (já aplicado no backend)
     // A competência já é filtrada no carregamento dos dados via DoctorPatientService
@@ -3433,7 +3441,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
     // Reset da página atual quando filtros são aplicados
     setCurrentDoctorPage(1);
-  }, [debouncedSearchTerm, debouncedPatientSearchTerm, selectedCompetencia, doctors, selectedHospitals]);
+  }, [debouncedSearchTerm, debouncedPatientSearchTerm, selectedCompetencia, doctors, selectedHospitals, selectedSpecialties]);
 
   // ✅ TOGGLE EXPANDIR MÉDICO
   const toggleDoctorExpansion = (doctorKey: string) => {

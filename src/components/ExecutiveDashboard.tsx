@@ -34,8 +34,13 @@ import {
   Search,
   X,
   Building,
-  Calendar
+  Calendar,
+  Check,
+  ChevronsUpDown
 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { cn } from '@/lib/utils';
 
 // Services
 import { DoctorsRevenueService, type DoctorAggregated, type SpecialtyStats, type HospitalStats as HospitalRevenueStats } from '../services/doctorsRevenueService';
@@ -470,6 +475,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [appliedFilterCareCharacter, setAppliedFilterCareCharacter] = useState<'all' | '1' | '2'>('all');
   const [appliedDischargeFrom, setAppliedDischargeFrom] = useState<string>('');
   const [appliedDischargeTo, setAppliedDischargeTo] = useState<string>('');
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
+  const [appliedSelectedSpecialties, setAppliedSelectedSpecialties] = useState<string[]>([]);
   const [pendingLoads, setPendingLoads] = useState(0);
   const startLoad = () => setPendingLoads(v => v + 1);
   const endLoad = () => setPendingLoads(v => Math.max(0, v - 1));
@@ -635,6 +642,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     setAppliedFilterCareCharacter(filterCareCharacter);
     setAppliedDischargeFrom(dischargeFrom);
     setAppliedDischargeTo(dischargeTo);
+    setAppliedSelectedSpecialties(selectedSpecialties);
     setFiltersApplied(true);
   };
 
@@ -647,7 +655,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       selectedCompetency,
       filterCareCharacter,
       dischargeFrom,
-      dischargeTo
+      dischargeTo,
+      selectedSpecialties
     });
     const appliedKey = JSON.stringify({
       searchTerm: appliedSearchTerm,
@@ -656,7 +665,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
       selectedCompetency: appliedSelectedCompetency,
       filterCareCharacter: appliedFilterCareCharacter,
       dischargeFrom: appliedDischargeFrom,
-      dischargeTo: appliedDischargeTo
+      dischargeTo: appliedDischargeTo,
+      selectedSpecialties: appliedSelectedSpecialties
     });
     return pendingKey !== appliedKey;
   }, [
@@ -668,13 +678,15 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     filterCareCharacter,
     dischargeFrom,
     dischargeTo,
+    selectedSpecialties,
     appliedSearchTerm,
     appliedPatientSearchTerm,
     appliedSelectedHospitals,
     appliedSelectedCompetency,
     appliedFilterCareCharacter,
     appliedDischargeFrom,
-    appliedDischargeTo
+    appliedDischargeTo,
+    appliedSelectedSpecialties
   ]);
 
   const handleAnesthetistsReport = async () => {
@@ -1715,8 +1727,77 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
               <div>
                 <label className="flex items-center gap-2 text-xs font-bold text-black uppercase tracking-wide mb-2">
+                  <Stethoscope className="h-3.5 w-3.5 text-black" />
+                  Especialidade
+                </label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between h-10 border-2 border-gray-200 hover:bg-white hover:border-gray-300 bg-white text-black text-left font-normal"
+                      disabled={isGlobalLoading}
+                    >
+                      <span className="truncate">
+                        {selectedSpecialties.length === 0
+                          ? "Todas as especialidades"
+                          : `${selectedSpecialties.length} selecionada${selectedSpecialties.length > 1 ? 's' : ''}`}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar especialidade..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhuma especialidade encontrada.</CommandEmpty>
+                        <CommandGroup className="max-h-[300px] overflow-auto">
+                          <CommandItem
+                            onSelect={() => setSelectedSpecialties([])}
+                            className="cursor-pointer font-semibold"
+                          >
+                            <div className={cn(
+                              "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                              selectedSpecialties.length === 0 ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible"
+                            )}>
+                              <Check className={cn("h-4 w-4")} />
+                            </div>
+                            Todas as especialidades
+                          </CommandItem>
+                          {availableSpecialties.map((specialty) => (
+                            <CommandItem
+                              key={specialty}
+                              onSelect={() => {
+                                setSelectedSpecialties((prev) => {
+                                  if (prev.includes(specialty)) {
+                                    return prev.filter((s) => s !== specialty);
+                                  } else {
+                                    return [...prev, specialty];
+                                  }
+                                });
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <div className={cn(
+                                "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                selectedSpecialties.includes(specialty) ? "bg-primary text-primary-foreground" : "opacity-50 [&_svg]:invisible"
+                              )}>
+                                <Check className={cn("h-4 w-4")} />
+                              </div>
+                              {specialty}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-xs font-bold text-black uppercase tracking-wide mb-2">
                   <Calendar className="h-3.5 w-3.5 text-black" />
-                  Início
+                  Início (Altas)
                 </label>
                 <input
                   type="date"
@@ -1746,7 +1827,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               <div>
                 <label className="flex items-center gap-2 text-xs font-bold text-black uppercase tracking-wide mb-2">
                   <Calendar className="h-3.5 w-3.5 text-black" />
-                  Fim
+                  Fim (Altas)
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -1778,12 +1859,18 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
             {/* ✅ BARRA DE ABAS DE HOSPITAIS REMOVIDA - Agora usa dropdown acima */}
 
             {/* INDICADORES DE FILTROS ATIVOS - DESIGN MINIMALISTA */}
-            {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all') || selectedCompetency !== 'all' || filterCareCharacter !== 'all' || dischargeFrom || dischargeTo) && (
+            {(searchTerm || patientSearchTerm || !selectedHospitals.includes('all') || selectedCompetency !== 'all' || filterCareCharacter !== 'all' || dischargeFrom || dischargeTo || selectedSpecialties.length > 0) && (
               <div className="flex items-center justify-between pt-4 border-t-2 border-gray-100">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-bold text-black uppercase tracking-wide">
                     Filtros Ativos:
                   </span>
+                  {selectedSpecialties.length > 0 && (
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs bg-white text-black border-gray-300 font-medium px-2 py-1">
+                      <Stethoscope className="h-3 w-3" />
+                      {selectedSpecialties.length} Especialidade(s)
+                    </Badge>
+                  )}
                   {searchTerm && (
                     <Badge variant="outline" className="flex items-center gap-1 text-xs bg-white text-black border-gray-300 font-medium px-2 py-1">
                       <Stethoscope className="h-3 w-3" />
@@ -1959,6 +2046,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 selectedCompetencia={appliedSelectedCompetency}
                 filterCareCharacter={appliedFilterCareCharacter}
                 dischargeDateRange={{ from: appliedDischargeFrom || undefined, to: appliedDischargeTo || undefined }}
+                selectedSpecialties={appliedSelectedSpecialties}
               />
             </div>
           )}
