@@ -800,7 +800,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     setSelectedHospitals([hospitalId]);
     // Recarregar dados com o novo hospital aplicado
     setIsLoading(true);
-    loadExecutiveData();
+    // loadExecutiveData(); // Removido para evitar duplo fetch (useEffect já monitora selectedHospitals)
   };
 
   // ✅ CORREÇÃO: Removido useEffect que forçava mudança de 'all' para hospital específico
@@ -1143,7 +1143,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         setAihDbCount(null);
       } finally { endLoad(); }
     })();
-  }, [hasExecutiveAccess, selectedHospitals, selectedCompetency, filterCareCharacter, dischargeFrom, dischargeTo]);
+  }, [hasExecutiveAccess, selectedHospitals, selectedCompetency, filterCareCharacter, appliedDischargeFrom, appliedDischargeTo]); // ✅ Depender de filtros APLICADOS para datas
 
   useEffect(() => {
     if (aihDbCount != null) {
@@ -1203,7 +1203,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         setAihKpi(null);
       } finally { endLoad(); }
     })();
-  }, [hasExecutiveAccess, selectedHospitals, selectedCompetency, filterCareCharacter, dischargeFrom, dischargeTo]);
+  }, [hasExecutiveAccess, selectedHospitals, selectedCompetency, filterCareCharacter, appliedDischargeFrom, appliedDischargeTo]); // ✅ Depender de filtros APLICADOS para datas
 
   useEffect(() => {
     if (aihKpi) {
@@ -1731,7 +1731,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                       setInputDischargeTo('');
                     }
                   }}
-                  onBlur={() => setDischargeFrom(inputDischargeFrom || '')}
+                  onBlur={() => {
+                    setDischargeFrom(inputDischargeFrom || '');
+                    // ✅ Sincronizar data fim se foi preenchida automaticamente
+                    if (inputDischargeTo) {
+                      setDischargeTo(inputDischargeTo);
+                    }
+                  }}
                     disabled={isGlobalLoading}
                   className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-10"
                 />
