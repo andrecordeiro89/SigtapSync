@@ -31,6 +31,18 @@ export type TabwinReportResult = {
   stats: TabwinReportStats
 }
 
+export type RejectedReportRow = {
+  aihNumber: string
+  patientName?: string
+  hospitalName?: string
+  dtInter?: string
+  dtSaida?: string
+  competencia?: string
+  valorTotal?: number
+  procedimento?: string
+  cid?: string
+}
+
 const chunk = <T,>(arr: T[], size = 200): T[][] => {
   const out: T[][] = []
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
@@ -361,5 +373,65 @@ export const SihTabwinReportService = {
   async fetchRows(filters: TabwinReportFilters): Promise<TabwinReportRow[]> {
     const res = await SihTabwinReportService.fetchReport(filters)
     return res.rows
+  },
+
+  async fetchRejectedReport(): Promise<RejectedReportRow[]> {
+    if (!supabaseSih) throw new Error('Fonte SIH remota não configurada')
+
+    // 1. Buscar AIHs rejeitadas no SIH remoto
+    const { data: rejRows, error: rejErr } = await supabaseSih
+      .from('sih_rejeitados')
+      .select('n_aih, cnes, dt_inter, dt_saida, ano_cmpt, mes_cmpt, val_tot, proc_rea, diag_princ')
+      .eq('uf', 'PR')
+      .gte('dt_saida', '2025-11-01')
+      .lte('dt_saida', '2025-11-30')
+
+    if (rejErr) throw rejErr
+    if (!rejRows || rejRows.length === 0) return []
+
+    // 2. Mapear CNES para Hospitais Locais
+    const cnesList = Array.from(new Set(rejRows.map(r => String(r.cnes || '').trim()).filter(Boolean)))
+    const { data: localHospitals, error: hospErr } = await supabase
+      .from('hospitals')
+      .select('name, cnes')
+      .in('cnes', cnesList)
+
+    if (hospErr) throw hospErr
+    const hospMap = new Map<string, string>()
+    ;(localHospitals || []).forEach(h => {
+      const c = String(h.cnes || '').trim()
+      if (c) hospMap.set(c, String(h.name || ''))
+    })
+
+    // 3. Buscar Pacientes Locais via AIH
+    const aihNumbers = Array.from(new Set(rejRows.map(r => String(r.n_aih || ''))))
+    const patientMap = new Map<string, string>()
+    
+    for (const ch of chunk(aihNumbers, 200)) {
+      const { data: aihLocal, error: aihErr } = await supabase
+        .from('aihs')
+        .select('aih_number, patients(name)')
+        .in('aih_number', ch)
+      
+      if (aihErr) continue
+      ;(aihLocal || []).forEach((a: any) => {
+        if (a.aih_number && a.patients?.name) {
+          patientMap.set(String(a.aih_number), String(a.patients.name))
+        }
+      })
+    }
+
+    // 4. Montar Resultado
+    return rejRows.map(r => ({
+      aihNumber: String(r.n_aih || ''),
+      patientName: patientMap.get(String(r.n_aih || '')) || 'Paciente não encontrado',
+      hospitalName: hospMap.get(String(r.cnes || '').trim()) || `CNES: ${String(r.cnes || '').trim()}`,
+      dtInter: formatDateBR(r.dt_inter),
+      dtSaida: formatDateBR(r.dt_saida),
+      competencia: formatCompetencia(Number(r.ano_cmpt), Number(r.mes_cmpt)),
+      valorTotal: Number(r.val_tot || 0),
+      procedimento: String(r.proc_rea || ''),
+      cid: String(r.diag_princ || '')
+    }))
   }
 }

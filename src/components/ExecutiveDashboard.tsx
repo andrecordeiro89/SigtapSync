@@ -337,6 +337,10 @@ interface AlertItem {
   priority: 'high' | 'medium' | 'low';
 }
 
+import { SihTabwinReportService } from '../services/sihTabwinReportService';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   // State Management - SIMPLIFICADO: Apenas competência
   const [selectedHospitals, setSelectedHospitals] = useState<string[]>(['all']);
@@ -405,6 +409,59 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [aihDbCount, setAihDbCount] = useState<number | null>(null);
   const [aihKpi, setAihKpi] = useState<{ totalAIHs: number; totalRevenue: number; averageTicket: number } | null>(null);
   const [tabwinOpen, setTabwinOpen] = useState(false);
+  const [isRejectedLoading, setIsRejectedLoading] = useState(false);
+
+  const handleRejectedReport = async () => {
+    try {
+      setIsRejectedLoading(true);
+      const data = await SihTabwinReportService.fetchRejectedReport();
+      
+      if (data.length === 0) {
+        toast.info('Nenhuma AIH rejeitada encontrada para o período 01/11/2025 - 30/11/2025.');
+        return;
+      }
+
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      doc.setFontSize(14);
+      doc.text('Relatório de AIHs Rejeitadas (Tabwin SIH)', 40, 40);
+      doc.setFontSize(10);
+      doc.text('Período: 01/11/2025 a 30/11/2025 | UF: PR', 40, 60);
+      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 40, 75);
+
+      const headers = [
+        'AIH', 'Paciente', 'Hospital', 'Internação', 'Alta', 'Comp.', 'Valor Total', 'Procedimento', 'CID'
+      ];
+
+      const body = data.map(r => [
+        r.aihNumber,
+        r.patientName,
+        r.hospitalName,
+        r.dtInter,
+        r.dtSaida,
+        r.competencia,
+        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(r.valorTotal || 0),
+        r.procedimento,
+        r.cid
+      ]);
+
+      autoTable(doc, {
+        head: [headers],
+        body: body,
+        startY: 90,
+        styles: { fontSize: 7, cellPadding: 3 },
+        headStyles: { fillColor: [220, 38, 38] }, // Vermelho para rejeitados
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 40, right: 40 }
+      });
+
+      doc.save(`AIHs_Rejeitadas_PR_Nov2025_${new Date().getTime()}.pdf`);
+    } catch (err: any) {
+      console.error('Erro ao gerar relatório de rejeitados:', err);
+      toast.error('Erro ao gerar relatório: ' + (err.message || 'Erro desconhecido'));
+    } finally {
+      setIsRejectedLoading(false);
+    }
+  };
   const [filtersApplied, setFiltersApplied] = useState(false);
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
   const [appliedPatientSearchTerm, setAppliedPatientSearchTerm] = useState('');
@@ -1802,6 +1859,18 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                 >
                   <FileSpreadsheet className="h-4 w-4" />
                   Conferência Tabwin
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white w-auto min-w-[200px]"
+                  onClick={handleRejectedReport}
+                  title="Gerar PDF de AIHs rejeitadas (01/11/2025 - 30/11/2025)"
+                  disabled={isGlobalLoading || isRejectedLoading}
+                  type="button"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  {isRejectedLoading ? 'Gerando...' : 'Rejeitados Tabwin'}
                 </Button>
                 </div>
                 <Button
