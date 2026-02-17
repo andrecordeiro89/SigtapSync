@@ -7,12 +7,11 @@ import { Calendar, FileSpreadsheet, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
-import { DoctorsCrudService } from '../services/doctorsCrudService'
 import { SihTabwinReportService, TabwinReportFilters } from '../services/sihTabwinReportService'
 
 type HospitalOption = { id: string; name: string; cnes?: string }
-type DoctorOption = { cns: string; name: string; specialty: string }
 
 export type RejectedTabwinDialogProps = {
   open: boolean
@@ -40,15 +39,13 @@ const endOfMonthISO = (isoDate: string): string => {
 
 export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTabwinDialogProps) {
   const [hospitals, setHospitals] = useState<HospitalOption[]>([])
-  const [doctors, setDoctors] = useState<DoctorOption[]>([])
   const [selectedHospital, setSelectedHospital] = useState<string>('all')
-  const [selectedDoctor, setSelectedDoctor] = useState<string>('all')
+  const [excludedHospitalIds, setExcludedHospitalIds] = useState<string[]>([])
   const [dischargeFrom, setDischargeFrom] = useState<string>('')
   const [dischargeTo, setDischargeTo] = useState<string>('')
   const [inputDischargeFrom, setInputDischargeFrom] = useState<string>('')
   const [inputDischargeTo, setInputDischargeTo] = useState<string>('')
   const [loadingHospitals, setLoadingHospitals] = useState(false)
-  const [loadingDoctors, setLoadingDoctors] = useState(false)
   const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
@@ -82,42 +79,13 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
 
   useEffect(() => {
     if (!open) return
-    let cancelled = false
-    const loadDoctors = async () => {
-      setLoadingDoctors(true)
-      try {
-        const hospitalIds = selectedHospital !== 'all' ? [selectedHospital] : undefined
-        const res = await DoctorsCrudService.getAllDoctors({ hospitalIds, isActive: true } as any)
-        if (!res.success) throw new Error(res.error || 'Erro ao carregar médicos')
-        const opts: DoctorOption[] = (res.data || [])
-          .map((d: any) => ({
-            cns: String(d.cns || ''),
-            name: String(d.name || ''),
-            specialty: String(d.speciality || d.specialty || '').trim()
-          }))
-          .filter(d => d.cns && d.name)
-          .sort((a, b) => a.name.localeCompare(b.name))
-        if (!cancelled) setDoctors(opts)
-      } catch (e: any) {
-        toast.error('Erro ao carregar médicos')
-        if (!cancelled) setDoctors([])
-      } finally {
-        if (!cancelled) setLoadingDoctors(false)
-      }
-    }
-    loadDoctors()
-    return () => { cancelled = true }
-  }, [open, selectedHospital])
+    setExcludedHospitalIds([])
+  }, [open])
 
   const hospitalLabel = useMemo(() => {
     if (selectedHospital === 'all') return 'Todos os hospitais'
     return hospitals.find(h => h.id === selectedHospital)?.name || 'Hospital'
   }, [hospitals, selectedHospital])
-
-  const doctorLabel = useMemo(() => {
-    if (selectedDoctor === 'all') return 'Todos os médicos'
-    return doctors.find(d => d.cns === selectedDoctor)?.name || 'Médico'
-  }, [doctors, selectedDoctor])
 
   const handleGeneratePdf = async () => {
     try {
@@ -132,7 +100,8 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
           hospitalId: selectedHospital,
           dischargeFrom: dischargeFrom,
           dischargeTo: dischargeTo,
-          doctorCns: selectedDoctor
+          doctorCns: 'all',
+          excludedHospitalIds: selectedHospital === 'all' ? excludedHospitalIds : []
       }
 
       const data = await SihTabwinReportService.fetchRejectedReport(filters)
@@ -148,18 +117,17 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
       doc.setFontSize(10)
       doc.text(`Unidade Hospitalar: ${hospitalLabel}`, 40, 60)
       doc.text(`Período: ${formatDateRangeLabel(dischargeFrom, dischargeTo)}`, 40, 75)
-      doc.text(`Médico: ${doctorLabel}`, 40, 90)
+      doc.text(`Total de AIHs: ${data.length}`, 40, 90)
       doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 40, 105)
 
       const headers = [
-        'AIH', 'Paciente', 'Hospital', 'Internação', 'Alta', 'Comp.', 'Valor Total', 'Procedimento', 'CID'
+        'AIH', 'Paciente', 'Hospital', 'Alta', 'Comp.', 'Valor Total', 'Procedimento', 'CID'
       ]
 
       const body = data.map(r => [
         r.aihNumber,
         r.patientName || '—',
         r.hospitalName || '—',
-        r.dtInter || '—',
         r.dtSaida || '—',
         r.competencia || '—',
         new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(r.valorTotal || 0),
@@ -170,7 +138,7 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
       autoTable(doc, {
         head: [headers],
         body: body,
-        startY: 120,
+        startY: 125,
         styles: { fontSize: 7, cellPadding: 3 },
         headStyles: { fillColor: [220, 38, 38] }, // Vermelho para rejeitados
         alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -179,9 +147,15 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
 
       // Calcular totais
       const totalsByHospital = data.reduce((acc, curr) => {
-          const hosp = curr.hospitalName || 'Hospital não identificado'
-          acc[hosp] = (acc[hosp] || 0) + (curr.valorTotal || 0)
-          return acc
+        const hosp = curr.hospitalName || 'Hospital não identificado'
+        acc[hosp] = (acc[hosp] || 0) + (curr.valorTotal || 0)
+        return acc
+      }, {} as Record<string, number>)
+
+      const countsByHospital = data.reduce((acc, curr) => {
+        const hosp = curr.hospitalName || 'Hospital não identificado'
+        acc[hosp] = (acc[hosp] || 0) + 1
+        return acc
       }, {} as Record<string, number>)
 
       const grandTotal = data.reduce((sum, curr) => sum + (curr.valorTotal || 0), 0)
@@ -207,7 +181,8 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
               finalY = 40
           }
           const val = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)
-          doc.text(`${hosp}: ${val}`, 40, finalY)
+          const cnt = countsByHospital[hosp] || 0
+          doc.text(`${hosp}: ${cnt} AIH(s) | ${val}`, 40, finalY)
           finalY += 15
       })
 
@@ -221,7 +196,7 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
       doc.setTextColor(220, 38, 38) // Red
       doc.setFont('helvetica', 'bold')
       const totalVal = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(grandTotal)
-      doc.text(`Total Geral de Rejeições: ${totalVal}`, 40, finalY)
+      doc.text(`Total Geral de Rejeições: ${data.length} AIH(s) | ${totalVal}`, 40, finalY)
 
       doc.save(`AIHs_Rejeitadas_${new Date().toISOString().slice(0, 10)}.pdf`)
       toast.success('Relatório de rejeitados gerado com sucesso')
@@ -233,7 +208,55 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
     }
   }
 
-  const disabled = generating || loadingHospitals || loadingDoctors
+  const handleGenerateExcel = async () => {
+    try {
+      if (!dischargeFrom || !dischargeTo) {
+        toast.error('Por favor, selecione um período de alta.')
+        return
+      }
+
+      setGenerating(true)
+
+      const filters: TabwinReportFilters = {
+        hospitalId: selectedHospital,
+        dischargeFrom: dischargeFrom,
+        dischargeTo: dischargeTo,
+        doctorCns: 'all',
+        excludedHospitalIds: selectedHospital === 'all' ? excludedHospitalIds : []
+      }
+
+      const data = await SihTabwinReportService.fetchRejectedReport(filters)
+      if (data.length === 0) {
+        toast.info('Nenhuma AIH rejeitada encontrada para os filtros selecionados.')
+        return
+      }
+
+      const headers = ['AIH', 'Paciente', 'Hospital', 'Alta', 'Comp.', 'Valor Total', 'Procedimento', 'CID']
+      const body = data.map(r => [
+        r.aihNumber,
+        r.patientName || '—',
+        r.hospitalName || '—',
+        r.dtSaida || '—',
+        r.competencia || '—',
+        r.valorTotal || 0,
+        r.procedimento || '—',
+        r.cid || '—'
+      ])
+
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...body])
+      XLSX.utils.book_append_sheet(wb, ws, 'Rejeitados')
+      const fileName = `AIHs_Rejeitadas_${new Date().toISOString().slice(0, 10)}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      toast.success('Relatório Excel gerado com sucesso')
+    } catch (e: any) {
+      toast.error('Erro ao gerar relatório Excel')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const disabled = generating || loadingHospitals
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -251,7 +274,7 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Select value={selectedHospital} onValueChange={(v) => { setSelectedHospital(v); setSelectedDoctor('all') }}>
+              <Select value={selectedHospital} onValueChange={(v) => { setSelectedHospital(v); setExcludedHospitalIds([]) }}>
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Selecione o hospital" />
                 </SelectTrigger>
@@ -262,6 +285,33 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
                   ))}
                 </SelectContent>
               </Select>
+              {selectedHospital === 'all' && hospitals.length > 0 && (
+                <div className="pt-2">
+                  <div className="text-sm font-semibold text-black mb-2">
+                    Excluir hospitais do relatório
+                  </div>
+                  <div className="max-h-40 overflow-auto border border-gray-200 rounded-md p-2 space-y-2">
+                    {hospitals.map(h => {
+                      const checked = excludedHospitalIds.includes(h.id)
+                      return (
+                        <label key={h.id} className="flex items-center gap-2 text-sm text-black">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const next = e.target.checked
+                                ? Array.from(new Set([...excludedHospitalIds, h.id]))
+                                : excludedHospitalIds.filter(id => id !== h.id)
+                              setExcludedHospitalIds(next)
+                            }}
+                          />
+                          <span>{h.name}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
               {loadingHospitals && (
                 <div className="text-xs text-gray-500 flex items-center gap-2">
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -271,35 +321,7 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
             </CardContent>
           </Card>
 
-          {/* 2. Médicos */}
-          <Card className="border border-gray-200 w-full">
-            <CardHeader className="pb-2">
-              <div className="text-center text-xl font-semibold text-black">
-                Médicos (Filtro por Responsável Local)
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Selecione o médico" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os médicos</SelectItem>
-                  {doctors.map(d => (
-                    <SelectItem key={d.cns} value={d.cns}>{d.name} ({d.specialty || '—'})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {loadingDoctors && (
-                <div className="text-xs text-gray-500 flex items-center gap-2">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Carregando médicos...
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* 3. Filtros de Data */}
+          {/* 2. Filtros de Data */}
           <Card className="border border-gray-200 w-full">
             <CardHeader className="pb-2">
               <div className="text-center text-xl font-semibold text-black">
@@ -348,9 +370,8 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
                           onChange={(e) => {
                             const v = e.target.value
                             setInputDischargeTo(v)
-                            setDischargeFrom(inputDischargeFrom || '')
-                            setDischargeTo(v || '')
                           }}
+                          onBlur={() => setDischargeTo(inputDischargeTo || '')}
                           disabled={disabled}
                           className="w-full px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-base focus:outline-none focus:border-black hover:border-gray-300 transition-colors h-11"
                         />
@@ -387,6 +408,15 @@ export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTab
           >
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
             Gerar Relatório PDF
+          </Button>
+          <Button
+            type="button"
+            onClick={handleGenerateExcel}
+            disabled={disabled}
+            className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-sm h-9 px-3 rounded-md text-sm w-auto min-w-[180px]"
+          >
+            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+            Gerar Relatório Excel
           </Button>
         </div>
       </DialogContent>

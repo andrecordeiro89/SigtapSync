@@ -159,23 +159,17 @@ export default function TabwinConferenceDialog({ open, onOpenChange }: TabwinCon
       }
     }
 
-    const missingHospitalName = rows.filter(r => !String(r.hospitalName || '').trim()).length
-    if (missingHospitalName > 0) {
-      toast.warning(`Atenção: ${missingHospitalName} AIH(s) sem hospital identificado`)
-    }
-
     const totalAIHs = rows.length
-    const includeHospital = selectedHospital === 'all'
 
     const headers = [
-      'Nº AIH',
+      'AIH',
       'Paciente',
-      'Internação - Alta',
+      'Hospital',
+      'Alta',
       'Competência',
-      ...(includeHospital ? ['Hospital'] : []),
-      'Médico Principal',
+      'Médico(Tabwin)',
       'Médico (GSUS)',
-      'Status'
+      'Conferência'
     ]
 
     const compactDate = (d?: string) => {
@@ -187,12 +181,12 @@ export default function TabwinConferenceDialog({ open, onOpenChange }: TabwinCon
     const body = rows.map(r => ([
       r.aihNumber,
       r.patientName || '—',
-      `${compactDate(r.dtInter)} - ${compactDate(r.dtSaida)}`,
+      r.hospitalName || '—',
+      compactDate(r.dtSaida),
       r.competencia || '',
-      ...(includeHospital ? [r.hospitalName || ''] : []),
       r.doctorNameTabwin || '—',
       r.doctorNameGsus || '—',
-      r.statusLabel || (r.isDivergent ? '⚠️ Divergente' : 'OK')
+      r.conferenceStatus || (r.isDivergent ? 'Divergente' : 'Confere')
     ]))
 
     return { headers, body, totalAIHs, stats: report.stats }

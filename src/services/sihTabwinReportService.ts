@@ -6,6 +6,7 @@ export type TabwinReportFilters = {
   dischargeFrom?: string
   dischargeTo?: string
   doctorCns: string
+  excludedHospitalIds?: string[]
 }
 
 export type TabwinReportRow = {
@@ -20,7 +21,8 @@ export type TabwinReportRow = {
   doctorNameTabwin?: string
   doctorCnsTabwin?: string
   isDivergent?: boolean
-  statusLabel?: string
+  conferenceStatus?: string
+  isLocalOnly?: boolean
 }
 
 export type TabwinReportStats = {
@@ -41,7 +43,6 @@ export type RejectedReportRow = {
   aihNumber: string
   patientName?: string
   hospitalName?: string
-  dtInter?: string
   dtSaida?: string
   competencia?: string
   valorTotal?: number
@@ -294,15 +295,15 @@ export const SihTabwinReportService = {
     // Construir query local equivalente aos filtros
     let localQuery = supabase
       .from('aihs')
-      .select('aih_number, patient_id, cns_responsavel, cns_solicitante, cns_autorizador, dt_saida, hospital_id, patients(name)')
+      .select('aih_number, patient_id, cns_responsavel, discharge_date, hospital_id')
     
     if (!hospitalIsAll) {
       localQuery = localQuery.eq('hospital_id', filters.hospitalId)
     }
     
-    if (filters.dischargeFrom) localQuery = localQuery.gte('dt_saida', filters.dischargeFrom)
-    if (endExclusive) localQuery = localQuery.lt('dt_saida', endExclusive)
-    if (hasDateFilter) localQuery = localQuery.not('dt_saida', 'is', null)
+    if (filters.dischargeFrom) localQuery = localQuery.gte('discharge_date', filters.dischargeFrom)
+    if (endExclusive) localQuery = localQuery.lt('discharge_date', endExclusive)
+    if (hasDateFilter) localQuery = localQuery.not('discharge_date', 'is', null)
 
     // Substituir a chamada direta por fetchAll adaptado
     const fetchAllLocal = async (qb: any) => {
@@ -334,85 +335,30 @@ export const SihTabwinReportService = {
         const rawAih = String(lc.aih_number || '')
         const key = normalizeDigits(rawAih) || rawAih
         if (!key) continue
+
+        if (lc.patient_id) {
+          missingPatientNameIds.add(String(lc.patient_id))
+          missingPatientNameAihs.set(key, String(lc.patient_id))
+        }
+
+        const cnsRespRaw = lc.cns_responsavel
+        const cnsRespNorm = normalizeDigits(cnsRespRaw)
+        if (cnsRespNorm) {
+          localDoctorNormByAihKey.set(key, cnsRespNorm)
+          localDoctorRawByAihKey.set(key, String(cnsRespRaw))
+        }
         
         // Se já existe no RD (Tabwin), ignorar (será processado pelo fluxo normal)
         if (rdMap.has(key)) continue
         
         // Verificar Filtro de Médico (APENAS RESPONSÁVEL)
         if (!doctorIsAll && desiredDoctorNorm) {
-            const cnsResp = normalizeDigits(lc.cns_responsavel)
-            // Se o responsável não for o médico filtrado, descarta
-            if (cnsResp !== desiredDoctorNorm) continue
+          // Se o responsável não for o médico filtrado, descarta
+          if (cnsRespNorm !== desiredDoctorNorm) continue
         }
 
         // É somente local e passou no filtro!
         localOnlyAihs.push({ ...lc, __aih_key: key })
-        
-        // Registrar Paciente
-        const pName = Array.isArray(lc.patients) ? lc.patients[0]?.name : (lc.patients as any)?.name
-        if (pName) {
-          patientNameByAihKey.set(key, String(pName))
-        } else if (lc.patient_id) {
-           missingPatientNameIds.add(String(lc.patient_id))
-           missingPatientNameAihs.set(key, String(lc.patient_id))
-        }
-        
-        // Registrar Médico (CNS) para busca de nome posterior
-        const cnsRaw = lc.cns_responsavel || lc.cns_solicitante || lc.cns_autorizador
-        const cnsNorm = normalizeDigits(cnsRaw)
-        if (cnsNorm) {
-          localDoctorNormByAihKey.set(key, cnsNorm)
-          localDoctorRawByAihKey.set(key, String(cnsRaw))
-        }
-      }
-    }
-    
-    if (rd.length > 0) {
-      const aihKeys = rd.map(r => String((r as any).__aih_key || '')).filter(Boolean)
-      const aihRawList = rd.map(r => String((r as any).n_aih || '')).filter(Boolean)
-      const allSearchKeys = Array.from(new Set([...aihKeys, ...aihRawList]))
-      
-      console.log(`[TabwinReport] Buscando dados locais para ${rd.length} AIHs. Chaves de busca: ${allSearchKeys.length}`)
-
-      for (const ch of chunk(allSearchKeys, 200)) {
-        const { data: localAihRows, error: localAihErr } = await supabase
-          .from('aihs')
-          .select('aih_number, patient_id, cns_responsavel, cns_solicitante, cns_autorizador, patients(name)')
-          .in('aih_number', ch)
-        
-        if (localAihErr) {
-          console.error('[TabwinReport] Erro ao buscar AIHs locais:', localAihErr)
-          throw localAihErr
-        }
-        
-        (localAihRows || []).forEach((a: any) => {
-          const key = normalizeDigits(a?.aih_number) || String(a?.aih_number || '')
-          if (!key) return
-
-          const pName = Array.isArray(a.patients) ? a.patients[0]?.name : a.patients?.name
-
-          // Debug para rastrear nomes perdidos
-          if (pName) {
-             patientNameByAihKey.set(key, String(pName))
-          } else if (a.patient_id) {
-             missingPatientNameIds.add(String(a.patient_id))
-             missingPatientNameAihs.set(key, String(a.patient_id))
-          }
-
-          // Prioridade: Responsável > Solicitante > Autorizador
-          let cnsRaw = a?.cns_responsavel || a?.cns_solicitante || a?.cns_autorizador
-
-          if (!doctorIsAll && desiredDoctorNorm) {
-            // Se o filtro for aplicado, verificamos apenas o responsável
-            cnsRaw = a?.cns_responsavel
-          }
-
-          const cnsNorm = normalizeDigits(cnsRaw)
-          if (cnsNorm) {
-            localDoctorNormByAihKey.set(key, cnsNorm)
-            localDoctorRawByAihKey.set(key, String(cnsRaw))
-          }
-        })
       }
     }
 
@@ -502,7 +448,7 @@ export const SihTabwinReportService = {
       const competencia = formatCompetencia(Number(r.ano_cmpt), Number(r.mes_cmpt))
       
       const base = {
-        aihNumber: aih,
+        aihNumber: String((r as any).n_aih || aih),
         patientName: patientNameByAihKey.get(aih) || 'Paciente não encontrado',
         dtInter: formatDateBR(r.dt_inter ? String(r.dt_inter) : ''),
         dtSaida: formatDateBR(r.dt_saida ? String(r.dt_saida) : ''),
@@ -566,13 +512,15 @@ export const SihTabwinReportService = {
         totalDivergent++
       }
 
+      const conferenceStatus = isDivergent ? 'Divergente' : 'Confere'
       out.push({
         ...base,
         doctorNameGsus: localName || '—',
         doctorCnsGsus: localCnsRaw || localCnsNorm || '',
         doctorNameTabwin: tabwinName,
         doctorCnsTabwin: tabwinCnsRawList.join(', ') || '',
-        isDivergent
+        isDivergent,
+        conferenceStatus
       })
     }
 
@@ -594,10 +542,10 @@ export const SihTabwinReportService = {
       const hospName = hospById.get(String(la.hospital_id))?.name || (hospitalIsAll ? '' : selectedHospitalName)
 
       out.push({
-        aihNumber: la.aih_number,
+        aihNumber: String(la.aih_number || ''),
         patientName: patientNameByAihKey.get(key) || 'Paciente não encontrado',
         dtInter: '—',
-        dtSaida: formatDateBR(la.dt_saida),
+        dtSaida: formatDateBR(la.discharge_date),
         competencia: '',
         hospitalName: hospName,
         doctorNameGsus: docName,
@@ -605,7 +553,8 @@ export const SihTabwinReportService = {
         doctorNameTabwin: '—',
         doctorCnsTabwin: '—',
         isDivergent: true,
-        statusLabel: '⚠️ Ausente Tabwin'
+        conferenceStatus: 'Ausente Tabwin',
+        isLocalOnly: true
       })
       
       totalDivergent++
@@ -616,27 +565,27 @@ export const SihTabwinReportService = {
       console.log(`[TabwinReport] Adicionados ${addedLocalOnly} registros locais que estavam ausentes no Tabwin.`)
     }
 
+    const confOrder = (v?: string) => {
+      if (v === 'Confere') return 0
+      if (v === 'Divergente') return 1
+      if (v === 'Ausente Tabwin') return 2
+      return 3
+    }
     out.sort((a, b) => {
-      const aNotFound = a.patientName === 'Paciente não encontrado'
-      const bNotFound = b.patientName === 'Paciente não encontrado'
-      if (aNotFound && !bNotFound) return 1
-      if (!aNotFound && bNotFound) return -1
-      
-      const aLocalOnly = a.statusLabel === '⚠️ Ausente Tabwin'
-      const bLocalOnly = b.statusLabel === '⚠️ Ausente Tabwin'
-      if (aLocalOnly && !bLocalOnly) return 1
-      if (!aLocalOnly && bLocalOnly) return -1
+      const ca = confOrder(a.conferenceStatus)
+      const cb = confOrder(b.conferenceStatus)
+      if (ca !== cb) return ca - cb
 
-      if (a.isDivergent && !b.isDivergent) return 1
-      if (!a.isDivergent && b.isDivergent) return -1
-      
-      const da = (a.dtSaida || '').localeCompare(b.dtSaida || '')
-      if (da !== 0) return da
-      
       const ha = (a.hospitalName || '').localeCompare(b.hospitalName || '')
       if (ha !== 0) return ha
-      
-      return (a.doctorNameGsus || '').localeCompare(b.doctorNameGsus || '')
+
+      const da = (a.dtSaida || '').localeCompare(b.dtSaida || '')
+      if (da !== 0) return da
+
+      const pa = (a.patientName || '').localeCompare(b.patientName || '')
+      if (pa !== 0) return pa
+
+      return String(a.aihNumber || '').localeCompare(String(b.aihNumber || ''))
     })
 
     const endTime = performance.now()
@@ -682,9 +631,7 @@ export const SihTabwinReportService = {
     const dischargeFrom = filters?.dischargeFrom
     const dischargeTo = filters?.dischargeTo
     const hospitalId = filters?.hospitalId
-    const doctorCns = filters?.doctorCns
-    const desiredDoctorNorm = normalizeDigits(doctorCns)
-    const doctorIsAll = !doctorCns || doctorCns === 'all'
+    const excludedHospitalIds = new Set((filters?.excludedHospitalIds || []).filter(Boolean))
 
     // 1. Mapear Hospitais Locais (CNES -> Nome/ID)
     const { data: allHospitals, error: hospErr } = await supabase
@@ -698,20 +645,56 @@ export const SihTabwinReportService = {
       if (c) hospMap.set(c, { id: h.id, name: String(h.name || '') })
     })
 
-    // 2. Buscar AIHs rejeitadas no SIH remoto
-    let q = supabaseSih
-      .from('sih_rejeitados')
-      .select('n_aih, cnes, dt_inter, dt_saida, ano_cmpt, mes_cmpt, val_tot, proc_rea, diag_princ')
-      .eq('uf', 'PR')
-    
-    if (dischargeFrom) q = q.gte('dt_saida', dischargeFrom)
-    if (dischargeTo) {
-        const endExclusive = endExclusiveFrom(dischargeTo)
-        if (endExclusive) q = q.lt('dt_saida', endExclusive)
+    const endExclusive = endExclusiveFrom(dischargeTo)
+    const endExclusiveDigits = endExclusive ? normalizeDigits(endExclusive) : undefined
+    const dischargeFromDigits = dischargeFrom ? normalizeDigits(dischargeFrom) : undefined
+
+    const fetchRejectedRemote = async (): Promise<any[]> => {
+      const baseSelect = 'n_aih, cnes, dt_saida, ano_cmpt, mes_cmpt, val_tot, proc_rea, diag_princ'
+
+      const tryFetch = async (from?: string, toExclusive?: string): Promise<any[]> => {
+        let q = supabaseSih
+          .from('sih_rejeitados')
+          .select(baseSelect)
+          .eq('uf', 'PR')
+        if (from) q = q.gte('dt_saida', from)
+        if (toExclusive) q = q.lt('dt_saida', toExclusive)
+        const { data, error } = await q
+        if (error) throw error
+        return (data || []) as any[]
+      }
+
+      const inMemoryFilter = (rows: any[]): any[] => {
+        if (!dischargeFrom && !dischargeTo) return rows
+        const fromIso = dischargeFrom ? toISODate(dischargeFrom) : ''
+        const toIso = dischargeTo ? toISODate(dischargeTo) : ''
+        return rows.filter(r => {
+          const iso = toISODate(r?.dt_saida)
+          if (!iso) return false
+          if (fromIso && iso < fromIso) return false
+          if (toIso && iso > toIso) return false
+          return true
+        })
+      }
+
+      try {
+        const first = await tryFetch(dischargeFrom, endExclusive)
+        const filtered = inMemoryFilter(first)
+        if (filtered.length > 0 || (!dischargeFrom && !dischargeTo)) return filtered
+      } catch {}
+
+      try {
+        const second = await tryFetch(dischargeFromDigits, endExclusiveDigits)
+        return inMemoryFilter(second)
+      } catch {}
+
+      const last = await tryFetch(undefined, undefined)
+      return inMemoryFilter(last)
     }
 
-    const { data: rejRows, error: rejErr } = await q
-    if (rejErr) throw rejErr
+    // 2. Buscar AIHs rejeitadas no SIH remoto (filtro por Data Alta: dt_saida)
+    const rejRows = await fetchRejectedRemote()
+
     if (!rejRows || rejRows.length === 0) return []
 
     // 3. Filtrar por Hospital (CNES)
@@ -724,92 +707,134 @@ export const SihTabwinReportService = {
         if (hospitalId && hospitalId !== 'all') {
             const localHosp = hospMap.get(cnes)
             if (localHosp?.id !== hospitalId) return false
+        } else if (excludedHospitalIds.size > 0) {
+            const localHosp = hospMap.get(cnes)
+            if (localHosp?.id && excludedHospitalIds.has(localHosp.id)) return false
         }
         return true
     })
-
     if (filteredRejRows.length === 0) return []
 
-    // 4. Buscar Pacientes e Médicos Locais via AIH
-    // Normalizar números de AIH para garantir match
-    const aihNumbers = Array.from(new Set(filteredRejRows.map(r => normalizeDigits(r.n_aih)))).filter(Boolean)
+    const groupByAih = new Map<string, any[]>()
+    for (const r of filteredRejRows) {
+      const key = normalizeDigits(r?.n_aih) || String(r?.n_aih || '')
+      if (!key) continue
+      if (!groupByAih.has(key)) groupByAih.set(key, [])
+      groupByAih.get(key)!.push(r)
+    }
+    if (groupByAih.size === 0) return []
+
+    // 4. Buscar nomes de Pacientes no banco local (AIH -> Patient Name), via número de AIH
     const patientMap = new Map<string, string>()
-    const doctorMap = new Map<string, string>() // AIH Key -> Doctor CNS (Responsavel)
-    
-    for (const ch of chunk(aihNumbers, 200)) {
-      const { data: aihLocal, error: aihErr } = await supabase
-        .from('aihs')
-        .select('aih_number, patient_id, cns_responsavel, patients(name)')
-        .in('aih_number', ch)
-      
-      if (aihErr) continue
-      
-      const missingIds: string[] = []
-      const aihByPatientId = new Map<string, string>()
+    const patientIds = new Set<string>()
+    const aihKeyToPatientId = new Map<string, string>()
 
-      ;(aihLocal || []).forEach((a: any) => {
-        const key = normalizeDigits(a.aih_number)
-        if (!key) return
-        
-        // Doctor (Responsável)
-        const cnsResp = normalizeDigits(a.cns_responsavel)
-        if (cnsResp) {
-            doctorMap.set(key, cnsResp)
+    try {
+      const aihVariants = new Set<string>()
+      for (const [key, rows] of groupByAih.entries()) {
+        aihVariants.add(key)
+        if (key.length > 1) aihVariants.add(`${key.slice(0, -1)}-${key.slice(-1)}`)
+        for (const r of rows) {
+          const raw = String(r?.n_aih || '').trim()
+          if (raw) aihVariants.add(raw)
         }
+      }
 
-        // Tentar nome via join
-        const pName = a.patients?.name || (Array.isArray(a.patients) ? a.patients[0]?.name : null)
-        
-        if (pName) {
-          patientMap.set(key, String(pName))
-        } else if (a.patient_id) {
-          missingIds.push(String(a.patient_id))
-          aihByPatientId.set(String(a.patient_id), key)
-        }
-      })
-      
-      // Repescagem de nomes
-      if (missingIds.length > 0) {
-          const { data: pats } = await supabase.from('patients').select('id,name').in('id', missingIds)
-          if (pats) {
-              pats.forEach((p: any) => {
-                  const aihKey = aihByPatientId.get(String(p.id))
-                  if (aihKey && p.name) {
-                      patientMap.set(aihKey, String(p.name))
-                  }
-              })
+      for (const ch of chunk(Array.from(aihVariants), 200)) {
+        let localQ = supabase
+          .from('aihs')
+          .select('aih_number, patient_id, hospital_id')
+          .in('aih_number', ch)
+        if (hospitalId && hospitalId !== 'all') localQ = localQ.eq('hospital_id', hospitalId)
+
+        const { data: localRows, error: localErr } = await localQ
+        if (localErr) throw localErr
+
+        ;(localRows || []).forEach((a: any) => {
+          if (excludedHospitalIds.size > 0 && hospitalId === 'all') {
+            const hid = String(a?.hospital_id || '')
+            if (hid && excludedHospitalIds.has(hid)) return
           }
+          const key = normalizeDigits(a?.aih_number) || String(a?.aih_number || '')
+          if (!key) return
+          if (a.patient_id) {
+            const pid = String(a.patient_id)
+            patientIds.add(pid)
+            aihKeyToPatientId.set(key, pid)
+          }
+        })
+      }
+    } catch (e) {
+      console.error('[RejectedTabwin] Erro ao buscar AIHs locais para nomes:', e)
+    }
+
+    if (patientIds.size > 0) {
+      try {
+        const patsAll: any[] = []
+        for (const ch of chunk(Array.from(patientIds), 200)) {
+          const { data: pats, error: patErr } = await supabase.from('patients').select('id,name').in('id', ch)
+          if (patErr) continue
+          if (pats && pats.length > 0) patsAll.push(...pats)
+        }
+        const patMap = new Map(patsAll.map((p: any) => [String(p.id), String(p.name || '')]))
+        for (const [aihKey, pid] of aihKeyToPatientId.entries()) {
+          const nm = patMap.get(pid)
+          if (nm) patientMap.set(aihKey, nm)
+        }
+      } catch (e) {
+        console.error('[RejectedTabwin] Erro ao repescar nomes de pacientes:', e)
       }
     }
 
-    // 5. Montar Resultado (com filtro de médico)
-    return filteredRejRows
-      .filter(r => {
-          const key = normalizeDigits(r.n_aih)
-          
-          // Se tiver filtro de médico, verificar se bate com o responsável local
-          if (!doctorIsAll && desiredDoctorNorm) {
-              const localDoc = doctorMap.get(key)
-              // Se não achou médico local ou não bate com o filtro, descarta
-              if (localDoc !== desiredDoctorNorm) return false
-          }
-          
-          return true
-      })
-      .map(r => {
-        const key = normalizeDigits(r.n_aih)
+    // 5. Montar Resultado (agregando competências por AIH)
+    const pickBestRow = (rows: any[]): any => {
+      if (!rows || rows.length === 0) return {}
+      const withIso = rows
+        .map(r => ({ r, iso: toISODate(r?.dt_saida) }))
+        .filter(x => x.iso)
+      if (withIso.length === 0) return rows[0]
+      withIso.sort((a, b) => b.iso.localeCompare(a.iso))
+      return withIso[0].r
+    }
+
+    const formatCompKey = (r: any) => {
+      const y = Number(r?.ano_cmpt)
+      const m = Number(r?.mes_cmpt)
+      if (!y || !m) return ''
+      return `${String(m).padStart(2, '0')}/${String(y)}`
+    }
+
+    const out = Array.from(groupByAih.entries())
+      .map(([key, rows]) => {
+        const best = pickBestRow(rows)
+        const comps = Array.from(new Set(rows.map(formatCompKey).filter(Boolean)))
+          .map(c => {
+            const [mm, yy] = c.split('/')
+            return { c, mm: Number(mm), yy: Number(yy) }
+          })
+          .sort((a, b) => (a.yy - b.yy) || (a.mm - b.mm))
+          .map(x => x.c)
+        const competencia = comps.join(' e ')
+
         return {
-          aihNumber: String(r.n_aih || ''),
+          aihNumber: String(best?.n_aih || ''),
           patientName: (key ? patientMap.get(key) : null) || 'Paciente não encontrado',
-          hospitalName: hospMap.get(String(r.cnes || '').trim())?.name || `CNES: ${String(r.cnes || '').trim()}`,
-          dtInter: formatDateBR(r.dt_inter),
-          dtSaida: formatDateBR(r.dt_saida),
-          competencia: formatCompetencia(Number(r.ano_cmpt), Number(r.mes_cmpt)),
-          valorTotal: Number(r.val_tot || 0),
-          procedimento: String(r.proc_rea || ''),
-          cid: String(r.diag_princ || '')
+          hospitalName: hospMap.get(String(best?.cnes || '').trim())?.name || `CNES: ${String(best?.cnes || '').trim()}`,
+          dtSaida: formatDateBR(best?.dt_saida),
+          competencia,
+          valorTotal: Number(best?.val_tot || 0),
+          procedimento: String(best?.proc_rea || ''),
+          cid: String(best?.diag_princ || '')
         }
       })
-      .sort((a, b) => (a.hospitalName || '').localeCompare(b.hospitalName || ''))
+      .sort((a, b) => {
+        const ha = (a.hospitalName || '').localeCompare(b.hospitalName || '')
+        if (ha !== 0) return ha
+        const da = (a.dtSaida || '').localeCompare(b.dtSaida || '')
+        if (da !== 0) return da
+        return String(a.aihNumber || '').localeCompare(String(b.aihNumber || ''))
+      })
+
+    return out
   }
 }
