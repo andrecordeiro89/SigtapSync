@@ -3,20 +3,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog'
 import { Card, CardContent, CardHeader } from './ui/card'
 import { Button } from './ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
-import { Input } from './ui/input'
-import { Building, Calendar, FileSpreadsheet, Loader2, Stethoscope } from 'lucide-react'
+import { Calendar, FileSpreadsheet, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { DoctorsCrudService } from '../services/doctorsCrudService'
-import { SihTabwinReportService } from '../services/sihTabwinReportService'
+import { SihTabwinReportService, TabwinReportFilters } from '../services/sihTabwinReportService'
 
 type HospitalOption = { id: string; name: string; cnes?: string }
 type DoctorOption = { cns: string; name: string; specialty: string }
 
-export type TabwinConferenceDialogProps = {
+export type RejectedTabwinDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -40,7 +38,7 @@ const endOfMonthISO = (isoDate: string): string => {
   return `${y}-${mm}-${dd}`
 }
 
-export default function TabwinConferenceDialog({ open, onOpenChange }: TabwinConferenceDialogProps) {
+export default function RejectedTabwinDialog({ open, onOpenChange }: RejectedTabwinDialogProps) {
   const [hospitals, setHospitals] = useState<HospitalOption[]>([])
   const [doctors, setDoctors] = useState<DoctorOption[]>([])
   const [selectedHospital, setSelectedHospital] = useState<string>('all')
@@ -111,13 +109,6 @@ export default function TabwinConferenceDialog({ open, onOpenChange }: TabwinCon
     return () => { cancelled = true }
   }, [open, selectedHospital])
 
-  useEffect(() => {
-    if (selectedDoctor !== 'all' && selectedHospital !== 'all') return
-    if (selectedDoctor === 'all') return
-    const exists = doctors.some(d => d.cns === selectedDoctor)
-    if (!exists) setSelectedDoctor('all')
-  }, [doctors, selectedDoctor, selectedHospital])
-
   const hospitalLabel = useMemo(() => {
     if (selectedHospital === 'all') return 'Todos os hospitais'
     return hospitals.find(h => h.id === selectedHospital)?.name || 'Hospital'
@@ -128,134 +119,115 @@ export default function TabwinConferenceDialog({ open, onOpenChange }: TabwinCon
     return doctors.find(d => d.cns === selectedDoctor)?.name || 'Médico'
   }, [doctors, selectedDoctor])
 
-  const buildTable = async () => {
-    const report = await SihTabwinReportService.fetchReport({
-      hospitalId: selectedHospital,
-      dischargeFrom: dischargeFrom || undefined,
-      dischargeTo: dischargeTo || undefined,
-      doctorCns: selectedDoctor
-    })
-    const rows = report.rows
-
-    if (rows.length === 0) {
-      if (selectedDoctor !== 'all') {
-        toast.error(`Nenhum dado encontrado. RD(SIH): ${report.stats.aihsRd} | com SP: ${report.stats.aihsWithSp}`)
-        if (report.stats.aihsRd > 0 && report.stats.aihsWithSp === 0) {
-          toast.warning('Possível causa: SIH_SP não tem vínculo de médico (SP_PF_DOC) para essas AIHs')
-        } else if (report.stats.aihsRd > 0 && report.stats.aihsWithSp > 0) {
-          toast.warning('Possível causa: CNS selecionado não casa com SP_PF_DOC ou vínculo está incompleto')
-        }
-      } else {
-        toast.error('Nenhum dado encontrado para os filtros selecionados')
-      }
-      return null
-    }
-
-    if (selectedDoctor !== 'all' && report.stats.aihsRd > 0) {
-      const matched = rows.length
-      const total = report.stats.aihsRd
-      if (matched < total) {
-        toast.warning(`No SIH, ${matched}/${total} AIH(s) casaram com o médico selecionado`)
-      }
-    }
-
-    const missingHospitalName = rows.filter(r => !String(r.hospitalName || '').trim()).length
-    if (missingHospitalName > 0) {
-      toast.warning(`Atenção: ${missingHospitalName} AIH(s) sem hospital identificado`)
-    }
-
-    const totalAIHs = rows.length
-    const includeHospital = selectedHospital === 'all'
-
-    const headers = [
-      'Nº AIH',
-      'Paciente',
-      'Internação - Alta',
-      'Competência',
-      ...(includeHospital ? ['Hospital'] : []),
-      'Médico Principal',
-      'Médico (GSUS)',
-      'Status'
-    ]
-
-    const compactDate = (d?: string) => {
-      if (!d) return ''
-      // Remove ! e formata para dd/MM/yy
-      return d.replace(/!/g, '').replace(/\/20(\d{2})$/, '/$1')
-    }
-
-    const body = rows.map(r => ([
-      r.aihNumber,
-      r.patientName || '—',
-      `${compactDate(r.dtInter)} - ${compactDate(r.dtSaida)}`,
-      r.competencia || '',
-      ...(includeHospital ? [r.hospitalName || ''] : []),
-      r.doctorNameTabwin || '—',
-      r.doctorNameGsus || '—',
-      r.statusLabel || (r.isDivergent ? '⚠️ Divergente' : 'OK')
-    ]))
-
-    return { headers, body, totalAIHs, stats: report.stats }
-  }
-
   const handleGeneratePdf = async () => {
     try {
+      if (!dischargeFrom || !dischargeTo) {
+        toast.error('Por favor, selecione um período de alta.')
+        return
+      }
+
       setGenerating(true)
-      const table = await buildTable()
-      if (!table) return
+      
+      const filters: TabwinReportFilters = {
+          hospitalId: selectedHospital,
+          dischargeFrom: dischargeFrom,
+          dischargeTo: dischargeTo,
+          doctorCns: selectedDoctor
+      }
+
+      const data = await SihTabwinReportService.fetchRejectedReport(filters)
+      
+      if (data.length === 0) {
+        toast.info('Nenhuma AIH rejeitada encontrada para os filtros selecionados.')
+        return
+      }
 
       const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
       doc.setFontSize(14)
-      doc.text('Conferência Tabwin (SIH)', 40, 32)
+      doc.text('Relatório de AIHs Rejeitadas (Tabwin SIH)', 40, 40)
       doc.setFontSize(10)
-      doc.text(`Unidade Hospitalar: ${hospitalLabel}`, 40, 50)
-      doc.text(`Data Alta: ${formatDateRangeLabel(dischargeFrom || undefined, dischargeTo || undefined)}`, 40, 64)
-      doc.text(`Médicos: ${doctorLabel}`, 40, 78)
-      doc.text(`Total de AIHs: ${table.totalAIHs}`, 40, 92)
-      if (selectedDoctor !== 'all') {
-        doc.text(
-          `AIHs RD: ${table.stats.aihsRd} | com SP: ${table.stats.aihsWithSp} | Divergentes: ${table.stats.totalDivergent || 0}`,
-          40,
-          106
-        )
-      }
+      doc.text(`Unidade Hospitalar: ${hospitalLabel}`, 40, 60)
+      doc.text(`Período: ${formatDateRangeLabel(dischargeFrom, dischargeTo)}`, 40, 75)
+      doc.text(`Médico: ${doctorLabel}`, 40, 90)
+      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 40, 105)
+
+      const headers = [
+        'AIH', 'Paciente', 'Hospital', 'Internação', 'Alta', 'Comp.', 'Valor Total', 'Procedimento', 'CID'
+      ]
+
+      const body = data.map(r => [
+        r.aihNumber,
+        r.patientName || '—',
+        r.hospitalName || '—',
+        r.dtInter || '—',
+        r.dtSaida || '—',
+        r.competencia || '—',
+        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(r.valorTotal || 0),
+        r.procedimento || '—',
+        r.cid || '—'
+      ])
 
       autoTable(doc, {
-        head: [table.headers],
-        body: table.body,
-        startY: selectedDoctor !== 'all' ? 120 : 106,
-        styles: { fontSize: 8, cellPadding: 4 },
-        headStyles: { fillColor: [79, 70, 229] },
-        columnStyles: {
-          2: { fontSize: 7 }, // Data (Internação - Alta)
-          3: { fontSize: 7 }  // Competência
-        }
+        head: [headers],
+        body: body,
+        startY: 120,
+        styles: { fontSize: 7, cellPadding: 3 },
+        headStyles: { fillColor: [220, 38, 38] }, // Vermelho para rejeitados
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 40, right: 40 }
       })
 
-      const fileName = `Conferencia_Tabwin_${new Date().toISOString().slice(0, 10)}.pdf`
-      doc.save(fileName)
-      toast.success('Relatório PDF gerado com sucesso')
-    } catch (e: any) {
-      toast.error('Erro ao gerar relatório PDF')
-    } finally {
-      setGenerating(false)
-    }
-  }
+      // Calcular totais
+      const totalsByHospital = data.reduce((acc, curr) => {
+          const hosp = curr.hospitalName || 'Hospital não identificado'
+          acc[hosp] = (acc[hosp] || 0) + (curr.valorTotal || 0)
+          return acc
+      }, {} as Record<string, number>)
 
-  const handleGenerateExcel = async () => {
-    try {
-      setGenerating(true)
-      const table = await buildTable()
-      if (!table) return
+      const grandTotal = data.reduce((sum, curr) => sum + (curr.valorTotal || 0), 0)
 
-      const wb = XLSX.utils.book_new()
-      const ws = XLSX.utils.aoa_to_sheet([table.headers, ...table.body])
-      XLSX.utils.book_append_sheet(wb, ws, 'Tabwin')
-      const fileName = `Conferencia_Tabwin_${new Date().toISOString().slice(0, 10)}.xlsx`
-      XLSX.writeFile(wb, fileName)
-      toast.success('Relatório Excel gerado com sucesso')
+      // Adicionar resumo na última página
+      let finalY = (doc as any).lastAutoTable.finalY + 30
+      
+      // Verificar se cabe na página, senão cria nova
+      if (finalY > doc.internal.pageSize.height - 100) {
+          doc.addPage()
+          finalY = 40
+      }
+
+      doc.setFontSize(12)
+      doc.setTextColor(0, 0, 0)
+      doc.text('Resumo por Hospital:', 40, finalY)
+      finalY += 20
+
+      doc.setFontSize(10)
+      Object.entries(totalsByHospital).sort((a, b) => a[0].localeCompare(b[0])).forEach(([hosp, total]) => {
+          if (finalY > doc.internal.pageSize.height - 50) {
+              doc.addPage()
+              finalY = 40
+          }
+          const val = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)
+          doc.text(`${hosp}: ${val}`, 40, finalY)
+          finalY += 15
+      })
+
+      finalY += 10
+      if (finalY > doc.internal.pageSize.height - 40) {
+          doc.addPage()
+          finalY = 40
+      }
+
+      doc.setFontSize(14)
+      doc.setTextColor(220, 38, 38) // Red
+      doc.setFont('helvetica', 'bold')
+      const totalVal = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(grandTotal)
+      doc.text(`Total Geral de Rejeições: ${totalVal}`, 40, finalY)
+
+      doc.save(`AIHs_Rejeitadas_${new Date().toISOString().slice(0, 10)}.pdf`)
+      toast.success('Relatório de rejeitados gerado com sucesso')
     } catch (e: any) {
-      toast.error('Erro ao gerar relatório Excel')
+      console.error('Erro ao gerar relatório de rejeitados:', e)
+      toast.error('Erro ao gerar relatório: ' + (e.message || 'Erro desconhecido'))
     } finally {
       setGenerating(false)
     }
@@ -267,7 +239,7 @@ export default function TabwinConferenceDialog({ open, onOpenChange }: TabwinCon
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-7xl w-[97vw] text-lg">
         <DialogHeader>
-          <DialogTitle className="text-3xl">Conferência Tabwin</DialogTitle>
+          <DialogTitle className="text-3xl text-red-600">Relatório de Rejeitados Tabwin</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
@@ -303,7 +275,7 @@ export default function TabwinConferenceDialog({ open, onOpenChange }: TabwinCon
           <Card className="border border-gray-200 w-full">
             <CardHeader className="pb-2">
               <div className="text-center text-xl font-semibold text-black">
-                Médicos
+                Médicos (Filtro por Responsável Local)
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -331,17 +303,16 @@ export default function TabwinConferenceDialog({ open, onOpenChange }: TabwinCon
           <Card className="border border-gray-200 w-full">
             <CardHeader className="pb-2">
               <div className="text-center text-xl font-semibold text-black">
-                Filtros de Data
+                Filtros de Data (Alta)
               </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-4">
-              {/* Data Alta */}
               <div className="w-full space-y-3">
                  <div className="grid grid-cols-2 gap-4 items-end">
                     <div>
                       <label className="flex items-center gap-2 text-sm font-bold text-black uppercase tracking-wide mb-2">
                         <Calendar className="h-3.5 w-3.5 text-black" />
-                        Início (Alta)
+                        Início
                       </label>
                       <input
                         type="date"
@@ -368,7 +339,7 @@ export default function TabwinConferenceDialog({ open, onOpenChange }: TabwinCon
                     <div>
                       <label className="flex items-center gap-2 text-sm font-bold text-black uppercase tracking-wide mb-2">
                         <Calendar className="h-3.5 w-3.5 text-black" />
-                        Fim (Alta)
+                        Fim
                       </label>
                       <div className="flex items-center gap-2">
                         <input
@@ -412,19 +383,10 @@ export default function TabwinConferenceDialog({ open, onOpenChange }: TabwinCon
             type="button"
             onClick={handleGeneratePdf}
             disabled={disabled}
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-3 rounded-md text-sm w-auto min-w-[180px]"
+            className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white shadow-sm h-9 px-3 rounded-md text-sm w-auto min-w-[180px]"
           >
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
             Gerar Relatório PDF
-          </Button>
-          <Button
-            type="button"
-            onClick={handleGenerateExcel}
-            disabled={disabled}
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-9 px-3 rounded-md text-sm w-auto min-w-[180px]"
-          >
-            {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
-            Gerar Relatório Excel
           </Button>
         </div>
       </DialogContent>
