@@ -60,6 +60,38 @@ const normalizeDigits = (v: unknown): string => {
   return String(v ?? '').replace(/\D/g, '').replace(/^0+/, '')
 }
 
+const cnesVariants = (raw: unknown): string[] => {
+  const digits = String(raw ?? '').replace(/\D/g, '')
+  const noLead = digits.replace(/^0+/, '')
+  const variants = new Set<string>()
+  if (digits) variants.add(digits)
+  if (noLead) variants.add(noLead)
+  const pad7a = digits ? digits.padStart(7, '0') : ''
+  const pad7b = noLead ? noLead.padStart(7, '0') : ''
+  if (pad7a) variants.add(pad7a)
+  if (pad7b) variants.add(pad7b)
+  return Array.from(variants)
+}
+
+const normalizeCnes7 = (raw: unknown): string => {
+  const digits = String(raw ?? '').replace(/\D/g, '')
+  if (!digits) return ''
+  return digits.padStart(7, '0').slice(-7)
+}
+
+const REJEITADOS_CNES_ALLOWLIST = [
+  '2687011',
+  '0887854',
+  '0213845',
+  '4820150',
+  '2738368',
+  '4388380',
+  '7278608',
+  '2877112',
+  '0017574',
+  '0018600'
+]
+
 const formatCompetencia = (year?: number | null, month?: number | null): string => {
   const y = typeof year === 'number' && Number.isFinite(year) ? year : undefined
   const m = typeof month === 'number' && Number.isFinite(month) ? month : undefined
@@ -632,6 +664,10 @@ export const SihTabwinReportService = {
     const dischargeTo = filters?.dischargeTo
     const hospitalId = filters?.hospitalId
     const excludedHospitalIds = new Set((filters?.excludedHospitalIds || []).filter(Boolean))
+    const allowedCnesSet = new Set(REJEITADOS_CNES_ALLOWLIST.map(normalizeCnes7).filter(Boolean))
+    const allowedCnesQueryValues = Array.from(new Set(
+      Array.from(allowedCnesSet).flatMap(c => [c, c.replace(/^0+/, '')]).filter(Boolean)
+    ))
 
     // 1. Mapear Hospitais Locais (CNES -> Nome/ID)
     const { data: allHospitals, error: hospErr } = await supabase
@@ -642,26 +678,42 @@ export const SihTabwinReportService = {
     const hospMap = new Map<string, { id: string, name: string }>()
     ;(allHospitals || []).forEach(h => {
       const c = String(h.cnes || '').trim()
-      if (c) hospMap.set(c, { id: h.id, name: String(h.name || '') })
+      const key = normalizeCnes7(c)
+      if (!key) return
+      if (!allowedCnesSet.has(key)) return
+      hospMap.set(key, { id: h.id, name: String(h.name || '') })
     })
 
     const endExclusive = endExclusiveFrom(dischargeTo)
-    const endExclusiveDigits = endExclusive ? normalizeDigits(endExclusive) : undefined
-    const dischargeFromDigits = dischargeFrom ? normalizeDigits(dischargeFrom) : undefined
 
     const fetchRejectedRemote = async (): Promise<any[]> => {
       const baseSelect = 'n_aih, cnes, dt_saida, ano_cmpt, mes_cmpt, val_tot, proc_rea, diag_princ'
+
+      const fetchAllRemote = async (queryBuilder: any): Promise<any[]> => {
+        const out: any[] = []
+        const pageSize = 1000
+        let page = 0
+        while (page < 20) {
+          const { data, error } = await queryBuilder.range(page * pageSize, (page + 1) * pageSize - 1)
+          if (error) throw error
+          if (!data || data.length === 0) break
+          out.push(...data)
+          if (data.length < pageSize) break
+          page++
+        }
+        return out
+      }
 
       const tryFetch = async (from?: string, toExclusive?: string): Promise<any[]> => {
         let q = supabaseSih
           .from('sih_rejeitados')
           .select(baseSelect)
           .eq('uf', 'PR')
+          .in('cnes', allowedCnesQueryValues)
         if (from) q = q.gte('dt_saida', from)
         if (toExclusive) q = q.lt('dt_saida', toExclusive)
-        const { data, error } = await q
-        if (error) throw error
-        return (data || []) as any[]
+        q = q.order('dt_saida', { ascending: false })
+        return await fetchAllRemote(q)
       }
 
       const inMemoryFilter = (rows: any[]): any[] => {
@@ -677,19 +729,8 @@ export const SihTabwinReportService = {
         })
       }
 
-      try {
-        const first = await tryFetch(dischargeFrom, endExclusive)
-        const filtered = inMemoryFilter(first)
-        if (filtered.length > 0 || (!dischargeFrom && !dischargeTo)) return filtered
-      } catch {}
-
-      try {
-        const second = await tryFetch(dischargeFromDigits, endExclusiveDigits)
-        return inMemoryFilter(second)
-      } catch {}
-
-      const last = await tryFetch(undefined, undefined)
-      return inMemoryFilter(last)
+      const rows = await tryFetch(dischargeFrom, endExclusive)
+      return inMemoryFilter(rows)
     }
 
     // 2. Buscar AIHs rejeitadas no SIH remoto (filtro por Data Alta: dt_saida)
@@ -701,17 +742,18 @@ export const SihTabwinReportService = {
     // Se o CNES não existir no banco local, descarta (conforme solicitado)
     // Se tiver filtro de hospital, verifica se o ID bate
     const filteredRejRows = rejRows.filter(r => {
-        const cnes = String(r.cnes || '').trim()
-        if (!hospMap.has(cnes)) return false // Descartar se não existe local
-        
-        if (hospitalId && hospitalId !== 'all') {
-            const localHosp = hospMap.get(cnes)
-            if (localHosp?.id !== hospitalId) return false
-        } else if (excludedHospitalIds.size > 0) {
-            const localHosp = hospMap.get(cnes)
-            if (localHosp?.id && excludedHospitalIds.has(localHosp.id)) return false
-        }
-        return true
+      const cnesKey = normalizeCnes7(r?.cnes)
+      if (!cnesKey) return false
+      if (!allowedCnesSet.has(cnesKey)) return false
+      const localHosp = hospMap.get(cnesKey)
+      if (!localHosp) return false
+
+      if (hospitalId && hospitalId !== 'all') {
+        if (localHosp.id !== hospitalId) return false
+      } else if (excludedHospitalIds.size > 0) {
+        if (excludedHospitalIds.has(localHosp.id)) return false
+      }
+      return true
     })
     if (filteredRejRows.length === 0) return []
 
@@ -816,10 +858,12 @@ export const SihTabwinReportService = {
           .map(x => x.c)
         const competencia = comps.join(' e ')
 
+        const cnesKey = normalizeCnes7(best?.cnes)
+        const localHosp = cnesKey ? hospMap.get(cnesKey) : undefined
         return {
           aihNumber: String(best?.n_aih || ''),
           patientName: (key ? patientMap.get(key) : null) || 'Paciente não encontrado',
-          hospitalName: hospMap.get(String(best?.cnes || '').trim())?.name || `CNES: ${String(best?.cnes || '').trim()}`,
+          hospitalName: localHosp?.name || `CNES: ${String(best?.cnes || '').trim()}`,
           dtSaida: formatDateBR(best?.dt_saida),
           competencia,
           valorTotal: Number(best?.val_tot || 0),
