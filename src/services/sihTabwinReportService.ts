@@ -50,7 +50,7 @@ export type RejectedReportRow = {
   cid?: string
 }
 
-const chunk = <T,>(arr: T[], size = 200): T[][] => {
+const chunk = <T>(arr: T[], size = 200): T[][] => {
   const out: T[][] = []
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
   return out
@@ -60,23 +60,55 @@ const normalizeDigits = (v: unknown): string => {
   return String(v ?? '').replace(/\D/g, '').replace(/^0+/, '')
 }
 
-const cnesVariants = (raw: unknown): string[] => {
-  const digits = String(raw ?? '').replace(/\D/g, '')
-  const noLead = digits.replace(/^0+/, '')
-  const variants = new Set<string>()
-  if (digits) variants.add(digits)
-  if (noLead) variants.add(noLead)
-  const pad7a = digits ? digits.padStart(7, '0') : ''
-  const pad7b = noLead ? noLead.padStart(7, '0') : ''
-  if (pad7a) variants.add(pad7a)
-  if (pad7b) variants.add(pad7b)
-  return Array.from(variants)
-}
+// Removida função cnesVariants (não utilizada)
 
 const normalizeCnes7 = (raw: unknown): string => {
   const digits = String(raw ?? '').replace(/\D/g, '')
   if (!digits) return ''
   return digits.padStart(7, '0').slice(-7)
+}
+
+// Interfaces para tipagem do retorno do Supabase
+interface SihRdRow {
+  n_aih: string
+  hospital_id?: string
+  cnes?: string
+  dt_inter?: string
+  dt_saida?: string
+  ano_cmpt?: string
+  mes_cmpt?: string
+}
+
+interface SihSpRow {
+  sp_naih: string
+  sp_pf_doc: string
+}
+
+interface SihRejeitadosRow {
+  n_aih: string
+  cnes: string
+  dt_saida: string
+  ano_cmpt: string
+  mes_cmpt: string
+  val_tot: number
+  proc_rea: string
+  diag_princ: string
+  uf?: string
+}
+
+// Helper genérico para paginação (substitui duplicatas internas)
+const fetchAll = async <T>(queryBuilder: any, pageSize = 1000, maxPages = 20): Promise<T[]> => {
+  const all: T[] = []
+  let page = 0
+  while (page < maxPages) {
+    const { data, error } = await queryBuilder.range(page * pageSize, (page + 1) * pageSize - 1)
+    if (error) throw error
+    if (!data || data.length === 0) break
+    all.push(...data)
+    if (data.length < pageSize) break
+    page++
+  }
+  return all
 }
 
 const REJEITADOS_CNES_ALLOWLIST = [
@@ -188,24 +220,10 @@ export const SihTabwinReportService = {
     }
 
     // Função auxiliar para buscar com paginação (evitar limite de 1000)
-    const fetchAll = async (queryBuilder: any): Promise<any[]> => {
-      let all: any[] = []
-      const pageSize = 1000
-      let page = 0
-      // Limite de segurança: 20 páginas (20k registros)
-      while (page < 20) {
-        const { data, error } = await queryBuilder.range(page * pageSize, (page + 1) * pageSize - 1)
-        if (error) throw error
-        if (!data || data.length === 0) break
-        all.push(...data)
-        if (data.length < pageSize) break
-        page++
-      }
-      return all
-    }
+    // Utiliza o helper fetchAll global para evitar duplicação
 
     // 2. Busca Primária (SIH RD)
-    const fetchRd = async (opts: { useCnesFallback: boolean }): Promise<any[]> => {
+    const fetchRd = async (opts: { useCnesFallback: boolean }): Promise<SihRdRow[]> => {
       // Se for fallback de CNES e não tiver variantes, retorna vazio
       if (opts.useCnesFallback && selectedHospitalCnesVariants.length === 0) return []
       
@@ -232,10 +250,10 @@ export const SihTabwinReportService = {
       // Ordenação padrão para garantir consistência na paginação
       q = q.order('dt_saida', { ascending: false })
 
-      return await fetchAll(q)
+      return await fetchAll<SihRdRow>(q)
     }
 
-    let rdRaw: any[] = []
+    let rdRaw: SihRdRow[] = []
     
     if (!hospitalIsAll) {
       // Tentativa 1: Busca por hospital_id (Chave Primária)
@@ -263,7 +281,7 @@ export const SihTabwinReportService = {
       })
     }
 
-    const rdMap = new Map<string, any>()
+    const rdMap = new Map<string, SihRdRow>()
     const aihNumbersRaw = Array.from(new Set(rdRaw.map(r => String(r?.n_aih ?? '')).filter(Boolean)))
     for (const r of rdRaw) {
       const rawAih = String(r?.n_aih ?? '')
@@ -279,7 +297,7 @@ export const SihTabwinReportService = {
     }
 
     // 3. Buscar Médicos Remotos (SIH SP)
-    const spRows: any[] = []
+    const spRows: SihSpRow[] = []
     const aihNumbersForSp = Array.from(new Set([
       ...aihNumbersRaw,
       ...aihNumbersRaw.map(n => normalizeDigits(n)).filter(Boolean)
@@ -291,7 +309,7 @@ export const SihTabwinReportService = {
         .in('sp_naih', ch)
       const { data: spData, error: spErr } = await spQuery
       if (spErr) throw spErr
-      if (spData && spData.length > 0) spRows.push(...spData)
+      if (spData && spData.length > 0) spRows.push(...(spData as unknown as SihSpRow[]))
     }
 
     // Map: AIH (norm) -> Lista de CNS (norm) do Tabwin
@@ -337,25 +355,9 @@ export const SihTabwinReportService = {
     if (endExclusive) localQuery = localQuery.lt('discharge_date', endExclusive)
     if (hasDateFilter) localQuery = localQuery.not('discharge_date', 'is', null)
 
-    // Substituir a chamada direta por fetchAll adaptado
-    const fetchAllLocal = async (qb: any) => {
-        let all: any[] = []
-        const pageSize = 1000
-        let page = 0
-        while (page < 20) { // Limite de 20k registros locais
-            const { data, error } = await qb.range(page * pageSize, (page + 1) * pageSize - 1)
-            if (error) throw error
-            if (!data || data.length === 0) break
-            all.push(...data)
-            if (data.length < pageSize) break
-            page++
-        }
-        return all
-    }
-
     let localCandidates: any[] = []
     try {
-        localCandidates = await fetchAllLocal(localQuery)
+        localCandidates = await fetchAll<any>(localQuery)
     } catch (localCandErr) {
         console.error('[TabwinReport] Erro na busca local reversa:', localCandErr)
     }
@@ -686,25 +688,10 @@ export const SihTabwinReportService = {
 
     const endExclusive = endExclusiveFrom(dischargeTo)
 
-    const fetchRejectedRemote = async (): Promise<any[]> => {
+    const fetchRejectedRemote = async (): Promise<SihRejeitadosRow[]> => {
       const baseSelect = 'n_aih, cnes, dt_saida, ano_cmpt, mes_cmpt, val_tot, proc_rea, diag_princ'
 
-      const fetchAllRemote = async (queryBuilder: any): Promise<any[]> => {
-        const out: any[] = []
-        const pageSize = 1000
-        let page = 0
-        while (page < 20) {
-          const { data, error } = await queryBuilder.range(page * pageSize, (page + 1) * pageSize - 1)
-          if (error) throw error
-          if (!data || data.length === 0) break
-          out.push(...data)
-          if (data.length < pageSize) break
-          page++
-        }
-        return out
-      }
-
-      const tryFetch = async (from?: string, toExclusive?: string): Promise<any[]> => {
+      const tryFetch = async (from?: string, toExclusive?: string): Promise<SihRejeitadosRow[]> => {
         let q = supabaseSih
           .from('sih_rejeitados')
           .select(baseSelect)
@@ -713,10 +700,10 @@ export const SihTabwinReportService = {
         if (from) q = q.gte('dt_saida', from)
         if (toExclusive) q = q.lt('dt_saida', toExclusive)
         q = q.order('dt_saida', { ascending: false })
-        return await fetchAllRemote(q)
+        return await fetchAll<SihRejeitadosRow>(q)
       }
 
-      const inMemoryFilter = (rows: any[]): any[] => {
+      const inMemoryFilter = (rows: SihRejeitadosRow[]): SihRejeitadosRow[] => {
         if (!dischargeFrom && !dischargeTo) return rows
         const fromIso = dischargeFrom ? toISODate(dischargeFrom) : ''
         const toIso = dischargeTo ? toISODate(dischargeTo) : ''
