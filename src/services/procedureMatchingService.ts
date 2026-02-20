@@ -35,6 +35,9 @@ export class ProcedureMatchingService {
           matchStatus: matchResult.encontrado ? 'matched' : 'approved',
           matchConfidence: matchResult.confidence,
           sigtapProcedure: matchResult.sigtapMatch,
+          // ✅ CORREÇÃO: Usar a descrição oficial do SIGTAP quando disponível
+          // Isso corrige artefatos de extração do PDF (ex: "VIDEOARTROSC OPIA" -> "VIDEOARTROSCOPIA")
+          descricao: matchResult.sigtapMatch ? matchResult.sigtapMatch.description : procedimento.descricao,
           valorCalculado: matchResult.sigtapMatch?.valueHospTotal || 0,
           valorOriginal: matchResult.sigtapMatch?.valueHospTotal || 0,
           aprovado: true // SEMPRE aprovado

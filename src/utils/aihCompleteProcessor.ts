@@ -755,8 +755,15 @@ export class AIHCompleteProcessor {
         // Extrair contexto de 300 caracteres após o código
         const contextAfter = text.substring(codeIndex, codeIndex + 300);
         
+        // ✅ CORREÇÃO: Definir limite de busca para não invadir o próximo procedimento
+        // Se houver outro código de procedimento no contexto, parar antes dele
+        const nextCodeMatch = contextAfter.substring(14).match(/\d{2}\.\d{2}\.\d{2}\.\d{3}-\d/);
+        const boundaryIndex = nextCodeMatch ? (nextCodeMatch.index! + 14) : 300;
+        const safeContext = contextAfter.substring(0, boundaryIndex);
+        
         // Buscar por texto em maiúsculas que pode ser a descrição
-        const uppercaseMatch = contextAfter.match(/[A-ZÁÊÇÕÚÍÂ][A-ZÁÊÇÕÚÍÂ\s\/\(\)]{10,150}/);
+        // ✅ CORREÇÃO: Permitir traços e espaços no final para não cortar descrições compostas
+        const uppercaseMatch = safeContext.match(/[A-ZÁÊÇÕÚÍÂ][A-ZÁÊÇÕÚÍÂ\s\/\(\)\-]{4,150}/);
         if (uppercaseMatch) {
           let descricao = uppercaseMatch[0]
             .trim()
@@ -764,7 +771,7 @@ export class AIHCompleteProcessor {
             .replace(/\s*\d+.*$/, '') // Cortar na primeira sequência de números
             .trim();
           
-          if (descricao.length >= 10) {
+          if (descricao.length >= 4) { // ✅ Mínimo 4 caracteres
             descriptions[codigo] = descricao;
             console.log(`✅ Contexto capturado: ${codigo} -> ${descricao.substring(0, 50)}...`);
           }
@@ -776,7 +783,12 @@ export class AIHCompleteProcessor {
     for (const codigo of codeMatches || []) {
       if (descriptions[codigo]) continue;
       
-      const regex = new RegExp(`${codigo.replace(/\./g, '\\.')}[^A-Z]*([A-ZÁÊÇÕÚÍÂ][A-ZÁÊÇÕÚÍÂ\\s\\/\\(\\)]{8,100})`);
+      // ✅ CORREÇÃO: Usar regex mais restrito para não pular outros códigos
+      // [^A-Z]* era muito permissivo e permitia pular números (outros códigos)
+      // Agora usamos [\s-]* para permitir apenas espaços e hifens
+      // Reduzido min-length de 8 para 4 para capturar "ANCORA" e outras curtas
+      // Adicionado hífen na lista de caracteres permitidos na descrição
+      const regex = new RegExp(`${codigo.replace(/\./g, '\\.')}[\\s-]*([A-ZÁÊÇÕÚÍÂ][A-ZÁÊÇÕÚÍÂ\\s\\/\\(\\) -]{4,100})`);
       const bruteMatch = text.match(regex);
       
       if (bruteMatch && bruteMatch[1]) {
@@ -785,7 +797,7 @@ export class AIHCompleteProcessor {
           .split(/\s+\d/)[0] // Cortar no primeiro número encontrado
           .trim();
         
-        if (descricao.length >= 8) {
+        if (descricao.length >= 4) {
           descriptions[codigo] = descricao;
           console.log(`✅ Extração bruta: ${codigo} -> ${descricao.substring(0, 50)}...`);
         }

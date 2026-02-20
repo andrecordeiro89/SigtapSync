@@ -1670,7 +1670,7 @@ const AIHOrganizedView = ({ aihCompleta, onUpdateAIH }: { aihCompleta: AIHComple
                         <div className="space-y-1">
                           <div className="flex items-center space-x-2">
                             <p className="font-medium text-sm leading-tight">
-                              {(procedure as any).procedure_description || procedure.descricao || procedure.sigtapProcedure?.description || `Procedimento ${procedure.procedimento}`}
+                              {procedure.sigtapProcedure?.description || (procedure as any).procedure_description || procedure.descricao || `Procedimento ${procedure.procedimento}`}
                             </p>
                             {procedure.sequencia === 1 && (
                               <Badge variant="default" className="text-xs bg-green-600 text-white px-2 py-0.5">
@@ -2632,6 +2632,8 @@ const AIHMultiPageTester = () => {
             matchStatus: matchDetail.encontrado ? 'matched' as const : 'approved' as const,
             matchConfidence: matchDetail.confidence,
             sigtapProcedure: matchDetail.sigtapMatch,
+            // ✅ CORREÇÃO: Atualizar descrição com a do SIGTAP se encontrada
+            descricao: matchDetail.sigtapMatch?.description || proc.descricao,
             valorCalculado: matchDetail.sigtapMatch?.valueHospTotal || 0,
             valorOriginal: matchDetail.sigtapMatch?.valueHospTotal || 0,
             aprovado: true, // SEMPRE aprovado
