@@ -36,7 +36,8 @@ import {
   Building,
   Calendar,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Settings
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
@@ -52,6 +53,7 @@ import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
 import MedicalProductionDashboard from './MedicalProductionDashboard';
 import MedicalStaffDashboard from './MedicalStaffDashboard';
 import ProcedureHierarchyDashboard from './ProcedureHierarchyDashboard';
+import RulesStudio from './rulesStudio/RulesStudio'
 import { CareCharacterUtils } from '../config/careCharacterCodes';
 import { exportAnesthesiaExcel } from '../services/exportService';
 // import ReportGenerator from './ReportGenerator';
@@ -1340,6 +1342,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               <Stethoscope className="h-4 w-4 mr-2" />
               Corpo Médico
             </TabsTrigger>
+            <TabsTrigger 
+              value="repasse-rules" 
+              className="rounded-md border border-gray-300 px-4 py-2 transition-all duration-200 font-semibold text-black bg-white hover:bg-neutral-100 data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:border-black"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Regras Repasse
+            </TabsTrigger>
           </TabsList>
 
         {/* 🔍 FILTROS EXECUTIVOS GLOBAIS - DESIGN MINIMALISTA */}
@@ -2008,6 +2017,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         {/* TAB: CORPO MÉDICO */}
         <TabsContent value="medical-staff" className="space-y-6">
           <MedicalStaffDashboard />
+        </TabsContent>
+
+        <TabsContent value="repasse-rules" className="space-y-6">
+          <RulesStudio />
         </TabsContent>
 
         {false && (

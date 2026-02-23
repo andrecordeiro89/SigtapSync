@@ -7683,6 +7683,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                                             ).length > 0 && (
                                                                 <DoctorPaymentRules
                                                                   doctorName={doctor.doctor_info.name}
+                                                                  doctorCns={doctor.doctor_info.cns}
+                                                                  doctorSpecialty={doctor.doctor_info.specialty}
                                                                   procedures={patient.procedures
                                                                     .filter(proc =>
                                                                       isMedicalProcedure(proc.procedure_code) &&

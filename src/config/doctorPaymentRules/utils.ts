@@ -24,6 +24,12 @@ let FIXED_RULES_CACHE: Map<string, { amount: number; description: string; hospit
 let PERCENTAGE_RULES_CACHE: Map<string, { percentage: number; description: string; hospitalId?: string }> | null = null;
 let INDIVIDUAL_RULES_CACHE: Map<string, DoctorPaymentRule> | null = null;
 
+export function resetRulesCache() {
+  FIXED_RULES_CACHE = null
+  PERCENTAGE_RULES_CACHE = null
+  INDIVIDUAL_RULES_CACHE = null
+}
+
 // ================================================================
 // MAPEAMENTO DE HOSPITAIS
 // ================================================================

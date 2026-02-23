@@ -1072,11 +1072,14 @@ export const TORAO_TOKUDA_RULES: HospitalRules = {
     rules: [
       { procedureCode: '04.08.01.021-5', standardValue: 0, description: 'TRATAMENTO CIRÚRGICO DE LUXAÇÃO RECIDIVANTE / HABITUAL DE ARTICULAÇÃO ESCAPULO-UMERAL' },
       { procedureCode: '04.08.01.014-2', standardValue: 0, description: 'REPARO DE ROTURA DO MANGUITO ROTADOR (INCLUI PROCEDIMENTOS DESCOMPRESSIVOS)' },
-      { procedureCode: '04.08.06.071-9', standardValue: 0, description: 'VIDEOARTROSCOPIA' }
+      { procedureCode: '04.08.06.071-9', standardValue: 0, description: 'VIDEOARTROSCOPIA' },
+      { procedureCode: '04.08.06.053-0', standardValue: 0, description: 'TRANSPOSIÇÃO / TRANSFERÊNCIA MIOTENDINOSA' },
+      { procedureCode: '04.08.06.046-8', standardValue: 0, description: 'TENOMIOTOMIA / DESINSERÇÃO' }
     ],
     multipleRules: [
       { codes: ['04.08.01.021-5', '04.08.06.071-9'], totalValue: 500.00, description: 'TRATAMENTO CIRÚRGICO DE LUXAÇÃO RECIDIVANTE + VIDEOARTROSCOPIA - R$ 500,00' },
-      { codes: ['04.08.01.014-2', '04.08.06.071-9'], totalValue: 900.00, description: 'REPARO DE ROTURA DO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00' }
+      { codes: ['04.08.01.014-2', '04.08.06.071-9'], totalValue: 900.00, description: 'REPARO DE ROTURA DO MANGUITO ROTADOR + VIDEOARTROSCOPIA - R$ 900,00' },
+      { codes: ['04.08.01.021-5', '04.08.06.053-0', '04.08.06.046-8'], totalValue: 500.00, description: 'TRATAMENTO LUXAÇÃO RECIDIVANTE + TRANSPOSIÇÃO MIOTENDINOSA + TENOMIOTOMIA - R$ 500,00 TOTAL' }
     ]
   },
 

@@ -42,8 +42,15 @@ export {
 // ================================================================
 export {
   calculateDoctorPayment,
-  ALL_HOSPITAL_RULES
+  ALL_HOSPITAL_RULES,
+  getAllHospitalRules,
+  getBaseHospitalRules,
+  setDoctorPaymentRulesOverrides,
+  getDoctorPaymentRulesOverrides,
+  withDoctorPaymentRulesOverrides
 } from './calculateDoctorPayment';
+
+export type { DoctorPaymentRulesOverrides } from './calculateDoctorPayment'
 
 // ================================================================
 // REGRAS DE HOSPITAIS INDIVIDUAIS (para uso direto se necessário)

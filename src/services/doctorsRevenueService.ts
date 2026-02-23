@@ -10,6 +10,7 @@
 
 import { supabase } from '../lib/supabase';
 import { calculateDoctorPayment, calculateFixedPayment, calculatePercentagePayment, ALL_HOSPITAL_RULES } from '../config/doctorPaymentRules'
+import { RepasseRulesService, applyRuleToProcedureValueReais, resolveBestRepasseRule } from './repasseRulesService'
 
 // ================================================================
 // TIPOS E INTERFACES
@@ -202,6 +203,7 @@ export class DoctorsRevenueService {
           id,
           aih_number,
           patient_id,
+          hospital_id,
           admission_date,
           patients!inner (
             id,
@@ -227,6 +229,12 @@ export class DoctorsRevenueService {
         console.log('ℹ️ Nenhuma AIH encontrada para este médico');
         return { totalPatients: 0, patientsWithoutPayment: 0, patientsWithoutPaymentList: [] };
       }
+
+      const { data: doctorRow } = await supabase.from('doctors').select('id,specialty').eq('cns', doctorCns).limit(1).maybeSingle()
+      const doctorId = (doctorRow as any)?.id as string | undefined
+      const doctorSpecialty = ((doctorRow as any)?.specialty as string | undefined) || undefined
+      const loadedCodes = new Set<string>()
+      let activeRules: any[] = []
 
       // Para cada AIH, buscar procedimentos e calcular pagamento
       const patientsWithoutPaymentList: Array<{
@@ -263,6 +271,20 @@ export class DoctorsRevenueService {
           }))
           .filter(pp => typeof pp.procedure_code === 'string' && pp.procedure_code.startsWith('04'));
 
+        const ctxHospitalId = (hospitalId || (aih as any).hospital_id || undefined) as string | undefined
+        const missingCodes = Array.from(
+          new Set(procedures04.map(p => String(p.procedure_code || '').trim()).filter(Boolean))
+        ).filter(c => !loadedCodes.has(c))
+        if (missingCodes.length > 0) {
+          const fetched = await RepasseRulesService.getActiveByCodes(missingCodes)
+          activeRules = [...activeRules, ...(fetched as any[])]
+          missingCodes.forEach(c => loadedCodes.add(c))
+        }
+        const adjustedProcedures04 = procedures04.map(p => {
+          const best = resolveBestRepasseRule(activeRules as any, { hospitalId: ctxHospitalId, doctorId, specialty: doctorSpecialty }, p.procedure_code)
+          return { ...p, value_reais: applyRuleToProcedureValueReais(p.value_reais, best as any) }
+        })
+
         // Calcular pagamento médico
         const fixedPaymentCalc = calculateFixedPayment(doctorName, hospitalId);
         let doctorPayment = 0;
@@ -272,10 +294,10 @@ export class DoctorsRevenueService {
           doctorPayment = 0; // Será somado no total, não por paciente
         } else {
           // Regras específicas por procedimento
-          const perProcedureCalc = calculateDoctorPayment(doctorName, procedures04 as any, hospitalId);
+          const perProcedureCalc = calculateDoctorPayment(doctorName, adjustedProcedures04 as any, hospitalId);
 
           // Regra de percentual (quando existir)
-          const baseProceduresSum = procedures04.reduce((s, p) => s + (p.value_reais || 0), 0);
+          const baseProceduresSum = adjustedProcedures04.reduce((s, p) => s + (p.value_reais || 0), 0);
           const percentageCalc = calculatePercentagePayment(doctorName, baseProceduresSum, hospitalId);
 
           // Precedência: percentual substitui cálculo individual
@@ -291,7 +313,7 @@ export class DoctorsRevenueService {
             patientName: patient.name,
             aihNumber: aih.aih_number,
             calculatedPayment: doctorPayment,
-            procedureCodes: procedures04.map(p => p.procedure_code)
+            procedureCodes: adjustedProcedures04.map(p => p.procedure_code)
           });
         }
       }
@@ -356,6 +378,11 @@ export class DoctorsRevenueService {
       aihQuery = aihQuery.eq('hospital_id', params.hospitalId);
     }
     const { data: aihs } = await aihQuery;
+    const { data: doctorRow } = await supabase.from('doctors').select('id,specialty').eq('cns', params.doctorCns).limit(1).maybeSingle()
+    const doctorId = (doctorRow as any)?.id as string | undefined
+    const doctorSpecialty = ((doctorRow as any)?.specialty as string | undefined) || undefined
+    const loadedCodes = new Set<string>()
+    let activeRules: any[] = []
     const samplePatients: Array<{
       patientId: string;
       patientName: string;
@@ -382,22 +409,34 @@ export class DoctorsRevenueService {
           value_reais: (p.value_cents || 0) / 100,
           cbo: p.professional_cbo
         }));
-        const calc = calculateDoctorPayment(params.doctorName, mapped as any, params.hospitalId);
-        const baseSum = mapped.reduce((s, p) => s + (p.value_reais || 0), 0);
+        const ctxHospitalId = (params.hospitalId || (a as any)?.hospital_id || undefined) as string | undefined
+        const mapped04 = mapped.filter(m => typeof m.procedure_code === 'string' && m.procedure_code.startsWith('04'))
+        const missingCodes = Array.from(new Set(mapped04.map(m => String(m.procedure_code || '').trim()).filter(Boolean))).filter(c => !loadedCodes.has(c))
+        if (missingCodes.length > 0) {
+          const fetched = await RepasseRulesService.getActiveByCodes(missingCodes)
+          activeRules = [...activeRules, ...(fetched as any[])]
+          missingCodes.forEach(c => loadedCodes.add(c))
+        }
+        const mappedAdjusted = mapped.map(p => {
+          const best = resolveBestRepasseRule(activeRules as any, { hospitalId: ctxHospitalId, doctorId, specialty: doctorSpecialty }, p.procedure_code)
+          return { ...p, value_reais: applyRuleToProcedureValueReais(p.value_reais, best as any) }
+        })
+        const calc = calculateDoctorPayment(params.doctorName, mappedAdjusted as any, params.hospitalId);
+        const baseSum = mappedAdjusted.reduce((s, p) => s + (p.value_reais || 0), 0);
         const perc = calculatePercentagePayment(params.doctorName, baseSum, params.hospitalId);
         const chosenTotal = perc.hasPercentageRule ? perc.calculatedPayment : calc.totalPayment;
-        totalProcedures04 += mapped.length;
+        totalProcedures04 += mappedAdjusted.length;
         totalCalculatedPayment += chosenTotal;
         samplePatients.push({
           patientId: (a.patients as any)?.id,
           patientName: (a.patients as any)?.name || '',
           aihId: a.id,
           aihNumber: a.aih_number,
-          procedureCodes04: mapped.map(m => m.procedure_code),
+          procedureCodes04: mappedAdjusted.map(m => m.procedure_code),
           calculatedPayment: chosenTotal,
           appliedRule: perc.hasPercentageRule ? perc.appliedRule : calc.appliedRule
         });
-        allCodes04.push(...mapped.map(m => m.procedure_code));
+        allCodes04.push(...mappedAdjusted.map(m => m.procedure_code));
       }
     }
     const fixed = calculateFixedPayment(params.doctorName, params.hospitalId);

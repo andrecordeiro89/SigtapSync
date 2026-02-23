@@ -1,11 +1,13 @@
 import { DoctorsHierarchyV2Service } from './doctorsHierarchyV2'
 import { getCalculableProcedures } from '../utils/anesthetistLogic'
+import { supabase } from '../lib/supabase'
 import {
   calculateDoctorPayment,
   calculatePercentagePayment,
   calculateFixedPayment,
   type ProcedurePaymentInfo,
 } from '../config/doctorPaymentRules'
+import { RepasseRulesService, applyRuleToProcedureValueReais, resolveBestRepasseRule } from './repasseRulesService'
 
 export interface ReportFilters {
   hospitalIds?: string[]
@@ -114,6 +116,14 @@ export async function getDoctorPatientReport(
   // 🔥 VERIFICAR SE MÉDICO TEM REGRA DE PAGAMENTO FIXO (antes do loop)
   const hospitalId = doctorCards[0]?.hospitals?.[0]?.hospital_id
   const fixedPaymentCalc = calculateFixedPayment(doctorName, hospitalId)
+  const doctorCns = (doctorCards[0]?.doctor_info?.cns || '').toString().trim()
+  const { data: doctorRow } = doctorCns
+    ? await supabase.from('doctors').select('id,specialty').eq('cns', doctorCns).limit(1).maybeSingle()
+    : { data: null as any }
+  const doctorId = (doctorRow as any)?.id as string | undefined
+  const doctorSpecialty = ((doctorRow as any)?.specialty as string | undefined) || (doctorCards[0]?.doctor_info?.specialty || '').trim() || undefined
+  const loadedCodes = new Set<string>()
+  let activeRules: any[] = []
 
   for (const [patientId, patient] of patientMap.entries()) {
     // Aplicar filtro por período, se fornecido
@@ -150,6 +160,19 @@ export async function getDoctorPatientReport(
         value_reais: Number(proc.value_reais || 0),
       }))
 
+    const ctxHospitalId = (((patient as any)?.aih_info?.hospital_id || hospitalId) as string | undefined) || undefined
+    const codes = Array.from(new Set(procedures04.map(p => String(p.procedure_code || '').trim()).filter(Boolean)))
+    const missingCodes = codes.filter(c => !loadedCodes.has(c))
+    if (missingCodes.length > 0) {
+      const fetched = await RepasseRulesService.getActiveByCodes(missingCodes)
+      activeRules = [...activeRules, ...(fetched as any[])]
+      missingCodes.forEach(c => loadedCodes.add(c))
+    }
+    const adjustedProcedures04: ProcedurePaymentInfo[] = procedures04.map(p => {
+      const best = resolveBestRepasseRule(activeRules as any, { hospitalId: ctxHospitalId, doctorId, specialty: doctorSpecialty }, p.procedure_code)
+      return { ...p, value_reais: applyRuleToProcedureValueReais(p.value_reais || 0, best as any) }
+    })
+
     // ✅ CALCULAR VALOR POR PACIENTE (será zero se médico tem pagamento fixo)
     let doctorReceivableReais = 0
     let appliedRule = ''
@@ -160,10 +183,10 @@ export async function getDoctorPatientReport(
       appliedRule = fixedPaymentCalc.appliedRule
     } else {
       // Regras específicas por procedimento
-      const perProcedureCalc = calculateDoctorPayment(doctorName, procedures04)
+      const perProcedureCalc = calculateDoctorPayment(doctorName, adjustedProcedures04)
 
       // Regra de percentual (quando existir) – base padrão: soma dos procedimentos 04 calculáveis
-      const baseProceduresSum = procedures04.reduce((s, p) => s + (p.value_reais || 0), 0)
+      const baseProceduresSum = adjustedProcedures04.reduce((s, p) => s + (p.value_reais || 0), 0)
       const percentageCalc = calculatePercentagePayment(doctorName, baseProceduresSum)
 
       // Precedência: percentual substitui cálculo individual (conforme regra de negócio)
@@ -183,7 +206,7 @@ export async function getDoctorPatientReport(
       aihNumber: (((patient as any)?.aih_info?.aih_number || '') as string).toString().replace(/\D/g, '') || undefined,
       aihTotalReais,
       aihCareSpecialty: getPatientCareSpecialty(patient),
-      procedures04,
+      procedures04: adjustedProcedures04,
       doctorReceivableReais,
       appliedRule,
       admissionDateISO: (patient as any)?.aih_info?.admission_date || undefined,

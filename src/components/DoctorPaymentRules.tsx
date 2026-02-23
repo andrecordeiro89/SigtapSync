@@ -9,10 +9,11 @@
  * ================================================================
  */
 
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Badge } from './ui/badge';
 import { Card, CardContent } from './ui/card';
 import { DollarSign, Calculator, AlertTriangle, CheckCircle, FileText } from 'lucide-react';
+import { supabase } from '../lib/supabase'
 
 // ================================================================
 // IMPORTS DA NOVA ESTRUTURA MODULAR
@@ -26,6 +27,7 @@ import {
   type ProcedurePaymentInfo
 } from '../config/doctorPaymentRules';
 import { calculateHonPayments } from '../config/doctorPaymentRules/importers/honCsv'
+import { applyRuleToProcedureValueReais, RepasseRulesService, resolveBestRepasseRule } from '../services/repasseRulesService'
 
 // ================================================================
 // INTERFACE DO COMPONENTE
@@ -33,6 +35,8 @@ import { calculateHonPayments } from '../config/doctorPaymentRules/importers/hon
 
 interface DoctorPaymentRulesProps {
   doctorName: string;
+  doctorCns?: string;
+  doctorSpecialty?: string;
   procedures: ProcedurePaymentInfo[];
   hospitalId?: string;
   className?: string;
@@ -45,6 +49,8 @@ interface DoctorPaymentRulesProps {
 
 export const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
   doctorName,
+  doctorCns,
+  doctorSpecialty,
   procedures,
   hospitalId,
   className = '',
@@ -86,7 +92,50 @@ export const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
     });
   })();
 
-  const resultRaw = useCsvHon ? calculateHonPayments(normalizedForRepasse as any) : calculateDoctorPayment(doctorName, normalizedForRepasse as any, hospitalId);
+  const [repasseProcedures, setRepasseProcedures] = useState<Array<ProcedurePaymentInfo & { __dup04?: boolean }>>(normalizedForRepasse as any)
+  const repasseDepKey = useMemo(() => {
+    const list = normalizedForRepasse as any as Array<ProcedurePaymentInfo & { __dup04?: boolean }>
+    return list.map(p => `${String(p.procedure_code || '').trim()}=${Number(p.value_reais || 0)}`).join('|')
+  }, [normalizedForRepasse])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const list = normalizedForRepasse as any as Array<ProcedurePaymentInfo & { __dup04?: boolean }>
+        const codes = Array.from(new Set(list.map(p => String(p.procedure_code || '').trim()).filter(Boolean)))
+        if (codes.length === 0) {
+          if (!cancelled) setRepasseProcedures(list)
+          return
+        }
+        const rules = await RepasseRulesService.getActiveByCodes(codes)
+        if (!rules || rules.length === 0) {
+          if (!cancelled) setRepasseProcedures(list)
+          return
+        }
+
+        let doctorId: string | undefined
+        let specialty: string | undefined = (doctorSpecialty || '').trim() || undefined
+        if (doctorCns) {
+          const { data } = await supabase.from('doctors').select('id,specialty').eq('cns', doctorCns).limit(1).maybeSingle()
+          doctorId = (data as any)?.id || undefined
+          if (!specialty) specialty = ((data as any)?.specialty || '').trim() || undefined
+        }
+        const ctx = { hospitalId, doctorId, specialty }
+        const adjusted = list.map(p => {
+          const best = resolveBestRepasseRule(rules, ctx, p.procedure_code)
+          if (!best) return p
+          return { ...p, value_reais: applyRuleToProcedureValueReais(Number(p.value_reais || 0), best) }
+        })
+        if (!cancelled) setRepasseProcedures(adjusted)
+      } catch {
+        if (!cancelled) setRepasseProcedures(normalizedForRepasse as any)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [doctorCns, doctorSpecialty, hospitalId, repasseDepKey])
+
+  const resultRaw = useCsvHon ? calculateHonPayments(repasseProcedures as any) : calculateDoctorPayment(doctorName, repasseProcedures as any, hospitalId);
   const result = {
     ...resultRaw,
     procedures: (resultRaw.procedures || []).map((p: any) => {
@@ -104,11 +153,11 @@ export const DoctorPaymentRules: React.FC<DoctorPaymentRulesProps> = ({
   
   // Cálculos auxiliares
   const fixedResult = calculateFixedPayment(doctorName, hospitalId);
-  const totalOriginal = normalizedForRepasse.reduce((sum: number, p: any) => sum + (p.value_reais || 0), 0);
+  const totalOriginal = repasseProcedures.reduce((sum: number, p: any) => sum + (p.value_reais || 0), 0);
   const percentageResult = calculatePercentagePayment(doctorName, totalOriginal, hospitalId);
   const unruledCheck = checkUnruledProcedures(
     doctorName,
-    normalizedForRepasse.map((p: any) => p.procedure_code),
+    repasseProcedures.map((p: any) => p.procedure_code),
     hospitalId
   );
 

@@ -17,7 +17,8 @@ import type {
 import {
   detectHospitalFromContext,
   initializeRulesCache,
-  formatCurrency
+  formatCurrency,
+  resetRulesCache
 } from './utils';
 import { getHonValuesForCode, calculateHonByPosition, calculateHonPayments } from './importers/honCsv'
 import { calculateGynHonPaymentsSync, loadGynHonMap, getGynHonMapSync } from './importers/gynXlsx'
@@ -45,7 +46,7 @@ import { HOSPITAL_SANTA_ALICE_RULES } from './hospitals/hospitalSantaAlice'
 // CONSOLIDAR REGRAS DE TODOS OS HOSPITAIS
 // ================================================================
 
-export const ALL_HOSPITAL_RULES: Record<string, HospitalRules> = {
+const BASE_HOSPITAL_RULES: Record<string, HospitalRules> = {
   // Hospital Municipal São José - Colombo
   HOSPITAL_MUNICIPAL_SAO_JOSE: HOSPITAL_SAO_JOSE_RULES,
 
@@ -68,7 +69,54 @@ export const ALL_HOSPITAL_RULES: Record<string, HospitalRules> = {
   HOSPITAL_MUNICIPAL_SANTA_ALICE: HOSPITAL_SANTA_ALICE_RULES
 };
 
-// Inicializar cache automaticamente
+export type DoctorPaymentRulesOverrides = {
+  hospitals?: Record<string, Record<string, DoctorPaymentRule>>
+}
+
+let CURRENT_OVERRIDES: DoctorPaymentRulesOverrides | null = null
+
+const buildMergedHospitalRules = (
+  base: Record<string, HospitalRules>,
+  overrides: DoctorPaymentRulesOverrides | null
+): Record<string, HospitalRules> => {
+  if (!overrides?.hospitals) return base
+  const out: Record<string, HospitalRules> = { ...base }
+  for (const [hospitalKey, doctors] of Object.entries(overrides.hospitals)) {
+    const baseHospital = out[hospitalKey] || {}
+    const mergedHospital: HospitalRules = { ...baseHospital }
+    for (const [doctorNameUpper, rule] of Object.entries(doctors || {})) {
+      mergedHospital[String(doctorNameUpper || '').trim().toUpperCase()] = rule
+    }
+    out[hospitalKey] = mergedHospital
+  }
+  return out
+}
+
+export let ALL_HOSPITAL_RULES: Record<string, HospitalRules> = BASE_HOSPITAL_RULES
+
+export const getAllHospitalRules = (): Record<string, HospitalRules> => ALL_HOSPITAL_RULES
+
+export const getBaseHospitalRules = (): Record<string, HospitalRules> => BASE_HOSPITAL_RULES
+
+export const setDoctorPaymentRulesOverrides = (overrides: DoctorPaymentRulesOverrides | null) => {
+  CURRENT_OVERRIDES = overrides
+  ALL_HOSPITAL_RULES = buildMergedHospitalRules(BASE_HOSPITAL_RULES, overrides)
+  resetRulesCache()
+  initializeRulesCache(ALL_HOSPITAL_RULES)
+}
+
+export const getDoctorPaymentRulesOverrides = (): DoctorPaymentRulesOverrides | null => CURRENT_OVERRIDES
+
+export const withDoctorPaymentRulesOverrides = <T,>(overrides: DoctorPaymentRulesOverrides | null, fn: () => T): T => {
+  const prev = CURRENT_OVERRIDES
+  setDoctorPaymentRulesOverrides(overrides)
+  try {
+    return fn()
+  } finally {
+    setDoctorPaymentRulesOverrides(prev)
+  }
+}
+
 initializeRulesCache(ALL_HOSPITAL_RULES);
 
 // Debug desativado no modo enxuto

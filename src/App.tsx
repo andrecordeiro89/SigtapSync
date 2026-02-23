@@ -16,6 +16,8 @@ import { Card, CardContent } from "./components/ui/card";
 import { RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from 'sonner';
 import { LEAN_MODE } from './config/system';
+import { setDoctorPaymentRulesOverrides } from './config/doctorPaymentRules'
+import { DoctorPaymentRulesOverridesService } from './services/doctorPaymentRulesOverridesService'
 
 const queryClient = new QueryClient();
 
@@ -47,6 +49,17 @@ function AppContent() {
       loadFozOrtJsonMap();
     })();
   }, []);
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const store = await DoctorPaymentRulesOverridesService.load()
+        setDoctorPaymentRulesOverrides(DoctorPaymentRulesOverridesService.toOverrides(store))
+      } catch {
+        setDoctorPaymentRulesOverrides(null)
+      }
+    })()
+  }, [])
 
   // Contar tempo de loading
   useEffect(() => {
