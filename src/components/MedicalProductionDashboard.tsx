@@ -52,6 +52,7 @@ import { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayme
 import ProcedurePatientDiagnostic from './ProcedurePatientDiagnostic';
 import CleuezaDebugComponent from './CleuezaDebugComponent';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
+import HybridSourceDialog from './HybridSourceDialog';
 import { CareCharacterUtils } from '../config/careCharacterCodes';
 import { getParticipationInfo } from '../config/participationCodes';
 import {
@@ -787,6 +788,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   // ✅ COMPETÊNCIA VEM DO PROP (não precisa de estado local)
   const [availableCompetencias, setAvailableCompetencias] = useState<string[]>([]);
   const [useSihSource, setUseSihSource] = useState<boolean>(false)
+  const [hybridSourceOpen, setHybridSourceOpen] = useState<boolean>(false)
   const [sigtapMap, setSigtapMap] = useState<Map<string, string> | null>(null)
   const [discrepancyLoading, setDiscrepancyLoading] = useState<boolean>(false)
   const [discrepancyTotals, setDiscrepancyTotals] = useState<{
@@ -4271,6 +4273,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
   return (
     <div className="space-y-4">
+      <HybridSourceDialog open={hybridSourceOpen} onOpenChange={setHybridSourceOpen} />
 
 
       {/* 🆕 COMPONENTE DE DIAGNÓSTICO */}
@@ -4457,6 +4460,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                     <span className="text-xs text-neutral-700">Fonte SIH</span>
                     <Switch checked={useSihSource} onCheckedChange={setUseSihSource} />
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setHybridSourceOpen(true)}
+                    className="h-9 px-3 border-black text-black hover:bg-neutral-100"
+                  >
+                    <Database className="h-4 w-4 mr-2" /> Fonte Híbrida
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
