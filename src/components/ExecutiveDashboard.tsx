@@ -165,138 +165,6 @@ const formatCompetencia = (competencia: string | undefined): string => {
   }
 };
 
-// ✅ FUNÇÃO PARA BUSCAR DADOS REAIS DAS AIHS (FALLBACK PARA VIEWS)
-const getRealAIHData = async (dateRange?: DateRange) => {
-  try {
-    console.log('🔄 Buscando dados reais das AIHs processadas...');
-    
-    let query = supabase
-      .from('aihs')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    // Aplicar filtros de data por ALTA (janela do dia inteiro)
-    if (dateRange) {
-      const startInclusiveISO = getStartOfDay(dateRange.startDate).toISOString();
-      const endExclusiveISO = getStartOfNextDay(dateRange.endDate).toISOString();
-      
-      console.log('📅 Aplicando filtros de ALTA (fallback):', {
-        inicio_inclusivo: startInclusiveISO,
-        fim_exclusivo: endExclusiveISO
-      });
-      
-      query = query
-        .gte('discharge_date', startInclusiveISO)
-        .lt('discharge_date', endExclusiveISO)
-        .not('discharge_date', 'is', null);
-    }
-    
-    const { data: aihs, error: aihsError } = await query;
-
-    if (aihsError) {
-      console.error('❌ Erro ao buscar AIHs:', aihsError);
-      return null;
-    }
-
-    // Buscar hospitais
-    const { data: hospitals, error: hospitalsError } = await supabase
-      .from('hospitals')
-      .select('*');
-
-    if (hospitalsError) {
-      console.error('❌ Erro ao buscar hospitais:', hospitalsError);
-    }
-
-    console.log(`✅ Encontradas ${aihs?.length || 0} AIHs e ${hospitals?.length || 0} hospitais`);
-
-    if (!aihs || aihs.length === 0) {
-      return {
-        summary: null,
-        byHospital: [],
-        byDoctor: [],
-        byProcedure: [],
-        metrics: {
-          totalRevenue: 0,
-          totalAIHs: 0,
-          averageTicket: 0,
-          approvalRate: 0,
-          totalPatients: 0,
-          activeHospitals: 0,
-          activeDoctors: 0
-        }
-      };
-    }
-
-    // Calcular estatísticas por hospital
-    const hospitalMap = new Map();
-    const hospitalLookup = new Map((hospitals || []).map(h => [h.id, h]));
-
-    // Processar AIHs
-    aihs.forEach((aih: any) => {
-      const hospitalId = aih.hospital_id;
-      const hospital = hospitalLookup.get(hospitalId);
-      const hospitalName = hospital?.name || 'Hospital não informado';
-      const value = Number(aih.calculated_total_value || aih.original_value || 0);
-
-      if (!hospitalMap.has(hospitalId)) {
-        hospitalMap.set(hospitalId, {
-          hospital_id: hospitalId,
-          hospital_name: hospitalName,
-          total_aihs: 0,
-          total_value: 0,
-          approved_aihs: 0,
-          unique_doctors: 0
-        });
-      }
-
-      const stats = hospitalMap.get(hospitalId);
-      stats.total_aihs += 1;
-      stats.total_value += value;
-      stats.approved_aihs += 1; // Por enquanto, todas aprovadas
-    });
-
-    // Converter para array
-    const byHospital = Array.from(hospitalMap.values()).map((stats: any) => ({
-      ...stats,
-      avg_value_per_aih: stats.total_aihs > 0 ? stats.total_value / stats.total_aihs : 0
-    })).sort((a, b) => b.total_value - a.total_value);
-
-    // Calcular totais
-    const totalRevenue = byHospital.reduce((sum, h) => sum + h.total_value, 0);
-    const totalAIHs = byHospital.reduce((sum, h) => sum + h.total_aihs, 0);
-
-    const result = {
-      summary: {
-        total_aihs: totalAIHs,
-        total_value: totalRevenue,
-        avg_value_per_aih: totalAIHs > 0 ? totalRevenue / totalAIHs : 0,
-        approved_aihs: totalAIHs,
-        approved_value: totalRevenue
-      },
-      byHospital,
-      byDoctor: [],
-      byProcedure: [],
-      metrics: {
-        totalRevenue,
-        totalAIHs,
-        averageTicket: totalAIHs > 0 ? totalRevenue / totalAIHs : 0,
-        approvalRate: 100,
-        totalPatients: totalAIHs,
-        activeHospitals: byHospital.length,
-        activeDoctors: 0,
-        topHospitalByRevenue: byHospital[0] || null
-      }
-    };
-
-    console.log('📊 Dados reais compilados:', result);
-    return result;
-    
-  } catch (error) {
-    console.error('❌ Erro ao buscar dados reais das AIHs:', error);
-    return null;
-  }
-};
-
 interface ExecutiveDashboardProps {}
 
 interface KPIData {
@@ -826,8 +694,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         billingStatsData = await AIHBillingService.getCompleteBillingStats();
         console.log('✅ Dados carregados das views de billing');
       } catch (error) {
-        console.warn('⚠️ Views de billing não disponíveis, buscando dados reais das tabelas:', error);
-        billingStatsData = await getRealAIHData();
+        console.warn('⚠️ Views de billing não disponíveis (fallback desativado por segurança):', error);
+        billingStatsData = null;
       }
 
       // Carregar dados das views de médicos/hospitais em paralelo
