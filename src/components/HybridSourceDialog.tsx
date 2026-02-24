@@ -7,8 +7,14 @@ import { Input } from './ui/input'
 import { Building, Calendar, FileText, Loader2, Stethoscope } from 'lucide-react'
 import { toast } from 'sonner'
 import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { supabase } from '../lib/supabase'
+import { supabaseSih } from '../lib/sihSupabase'
 import { DoctorsCrudService } from '../services/doctorsCrudService'
+import { formatSigtapCode } from '../utils/formatters'
+import { getSigtapLocalMap } from '../utils/sigtapLocal'
+import { getCalculableProcedures } from '../utils/anesthetistLogic'
+import { calculateDoctorPayment, calculateFixedPayment, isFixedMonthlyPayment, ALL_HOSPITAL_RULES } from '../config/doctorPaymentRules'
 
 type HospitalOption = { id: string; name: string; cnes?: string }
 type DoctorOption = { cns: string; name: string; specialty: string }
@@ -22,6 +28,44 @@ const formatDateRangeLabel = (from?: string, to?: string) => {
   const f = from ? from.split('-').reverse().join('/') : '—'
   const t = to ? to.split('-').reverse().join('/') : '—'
   return `${f} — ${t}`
+}
+
+const formatCurrency = (value: number | null | undefined): string => {
+  if (value == null || isNaN(value)) return 'R$ 0,00'
+  return value.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+const normalizeAih = (s: unknown): string => String(s ?? '').replace(/\D/g, '').replace(/^0+/, '')
+
+const parseISODateToLocal = (isoString: string | undefined | null): string => {
+  if (!isoString) return ''
+  const s = String(isoString).trim()
+  if (!s) return ''
+  const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (match) {
+    const [, year, month, day] = match
+    return `${day}/${month}/${year}`
+  }
+  try {
+    const parts = s.split(/[-T]/)
+    if (parts.length >= 3) {
+      const [year, month, day] = parts
+      if (year && month && day) {
+        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`
+      }
+    }
+  } catch { }
+  return ''
+}
+
+const isMedicalProcedure = (procedureCode: string): boolean => {
+  if (!procedureCode) return false
+  return String(procedureCode).trim().startsWith('04')
 }
 
 export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceDialogProps) {
@@ -149,21 +193,367 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
       }
 
       setGenerating(true)
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
-      doc.setFontSize(14)
-      doc.text('Repasse Médico (Fonte Híbrida)', 40, 40)
+      if (!supabaseSih) {
+        toast.error('Fonte SIH remota não configurada')
+        return
+      }
+
+      const endExclusive = (() => {
+        const d = new Date(dischargeTo)
+        d.setDate(d.getDate() + 1)
+        return d.toISOString().slice(0, 10)
+      })()
+
+      const localRows: Array<{ aih: string; patient_name?: string; data_saida?: string; hospital_id?: string }> = []
+      const pageSize = 1000
+      let offset = 0
+      for (; ;) {
+        let q = supabase
+          .from('gsus_aihs_patients')
+          .select('aih, patient_name, data_saida, hospital_id')
+          .gte('data_saida', dischargeFrom)
+          .lt('data_saida', endExclusive)
+          .range(offset, offset + pageSize - 1)
+        if (selectedHospital !== 'all') q = q.eq('hospital_id', selectedHospital)
+        const { data, error } = await q
+        if (error) throw error
+        const batch = (data || []) as any[]
+        if (batch.length === 0) break
+        batch.forEach((r: any) => {
+          localRows.push({
+            aih: String(r.aih || ''),
+            patient_name: r.patient_name ? String(r.patient_name) : undefined,
+            data_saida: r.data_saida ? String(r.data_saida) : undefined,
+            hospital_id: r.hospital_id ? String(r.hospital_id) : undefined,
+          })
+        })
+        if (batch.length < pageSize) break
+        offset += pageSize
+      }
+
+      const aihKeys = Array.from(new Set(localRows.map(r => normalizeAih(r.aih)).filter(Boolean)))
+      if (aihKeys.length === 0) {
+        toast.warning('Nenhuma AIH encontrada no banco local para os filtros selecionados')
+        return
+      }
+
+      const compFilter = (() => {
+        try {
+          const from = new Date(dischargeFrom)
+          const to = new Date(dischargeTo)
+          const same =
+            from.getUTCFullYear() === to.getUTCFullYear() &&
+            from.getUTCMonth() === to.getUTCMonth()
+          if (!same) return null
+          return { year: from.getUTCFullYear(), month: from.getUTCMonth() + 1 }
+        } catch {
+          return null
+        }
+      })()
+
+      const chunk = <T,>(arr: T[], size = 80): T[][] => {
+        const out: T[][] = []
+        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+        return out
+      }
+
+      const spRows: any[] = []
+      for (const ch of chunk(aihKeys, 80)) {
+        let spQuery = supabaseSih
+          .from('sih_sp')
+          .select('sp_naih, sp_atoprof, sp_qt_proc, sp_qtd_ato, sp_valato, sp_pf_doc, sp_pf_cbo, sp_mm, sp_aa')
+          .in('sp_naih', ch)
+        if (compFilter) {
+          spQuery = spQuery.eq('sp_aa', compFilter.year).eq('sp_mm', compFilter.month)
+        }
+        const { data, error } = await spQuery
+        if (error) throw error
+        if (data && data.length > 0) spRows.push(...data)
+      }
+
+      const spByAih = new Map<string, any[]>()
+      spRows.forEach((r) => {
+        const key = normalizeAih(r?.sp_naih)
+        if (!key) return
+        if (!spByAih.has(key)) spByAih.set(key, [])
+        spByAih.get(key)!.push(r)
+      })
+
+      const responsibleCnsByAih = new Map<string, string>()
+      for (const [aihKey, rows] of spByAih.entries()) {
+        const perCns = new Map<string, { sum: number; hasNonAnesth: boolean }>()
+        rows.forEach((r: any) => {
+          const cns = String(r?.sp_pf_doc || '').trim()
+          if (!cns) return
+          const qty = Number(r?.sp_qtd_ato ?? r?.sp_qt_proc ?? 1) || 1
+          const val = Number(r?.sp_valato || 0) * qty
+          const cbo = String(r?.sp_pf_cbo || '').trim()
+          const prev = perCns.get(cns) || { sum: 0, hasNonAnesth: false }
+          perCns.set(cns, { sum: prev.sum + (Number.isFinite(val) ? val : 0), hasNonAnesth: prev.hasNonAnesth || (cbo && cbo !== '225151') })
+        })
+        if (perCns.size === 0) continue
+        const entries = Array.from(perCns.entries())
+        const preferred = entries.filter(([, v]) => v.hasNonAnesth)
+        const candidates = preferred.length > 0 ? preferred : entries
+        candidates.sort((a, b) => {
+          const diff = (b[1].sum || 0) - (a[1].sum || 0)
+          if (diff !== 0) return diff
+          return a[0].localeCompare(b[0])
+        })
+        responsibleCnsByAih.set(aihKey, candidates[0][0])
+      }
+
+      const uniqueLocalByAih = new Map<string, { aih: string; patient_name?: string; data_saida?: string; hospital_id?: string }>()
+      localRows.forEach((r) => {
+        const k = normalizeAih(r.aih)
+        if (!k) return
+        if (!uniqueLocalByAih.has(k)) uniqueLocalByAih.set(k, r)
+      })
+
+      const reportEntries: Array<{
+        aihKey: string
+        aihNumber: string
+        patientName: string
+        dischargeISO: string
+        hospitalId?: string
+        doctorCns: string
+      }> = []
+
+      for (const [aihKey, r] of uniqueLocalByAih.entries()) {
+        const doctorCns = responsibleCnsByAih.get(aihKey) || ''
+        if (selectedDoctor !== 'all' && doctorCns !== selectedDoctor) continue
+        reportEntries.push({
+          aihKey,
+          aihNumber: normalizeAih(r.aih),
+          patientName: (r.patient_name || '').trim() || 'Paciente',
+          dischargeISO: (r.data_saida || '').trim(),
+          hospitalId: r.hospital_id,
+          doctorCns: doctorCns || 'NAO_IDENTIFICADO',
+        })
+      }
+
+      if (reportEntries.length === 0) {
+        toast.warning('Nenhum registro encontrado para os filtros selecionados')
+        return
+      }
+
+      const cnsSet = Array.from(new Set(reportEntries.map(e => e.doctorCns).filter(cns => cns && cns !== 'NAO_IDENTIFICADO')))
+      const doctorByCns = new Map<string, { name: string; specialty: string }>()
+      if (cnsSet.length > 0) {
+        const { data: doctorRows, error: doctorErr } = await supabase
+          .from('doctors')
+          .select('name,cns,specialty')
+          .in('cns', cnsSet)
+        if (doctorErr) throw doctorErr
+        ;(doctorRows || []).forEach((d: any) => {
+          const cns = String(d.cns || '').trim()
+          if (!cns) return
+          doctorByCns.set(cns, { name: String(d.name || '').trim(), specialty: String(d.specialty || '').trim() })
+        })
+      }
+
+      const filteredEntries = reportEntries.filter((e) => {
+        if (selectedSpecialty === 'all') return true
+        const spec = doctorByCns.get(e.doctorCns)?.specialty || ''
+        return String(spec).trim() === selectedSpecialty
+      })
+
+      if (filteredEntries.length === 0) {
+        toast.warning('Nenhum registro encontrado após aplicar os filtros de médico/especialidade')
+        return
+      }
+
+      const sigtapLocalMap = await getSigtapLocalMap()
+      const codesRaw = Array.from(new Set(spRows.map(r => String(r?.sp_atoprof || '')).filter(Boolean)))
+      const codes = codesRaw.map(formatSigtapCode).filter(Boolean)
+      const codesPlain = codes.map(c => c.replace(/\D/g, ''))
+      const remoteDescMap = new Map<string, string>()
+      try {
+        const { data: procRows } = await supabaseSih
+          .from('sigtap_procedimentos')
+          .select('code, description')
+          .in('code', Array.from(new Set([...codes, ...codesPlain])))
+        ;(procRows || []).forEach((p: any) => {
+          const code = String(p.code || '').trim()
+          const desc = String(p.description || '').trim()
+          if (code && desc) remoteDescMap.set(code, desc)
+        })
+      } catch { }
+
+      const rowsOut: Array<Array<string>> = []
+      const totalsByDoctor = new Map<string, { total: number; isMonthly: boolean; fixed: number; fixedRule: string }>()
+
+      filteredEntries.forEach((entry) => {
+        const doctorName =
+          entry.doctorCns === 'NAO_IDENTIFICADO'
+            ? '⚠️ Médico Não Identificado'
+            : (doctorByCns.get(entry.doctorCns)?.name || `Dr(a). CNS ${entry.doctorCns}`)
+        const hospitalId = entry.hospitalId
+        const isMonthly = isFixedMonthlyPayment(doctorName, hospitalId, ALL_HOSPITAL_RULES)
+        const fixedCalc = calculateFixedPayment(doctorName, hospitalId, ALL_HOSPITAL_RULES)
+
+        const sp = spByAih.get(entry.aihKey) || []
+        const procRows = sp.filter((r: any) => String(r?.sp_pf_doc || '').trim() === entry.doctorCns)
+        const procedureList = procRows.map((r: any, idx: number) => {
+          const code = formatSigtapCode(String(r?.sp_atoprof || ''))
+          const digits = code.replace(/\D/g, '')
+          const desc =
+            remoteDescMap.get(code) ||
+            remoteDescMap.get(digits) ||
+            sigtapLocalMap.get(code) ||
+            sigtapLocalMap.get(digits) ||
+            ''
+          const qty = Number(r?.sp_qtd_ato ?? r?.sp_qt_proc ?? 1) || 1
+          const val = Number(r?.sp_valato || 0) * qty
+          return {
+            procedure_code: code,
+            procedure_description: desc,
+            value_reais: Number.isFinite(val) ? val : 0,
+            cbo: String(r?.sp_pf_cbo || ''),
+            sequence: idx + 1,
+            aih_id: entry.aihKey,
+          }
+        })
+
+        const baseProcedures = getCalculableProcedures(procedureList as any)
+        const proceduresWithPayment = (baseProcedures as any[])
+          .filter((p: any) => isMedicalProcedure(p.procedure_code))
+          .sort((a: any, b: any) => {
+            const sa = typeof a.sequence === 'number' ? a.sequence : 9999
+            const sb = typeof b.sequence === 'number' ? b.sequence : 9999
+            if (sa !== sb) return sa - sb
+            const va = typeof a.value_reais === 'number' ? a.value_reais : 0
+            const vb = typeof b.value_reais === 'number' ? b.value_reais : 0
+            return vb - va
+          })
+          .map((p: any) => ({
+            procedure_code: p.procedure_code,
+            procedure_description: p.procedure_description,
+            value_reais: p.value_reais || 0,
+            cbo: p.cbo,
+            sequence: p.sequence,
+          }))
+
+        const proceduresDisplay = (() => {
+          const labels = proceduresWithPayment
+            .map((m: any) => String(m.procedure_description || '').trim() || (m.procedure_code ? `Procedimento ${m.procedure_code}` : 'Procedimento'))
+            .filter(Boolean)
+          return labels.length > 0 ? labels.join(' + ') : 'Sem procedimentos 04.*'
+        })()
+
+        let repasseValue = 0
+        if (proceduresWithPayment.length > 0) {
+          const paymentResult = calculateDoctorPayment(doctorName, proceduresWithPayment as any, hospitalId)
+          repasseValue = isMonthly ? 0 : (paymentResult.totalPayment || 0)
+        }
+
+        const prev = totalsByDoctor.get(entry.doctorCns) || { total: 0, isMonthly, fixed: fixedCalc.calculatedPayment || 0, fixedRule: fixedCalc.appliedRule || '' }
+        totalsByDoctor.set(entry.doctorCns, {
+          total: prev.total + repasseValue,
+          isMonthly,
+          fixed: fixedCalc.calculatedPayment || prev.fixed || 0,
+          fixedRule: fixedCalc.appliedRule || prev.fixedRule || '',
+        })
+
+        rowsOut.push([
+          '',
+          doctorName,
+          entry.aihNumber || '-',
+          entry.patientName,
+          proceduresDisplay,
+          parseISODateToLocal(entry.dischargeISO),
+          formatCurrency(repasseValue),
+        ])
+      })
+
+      Array.from(totalsByDoctor.entries()).forEach(([cns, t]) => {
+        if (t.isMonthly && t.fixed > 0) {
+          const name =
+            cns === 'NAO_IDENTIFICADO'
+              ? '⚠️ Médico Não Identificado'
+              : (doctorByCns.get(cns)?.name || `Dr(a). CNS ${cns}`)
+          rowsOut.push([
+            '',
+            name,
+            '',
+            'PAGAMENTO FIXO MENSAL',
+            t.fixedRule || 'Valor Fixo',
+            '-',
+            formatCurrency(t.fixed),
+          ])
+        }
+      })
+
+      const parseBrCurrency = (s: unknown): number => {
+        const raw = (s ?? '').toString()
+        const cleaned = raw
+          .replace(/[^\d,.-]/g, '')
+          .replace(/\./g, '')
+          .replace(/,/, '.')
+        const n = Number(cleaned)
+        return Number.isFinite(n) ? n : 0
+      }
+
+      rowsOut.sort((a, b) => {
+        const repA = parseBrCurrency(a[6])
+        const repB = parseBrCurrency(b[6])
+        if (repA !== repB) return repB - repA
+        const docA = (a[1] || '').toString().localeCompare((b[1] || '').toString(), 'pt-BR')
+        if (docA !== 0) return docA
+        return (a[3] || '').toString().localeCompare((b[3] || '').toString(), 'pt-BR')
+      })
+      rowsOut.forEach((r, idx) => { r[0] = String(idx + 1) })
+
+      const globalTotal = Array.from(totalsByDoctor.values()).reduce((acc, t) => {
+        if (t.isMonthly && t.fixed > 0) return acc + t.fixed
+        return acc + (t.total || 0)
+      }, 0)
+
+      const doc = new jsPDF('landscape')
+      const pageWidth = doc.internal.pageSize.getWidth()
+      doc.setFontSize(16)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(0, 51, 102)
+      doc.text('RELATÓRIO DE REPASSE MÉDICO (FONTE HÍBRIDA)', pageWidth / 2, 24, { align: 'center' })
       doc.setFontSize(10)
-      doc.text(`Unidade Hospitalar: ${hospitalLabel}`, 40, 60)
-      doc.text(`Especialidade: ${specialtyLabel}`, 40, 74)
-      doc.text(`Médico: ${doctorLabel}`, 40, 88)
-      doc.text(`Data Alta: ${formatDateRangeLabel(dischargeFrom, dischargeTo)}`, 40, 102)
-      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 40, 116)
-      doc.setFontSize(10)
-      doc.text('Relatório em construção: a lógica de busca e cálculo será adicionada em seguida.', 40, 140)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      doc.text(`Unidade Hospitalar: ${hospitalLabel}`, 20, 40)
+      doc.text(`Especialidade: ${specialtyLabel}`, 20, 54)
+      doc.text(`Médico: ${doctorLabel}`, 20, 68)
+      doc.text(`Data Alta: ${formatDateRangeLabel(dischargeFrom, dischargeTo)}`, 20, 82)
+      doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 20, 96)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(0, 102, 0)
+      doc.text(`Valor Total: ${formatCurrency(globalTotal)}`, pageWidth - 20, 40, { align: 'right' })
+
+      autoTable(doc, {
+        head: [['#', 'Médico', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Valor de Repasse']],
+        body: rowsOut,
+        startY: 110,
+        theme: 'striped',
+        headStyles: { fillColor: [0, 51, 102], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 2 },
+        bodyStyles: { fontSize: 8, textColor: [50, 50, 50], cellPadding: 2 },
+        columnStyles: {
+          0: { cellWidth: 'auto', halign: 'center' },
+          1: { cellWidth: 'auto', halign: 'left' },
+          2: { cellWidth: 'auto', halign: 'center' },
+          3: { cellWidth: 'auto', halign: 'left' },
+          4: { cellWidth: 'auto', halign: 'left', fontSize: 7 },
+          5: { cellWidth: 'auto', halign: 'center' },
+          6: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
+        },
+        styles: { overflow: 'linebreak', cellPadding: 2, fontSize: 8 },
+        margin: { left: 20, right: 20 },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+      })
+
       doc.save(`Repasse_Medico_Fonte_Hibrida_${new Date().toISOString().slice(0, 10)}.pdf`)
-      toast.success('PDF gerado (modelo inicial)')
+      toast.success('Relatório gerado com sucesso!')
     } catch (e: any) {
-      toast.error('Erro ao gerar PDF')
+      console.error('Erro ao gerar PDF (Fonte Híbrida):', e)
+      const msg = String(e?.message || e?.error_description || e?.details || e || '').trim()
+      toast.error(msg ? `Erro ao gerar PDF: ${msg}` : 'Erro ao gerar PDF')
     } finally {
       setGenerating(false)
     }
