@@ -191,6 +191,22 @@ const CIRURGIA_GERAL_FOZ_RULES: Omit<DoctorPaymentRule, 'doctorName'> = {
       tertiaryValue: 0,
       quaternaryValue: 0,
       description: 'FASCIECTOMIA - R$ 450,00 (somente principal)'
+    },
+    {
+      procedureCode: '04.09.06.018-6',
+      standardValue: 600.00,
+      secondaryValue: 450.00,
+      tertiaryValue: 360.00,
+      quaternaryValue: 300.00,
+      description: 'LAQUEADURA TUBARIA - R$ 600,00'
+    },
+    {
+      procedureCode: '04.07.04.001-3',
+      standardValue: 300.00,
+      secondaryValue: 225.00,
+      tertiaryValue: 180.00,
+      quaternaryValue: 150.00,
+      description: 'DRENAGEM DE ABSCESSO PÉLVICO - R$ 300,00'
     }
   ],
   multipleRules: [
@@ -203,7 +219,7 @@ const CIRURGIA_GERAL_FOZ_RULES: Omit<DoctorPaymentRule, 'doctorName'> = {
     { codes: ['04.07.03.002-6', '04.07.04.009-9'], totalValue: 1600.00, description: 'COLECISTECTOMIA + HERNIOPLASTIA INGUINAL BILATERAL - R$ 1.600,00' },
     { codes: ['04.07.03.002-6', '04.07.04.006-4'], totalValue: 1700.00, description: 'COLECISTECTOMIA + HERNIOPLASTIA EPIGÁSTRICA - R$ 1.700,00' },
     { codes: ['04.07.03.002-6', '04.07.04.012-9'], totalValue: 1350.00, description: 'COLECISTECTOMIA + HERNIOPLASTIA UMBILICAL - R$ 1.350,00' },
-    { codes: ['04.07.03.002-6', '04.07.04.008-0'], totalValue: 1500.00, description: 'COLECISTECTOMIA + HERNIOPLASTIA INCISIONAL/VENTRAL - R$ 1.500,00' },
+    { codes: ['04.07.03.002-6', '04.07.04.008-0'], totalValue: 1200.00, description: 'COLECISTECTOMIA + HERNIOPLASTIA INCISIONAL/VENTRAL - R$ 1.200,00' },
     { codes: ['04.07.03.002-6', '04.07.04.018-8', '04.07.03.014-0'], totalValue: 1500.00, description: 'COLECISTECTOMIA + LIBERAÇÃO ADERÊNCIAS + HEPATORRAFIA - R$ 1.500,00' },
     { codes: ['04.07.03.002-6', '04.07.03.006-9', '04.07.03.005-0'], totalValue: 1350.00, description: 'COLECISTECTOMIA + COLEDOCOTOMIA + COLEDOCOPLASTIA - R$ 1.350,00' },
     { codes: ['04.07.03.002-6', '04.07.04.018-8', '04.07.03.014-0', '04.07.04.002-1'], totalValue: 1800.00, description: 'COLECISTECTOMIA + LIBERAÇÃO + HEPATORRAFIA + DRENAGEM - R$ 1.800,00' },

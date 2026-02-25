@@ -52,7 +52,6 @@ import { calculateDoctorPayment, calculatePercentagePayment, calculateFixedPayme
 import ProcedurePatientDiagnostic from './ProcedurePatientDiagnostic';
 import CleuezaDebugComponent from './CleuezaDebugComponent';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
-import HybridSourceDialog from './HybridSourceDialog';
 import { CareCharacterUtils } from '../config/careCharacterCodes';
 import { getParticipationInfo } from '../config/participationCodes';
 import {
@@ -787,8 +786,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [reportModalOpen, setReportModalOpen] = useState<boolean>(false);
   // ✅ COMPETÊNCIA VEM DO PROP (não precisa de estado local)
   const [availableCompetencias, setAvailableCompetencias] = useState<string[]>([]);
-  const [useSihSource, setUseSihSource] = useState<boolean>(false)
-  const [hybridSourceOpen, setHybridSourceOpen] = useState<boolean>(false)
   const [sigtapMap, setSigtapMap] = useState<Map<string, string> | null>(null)
   const [discrepancyLoading, setDiscrepancyLoading] = useState<boolean>(false)
   const [discrepancyTotals, setDiscrepancyTotals] = useState<{
@@ -802,22 +799,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [discrepancyCounts, setDiscrepancyCounts] = useState<{ missingInLocal: number; missingInCards: number; missingInRemote: number; withoutNumber: number }>({ missingInLocal: 0, missingInCards: 0, missingInRemote: 0, withoutNumber: 0 })
   const [showDiscrepancyDetails, setShowDiscrepancyDetails] = useState<boolean>(false)
   const [showDedupList, setShowDedupList] = useState<boolean>(false)
-  useEffect(() => {
-    try { localStorage.setItem('useSihSource', 'false') } catch { }
-  }, [])
   const [zeroRepasseOpen, setZeroRepasseOpen] = useState<boolean>(false)
   const [zeroRepasseItems, setZeroRepasseItems] = useState<Array<{ medicalRecord: string; aihNumber: string; name: string; procedures: string; discharge: string }>>([])
   const [zeroRepasseDoctorName, setZeroRepasseDoctorName] = useState<string>('')
-  useEffect(() => {
-    try {
-      localStorage.setItem('useSihSource', useSihSource ? 'true' : 'false')
-      window.dispatchEvent(new CustomEvent('sihsourcechange', { detail: { useSihSource } }))
-    } catch { }
-  }, [useSihSource])
+  const useSihSource = false
   useEffect(() => {
     let mounted = true
     const load = async () => {
-      if (!useSihSource) { setSigtapMap(null); return }
       try {
         const map = await getSigtapLocalMap()
         if (mounted) setSigtapMap(map)
@@ -825,7 +813,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
     load()
     return () => { mounted = false }
-  }, [useSihSource])
+  }, [])
   const remoteConfigured = Boolean(ENV_CONFIG.SIH_SUPABASE_URL && ENV_CONFIG.SIH_SUPABASE_ANON_KEY)
   const [simplifiedValidationOpen, setSimplifiedValidationOpen] = useState<boolean>(false)
   const [simplifiedValidationLoading, setSimplifiedValidationLoading] = useState<boolean>(false)
@@ -833,6 +821,18 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const approvedSetRef = useRef<Set<string>>(new Set())
   const approvalCompetenciaByAihRef = useRef<Map<string, string>>(new Map())
   const [selectedDoctorForReport, setSelectedDoctorForReport] = useState<any>(null)
+  const [simplifiedPreviewOpen, setSimplifiedPreviewOpen] = useState<boolean>(false)
+  const [simplifiedPreviewRows, setSimplifiedPreviewRows] = useState<Array<Array<string>>>([])
+  const simplifiedPreviewConfirmRef = useRef<null | ((rows: Array<Array<string>>) => void)>(null)
+  const parseBrCurrencyPreview = (s: unknown): number => {
+    const raw = (s ?? '').toString()
+    const cleaned = raw
+      .replace(/[^\d,.-]/g, '')
+      .replace(/\./g, '')
+      .replace(/,/, '.')
+    const n = Number(cleaned)
+    return Number.isFinite(n) ? n : 0
+  }
   const [relateOpen, setRelateOpen] = useState<boolean>(false)
   const [relateDoctor, setRelateDoctor] = useState<any>(null)
   const [relateReportA, setRelateReportA] = useState<string>('Relatório Pacientes')
@@ -1149,7 +1149,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     const handlerGeneral = () => { generateGeneralPatientsReport() }
     const handlerConference = () => { generateConferencePatientsReport() }
     const handlerSimplified = () => { generateSimplifiedPatientsReport() }
-    const handlerValidation = () => { generateValidationReport(selectedHospitals, selectedCompetencia, useSihSource, filteredDoctors) }
+    const handlerValidation = () => { generateValidationReport(selectedHospitals, selectedCompetencia, false, filteredDoctors) }
     window.addEventListener('mpd:report-general', handlerGeneral)
     window.addEventListener('mpd:report-conference', handlerConference)
     window.addEventListener('mpd:report-simplified', handlerSimplified)
@@ -1440,7 +1440,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             })
           }
         }
-        if (!excludeZeros || repasseValue > 0) {
+        const careRaw = (p?.aih_info?.care_character ?? '').toString().trim()
+        const careNum = careRaw.replace(/^0+/, '')
+        const careAscii = careRaw
+          .normalize('NFD')
+          .replace(/\p{Diacritic}/gu, '')
+          .toLowerCase()
+        const isElective = careNum === '1' || careAscii === 'eletivo'
+        const has04 = proceduresWithPayment.length > 0
+        if (!excludeZeros || repasseValue > 0 || (isElective && has04)) {
           patientsWithPayment++
           tableData.push([
             '',
@@ -1500,134 +1508,145 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         totalRepasse = fixedCalcReport.calculatedPayment
       }
 
-      const doc = new jsPDF('landscape')
-      const pageWidth = doc.internal.pageSize.getWidth()
-      const pageHeight = doc.internal.pageSize.getHeight()
-      // Fonte do relatório (topo)
-      try {
-        const sourceLabel = options?.sourceLabelOverride ?? (sihMode ? 'TABWIN' : 'GSUS')
-        doc.setFontSize(10)
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(80, 80, 80)
-        doc.text(sourceLabel, pageWidth - 20, 10, { align: 'right' })
-      } catch { }
-      let yPosition = 20
-      if (logoBase64) {
-        const logoWidth = 40
-        const logoHeight = 20
-        const logoX = 20
-        const logoY = 8
-        doc.addImage(logoBase64, 'JPEG', logoX, logoY, logoWidth, logoHeight)
-        yPosition = logoY + logoHeight + 10
-      }
-      doc.setFontSize(16)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(0, 51, 102)
-      doc.text('RELATÓRIO DE PACIENTES - MÉDICO', pageWidth / 2, yPosition, { align: 'center' })
-      yPosition += 10
-      const careHeader = (filterCareCharacter && filterCareCharacter !== 'all')
-        ? CareCharacterUtils.formatForDisplay(filterCareCharacter, false)
-        : 'TODOS'
-      const compHeader = (selectedCompetencia && selectedCompetencia !== 'all')
-        ? formatCompetencia(selectedCompetencia)
-        : 'TODAS'
-      const dataGeracao = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-      const line1 = [
-        { label: 'Médico: ', value: doctorName, bold: true },
-        { label: 'Hospital: ', value: hospitalName }
-      ]
-      const line2 = [
-        { label: 'Comp. Aprovação: ', value: compHeader },
-        { label: 'Caráter: ', value: careHeader },
-        { label: 'Gerado em: ', value: dataGeracao }
-      ]
-      const separator = '  |  '
-      const drawSegments = (segments: Array<{ label: string; value: string; bold?: boolean }>, y: number, fontSize = 10) => {
-        doc.setFontSize(fontSize)
-        doc.setTextColor(60, 60, 60)
-        let totalWidth = 0
-        segments.forEach((seg, idx) => {
-          totalWidth += doc.getTextWidth(seg.label) + doc.getTextWidth(seg.value)
-          if (idx < segments.length - 1) totalWidth += doc.getTextWidth(separator)
+      const runPdf = (rowsOverride: Array<Array<string>>) => {
+        const rows = (rowsOverride || []).map((r, idx) => {
+          const out = [...r]
+          out[0] = String(idx + 1)
+          return out
         })
-        let x = (pageWidth / 2) - (totalWidth / 2)
-        segments.forEach((seg, idx) => {
-          doc.setFont('helvetica', 'normal')
-          doc.text(seg.label, x, y)
-          x += doc.getTextWidth(seg.label)
-          doc.setFont('helvetica', seg.bold ? 'bold' : 'normal')
-          doc.text(seg.value, x, y)
-          x += doc.getTextWidth(seg.value)
-          if (idx < segments.length - 1) {
-            doc.setFont('helvetica', 'normal')
-            doc.setTextColor(100, 100, 100)
-            doc.text(separator, x, y)
-            doc.setTextColor(60, 60, 60)
-            x += doc.getTextWidth(separator)
-          }
-        })
-      }
-      drawSegments(line1, yPosition, 11)
-      yPosition += 6
-      drawSegments(line2, yPosition, 10)
-      yPosition += 8
-      doc.setDrawColor(200, 200, 200)
-      doc.setLineWidth(0.5)
-      doc.line(20, yPosition, pageWidth - 20, yPosition)
-      const metricY = yPosition + 7
-      const patientsCount = tableData.length
-      doc.setFontSize(10)
-      doc.setTextColor(60, 60, 60)
-      doc.text('Pacientes:', 20, metricY)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(0, 51, 102)
-      doc.text(String(patientsCount), 48, metricY)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(60, 60, 60)
-      doc.text('Valor Total:', pageWidth - 90, metricY)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(0, 102, 0)
-      doc.text(formatCurrency(totalRepasse), pageWidth - 20, metricY, { align: 'right' })
-      const startY = yPosition + 16
-      autoTable(doc, {
-        head: [['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Valor de Repasse']],
-        body: tableData,
-        startY,
-        theme: 'striped',
-        tableWidth: 'auto',
-        headStyles: { fillColor: [0, 51, 102], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 2 },
-        bodyStyles: { fontSize: 8, textColor: [50, 50, 50], cellPadding: 2 },
-        columnStyles: {
-          0: { cellWidth: 'auto', halign: 'center' },
-          1: { cellWidth: 'auto', halign: 'center' },
-          2: { cellWidth: 'auto', halign: 'center' },
-          3: { cellWidth: 'auto', halign: 'left' },
-          4: { cellWidth: 'auto', halign: 'left', fontSize: 7 },
-          5: { cellWidth: 'auto', halign: 'center' },
-          6: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
-        },
-        styles: { overflow: 'linebreak', cellPadding: 2, fontSize: 8 },
-        margin: { left: 20, right: 20 },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
+        const totalRepasseCalc = rows.reduce((s, r) => s + parseBrCurrency(r[6]), 0)
+        const patientsCount = rows.length
 
-      })
-      const finalY = (doc as any).lastAutoTable?.finalY || startY + 50
-      const footerBaseY = pageHeight - 20
-      doc.setDrawColor(200, 200, 200)
-      doc.setLineWidth(0.5)
-      const lineY = Math.max(finalY + 8, footerBaseY - 10)
-      doc.line(20, lineY, pageWidth - 20, lineY)
-      doc.setFontSize(8)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(120, 120, 120)
-      doc.text('CIS - Centro Integrado em Saúde', pageWidth / 2, lineY + 5, { align: 'center' })
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(0, 51, 102)
-      doc.text(`Valor Total de Repasse: ${formatCurrency(totalRepasse)}`, pageWidth / 2, lineY + 15, { align: 'center' })
-      const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`
-      doc.save(fileName)
-      toast.success('Relatório PDF gerado com sucesso!')
+        const doc = new jsPDF('landscape')
+        const pageWidth = doc.internal.pageSize.getWidth()
+        const pageHeight = doc.internal.pageSize.getHeight()
+        try {
+          const sourceLabel = options?.sourceLabelOverride ?? (sihMode ? 'TABWIN' : 'GSUS')
+          doc.setFontSize(10)
+          doc.setFont('helvetica', 'bold')
+          doc.setTextColor(80, 80, 80)
+          doc.text(sourceLabel, pageWidth - 20, 10, { align: 'right' })
+        } catch { }
+        let yPosition = 20
+        if (logoBase64) {
+          const logoWidth = 40
+          const logoHeight = 20
+          const logoX = 20
+          const logoY = 8
+          doc.addImage(logoBase64, 'JPEG', logoX, logoY, logoWidth, logoHeight)
+          yPosition = logoY + logoHeight + 10
+        }
+        doc.setFontSize(16)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(0, 51, 102)
+        doc.text('RELATÓRIO DE PACIENTES - MÉDICO', pageWidth / 2, yPosition, { align: 'center' })
+        yPosition += 10
+        const careHeader = (filterCareCharacter && filterCareCharacter !== 'all')
+          ? CareCharacterUtils.formatForDisplay(filterCareCharacter, false)
+          : 'TODOS'
+        const compHeader = (selectedCompetencia && selectedCompetencia !== 'all')
+          ? formatCompetencia(selectedCompetencia)
+          : 'TODAS'
+        const dataGeracao = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        const line1 = [
+          { label: 'Médico: ', value: doctorName, bold: true },
+          { label: 'Hospital: ', value: hospitalName }
+        ]
+        const line2 = [
+          { label: 'Comp. Aprovação: ', value: compHeader },
+          { label: 'Caráter: ', value: careHeader },
+          { label: 'Gerado em: ', value: dataGeracao }
+        ]
+        const separator = '  |  '
+        const drawSegments = (segments: Array<{ label: string; value: string; bold?: boolean }>, y: number, fontSize = 10) => {
+          doc.setFontSize(fontSize)
+          doc.setTextColor(60, 60, 60)
+          let totalWidth = 0
+          segments.forEach((seg, idx) => {
+            totalWidth += doc.getTextWidth(seg.label) + doc.getTextWidth(seg.value)
+            if (idx < segments.length - 1) totalWidth += doc.getTextWidth(separator)
+          })
+          let x = (pageWidth / 2) - (totalWidth / 2)
+          segments.forEach((seg, idx) => {
+            doc.setFont('helvetica', 'normal')
+            doc.text(seg.label, x, y)
+            x += doc.getTextWidth(seg.label)
+            doc.setFont('helvetica', seg.bold ? 'bold' : 'normal')
+            doc.text(seg.value, x, y)
+            x += doc.getTextWidth(seg.value)
+            if (idx < segments.length - 1) {
+              doc.setFont('helvetica', 'normal')
+              doc.setTextColor(100, 100, 100)
+              doc.text(separator, x, y)
+              doc.setTextColor(60, 60, 60)
+              x += doc.getTextWidth(separator)
+            }
+          })
+        }
+        drawSegments(line1, yPosition, 11)
+        yPosition += 6
+        drawSegments(line2, yPosition, 10)
+        yPosition += 8
+        doc.setDrawColor(200, 200, 200)
+        doc.setLineWidth(0.5)
+        doc.line(20, yPosition, pageWidth - 20, yPosition)
+        const metricY = yPosition + 7
+        doc.setFontSize(10)
+        doc.setTextColor(60, 60, 60)
+        doc.text('Pacientes:', 20, metricY)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(0, 51, 102)
+        doc.text(String(patientsCount), 48, metricY)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(60, 60, 60)
+        doc.text('Valor Total:', pageWidth - 90, metricY)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(0, 102, 0)
+        doc.text(formatCurrency(totalRepasseCalc), pageWidth - 20, metricY, { align: 'right' })
+        const startY = yPosition + 16
+        autoTable(doc, {
+          head: [['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Valor de Repasse']],
+          body: rows,
+          startY,
+          theme: 'striped',
+          tableWidth: 'auto',
+          headStyles: { fillColor: [0, 51, 102], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 2 },
+          bodyStyles: { fontSize: 8, textColor: [50, 50, 50], cellPadding: 2 },
+          columnStyles: {
+            0: { cellWidth: 'auto', halign: 'center' },
+            1: { cellWidth: 'auto', halign: 'center' },
+            2: { cellWidth: 'auto', halign: 'center' },
+            3: { cellWidth: 'auto', halign: 'left' },
+            4: { cellWidth: 'auto', halign: 'left', fontSize: 7 },
+            5: { cellWidth: 'auto', halign: 'center' },
+            6: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
+          },
+          styles: { overflow: 'linebreak', cellPadding: 2, fontSize: 8 },
+          margin: { left: 20, right: 20 },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
+        })
+        const finalY = (doc as any).lastAutoTable?.finalY || startY + 50
+        const footerBaseY = pageHeight - 20
+        doc.setDrawColor(200, 200, 200)
+        doc.setLineWidth(0.5)
+        const lineY = Math.max(finalY + 8, footerBaseY - 10)
+        doc.line(20, lineY, pageWidth - 20, lineY)
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(120, 120, 120)
+        doc.text('CIS - Centro Integrado em Saúde', pageWidth / 2, lineY + 5, { align: 'center' })
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(0, 51, 102)
+        doc.text(`Valor Total de Repasse: ${formatCurrency(totalRepasseCalc)}`, pageWidth / 2, lineY + 15, { align: 'center' })
+        const fileName = `Relatorio_Pacientes_Simplificado_${doctorName.replace(/\\s+/g, '_')}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.pdf`
+        doc.save(fileName)
+      }
+
+      simplifiedPreviewConfirmRef.current = runPdf
+      setSimplifiedPreviewRows(tableData)
+      setSimplifiedPreviewOpen(true)
+      return
     } catch (err) {
       console.error('Erro ao exportar Relatório Simplificado (PDF):', err)
       toast.error('Erro ao gerar relatório PDF')
@@ -1914,7 +1933,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         repasseValue = isMonthly ? 0 : (paymentResult.totalPayment || 0)
       }
 
-      if (!excludeZeros || repasseValue > 0) {
+      const careRaw = (p?.aih_info?.care_character ?? '').toString().trim()
+      const careNum = careRaw.replace(/^0+/, '')
+      const careAscii = careRaw
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase()
+      const isElective = careNum === '1' || careAscii === 'eletivo'
+      const has04 = proceduresWithPayment.length > 0
+      if (!excludeZeros || repasseValue > 0 || (isElective && has04)) {
         totalRepasse += repasseValue
         tableData.push([
           '',
@@ -3192,7 +3219,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             competencia: competenciaFilter, // ✅ Passar undefined se não houver filtro
             filterCareCharacter: careFilter,
             dischargeDateRange,
-            useSihSource,
             doctorNameContains: searchTerm?.trim() || undefined,
             patientNameContains: patientSearchTerm?.trim() || undefined
           });
@@ -3247,7 +3273,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     };
 
     loadDoctorsData();
-  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, refreshTick, selectedCompetencia, filterCareCharacter, dischargeDateRange?.from, dischargeDateRange?.to, useSihSource]);
+  }, [user, canAccessAllHospitals, hasFullAccess, selectedHospitals, refreshTick, selectedCompetencia, filterCareCharacter, dischargeDateRange?.from, dischargeDateRange?.to]);
 
   // 🆕 CARREGAR COMPETÊNCIAS DISPONÍVEIS (apenas das AIHs carregadas atualmente)
   useEffect(() => {
@@ -4273,9 +4299,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
   return (
     <div className="space-y-4">
-      <HybridSourceDialog open={hybridSourceOpen} onOpenChange={setHybridSourceOpen} />
-
-
       {/* 🆕 COMPONENTE DE DIAGNÓSTICO */}
       {showDiagnostic && (
         <DataDiagnostics onClose={() => setShowDiagnostic(false)} />
@@ -4439,35 +4462,6 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {useSihSource && (
-                    remoteConfigured ? (
-                      <Badge
-                        variant="outline"
-                        className="bg-white text-black border-gray-300 px-2.5 py-0.5 text-xs font-semibold"
-                      >
-                        Fonte: SIH Remoto
-                      </Badge>
-                    ) : (
-                      <Badge
-                        variant="outline"
-                        className="bg-white text-black border-gray-300 px-2.5 py-0.5 text-xs font-semibold"
-                      >
-                        ⚠️ Fonte SIH remota desativada ou não configurada
-                      </Badge>
-                    )
-                  )}
-                  <div className="flex items-center gap-2 mr-2">
-                    <span className="text-xs text-neutral-700">Fonte SIH</span>
-                    <Switch checked={useSihSource} onCheckedChange={setUseSihSource} />
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setHybridSourceOpen(true)}
-                    className="h-9 px-3 border-black text-black hover:bg-neutral-100"
-                  >
-                    <Database className="h-4 w-4 mr-2" /> Fonte Híbrida
-                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -7919,6 +7913,105 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 </div>
               </>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={simplifiedPreviewOpen}
+        onOpenChange={(open) => {
+          setSimplifiedPreviewOpen(open)
+          if (!open) {
+            setSimplifiedPreviewRows([])
+            simplifiedPreviewConfirmRef.current = null
+          }
+        }}
+      >
+        <DialogContent className="max-w-5xl w-[90vw]">
+          <DialogHeader>
+            <DialogTitle>Pré-visualização – Relatório Pacientes Simplificado</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-neutral-700">
+            <div>Linhas: <span className="font-semibold text-black">{simplifiedPreviewRows.length}</span></div>
+            <div>Valor Total: <span className="font-semibold text-green-700">{formatCurrency(simplifiedPreviewRows.reduce((s, r) => s + parseBrCurrencyPreview(r[6]), 0))}</span></div>
+          </div>
+          <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead className="w-28">Prontuário</TableHead>
+                  <TableHead className="w-24">AIH</TableHead>
+                  <TableHead>Paciente</TableHead>
+                  <TableHead>Procedimentos</TableHead>
+                  <TableHead className="w-24">Alta</TableHead>
+                  <TableHead className="w-28 text-right">Repasse</TableHead>
+                  <TableHead className="w-16"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {simplifiedPreviewRows.map((row, idx) => (
+                  <TableRow key={`${idx}-${row[2] || ''}-${row[3] || ''}`}>
+                    <TableCell className="text-center">{idx + 1}</TableCell>
+                    <TableCell className="text-center">{row[1]}</TableCell>
+                    <TableCell className="text-center">{row[2]}</TableCell>
+                    <TableCell>{row[3]}</TableCell>
+                    <TableCell className="text-xs">{row[4]}</TableCell>
+                    <TableCell className="text-center">{row[5]}</TableCell>
+                    <TableCell className="text-right font-semibold">{row[6]}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        title="Apagar linha"
+                        onClick={() => {
+                          setSimplifiedPreviewRows(prev => {
+                            const next = prev.filter((_, i) => i !== idx)
+                            return next.map((r, j) => {
+                              const out = [...r]
+                              out[0] = String(j + 1)
+                              return out
+                            })
+                          })
+                        }}
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSimplifiedPreviewOpen(false)
+                setSimplifiedPreviewRows([])
+                simplifiedPreviewConfirmRef.current = null
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="bg-black hover:bg-neutral-800 text-white"
+              disabled={simplifiedPreviewRows.length === 0}
+              onClick={() => {
+                try {
+                  simplifiedPreviewConfirmRef.current?.(simplifiedPreviewRows)
+                  toast.success('Relatório PDF gerado com sucesso!')
+                } catch {
+                  toast.error('Erro ao gerar relatório PDF')
+                } finally {
+                  setSimplifiedPreviewOpen(false)
+                  setSimplifiedPreviewRows([])
+                  simplifiedPreviewConfirmRef.current = null
+                }
+              }}
+            >
+              Confirmar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

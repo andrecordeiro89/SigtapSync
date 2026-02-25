@@ -124,26 +124,11 @@ export class DoctorPatientService {
     filterPgtAdm?: 'all' | 'sim' | 'não'; // ✅ Mantido para compatibilidade
     filterCareCharacter?: '1' | '2';
     dischargeDateRange?: { from?: string; to?: string };
-    useSihSource?: boolean;
     doctorNameContains?: string;
     patientNameContains?: string;
   }): Promise<DoctorWithPatients[]> {
     try {
       console.log('📥 [TABELAS - OTIMIZADO] Carregando dados em paralelo...', options);
-
-      // 🔄 NOVO: Alternar para fonte SIH remota quando habilitado
-      const useRemote = Boolean(options?.useSihSource)
-      if (useRemote) {
-        const { SihApiAdapter } = await import('./sihApiAdapter')
-        const result = await SihApiAdapter.getDoctorsWithPatients({
-          hospitalIds: options?.hospitalIds,
-          competencia: options?.competencia,
-          dischargeDateRange: options?.dischargeDateRange,
-          filterCareCharacter: options?.filterCareCharacter
-        })
-        console.log(`✅ [SIH REMOTO] Fonte alternada. Médicos carregados: ${result?.length || 0}`)
-        return result || []
-      }
       const startTime = performance.now();
 
       // 🚀 OTIMIZAÇÃO #1: PREPARAR QUERIES EM PARALELO
@@ -2355,63 +2340,44 @@ export class DoctorPatientService {
     try {
       // ✅ BUSCAR INSTRUMENTO DE REGISTRO PARA TODOS OS PROCEDIMENTOS
       const { formatSigtapCode } = await import('../utils/formatters');
-      const { isSihSourceActive } = await import('../utils/sihSource')
       const allProcedureCodes = procedures
         .filter(p => p.procedure_code)
         .map(p => formatSigtapCode(p.procedure_code));
 
       if (allProcedureCodes.length === 0) return procedures;
 
-      // 🔀 Lógica condicional pelo toggle Fonte SIH
-      if (isSihSourceActive()) {
-        const { getSigtapLocalMap } = await import('../utils/sigtapLocal')
-        const localCsvMap = await getSigtapLocalMap()
+      console.log(`🔍 Buscando dados SIGTAP (descrição + instrumento) para ${allProcedureCodes.length} procedimentos...`)
+      const { data: sigtapData, error: sigtapError } = await supabase
+        .from('sigtap_procedures')
+        .select('code, description, registration_instrument')
+        .in('code', allProcedureCodes)
+      if (sigtapError) {
+        console.error('❌ Erro ao buscar dados do SIGTAP:', sigtapError.message)
+        return procedures
+      }
+      if (sigtapData && sigtapData.length > 0) {
+        const dataMap = new Map(sigtapData.map(item => [
+          item.code,
+          {
+            description: item.description,
+            registration_instrument: item.registration_instrument
+          }
+        ]))
         return procedures.map(proc => {
           const formattedCode = formatSigtapCode(proc.procedure_code)
-          const csvDesc = localCsvMap.get(formattedCode) || localCsvMap.get(formattedCode.replace(/\D/g, ''))
+          const sigtapInfo = dataMap.get(formattedCode)
           return {
             ...proc,
             procedure_code: formattedCode,
-            procedure_description: csvDesc || (proc.procedure_description && proc.procedure_description !== 'Descrição não disponível'
+            procedure_description: sigtapInfo?.description || (proc.procedure_description && proc.procedure_description !== 'Descrição não disponível'
               ? proc.procedure_description
               : `Procedimento ${formattedCode}`),
-            registration_instrument: '-'
+            registration_instrument: sigtapInfo?.registration_instrument || '-'
           }
         })
-      } else {
-        console.log(`🔍 Buscando dados SIGTAP (descrição + instrumento) para ${allProcedureCodes.length} procedimentos...`)
-        const { data: sigtapData, error: sigtapError } = await supabase
-          .from('sigtap_procedures')
-          .select('code, description, registration_instrument')
-          .in('code', allProcedureCodes)
-        if (sigtapError) {
-          console.error('❌ Erro ao buscar dados do SIGTAP:', sigtapError.message)
-          return procedures
-        }
-        if (sigtapData && sigtapData.length > 0) {
-          const dataMap = new Map(sigtapData.map(item => [
-            item.code,
-            {
-              description: item.description,
-              registration_instrument: item.registration_instrument
-            }
-          ]))
-          return procedures.map(proc => {
-            const formattedCode = formatSigtapCode(proc.procedure_code)
-            const sigtapInfo = dataMap.get(formattedCode)
-            return {
-              ...proc,
-              procedure_code: formattedCode,
-              procedure_description: sigtapInfo?.description || (proc.procedure_description && proc.procedure_description !== 'Descrição não disponível'
-                ? proc.procedure_description
-                : `Procedimento ${formattedCode}`),
-              registration_instrument: sigtapInfo?.registration_instrument || '-'
-            }
-          })
-        }
-        console.warn('⚠️ Nenhum procedimento encontrado no SIGTAP')
-        return procedures
       }
+      console.warn('⚠️ Nenhum procedimento encontrado no SIGTAP')
+      return procedures
     } catch (error) {
       console.error('❌ Erro ao enriquecer procedimentos com SIGTAP:', error);
       return procedures;

@@ -56,6 +56,7 @@ import ProcedureHierarchyDashboard from './ProcedureHierarchyDashboard';
 import RulesStudio from './rulesStudio/RulesStudio'
 import { CareCharacterUtils } from '../config/careCharacterCodes';
 import { exportAnesthesiaExcel } from '../services/exportService';
+import HybridSourceDialog from './HybridSourceDialog';
 // import ReportGenerator from './ReportGenerator';
 // import ExecutiveDateFilters from './ExecutiveDateFilters';
 import TabwinConferenceDialog from './TabwinConferenceDialog';
@@ -286,6 +287,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [aihKpi, setAihKpi] = useState<{ totalAIHs: number; totalRevenue: number; averageTicket: number } | null>(null);
   const [tabwinOpen, setTabwinOpen] = useState(false);
   const [isRejectedTabwinDialogOpen, setIsRejectedTabwinDialogOpen] = useState(false);
+  const [repasseSihOpen, setRepasseSihOpen] = useState(false)
 
   const [filtersApplied, setFiltersApplied] = useState(false);
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
@@ -1792,6 +1794,18 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <FileSpreadsheet className="h-4 w-4" />
                   Rejeitados Tabwin
                 </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white w-auto min-w-[180px]"
+                  onClick={() => setRepasseSihOpen(true)}
+                  title="Gerar Repasse Médico com SIH"
+                  disabled={isGlobalLoading}
+                  type="button"
+                >
+                  <DollarSign className="h-4 w-4" />
+                  Repasse SIH
+                </Button>
                 </div>
                 <Button
                   variant="default"
@@ -1904,6 +1918,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     </div>
     <TabwinConferenceDialog open={tabwinOpen} onOpenChange={setTabwinOpen} />
     <RejectedTabwinDialog open={isRejectedTabwinDialogOpen} onOpenChange={setIsRejectedTabwinDialogOpen} />
+    <HybridSourceDialog open={repasseSihOpen} onOpenChange={setRepasseSihOpen} />
     {importOpen && (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
         <div className="bg-white rounded shadow-xl w-full max-w-4xl">

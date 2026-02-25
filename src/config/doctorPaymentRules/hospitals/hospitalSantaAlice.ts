@@ -39,12 +39,19 @@ export const HOSPITAL_SANTA_ALICE_RULES: HospitalRules = {
       {
         procedureCode: '04.08.05.015-2',
         standardValue: 500.00,
+        secondaryValue: 0,
         description: 'RECONSTRUÇÃO LIGAMENTAR EXTRA-ARTICULAR DO JOELHO - R$ 500,00'
       },
       {
         procedureCode: '04.08.05.006-3',
         standardValue: 2000.00,
         description: 'ARTROPLASTIA TOTAL PRIMÁRIA DO JOELHO - R$ 2.000,00'
+      },
+      {
+        procedureCode: '04.08.06.012-3',
+        standardValue: 250.00,
+        secondaryValue: 0,
+        description: 'EXPLORAÇÃO ARTICULAR C/ OU S/ SINOVECTOMIA DE MÉDIAS / GRANDES ARTICULAÇÕES - R$ 250,00'
       }
     ]
   },

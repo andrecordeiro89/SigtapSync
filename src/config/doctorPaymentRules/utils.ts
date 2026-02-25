@@ -56,7 +56,7 @@ export const HOSPITAL_MAPPINGS: HospitalMapping[] = [
     name: 'Hospital Maternidade Nossa Senhora Aparecida - FRG'
   },
   {
-    id: '1d8ca73a-1927-462e-91c0-fa7004d0b377',
+    id: '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b',
     key: 'HOSPITAL_MUNICIPAL_SANTA_ALICE',
     name: 'Hospital Municipal Santa Alice'
   },
@@ -69,11 +69,6 @@ export const HOSPITAL_MAPPINGS: HospitalMapping[] = [
     id: '1218dd7b-efcb-442e-ad2b-b72d04128cb9',
     key: 'HOSPITAL_GUA_CENTRO_MEDICINA_AVANCADA',
     name: 'Hospital GUA - Centro de Medicina Avançada'
-  },
-  {
-    id: '68bf9b1a-9d0b-423b-9bb3-3c02017b1d7b',
-    key: 'HOSPITAL_SM_SANTA_MARIA',
-    name: 'Hospital SM - Santa Maria'
   },
   {
     id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
@@ -98,8 +93,8 @@ export function detectHospitalFromContext(
       return mapping.key;
     }
 
-    console.warn(`⚠️ Hospital ID não reconhecido: ${hospitalId}`);
-    return 'TORAO_TOKUDA_APUCARANA';
+    console.warn(`⚠️ Hospital ID não reconhecido: ${hospitalId}. Tentando detecção por nome...`);
+    // Não retorna fallback imediatamente, tenta buscar por nome
   }
 
   // Prioridade 2+: Verificar se médico existe em cada hospital

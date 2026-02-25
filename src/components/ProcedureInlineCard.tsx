@@ -18,8 +18,6 @@ import { getAnesthetistProcedureType } from '@/utils/anesthetistLogic';
 import { getProcedureIncrementMeta } from '@/config/operaParana';
 import { resolveCommonProcedureName } from '@/utils/commonProcedureName';
 import { formatSigtapCode } from '@/utils/formatters';
-import { getSigtapLocalMap, resolveSigtapDescriptionFromCsv } from '@/utils/sigtapLocal';
-import { isSihSourceActive } from '@/utils/sihSource';
 
 interface ProcedureData {
   id: string;
@@ -66,49 +64,6 @@ const ProcedureInlineCard = ({
 }: ProcedureInlineCardProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [sigtapMap, setSigtapMap] = useState<Map<string, string> | null>(null);
-  const [csvDesc, setCsvDesc] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    if (isSihSourceActive()) {
-      getSigtapLocalMap()
-        .then((map) => { if (mounted) setSigtapMap(map); })
-        .catch(() => setSigtapMap(new Map()));
-    }
-    return () => { mounted = false; };
-  }, []);
-
-  useEffect(() => {
-    const tryLoad = () => {
-      if (!sigtapMap && isSihSourceActive()) {
-        getSigtapLocalMap()
-          .then((map) => setSigtapMap(map))
-          .catch(() => setSigtapMap(new Map()))
-      }
-    }
-    tryLoad()
-    const onCustom = () => tryLoad()
-    window.addEventListener('sihsourcechange', onCustom as any)
-    return () => window.removeEventListener('sihsourcechange', onCustom as any)
-  }, [sigtapMap, procedure.procedure_code])
-
-  useEffect(() => {
-    const run = async () => {
-      if (!isSihSourceActive()) { setCsvDesc(null); return }
-      const formatted = formatSigtapCode(procedure.procedure_code)
-      if (sigtapMap) {
-        const digits = formatted.replace(/\D/g, '')
-        const direct = sigtapMap.get(formatted) || sigtapMap.get(digits)
-        if (direct) { setCsvDesc(direct); return }
-      }
-      try {
-        const direct = await resolveSigtapDescriptionFromCsv(formatted)
-        setCsvDesc(direct || null)
-      } catch { setCsvDesc(null) }
-    }
-    run()
-  }, [procedure.procedure_code, sigtapMap])
 
   const handleAction = async (action: () => Promise<void>, actionName: string) => {
     if (isLoading) return;
@@ -208,10 +163,6 @@ const ProcedureInlineCard = ({
       return v === 'descrição não disponível' || v === 'descricao nao disponivel';
     };
     const formattedCode = formatSigtapCode(procedure.procedure_code);
-
-    if (isSihSourceActive() && csvDesc && !isUnavailable(csvDesc)) {
-      return csvDesc
-    }
 
     // 2. Descrição armazenada no banco (desde que não seja "Descrição não disponível" ou fallback)
     if (procedure.procedure_description && 
