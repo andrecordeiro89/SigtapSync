@@ -892,7 +892,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             const disISO = p?.aih_info?.discharge_date || ''
             const disLabel = disISO ? parseISODateToLocal(disISO) : ''
             // Usar o mesmo filtro da tela para garantir fidelidade
-            const procedures = (p as any).calculable_procedures || (p.procedures || []).filter(filterCalculableProcedures)
+            const cp = (p as any).calculable_procedures
+            const procedures = (Array.isArray(cp) && cp.length > 0) ? cp : (p.procedures || []).filter(filterCalculableProcedures)
             procedures.forEach((proc: any) => {
               const procCode = proc.procedure_code || ''
               const procDesc = proc.procedure_description || proc.sigtap_description || ''
@@ -1017,7 +1018,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             const disLabel = parseISODateToLocal(disISO)
             const baseAih = Number(p.total_value_reais || 0)
             const doctorCovered = isDoctorCoveredForOperaParana(doctorName, card.hospitals?.[0]?.hospital_id)
-            const procedures = (p as any).calculable_procedures || (p.procedures || []).filter(filterCalculableProcedures)
+            const cp = (p as any).calculable_procedures
+            const procedures = (Array.isArray(cp) && cp.length > 0) ? cp : (p.procedures || []).filter(filterCalculableProcedures)
             if (procedures.length > 0) {
               aihIdsWithProcedures.add(String(p.aih_id || aihRaw || `${p.patient_id}|${p?.aih_info?.admission_date || ''}`))
             }
@@ -1296,7 +1298,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           name = candidate || (name || 'Paciente')
         }
         const procsAll = p.procedures || []
-        const calculable = (p as any).calculable_procedures || procsAll.filter(filterCalculableProcedures)
+        const cp = (p as any).calculable_procedures
+        const calculable = (Array.isArray(cp) && cp.length > 0) ? cp : procsAll.filter(filterCalculableProcedures)
         const mainCandidates = calculable.filter((proc: any) => (typeof proc.registration_instrument === 'string' ? proc.registration_instrument.includes('03') : false) && (proc.cbo !== '225151'))
         let mainProc = mainCandidates.length > 0 ? mainCandidates[0] : null
         if (!mainProc) {
@@ -1383,7 +1386,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         // ✅ CORREÇÃO FINAL: Usar p.procedures diretamente (IGUAL ao card do paciente)
         // O card usa patient.procedures, então o relatório deve usar p.procedures
         const aihKey = (p as any).aih_id || normalizeAihNumber(p?.aih_info?.aih_number) || '__single__'
-        const baseProcedures = (p as any).calculable_procedures || getCalculableProcedures(
+        const cp2 = (p as any).calculable_procedures
+        const baseProcedures = (Array.isArray(cp2) && cp2.length > 0) ? cp2 : getCalculableProcedures(
           ((p.procedures || []) as any[]).map((proc: any) => ({
             ...proc,
             aih_id: proc.aih_id || aihKey,
@@ -1836,7 +1840,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       }
 
       const procsAll = p.procedures || []
-      const calculable = (p as any).calculable_procedures || procsAll.filter(filterCalculableProcedures)
+      const cp = (p as any).calculable_procedures
+      const calculable = (Array.isArray(cp) && cp.length > 0) ? cp : procsAll.filter(filterCalculableProcedures)
 
       const mainCandidates = calculable.filter((proc: any) => (typeof proc.registration_instrument === 'string' ? proc.registration_instrument.includes('03') : false) && (proc.cbo !== '225151'))
       let mainProc = mainCandidates.length > 0 ? mainCandidates[0] : null
@@ -1893,7 +1898,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       }
 
       const aihKey = (p as any).aih_id || normalizeAihNumber(p?.aih_info?.aih_number) || '__single__'
-      const baseProcedures = (p as any).calculable_procedures || getCalculableProcedures(
+      const cp2 = (p as any).calculable_procedures
+      const baseProcedures = (Array.isArray(cp2) && cp2.length > 0) ? cp2 : getCalculableProcedures(
         ((p.procedures || []) as any[]).map((proc: any) => ({
           ...proc,
           aih_id: proc.aih_id || aihKey,
@@ -2016,7 +2022,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       const name = p.patient_info?.name || 'Paciente'
 
       const procsAll = p.procedures || []
-      const calculable = (p as any).calculable_procedures || procsAll.filter(filterCalculableProcedures)
+      const cp = (p as any).calculable_procedures
+      const calculable = (Array.isArray(cp) && cp.length > 0) ? cp : procsAll.filter(filterCalculableProcedures)
 
       const medicalForDisplay = calculable
         .filter((x: any) => isMedicalProcedure(x.procedure_code) && shouldCalculateAnesthetistProcedure(x.cbo, x.procedure_code))

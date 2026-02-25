@@ -98,10 +98,8 @@ export const SihApiAdapter = {
     for (const ch of spChunks) {
       let spQuery = supabaseSih
         .from('sih_sp')
-        .select('sp_naih, sp_atoprof, sp_qt_proc, sp_qtd_ato, sp_valato, sp_pf_doc, sp_pf_cbo, sp_cidpri, sp_complex, sp_mm, sp_aa')
+        .select('sp_naih, sp_atoprof, sp_qt_proc, sp_qtd_ato, sp_valato, sp_pf_doc, sp_pf_cbo, sp_cidpri, sp_complex, sp_dtsaida')
         .in('sp_naih', ch)
-      if (typeof compMonth === 'number') spQuery = spQuery.eq('sp_mm', compMonth)
-      if (typeof compYear === 'number') spQuery = spQuery.eq('sp_aa', compYear)
       const { data: spData, error: spError } = await spQuery
       if (spError) logger.warn('Erro chunk sih_sp', spError)
       if (spData && spData.length > 0) spResults.push(...spData)
@@ -119,7 +117,7 @@ export const SihApiAdapter = {
     // 5) Carregar AIHs locais correspondentes para obter CNS responsável e dados de paciente
     let localAihQuery = supabase
       .from('aihs')
-      .select('aih_number, cns_responsavel, hospital_id, discharge_date, competencia, patients(name, medical_record)')
+      .select('id, aih_number, cns_responsavel, hospital_id, discharge_date, competencia, patients(name, medical_record)')
     const localHospitalIds = Array.from(new Set((rdData || []).map(r => String(r.cnes)).filter(Boolean))).map(c => hospByCnes.get(String(c))?.id).filter(Boolean) as string[]
     if (localHospitalIds.length > 0) localAihQuery = localAihQuery.in('hospital_id', localHospitalIds)
     // Aplicar filtros primários (competência e período de alta) para priorizar nomes do recorte atual
@@ -140,6 +138,8 @@ export const SihApiAdapter = {
     const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
     const localRespByAih = new Map<string, string>()
     const localPatientByAih = new Map<string, { name?: string; medical_record?: string }>()
+    const localAihIdByAihKey = new Map<string, string>()
+    const localAihKeyByAihId = new Map<string, string>()
     ;(localAihRows || []).forEach((r: any) => {
       const k = normalizeAih(String(r.aih_number || ''))
       if (!k) return
@@ -147,6 +147,11 @@ export const SihApiAdapter = {
       const nm = r?.patients?.name
       const mr = r?.patients?.medical_record
       if (nm || mr) localPatientByAih.set(k, { name: nm, medical_record: mr })
+      const aihId = String(r.id || '').trim()
+      if (aihId) {
+        if (!localAihIdByAihKey.has(k)) localAihIdByAihKey.set(k, aihId)
+        if (!localAihKeyByAihId.has(aihId)) localAihKeyByAihId.set(aihId, k)
+      }
     })
 
     // Fallback: completar nomes por AIH sem respeitar competência/alta, usando a lista de AIHs remotas
@@ -154,10 +159,15 @@ export const SihApiAdapter = {
       .map(n => normalizeAih(String(n)))
       .filter(k => k && !localPatientByAih.has(k))
     if (missingKeys.length > 0) {
+      const variants = Array.from(new Set(missingKeys.flatMap(k => {
+        const raw = String(k || '').replace(/\D/g, '').replace(/^0+/, '')
+        if (!raw) return []
+        return [raw, raw.padStart(12, '0'), raw.padStart(13, '0')]
+      }))).filter(Boolean)
       const { data: localAihByNumber } = await supabase
         .from('aihs')
-        .select('aih_number, patients(name, medical_record), cns_responsavel')
-        .in('aih_number', missingKeys)
+        .select('id, aih_number, patients(name, medical_record), cns_responsavel')
+        .in('aih_number', variants)
       ;(localAihByNumber || []).forEach((r: any) => {
         const k = normalizeAih(String(r.aih_number || ''))
         if (!k) return
@@ -166,6 +176,11 @@ export const SihApiAdapter = {
         if (nm || mr) localPatientByAih.set(k, { name: nm, medical_record: mr })
         const resp = r?.cns_responsavel
         if (resp && !localRespByAih.has(k)) localRespByAih.set(k, String(resp))
+        const aihId = String(r.id || '').trim()
+        if (aihId) {
+          if (!localAihIdByAihKey.has(k)) localAihIdByAihKey.set(k, aihId)
+          if (!localAihKeyByAihId.has(aihId)) localAihKeyByAihId.set(aihId, k)
+        }
       })
     }
 
@@ -192,6 +207,65 @@ export const SihApiAdapter = {
       spByAih.get(key)!.push(row)
     })
 
+    // 6.1) Fallback local: se a AIH veio do RD mas não tem SP no remoto, buscar procedimentos no banco local
+    const aihKeysMissingSp = new Set<string>()
+    const localAihIdsMissingSp = new Set<string>()
+    for (const rd of rdData || []) {
+      const aih = String((rd as any).n_aih || '')
+      const key = normalizeAih(aih)
+      if (!key) continue
+      const procs = spByAih.get(aih) || []
+      if (procs.length > 0) continue
+      aihKeysMissingSp.add(key)
+      const localId = localAihIdByAihKey.get(key)
+      if (localId) localAihIdsMissingSp.add(localId)
+    }
+
+    const localFallbackProcsByAihKey = new Map<string, ProcedureDetail[]>()
+    if (localAihIdsMissingSp.size > 0) {
+      try {
+        const { ProcedureRecordsService } = await import('./simplifiedProcedureService')
+        const { getCalculableProcedures } = await import('../utils/anesthetistLogic')
+        const localProcsByAih = await ProcedureRecordsService.getProceduresByAihIds(Array.from(localAihIdsMissingSp))
+        if (localProcsByAih.success) {
+          for (const [aihId, procs] of localProcsByAih.proceduresByAihId.entries()) {
+            const aihKey = localAihKeyByAihId.get(String(aihId))
+            if (!aihKey) continue
+            const mapped = (procs || []).map((p: any) => {
+              const code = String(p.procedure_code || '').trim()
+              const cbo = String(p.professional_cbo || '').trim()
+              const isAnesthetist04 = cbo === '225151' && code.startsWith('04') && code !== '04.17.01.001-0'
+              const rawCents = typeof p.total_value === 'number' ? p.total_value : 0
+              const value_cents = isAnesthetist04 ? 0 : rawCents
+              return {
+                procedure_id: String(p.id || ''),
+                procedure_code: code,
+                procedure_description: String(p.procedure_description || p.procedure_name || '').trim(),
+                procedure_date: String(p.procedure_date || ''),
+                value_reais: value_cents / 100,
+                value_cents,
+                approved: p.billing_status === 'approved' || p.match_status === 'approved' || p.billing_status === 'paid',
+                approval_status: p.billing_status || p.match_status,
+                sequence: (typeof p.sequencia === 'number' ? p.sequencia : undefined),
+                aih_id: String(p.aih_id || ''),
+                match_confidence: Number(p.match_confidence || 0),
+                sigtap_description: String(p.procedure_description || p.procedure_name || '').trim(),
+                complexity: String(p.complexity || ''),
+                professional_name: p.professional_name ? String(p.professional_name) : undefined,
+                cbo,
+                participation: String(p.participacao || '').trim() || 'Responsável',
+                registration_instrument: (p as any)?.sigtap_procedures?.registration_instrument || '-'
+              } as any
+            })
+            const calculable = getCalculableProcedures(mapped as any)
+            localFallbackProcsByAihKey.set(aihKey, (calculable as any[]) as any)
+          }
+        }
+      } catch (e) {
+        logger.warn('Erro ao buscar procedimentos locais (fallback SIH RD)', e as any)
+      }
+    }
+
     const doctorsMap = new Map<string, DoctorWithPatients & { hospitalIds: Set<string> }>()
 
     // Pré-carregar dados de médicos locais por CNS
@@ -217,40 +291,46 @@ export const SihApiAdapter = {
       const localResp = localRespByAih.get(aihKey)
 
       // Construir procedimentos detalhados
-      const procedures: ProcedureDetail[] = procs.map((p, idx) => {
-        const rawCode = String(p.sp_atoprof || '')
-        const code = formatSigtapCode(rawCode)
-        const csvDesc = remoteDescMap.get(code) || remoteDescMap.get(code.replace(/\D/g, '')) || localCsvMap.get(code) || localCsvMap.get(code.replace(/\D/g, ''))
-        const valueCents = Math.round(Number(p.sp_valato || 0) * 100)
-        const quantity = Number(p.sp_qtd_ato ?? p.sp_qt_proc ?? 1) || 1
-        return {
-          procedure_id: `${aih}-${code}-${idx}`,
-          procedure_code: code,
-          procedure_description: csvDesc || '',
-          procedure_date: String(rd.dt_inter || ''),
-          value_reais: valueCents / 100,
-          value_cents: valueCents,
-          quantity,
-          cid_primary: String(p.sp_cidpri || ''),
-          approved: undefined,
-          approval_status: undefined,
-          sequence: idx + 1,
-          aih_id: undefined,
-          match_confidence: undefined,
-          sigtap_description: csvDesc,
-          complexity: String(p.sp_complex || ''),
-          professional_name: doctorByCns.get(String(p.sp_pf_doc))?.name || undefined,
-          cbo: String(p.sp_pf_cbo || ''),
-          participation: 'Responsável',
-          registration_instrument: '-',
-          sigtap_procedures: {
-            code,
-            description: csvDesc || '',
-            value_hosp_total: valueCents,
-            complexity: String(p.sp_complex || '')
-          } as any
-        }
-      })
+      let procedures: ProcedureDetail[] = []
+      if (procs.length > 0) {
+        procedures = procs.map((p, idx) => {
+          const rawCode = String(p.sp_atoprof || '')
+          const code = formatSigtapCode(rawCode)
+          const csvDesc = remoteDescMap.get(code) || remoteDescMap.get(code.replace(/\D/g, '')) || localCsvMap.get(code) || localCsvMap.get(code.replace(/\D/g, ''))
+          const valueCents = Math.round(Number(p.sp_valato || 0) * 100)
+          const quantity = Number(p.sp_qtd_ato ?? p.sp_qt_proc ?? 1) || 1
+          return {
+            procedure_id: `${aih}-${code}-${idx}`,
+            procedure_code: code,
+            procedure_description: csvDesc || '',
+            procedure_date: String(rd.dt_inter || ''),
+            value_reais: valueCents / 100,
+            value_cents: valueCents,
+            quantity,
+            cid_primary: String(p.sp_cidpri || ''),
+            approved: undefined,
+            approval_status: undefined,
+            sequence: idx + 1,
+            aih_id: undefined,
+            match_confidence: undefined,
+            sigtap_description: csvDesc,
+            complexity: String(p.sp_complex || ''),
+            professional_name: doctorByCns.get(String(p.sp_pf_doc))?.name || undefined,
+            cbo: String(p.sp_pf_cbo || ''),
+            participation: 'Responsável',
+            registration_instrument: '-',
+            sigtap_procedures: {
+              code,
+              description: csvDesc || '',
+              value_hosp_total: valueCents,
+              complexity: String(p.sp_complex || '')
+            } as any
+          }
+        })
+      } else {
+        const fallback = localFallbackProcsByAihKey.get(aihKey)
+        if (fallback && fallback.length > 0) procedures = fallback
+      }
 
       const patientLocalInfo = localPatientByAih.get(aihKey)
       const patientEntry = {
