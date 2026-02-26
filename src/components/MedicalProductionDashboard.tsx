@@ -1456,11 +1456,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const isElective = careNum === '1' || careAscii === 'eletivo'
         const has04 = proceduresWithPayment.length > 0
         if (!excludeZeros || repasseValue > 0 || (isElective && has04)) {
+          const doctorSource = (p?.aih_info as any)?.doctor_source
+          const aihDisplay = (sihMode && options?.sourceLabelOverride === 'TABWIN' && doctorSource === 'GSUS')
+            ? `${aihNumber || '-'} (GSUS)`
+            : (aihNumber || '-')
           patientsWithPayment++
           tableData.push([
             '',
             medicalRecord,
-            aihNumber || '-',
+            aihDisplay,
             name,
             proceduresDisplay,
             dischargeLabel,

@@ -368,10 +368,8 @@ export const SihApiAdapter = {
         common_name: null
       }
 
-      // Anexar AIH ao médico correto
-      // Regra: se existir responsável local, atribuir exclusivamente a ele;
-      // caso contrário, atribuir aos médicos presentes na SP (ou marcador NAO_IDENTIFICADO)
-      const assignList = localResp ? [localResp] : (doctorCnsInAih.length > 0 ? doctorCnsInAih : ['NAO_IDENTIFICADO'])
+      const assignSource: 'TABWIN' | 'GSUS' = doctorCnsInAih.length > 0 ? 'TABWIN' : (localResp ? 'GSUS' : 'TABWIN')
+      const assignList = doctorCnsInAih.length > 0 ? doctorCnsInAih : (localResp ? [localResp] : ['NAO_IDENTIFICADO'])
       for (const dcns of assignList) {
         if (!doctorsMap.has(dcns)) {
           const d = doctorByCns.get(dcns)
@@ -389,7 +387,15 @@ export const SihApiAdapter = {
         }
         const entry = doctorsMap.get(dcns) as any
         if (hosp?.id) entry.hospitalIds.add(hosp.id)
-        entry.patients.push({ ...patientEntry })
+        const nextEntry = {
+          ...patientEntry,
+          aih_info: {
+            ...(patientEntry as any).aih_info,
+            cns_responsavel: dcns || (patientEntry as any)?.aih_info?.cns_responsavel,
+            doctor_source: assignSource
+          }
+        }
+        entry.patients.push(nextEntry)
       }
     }
 

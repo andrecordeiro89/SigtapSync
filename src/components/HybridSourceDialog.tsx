@@ -5,10 +5,11 @@ import { Button } from './ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Input } from './ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table'
-import { Building, Calendar, FileText, Loader2, Stethoscope, X } from 'lucide-react'
+import { Building, Calendar, FileSpreadsheet, FileText, Loader2, Stethoscope, X } from 'lucide-react'
 import { toast } from 'sonner'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { supabaseSih } from '../lib/sihSupabase'
 import { DoctorsCrudService } from '../services/doctorsCrudService'
@@ -365,6 +366,51 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
     })
 
     doc.save(`Repasse_SIH_${new Date().toISOString().slice(0, 10)}.pdf`)
+  }
+
+  const saveExcelReport = (rows: PreviewRow[], info: NonNullable<typeof previewInfo>) => {
+    const now = new Date()
+    const generatedAt = now.toLocaleString('pt-BR')
+    const globalTotal = rows.reduce((s, r) => s + (r.repasseValue || 0), 0)
+    const header = ['#', 'AIH', 'Médico', 'Prontuário', 'Paciente', 'Procedimentos', 'Alta', 'Repasse (R$)']
+    const body = rows.map((r, idx) => [
+      idx + 1,
+      r.cells[0],
+      r.cells[1],
+      r.cells[2],
+      r.cells[3],
+      r.cells[4],
+      r.cells[5],
+      r.repasseValue || 0
+    ])
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([header, ...body])
+    ;(ws as any)['!cols'] = [
+      { wch: 5 },
+      { wch: 18 },
+      { wch: 34 },
+      { wch: 16 },
+      { wch: 34 },
+      { wch: 70 },
+      { wch: 12 },
+      { wch: 16 }
+    ]
+    XLSX.utils.book_append_sheet(wb, ws, 'Repasse SIH')
+    const wsSummary = XLSX.utils.aoa_to_sheet([
+      ['Hospital', info.hospitalLabel],
+      ['Médico', info.doctorLabel],
+      ['Especialidade', info.specialtyLabel],
+      ['Data Alta', formatDateRangeLabel(info.dischargeFrom, info.dischargeTo)],
+      ['Linhas', rows.length],
+      ['Valor Total', globalTotal],
+      ['Gerado em', generatedAt],
+      ['AIHs no SIH (encontradas)', info.remoteAihFoundCount],
+      ['AIHs no local (preenchidas)', info.localAihFilledCount],
+      ['AIHs não encontradas no SIH', info.missingInRemoteCount],
+      ['Registros locais sem nº AIH', info.localNoAihCount]
+    ])
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo')
+    XLSX.writeFile(wb, `Repasse_SIH_${now.toISOString().slice(0, 10)}.xlsx`)
   }
 
   const handleGeneratePdf = async () => {
@@ -1223,6 +1269,29 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
                 disabled={generating}
               >
                 Voltar
+              </Button>
+              <Button
+                variant="default"
+                onClick={async () => {
+                  if (!previewInfo) return
+                  try {
+                    setGenerating(true)
+                    saveExcelReport(previewRows, previewInfo)
+                    toast.success('Relatório Excel gerado com sucesso!')
+                  } catch {
+                    toast.error('Erro ao gerar relatório Excel')
+                  } finally {
+                    setGenerating(false)
+                    setPreviewMode(false)
+                    setPreviewRows([])
+                    setPreviewInfo(null)
+                  }
+                }}
+                disabled={generating || previewRows.length === 0}
+                className="bg-[#0b1736] hover:bg-[#09122a] text-white inline-flex items-center gap-2"
+              >
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                Excel
               </Button>
               <Button
                 variant="default"
