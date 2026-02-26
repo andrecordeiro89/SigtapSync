@@ -70,6 +70,43 @@ const isMedicalProcedure = (procedureCode: string): boolean => {
   return String(procedureCode).trim().startsWith('04')
 }
 
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const cleanProcedureDescription = (procedureCode: string, rawDesc: string): string => {
+  const code = String(procedureCode || '').trim()
+  const digits = code.replace(/\D/g, '')
+  let desc = String(rawDesc || '').trim()
+  if (!desc) return ''
+  if (code) {
+    desc = desc.replace(new RegExp(`^\\s*${escapeRegExp(code)}\\s*[-–—:]?\\s*`, 'i'), '')
+    desc = desc.replace(new RegExp(`\\b${escapeRegExp(code)}\\b`, 'gi'), '')
+  }
+  if (digits) {
+    desc = desc.replace(new RegExp(`^\\s*${escapeRegExp(digits)}\\s*[-–—:]?\\s*`, 'i'), '')
+    desc = desc.replace(new RegExp(`\\b${escapeRegExp(digits)}\\b`, 'gi'), '')
+  }
+  desc = desc.replace(/\s+/g, ' ').trim()
+  return desc
+}
+
+const buildProceduresDisplay = (proceduresWithPayment: any[]): string => {
+  const seen = new Set<string>()
+  const labels = (proceduresWithPayment || [])
+    .map((m: any) => {
+      const code = String(m?.procedure_code || '').trim()
+      const raw = String(m?.procedure_description || '').trim()
+      const cleaned = cleanProcedureDescription(code, raw)
+      const out = cleaned || (code ? `Procedimento ${code}` : 'Procedimento')
+      const key = out.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase()
+      if (!key) return null
+      if (seen.has(key)) return null
+      seen.add(key)
+      return out
+    })
+    .filter(Boolean) as string[]
+  return labels.length > 0 ? labels.join(' + ') : 'Sem procedimentos 04.*'
+}
+
 const endOfMonthISO = (isoDate: string): string => {
   const m = String(isoDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
   if (!m) return ''
@@ -907,12 +944,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
             sequence: p.sequence,
           }))
 
-        const proceduresDisplay = (() => {
-          const labels = proceduresWithPayment
-            .map((m: any) => String(m.procedure_description || '').trim() || (m.procedure_code ? `Procedimento ${m.procedure_code}` : 'Procedimento'))
-            .filter(Boolean)
-          return labels.length > 0 ? labels.join(' + ') : 'Sem procedimentos 04.*'
-        })()
+        const proceduresDisplay = buildProceduresDisplay(proceduresWithPayment)
 
         let repasseValue = 0
         if (knownDoctorName && proceduresWithPayment.length > 0) {

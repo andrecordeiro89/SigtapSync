@@ -85,6 +85,43 @@ const isMedicalProcedure = (procedureCode: string): boolean => {
   return code.startsWith('04');
 };
 
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const cleanProcedureDescription = (procedureCode: string, rawDesc: string): string => {
+  const code = String(procedureCode || '').trim();
+  const digits = code.replace(/\D/g, '');
+  let desc = String(rawDesc || '').trim();
+  if (!desc) return '';
+  if (code) {
+    desc = desc.replace(new RegExp(`^\\s*${escapeRegExp(code)}\\s*[-–—:]?\\s*`, 'i'), '');
+    desc = desc.replace(new RegExp(`\\b${escapeRegExp(code)}\\b`, 'gi'), '');
+  }
+  if (digits) {
+    desc = desc.replace(new RegExp(`^\\s*${escapeRegExp(digits)}\\s*[-–—:]?\\s*`, 'i'), '');
+    desc = desc.replace(new RegExp(`\\b${escapeRegExp(digits)}\\b`, 'gi'), '');
+  }
+  desc = desc.replace(/\s+/g, ' ').trim();
+  return desc;
+};
+
+const buildProceduresDisplay = (procedures: any[], fallbackText: string): string => {
+  const seen = new Set<string>();
+  const labels = (procedures || [])
+    .map((m: any) => {
+      const code = String(m?.procedure_code || '').trim();
+      const raw = String(m?.procedure_description || m?.sigtap_description || '').trim();
+      const cleaned = cleanProcedureDescription(code, raw);
+      const out = cleaned || (code ? `Procedimento ${code}` : 'Procedimento');
+      const key = out.normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
+      if (!key) return null;
+      if (seen.has(key)) return null;
+      seen.add(key);
+      return out;
+    })
+    .filter(Boolean) as string[];
+  return labels.length > 0 ? labels.join(' + ') : fallbackText;
+};
+
 const formatParticipationLabel = (raw: unknown): string => {
   const base = String(raw ?? '').trim();
   if (!base) return '';
@@ -1319,7 +1356,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const mainCode = mainProc?.procedure_code || ''
         const mainCodeDigits = mainCode.replace(/\D/g, '')
         const descFallback = mainCode && sigtapMap ? ((sigtapMap.get(mainCode) || sigtapMap.get(mainCodeDigits) || '') as string) : ''
-        const mainProcDesc = ((mainProc?.procedure_description || mainProc?.sigtap_description || descFallback || '') as string).trim()
+        const mainProcDescRaw = ((mainProc?.procedure_description || mainProc?.sigtap_description || descFallback || '') as string).trim()
+        const mainProcDesc = cleanProcedureDescription(mainCode, mainProcDescRaw)
         const medicalForDisplay = calculable
           .filter((x: any) => isMedicalProcedure(x.procedure_code) && shouldCalculateAnesthetistProcedure(x.cbo, x.procedure_code))
           .sort((a: any, b: any) => {
@@ -1330,15 +1368,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             const vb = typeof b.value_reais === 'number' ? b.value_reais : 0
             return vb - va
           })
-        // ✅ CORREÇÃO: Mostrar TODOS os procedimentos contemplados (não apenas 2)
-        const labels = medicalForDisplay.map((m: any) => {
-          const code = m.procedure_code || ''
-          const digits = code.replace(/\D/g, '')
-          const descFallback2 = code && sigtapMap ? ((sigtapMap.get(code) || sigtapMap.get(digits) || '') as string) : ''
-          const desc = ((m.procedure_description || m.sigtap_description || descFallback2 || '') as string).trim()
-          return desc || (code ? `Procedimento ${code}` : 'Procedimento')
-        })
-        const proceduresDisplay = labels.length > 0 ? labels.join(' + ') : (mainProcDesc || (mainCode ? `Procedimento ${mainCode}` : 'Sem procedimento principal'))
+        const proceduresDisplay = buildProceduresDisplay(
+          medicalForDisplay.map((m: any) => {
+            const code = String(m?.procedure_code || '').trim()
+            const digits = code.replace(/\D/g, '')
+            const descFallback2 = code && sigtapMap ? ((sigtapMap.get(code) || sigtapMap.get(digits) || '') as string) : ''
+            return { ...m, procedure_description: String(m?.procedure_description || m?.sigtap_description || descFallback2 || '').trim() }
+          }),
+          mainProcDesc || (mainCode ? `Procedimento ${mainCode}` : 'Sem procedimento principal')
+        )
         const dischargeISO = p?.aih_info?.discharge_date || ''
         const dischargeLabel = parseISODateToLocal(dischargeISO)
         if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
