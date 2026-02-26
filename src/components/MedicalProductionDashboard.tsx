@@ -821,6 +821,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const approvedSetRef = useRef<Set<string>>(new Set())
   const approvalCompetenciaByAihRef = useRef<Map<string, string>>(new Map())
   const [selectedDoctorForReport, setSelectedDoctorForReport] = useState<any>(null)
+  const [tabwinReportOpen, setTabwinReportOpen] = useState<boolean>(false)
+  const [tabwinReportDoctor, setTabwinReportDoctor] = useState<any>(null)
+  const [tabwinReportLoading, setTabwinReportLoading] = useState<boolean>(false)
   const [simplifiedPreviewOpen, setSimplifiedPreviewOpen] = useState<boolean>(false)
   const [simplifiedPreviewRows, setSimplifiedPreviewRows] = useState<Array<Array<string>>>([])
   const simplifiedPreviewConfirmRef = useRef<null | ((rows: Array<Array<string>>) => void)>(null)
@@ -835,8 +838,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   }
   const [relateOpen, setRelateOpen] = useState<boolean>(false)
   const [relateDoctor, setRelateDoctor] = useState<any>(null)
-  const [relateReportA, setRelateReportA] = useState<string>('Relatório Pacientes')
-  const [relateReportB, setRelateReportB] = useState<string>('Relatório Pacientes Simplificado')
+  const [relateReportA, setRelateReportA] = useState<string>('Relatório Pacientes Simplificado')
+  const [relateReportB, setRelateReportB] = useState<string>('Repasse Médico (TABWIN)')
   const [relateLoading, setRelateLoading] = useState<boolean>(false)
   const [valueConferenceOpen, setValueConferenceOpen] = useState<boolean>(false)
   const [valueConferenceDoctor, setValueConferenceDoctor] = useState<any>(null)
@@ -1214,7 +1217,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     doctor: any,
     approvedOnly: boolean,
     excludeZeros?: boolean,
-    options?: { forceSihSource?: boolean; sourceLabelOverride?: 'TABWIN' | 'GSUS' }
+    options?: { forceSihSource?: boolean; sourceLabelOverride?: 'TABWIN' | 'GSUS'; outputFormat?: 'pdf' | 'excel' }
   ) => {
     try {
       const sihMode = typeof options?.forceSihSource === 'boolean' ? options.forceSihSource : useSihSource
@@ -1512,6 +1515,41 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         totalRepasse = fixedCalcReport.calculatedPayment
       }
 
+      if (options?.outputFormat === 'excel') {
+        const sourceLabel = options.sourceLabelOverride ?? (sihMode ? 'TABWIN' : 'GSUS')
+        const header = ['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Valor de Repasse']
+        const rows = tableData.map(r => [r[0], r[1], r[2], r[3], r[4], r[5], r[6]])
+
+        const wb = XLSX.utils.book_new()
+        const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
+        ;(ws as any)['!cols'] = [
+          { wch: 5 },
+          { wch: 18 },
+          { wch: 18 },
+          { wch: 40 },
+          { wch: 70 },
+          { wch: 14 },
+          { wch: 18 }
+        ]
+        XLSX.utils.book_append_sheet(wb, ws, 'Repasse')
+
+        const summarySheet = XLSX.utils.aoa_to_sheet([
+          ['Fonte', sourceLabel],
+          ['Médico', doctorName || ''],
+          ['Hospital', hospitalName || ''],
+          ['Linhas', rows.length],
+          ['Valor Total', totalRepasse],
+          ['Gerado em', formatDateFns(new Date(), 'dd/MM/yyyy HH:mm')]
+        ])
+        XLSX.utils.book_append_sheet(wb, summarySheet, 'Resumo')
+
+        const safeDoctor = (doctorName || 'Medico').replace(/\s+/g, '_')
+        const fileName = `Repasse_Medico_${sourceLabel}_${safeDoctor}_${formatDateFns(new Date(), 'yyyyMMdd_HHmm')}.xlsx`
+        XLSX.writeFile(wb, fileName)
+        toast.success('Relatório Excel gerado com sucesso!')
+        return
+      }
+
       const runPdf = (rowsOverride: Array<Array<string>>) => {
         const rows = (rowsOverride || []).map((r, idx) => {
           const out = [...r]
@@ -1657,7 +1695,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     }
   }
 
-  const generateSimplifiedReportFromSih = async (doctor: any, excludeZeros?: boolean) => {
+  const generateSimplifiedReportFromSih = async (doctor: any, excludeZeros?: boolean, outputFormat: 'pdf' | 'excel' = 'pdf') => {
     try {
       if (!remoteConfigured) {
         toast.error('Fonte SIH remota não configurada')
@@ -1721,7 +1759,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         return
       }
 
-      await generateSimplifiedReport(remoteDoc, false, excludeZeros, { forceSihSource: true, sourceLabelOverride: 'TABWIN' })
+      await generateSimplifiedReport(remoteDoc, false, excludeZeros, { forceSihSource: true, sourceLabelOverride: 'TABWIN', outputFormat })
     } catch (err) {
       console.error('Erro ao gerar relatório simplificado SIH:', err)
       toast.error('Erro ao gerar relatório SIH')
@@ -1731,7 +1769,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const relateReportOptions = [
     'Relatório Pacientes',
     'Relatório Pacientes Simplificado',
-    'Relatório Pacientes Simplificado (SIH RD)',
+    'Repasse Médico (TABWIN)',
     'Relatório Simplificado (Sem Zeros)'
   ] as const
 
@@ -1996,7 +2034,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   }
 
   const buildRelateDataset = async (doctor: any, reportLabel: string) => {
-    if (reportLabel === 'Relatório Pacientes Simplificado (SIH RD)') {
+    if (reportLabel === 'Repasse Médico (TABWIN)') {
       const remoteDoc = await loadRemoteDoctorForCard(doctor)
       if (!remoteDoc) throw new Error('Nenhum dado remoto SIH encontrado')
       return buildSimplifiedTableData(remoteDoc, false, true)
@@ -2476,7 +2514,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
     setRelateLoading(true)
     try {
-      if ((relateReportA === 'Relatório Pacientes Simplificado (SIH RD)' || relateReportB === 'Relatório Pacientes Simplificado (SIH RD)') && !remoteConfigured) {
+      if ((relateReportA === 'Repasse Médico (TABWIN)' || relateReportB === 'Repasse Médico (TABWIN)') && !remoteConfigured) {
         toast.error('Fonte SIH remota não configurada')
         return
       }
@@ -6233,14 +6271,15 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                     </Button>
                                     <Button
                                       type="button"
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        await generateSimplifiedReportFromSih(doctor, false);
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setTabwinReportDoctor(doctor)
+                                        setTabwinReportOpen(true)
                                       }}
                                       className="inline-flex items-center gap-2 bg-[#0b1736] hover:bg-[#09122a] text-white shadow-sm h-9 px-3 rounded-md text-sm w-auto min-w-[200px]"
                                     >
                                       <FileSpreadsheet className="h-4 w-4" />
-                                      Relatório Pacientes Simplificado (SIH RD)
+                                      Repasse Médico (TABWIN)
                                     </Button>
                                     <Button
                                       type="button"
@@ -6258,8 +6297,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setRelateDoctor(doctor);
-                                        setRelateReportA('Relatório Pacientes');
-                                        setRelateReportB('Relatório Pacientes Simplificado');
+                                        setRelateReportA('Relatório Pacientes Simplificado');
+                                        setRelateReportB('Repasse Médico (TABWIN)');
                                         setRelateOpen(true);
                                       }}
                                       className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-9 px-3 rounded-md text-sm w-auto min-w-[200px]"
@@ -7920,6 +7959,65 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                 </div>
               </>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={tabwinReportOpen}
+        onOpenChange={(open) => {
+          if (!tabwinReportLoading) setTabwinReportOpen(open)
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Repasse Médico (TABWIN)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm text-neutral-700">
+            <div>Médico: <span className="font-semibold text-black">{tabwinReportDoctor?.doctor_info?.name || '-'}</span></div>
+            <div>Hospital: <span className="font-semibold text-black">{tabwinReportDoctor?.hospitals?.[0]?.hospital_name || '-'}</span></div>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setTabwinReportOpen(false)}
+              disabled={tabwinReportLoading}
+            >
+              Fechar
+            </Button>
+            <Button
+              className="bg-black hover:bg-neutral-800 text-white inline-flex items-center gap-2"
+              onClick={async () => {
+                if (!tabwinReportDoctor) return
+                try {
+                  setTabwinReportLoading(true)
+                  setTabwinReportOpen(false)
+                  await generateSimplifiedReportFromSih(tabwinReportDoctor, false, 'pdf')
+                } finally {
+                  setTabwinReportLoading(false)
+                }
+              }}
+              disabled={tabwinReportLoading}
+            >
+              {tabwinReportLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+              PDF
+            </Button>
+            <Button
+              className="bg-[#0b1736] hover:bg-[#09122a] text-white inline-flex items-center gap-2"
+              onClick={async () => {
+                if (!tabwinReportDoctor) return
+                try {
+                  setTabwinReportLoading(true)
+                  setTabwinReportOpen(false)
+                  await generateSimplifiedReportFromSih(tabwinReportDoctor, false, 'excel')
+                } finally {
+                  setTabwinReportLoading(false)
+                }
+              }}
+              disabled={tabwinReportLoading}
+            >
+              {tabwinReportLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+              Excel
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
