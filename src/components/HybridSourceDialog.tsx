@@ -369,51 +369,45 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
   }
 
   const saveExcelReport = (rows: PreviewRow[], info: NonNullable<typeof previewInfo>) => {
-    const now = new Date()
-    const generatedAt = now.toLocaleString('pt-BR')
+    const body = rows.map((r, idx) => [idx + 1, ...r.cells])
+    const header = ['#', 'Nº da AIH', 'Médico', 'Prontuário', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Valor de Repasse']
     const globalTotal = rows.reduce((s, r) => s + (r.repasseValue || 0), 0)
-    const header = ['#', 'AIH', 'Médico', 'Prontuário', 'Paciente', 'Procedimentos', 'Alta', 'Repasse (R$)']
-    const body = rows.map((r, idx) => [
-      idx + 1,
-      r.cells[0],
-      r.cells[1],
-      r.cells[2],
-      r.cells[3],
-      r.cells[4],
-      r.cells[5],
-      r.repasseValue || 0
-    ])
+    const nowLabel = new Date().toLocaleString('pt-BR')
+
     const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.aoa_to_sheet([header, ...body])
     ;(ws as any)['!cols'] = [
-      { wch: 5 },
+      { wch: 6 },
       { wch: 18 },
-      { wch: 34 },
+      { wch: 28 },
       { wch: 16 },
-      { wch: 34 },
+      { wch: 36 },
       { wch: 70 },
-      { wch: 12 },
-      { wch: 16 }
+      { wch: 14 },
+      { wch: 18 }
     ]
     XLSX.utils.book_append_sheet(wb, ws, 'Repasse SIH')
+
     const wsSummary = XLSX.utils.aoa_to_sheet([
       ['Hospital', info.hospitalLabel],
-      ['Médico', info.doctorLabel],
       ['Especialidade', info.specialtyLabel],
+      ['Médico', info.doctorLabel],
       ['Data Alta', formatDateRangeLabel(info.dischargeFrom, info.dischargeTo)],
+      ['Gerado em', nowLabel],
       ['Linhas', rows.length],
       ['Valor Total', globalTotal],
-      ['Gerado em', generatedAt],
       ['AIHs no SIH (encontradas)', info.remoteAihFoundCount],
       ['AIHs no local (preenchidas)', info.localAihFilledCount],
       ['AIHs não encontradas no SIH', info.missingInRemoteCount],
-      ['Registros locais sem nº AIH', info.localNoAihCount]
+      ['Registros locais sem nº AIH', info.localNoAihCount],
     ])
     XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo')
-    XLSX.writeFile(wb, `Repasse_SIH_${now.toISOString().slice(0, 10)}.xlsx`)
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16)
+    XLSX.writeFile(wb, `Repasse_SIH_${stamp}.xlsx`)
   }
 
-  const handleGeneratePdf = async () => {
+  const handleGeneratePdf = async (format: 'pdf' | 'excel' = 'pdf') => {
     try {
       if (!dischargeFrom || !dischargeTo) {
         toast.error('Por favor, selecione um período de alta.')
@@ -1026,12 +1020,13 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
         return
       }
 
-      savePdfReport(sorted, info)
+      if (format === 'pdf') savePdfReport(sorted, info)
+      else saveExcelReport(sorted, info)
       toast.success('Relatório gerado com sucesso!')
     } catch (e: any) {
-      console.error('Erro ao gerar PDF (Fonte Híbrida):', e)
+      console.error('Erro ao gerar relatório (Fonte Híbrida):', e)
       const msg = String(e?.message || e?.error_description || e?.details || e || '').trim()
-      toast.error(msg ? `Erro ao gerar PDF: ${msg}` : 'Erro ao gerar PDF')
+      toast.error(msg ? `Erro ao gerar relatório: ${msg}` : 'Erro ao gerar relatório')
     } finally {
       setGenerating(false)
     }
@@ -1041,11 +1036,12 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
     return (previewRows || []).reduce((s, r) => s + (r.repasseValue || 0), 0)
   }, [previewRows])
 
-  const handleConfirmPreview = async () => {
+  const handleConfirmPreview = async (format: 'pdf' | 'excel') => {
     if (!previewInfo) return
     try {
       setGenerating(true)
-      savePdfReport(previewRows, previewInfo)
+      if (format === 'pdf') savePdfReport(previewRows, previewInfo)
+      else saveExcelReport(previewRows, previewInfo)
       toast.success('Relatório gerado com sucesso!')
       setPreviewMode(false)
       setPreviewRows([])
@@ -1053,7 +1049,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
       onOpenChange(false)
     } catch (e: any) {
       const msg = String(e?.message || e || '').trim()
-      toast.error(msg ? `Erro ao gerar PDF: ${msg}` : 'Erro ao gerar PDF')
+      toast.error(msg ? `Erro ao gerar relatório: ${msg}` : 'Erro ao gerar relatório')
     } finally {
       setGenerating(false)
     }
@@ -1193,12 +1189,21 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
               </Button>
               <Button
                 variant="default"
-                onClick={handleGeneratePdf}
+                onClick={() => handleGeneratePdf('pdf')}
                 disabled={generating}
                 className="bg-black hover:bg-neutral-800 text-white inline-flex items-center gap-2"
               >
                 {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                 Repasse SIH (PDF)
+              </Button>
+              <Button
+                variant="default"
+                onClick={() => handleGeneratePdf('excel')}
+                disabled={generating}
+                className="bg-[#0b1736] hover:bg-[#09122a] text-white inline-flex items-center gap-2"
+              >
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+                Repasse SIH (Excel)
               </Button>
             </div>
           </>
@@ -1272,35 +1277,21 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
               </Button>
               <Button
                 variant="default"
-                onClick={async () => {
-                  if (!previewInfo) return
-                  try {
-                    setGenerating(true)
-                    saveExcelReport(previewRows, previewInfo)
-                    toast.success('Relatório Excel gerado com sucesso!')
-                  } catch {
-                    toast.error('Erro ao gerar relatório Excel')
-                  } finally {
-                    setGenerating(false)
-                    setPreviewMode(false)
-                    setPreviewRows([])
-                    setPreviewInfo(null)
-                  }
-                }}
+                onClick={() => handleConfirmPreview('pdf')}
+                disabled={generating || previewRows.length === 0}
+                className="bg-black hover:bg-neutral-800 text-white inline-flex items-center gap-2"
+              >
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                PDF
+              </Button>
+              <Button
+                variant="default"
+                onClick={() => handleConfirmPreview('excel')}
                 disabled={generating || previewRows.length === 0}
                 className="bg-[#0b1736] hover:bg-[#09122a] text-white inline-flex items-center gap-2"
               >
                 {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
                 Excel
-              </Button>
-              <Button
-                variant="default"
-                onClick={handleConfirmPreview}
-                disabled={generating || previewRows.length === 0}
-                className="bg-black hover:bg-neutral-800 text-white inline-flex items-center gap-2"
-              >
-                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                Confirmar
               </Button>
             </div>
           </>
