@@ -98,7 +98,7 @@ export const SihApiAdapter = {
     for (const ch of spChunks) {
       let spQuery = supabaseSih
         .from('sih_sp')
-        .select('sp_naih, sp_atoprof, sp_qt_proc, sp_qtd_ato, sp_valato, sp_pf_doc, sp_pf_cbo, sp_cidpri, sp_complex, sp_dtsaida')
+        .select('sp_naih, sp_atoprof, sp_qt_proc, sp_qtd_ato, sp_valato, sp_ptsp, sp_pf_doc, sp_pf_cbo, sp_cidpri, sp_complex, sp_dtsaida')
         .in('sp_naih', ch)
       const { data: spData, error: spError } = await spQuery
       if (spError) logger.warn('Erro chunk sih_sp', spError)
@@ -286,8 +286,34 @@ export const SihApiAdapter = {
       const hosp = hospByCnes.get(cnes)
       const procs = spByAih.get(aih) || []
 
-      // Cada AIH pode aparecer para múltiplos médicos (cada profissional do SP)
-      const doctorCnsInAih = Array.from(new Set(procs.map(p => String(p.sp_pf_doc)).filter(Boolean)))
+      const pickPreferredDoctorCns = (list: any[]): string => {
+        let best: { cns: string; is04: boolean; weight: number; idx: number } | null = null
+        for (let i = 0; i < list.length; i++) {
+          const row = list[i]
+          const cns = String(row?.sp_pf_doc || '').trim()
+          if (!cns) continue
+          const code = formatSigtapCode(String(row?.sp_atoprof || ''))
+          const is04 = code.startsWith('04')
+          const ptspRaw = Number(row?.sp_ptsp)
+          const valRaw = Number(row?.sp_valato)
+          const weight = Number.isFinite(ptspRaw) ? ptspRaw : (Number.isFinite(valRaw) ? valRaw : 0)
+          if (!best) {
+            best = { cns, is04, weight, idx: i }
+            continue
+          }
+          if (is04 !== best.is04) {
+            if (is04) best = { cns, is04, weight, idx: i }
+            continue
+          }
+          if (weight !== best.weight) {
+            if (weight > best.weight) best = { cns, is04, weight, idx: i }
+            continue
+          }
+        }
+        return best?.cns || (String(list?.[0]?.sp_pf_doc || '').trim() || '')
+      }
+
+      const preferredDoctorCns = procs.length > 0 ? pickPreferredDoctorCns(procs) : ''
       const localResp = localRespByAih.get(aihKey)
 
       // Construir procedimentos detalhados
@@ -368,8 +394,8 @@ export const SihApiAdapter = {
         common_name: null
       }
 
-      const assignSource: 'TABWIN' | 'GSUS' = doctorCnsInAih.length > 0 ? 'TABWIN' : (localResp ? 'GSUS' : 'TABWIN')
-      const assignList = doctorCnsInAih.length > 0 ? doctorCnsInAih : (localResp ? [localResp] : ['NAO_IDENTIFICADO'])
+      const assignSource: 'TABWIN' | 'GSUS' = preferredDoctorCns ? 'TABWIN' : (localResp ? 'GSUS' : 'TABWIN')
+      const assignList = preferredDoctorCns ? [preferredDoctorCns] : (localResp ? [localResp] : ['NAO_IDENTIFICADO'])
       for (const dcns of assignList) {
         if (!doctorsMap.has(dcns)) {
           const d = doctorByCns.get(dcns)
