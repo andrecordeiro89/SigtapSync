@@ -136,6 +136,10 @@ const endExclusiveISODate = (isoDate: string): string => {
   return next.toISOString().slice(0, 10)
 }
 
+import { checkCboCompatibility, isSurgicalProcedure } from '../utils/cboCompatibility'
+import { getSpecialtyName } from '../utils/aihLookups'
+import { CareCharacterUtils } from '../config/careCharacterCodes'
+
 export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceDialogProps) {
   type PreviewRow = {
     id: string
@@ -144,6 +148,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
     hasProcedures04: boolean
     repasseValue: number
     cells: string[]
+    isDivergent?: boolean
   }
 
   const [hospitals, setHospitals] = useState<HospitalOption[]>([])
@@ -440,7 +445,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
     }
 
     autoTable(doc, {
-      head: [['#', 'Nº da AIH', 'Médico', 'Prontuário', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Competência', 'Valor de Repasse']],
+      head: [['#', 'Nº da AIH', 'Médico', 'Prontuário', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Caráter', 'Competência', 'Valor de Repasse']],
       body,
       startY,
       theme: 'striped',
@@ -454,10 +459,20 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
         4: { cellWidth: 'auto', halign: 'left' },
         5: { cellWidth: 'auto', halign: 'left', fontSize: 7 },
         6: { cellWidth: 'auto', halign: 'center' },
-        7: { cellWidth: 'auto', halign: 'center' },
-        8: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
+        7: { cellWidth: 'auto', halign: 'center', fontSize: 7 },
+        8: { cellWidth: 'auto', halign: 'center' },
+        9: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
       },
       styles: { overflow: 'linebreak', cellPadding: 2, fontSize: 8 },
+      didParseCell: (data) => {
+        if (data.section === 'body') {
+          const rowIndex = data.row.index
+          const originalRow = rows[rowIndex] as PreviewRow
+          if (originalRow && originalRow.isDivergent) {
+            data.cell.styles.textColor = [255, 0, 0] // Vermelho
+          }
+        }
+      },
       margin: { left: 20, right: 20 },
       alternateRowStyles: { fillColor: [245, 245, 245] },
     })
@@ -466,8 +481,8 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
   }
 
   const saveExcelReport = (rows: PreviewRow[], info: NonNullable<typeof previewInfo>) => {
-    const body = rows.map((r, idx) => [idx + 1, ...r.cells])
-    const header = ['#', 'Nº da AIH', 'Médico', 'Prontuário', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Competência', 'Valor de Repasse']
+    const body = rows.map((r, idx) => [...[idx + 1, ...r.cells], r.isDivergent ? 'DIVERGÊNCIA ESPECIALIDADE' : ''])
+    const header = ['#', 'Nº da AIH', 'Médico', 'Prontuário', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Caráter', 'Competência', 'Valor de Repasse', 'Obs']
     const globalTotal = rows.reduce((s, r) => s + (r.repasseValue || 0), 0)
     const nowLabel = new Date().toLocaleString('pt-BR')
 
@@ -481,8 +496,10 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
         { wch: 36 }, // Nome do Paciente
         { wch: 70 }, // Procedimentos
         { wch: 14 }, // Data Alta
+        { wch: 25 }, // Caráter
         { wch: 12 }, // Competência
-        { wch: 18 } // Valor de Repasse
+        { wch: 18 }, // Valor de Repasse
+        { wch: 25 }  // Obs
       ]
     XLSX.utils.book_append_sheet(wb, ws, 'Repasse SIH')
 
@@ -591,8 +608,8 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
       const cnesDigits = normalizeCnes(selectedHospitalCnes)
       const cnesVariants = Array.from(new Set([cnesDigits, cnesDigits.replace(/^0+/, ''), cnesDigits.padStart(7, '0')].filter(Boolean)))
 
-      const rdRows: Array<{ n_aih: string; dt_saida?: string; hospital_id?: string; cnes?: string; competencia?: string }> = []
-      const remoteRdByAih = new Map<string, { dtSaida: string; hospitalId?: string; competencia?: string }>()
+      const rdRows: Array<{ n_aih: string; dt_saida?: string; hospital_id?: string; cnes?: string; competencia?: string; espec?: string; car_int?: string; diag_princ?: string }> = []
+      const remoteRdByAih = new Map<string, { dtSaida: string; hospitalId?: string; competencia?: string; espec?: string; car_int?: string; diag_princ?: string }>()
 
       if (selectedHospital !== 'all') {
         const pageSizeRd = 1000
@@ -619,6 +636,9 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
             hospital_id: r?.hospital_id ? String(r.hospital_id) : undefined,
             cnes: r?.cnes ? String(r.cnes) : undefined,
             competencia: (r?.ano_cmpt && r?.mes_cmpt) ? `${String(r.ano_cmpt).padStart(4, '0')}${String(r.mes_cmpt).padStart(2, '0')}` : undefined,
+            espec: r?.espec ? String(r.espec) : undefined,
+            car_int: r?.car_int ? String(r.car_int) : undefined,
+            diag_princ: r?.diag_princ ? String(r.diag_princ) : undefined,
           }))
           if (batch.length < pageSizeRd) break
           rdOffset += pageSizeRd
@@ -629,7 +649,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
           for (; ;) {
             let q = supabaseSih
               .from('sih_rd')
-              .select('n_aih, dt_saida, hospital_id, cnes, ano_cmpt, mes_cmpt')
+              .select('n_aih, dt_saida, hospital_id, cnes, ano_cmpt, mes_cmpt, espec, car_int, diag_princ')
               .in('cnes', cnesVariants)
             if (hasDateFilter) {
               q = q.not('dt_saida', 'is', null).gte('dt_saida', dischargeFrom).lt('dt_saida', endExclusive)
@@ -643,12 +663,15 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
             const batch = (data || []) as any[]
             if (batch.length === 0) break
             batch.forEach((r: any) => rdRows.push({
-              n_aih: String(r?.n_aih || ''),
-              dt_saida: r?.dt_saida ? String(r.dt_saida) : undefined,
-              hospital_id: r?.hospital_id ? String(r.hospital_id) : undefined,
-              cnes: r?.cnes ? String(r.cnes) : undefined,
-              competencia: (r?.ano_cmpt && r?.mes_cmpt) ? `${String(r.ano_cmpt).padStart(4, '0')}${String(r.mes_cmpt).padStart(2, '0')}` : undefined,
-            }))
+            n_aih: String(r?.n_aih || ''),
+            dt_saida: r?.dt_saida ? String(r.dt_saida) : undefined,
+            hospital_id: r?.hospital_id ? String(r.hospital_id) : undefined,
+            cnes: r?.cnes ? String(r.cnes) : undefined,
+            competencia: (r?.ano_cmpt && r?.mes_cmpt) ? `${String(r.ano_cmpt).padStart(4, '0')}${String(r.mes_cmpt).padStart(2, '0')}` : undefined,
+            espec: r?.espec ? String(r.espec) : undefined,
+            car_int: r?.car_int ? String(r.car_int) : undefined,
+            diag_princ: r?.diag_princ ? String(r.diag_princ) : undefined,
+          }))
             if (batch.length < pageSizeRd) break
             rdOffset += pageSizeRd
           }
@@ -658,7 +681,14 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
           const key = normalizeAih(r?.n_aih)
           if (!key) return
           if (!remoteRdByAih.has(key)) {
-            remoteRdByAih.set(key, { dtSaida: String(r?.dt_saida || '').trim(), hospitalId: r?.hospital_id, competencia: r?.competencia })
+            remoteRdByAih.set(key, { 
+              dtSaida: String(r?.dt_saida || '').trim(), 
+              hospitalId: r?.hospital_id, 
+              competencia: r?.competencia,
+              espec: r?.espec,
+              car_int: r?.car_int,
+              diag_princ: r?.diag_princ
+            })
           }
         })
       }
@@ -694,7 +724,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
           for (const ch of chunk(doctorAihRaw, 80)) {
             let q = supabaseSih
               .from('sih_rd')
-              .select('n_aih, dt_saida, hospital_id, cnes, ano_cmpt, mes_cmpt')
+              .select('n_aih, dt_saida, hospital_id, cnes, ano_cmpt, mes_cmpt, espec, car_int, diag_princ')
               .in('n_aih', ch)
             if (hasDateFilter) {
               q = q.not('dt_saida', 'is', null).gte('dt_saida', dischargeFrom).lt('dt_saida', endExclusive)
@@ -712,12 +742,22 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
                   hospital_id: r?.hospital_id ? String(r.hospital_id) : undefined,
                   cnes: r?.cnes ? String(r.cnes) : undefined,
                   competencia: (r?.ano_cmpt && r?.mes_cmpt) ? `${String(r.ano_cmpt).padStart(4, '0')}${String(r.mes_cmpt).padStart(2, '0')}` : undefined,
+                  espec: r?.espec ? String(r.espec) : undefined,
+                  car_int: r?.car_int ? String(r.car_int) : undefined,
+                  diag_princ: r?.diag_princ ? String(r.diag_princ) : undefined,
                 }
                 rdRows.push(row)
                 const key = normalizeAih(row.n_aih)
                 if (!key) return
                 if (!remoteRdByAih.has(key)) {
-                  remoteRdByAih.set(key, { dtSaida: String(row.dt_saida || '').trim(), hospitalId: row.hospital_id, competencia: row.competencia })
+                  remoteRdByAih.set(key, { 
+                    dtSaida: String(row.dt_saida || '').trim(), 
+                    hospitalId: row.hospital_id, 
+                    competencia: row.competencia,
+                    espec: row.espec,
+                    car_int: row.car_int,
+                    diag_princ: row.diag_princ
+                  })
                 }
               })
           }
@@ -817,6 +857,9 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
         competencia?: string
         hospitalId?: string
         doctorCns?: string
+        espec?: string
+        car_int?: string
+        diag_princ?: string
       }> = []
 
       const combinedAihKeys = Array.from(new Set([...Array.from(uniqueLocalByAih.keys()), ...remoteRdAihKeys]))
@@ -832,6 +875,9 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
           competencia: rd?.competencia,
           hospitalId: r?.hospital_id || rd?.hospitalId,
           doctorCns: undefined,
+          espec: rd?.espec,
+          car_int: rd?.car_int,
+          diag_princ: rd?.diag_princ
         })
       }
 
@@ -965,21 +1011,39 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
       const codes = codesRaw.map(formatSigtapCode).filter(Boolean)
       const codesPlain = codes.map(c => c.replace(/\D/g, ''))
       const remoteDescMap = new Map<string, string>()
+      const remoteCbosMap = new Map<string, string[]>()
       try {
         const { data: procRows } = await supabaseSih
           .from('sigtap_procedimentos')
-          .select('code, description')
+          .select('code, description, cbo')
           .in('code', Array.from(new Set([...codes, ...codesPlain])))
           ; (procRows || []).forEach((p: any) => {
             const code = String(p.code || '').trim()
             const desc = String(p.description || '').trim()
-            if (code && desc) remoteDescMap.set(code, desc)
+            const cbos = Array.isArray(p.cbo) ? p.cbo.map(String) : []
+            if (code && desc) {
+              remoteDescMap.set(code, desc)
+              remoteCbosMap.set(code, cbos)
+            }
           })
       } catch { }
 
       const rowsDetailed: PreviewRow[] = []
       const totalsByDoctorHospital = new Map<string, { total: number; isMonthly: boolean; fixed: number; fixedRule: string; hospitalId?: string; hospitalName?: string; doctorName: string }>()
       const remoteFoundAihKeys = new Set<string>(Array.from(spByAih.keys()))
+      const doctorCboMap = new Map<string, string[]>()
+      if (cnsSet.length > 0) {
+        const { data: doctorCboRows } = await supabase
+          .from('doctors')
+          .select('cns, cbo_codes')
+          .in('cns', cnsSet)
+        ;(doctorCboRows || []).forEach((d: any) => {
+          const cns = String(d.cns || '').trim()
+          if (cns) {
+            doctorCboMap.set(cns, Array.isArray(d.cbo_codes) ? d.cbo_codes.map(String) : [])
+          }
+        })
+      }
 
       filteredEntries.forEach((entry) => {
         const chosenCns = entry.aihKey ? (chooseDoctorCnsForAih(entry.aihKey, selectedDoctor !== 'all' ? selectedDoctor : undefined) || '') : ''
@@ -997,6 +1061,11 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
 
         const spAll = entry.aihKey ? (spByAih.get(entry.aihKey) || []) : []
         const sp = chosenCns ? spAll.filter((r: any) => String(r?.sp_pf_doc || '').trim() === chosenCns) : spAll
+        
+        // Verifica divergência CBO
+        const doctorCbos = chosenCns ? (doctorCboMap.get(chosenCns) || []) : []
+        let hasDivergentProcedure = false
+
         const procedureList = sp.map((r: any, idx: number) => {
           const code = formatSigtapCode(String(r?.sp_atoprof || ''))
           const digits = code.replace(/\D/g, '')
@@ -1008,6 +1077,18 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
             ''
           const qty = Number(r?.sp_qtd_ato ?? r?.sp_qt_proc ?? 1) || 1
           const val = Number(r?.sp_valato || 0) * qty
+          
+          // Validação CBO
+          if (isSurgicalProcedure(code) && doctorCbos.length > 0) {
+            const allowedCbos = remoteCbosMap.get(code) || remoteCbosMap.get(digits)
+            if (allowedCbos && allowedCbos.length > 0) {
+              const isCompatible = checkCboCompatibility(doctorCbos, allowedCbos)
+              if (!isCompatible) {
+                hasDivergentProcedure = true
+              }
+            }
+          }
+
           return {
             procedure_code: code,
             procedure_description: desc,
@@ -1037,7 +1118,27 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
             sequence: p.sequence,
           }))
 
-        const proceduresDisplay = buildProceduresDisplay(proceduresWithPayment)
+        // Se não tiver procedimentos cirúrgicos (04.*) e tivermos info remota, tentar exibir procedimento principal
+        let proceduresDisplay = buildProceduresDisplay(proceduresWithPayment)
+        if (proceduresWithPayment.length === 0 && (entry.diag_princ || spAll.length > 0)) {
+           // Tentar pegar do diag_princ ou do primeiro procedimento SP
+           let mainDesc = ''
+           if (spAll.length > 0) {
+             // Tentar achar o principal no SP (geralmente seq 1 ou maior valor)
+             const mainSp = spAll.reduce((prev: any, curr: any) => {
+               const vPrev = Number(prev?.sp_valato || 0)
+               const vCurr = Number(curr?.sp_valato || 0)
+               return vCurr > vPrev ? curr : prev
+             }, spAll[0])
+             const code = formatSigtapCode(String(mainSp?.sp_atoprof || ''))
+             const digits = code.replace(/\D/g, '')
+             mainDesc = remoteDescMap.get(code) || remoteDescMap.get(digits) || sigtapLocalMap.get(code) || sigtapLocalMap.get(digits) || ''
+             if (mainDesc) proceduresDisplay = `(Principal) ${cleanProcedureDescription(code, mainDesc)}`
+           }
+           if (!mainDesc && entry.diag_princ) {
+             proceduresDisplay = `(CID Principal) ${entry.diag_princ}`
+           }
+        }
 
         let repasseValue = 0
         if (knownDoctorName && proceduresWithPayment.length > 0) {
@@ -1063,12 +1164,21 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
           const isRemote = hasAih ? remoteRdByAih.has(entry.aihKey) : false
           const hasProcedures04 = proceduresWithPayment.length > 0
           const id = `${entry.aihKey || 'NOAIH'}::${chosenCns || 'NOCNS'}::${rowsDetailed.length}`
+          
+          // Formatar coluna Caráter
+          const specName = getSpecialtyName(entry.espec)
+          const carName = CareCharacterUtils.getDescription(String(entry.car_int || '').replace(/^0+/, ''))
+          const caraterDisplay = (entry.espec || entry.car_int) 
+            ? `${specName} / ${carName}`
+            : '-'
+
           rowsDetailed.push({
             id,
             isRemote,
             hasAih,
             hasProcedures04,
             repasseValue,
+            isDivergent: hasDivergentProcedure,
             cells: [
               entry.aihNumber || '-',
               doctorDisplay,
@@ -1076,6 +1186,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
               entry.patientName || 'Paciente',
               proceduresDisplay,
               parseISODateToLocal(entry.dischargeISO),
+              caraterDisplay,
               entry.competencia ? formatCompetenciaDisplay(entry.competencia) : '-',
               formatCurrency(repasseValue),
             ]

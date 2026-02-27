@@ -105,6 +105,17 @@ export const SihApiAdapter = {
       logger.error('Erro ao consultar sih_rd', rdError)
       return []
     }
+    
+    // 🔍 DEBUG: Verificar dados brutos do sih_rd
+    if (rdData && rdData.length > 0) {
+      console.log('🔍 [SihApiAdapter] Amostra de dados sih_rd (primeiro registro):', {
+        n_aih: rdData[0].n_aih,
+        espec: rdData[0].espec,
+        car_int: rdData[0].car_int,
+        diag_princ: rdData[0].diag_princ
+      });
+    }
+
     const aihNumbers = Array.from(new Set((rdData || []).map(r => String(r.n_aih)).filter(Boolean)))
     if (aihNumbers.length === 0) return []
 
@@ -289,7 +300,7 @@ export const SihApiAdapter = {
     const localCnsAll = Array.from(new Set(Array.from(localRespByAih.values()).filter(Boolean)))
     const { data: localDoctors } = await supabase
       .from('doctors')
-      .select('id,name,cns,crm,specialty')
+      .select('id,name,cns,crm,specialty,cbo_codes')
       .in('cns', Array.from(new Set([...doctorCnsAll, ...localCnsAll])))
 
     const doctorByCns = new Map((localDoctors || []).map(d => [String(d.cns), d]))
@@ -420,7 +431,8 @@ export const SihApiAdapter = {
               name: d?.name || (dcns === 'NAO_IDENTIFICADO' ? '⚠️ Médico Não Identificado' : `Dr(a). CNS ${dcns}`),
               cns: dcns,
               crm: d?.crm || '',
-              specialty: d?.specialty || ''
+              specialty: d?.specialty || '',
+              cbo_codes: d?.cbo_codes || []
             },
             hospitals: [],
             patients: [],

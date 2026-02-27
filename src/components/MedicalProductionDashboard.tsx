@@ -55,12 +55,15 @@ import CleuezaDebugComponent from './CleuezaDebugComponent';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
 import { CareCharacterUtils } from '../config/careCharacterCodes';
 import { getParticipationInfo } from '../config/participationCodes';
-import {
+import { 
   shouldCalculateAnesthetistProcedure,
   getAnesthetistProcedureType,
   filterCalculableProcedures,
   getCalculableProcedures
 } from '../utils/anesthetistLogic';
+import { checkCboCompatibility, isSurgicalProcedure } from '../utils/cboCompatibility';
+import { formatSigtapCode } from '../utils/formatters';
+import { getSpecialtyName } from '../utils/aihLookups'
 import { calculateHonPayments } from '../config/doctorPaymentRules/importers/honCsv'
 import ReportGenerator from './ReportGenerator';
 import PatientAihInfoBadges from './PatientAihInfoBadges';
@@ -1326,19 +1329,59 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       const isMonthly = isFixedMonthlyPayment(doctorName, hospitalId, ALL_HOSPITAL_RULES)
       const fixedCalcReport = calculateFixedPayment(doctorName, hospitalId, ALL_HOSPITAL_RULES)
 
+      // Carregar CBOs permitidos para procedimentos cirúrgicos
+      const doctorCbos = Array.isArray(doctor?.doctor_info?.cbo_codes) ? doctor?.doctor_info?.cbo_codes.map(String) : []
+      const allProcedureCodes = new Set<string>()
+      
+      // Coletar códigos para consulta
+      const patientsDedupForCodes = dedupPatientsByAIH(doctor.patients || [])
+      patientsDedupForCodes.forEach((p: any) => {
+        const cp = (p as any).calculable_procedures
+        const procs = (Array.isArray(cp) && cp.length > 0) ? cp : (p.procedures || [])
+        procs.forEach((proc: any) => {
+          const code = formatSigtapCode(String(proc.procedure_code || ''))
+          if (isSurgicalProcedure(code)) {
+            allProcedureCodes.add(code)
+            allProcedureCodes.add(code.replace(/\D/g, ''))
+          }
+        })
+      })
+
+      const remoteCbosMap = new Map<string, string[]>()
+      if (allProcedureCodes.size > 0) {
+        try {
+          const { data: procRows } = await supabaseSih
+            .from('sigtap_procedimentos')
+            .select('code, cbo')
+            .in('code', Array.from(allProcedureCodes))
+          ;(procRows || []).forEach((p: any) => {
+            const code = String(p.code || '').trim()
+            // ✅ CORREÇÃO: Tratar cbo como array, string ou CSV, usando ensureArray
+            const cbos = Array.isArray(p.cbo) ? p.cbo.map(String) : (
+              typeof p.cbo === 'string' ? p.cbo.split(',').map((s: string) => s.trim()) : []
+            )
+            if (code) remoteCbosMap.set(code, cbos)
+          })
+        } catch {}
+      }
+
       const tableData: Array<Array<string>> = []
+      const divergentRows: boolean[] = []
       let totalRepasse = 0
       let totalPatientsProcessed = 0
       let patientsWithPayment = 0
 
       // Mapear nomes de pacientes quando fonte remota está ativa (join local AIH→patients)
+      // Mapear também infos extras: espec, car_int, diag_princ para exibir no relatório
       let nameByAih = new Map<string, string>()
+      let extraInfoByAih = new Map<string, { espec?: string; car_int?: string; diag_princ?: string }>()
+
       if (sihMode) {
         try {
           const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
           let q = supabase
             .from('aihs')
-            .select('aih_number, patient_id, discharge_date, competencia, patients(name)')
+            .select('aih_number, patient_id, discharge_date, competencia, patients(name), specialty, care_character, main_cid')
           if (hospitalId) q = q.eq('hospital_id', hospitalId)
           if (selectedCompetencia && selectedCompetencia !== 'all') q = q.eq('competencia', selectedCompetencia)
           if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
@@ -1354,7 +1397,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             ; (rows || []).forEach((r: any) => {
               const key = normalizeAih(String(r.aih_number || ''))
               const nm = String(r?.patients?.name || '')
-              if (key && nm) nameByAih.set(key, nm)
+              if (key) {
+                if (nm) nameByAih.set(key, nm)
+                extraInfoByAih.set(key, {
+                  espec: r.specialty,
+                  car_int: r.care_character,
+                  diag_princ: r.main_cid
+                })
+              }
             })
           // Fallback: completar nomes para AIHs faltantes sem filtrar por competência/alta
           const missingAihs = dedupPatientsByAIH(doctor.patients || [])
@@ -1363,12 +1413,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           if (missingAihs.length > 0) {
             const { data: rows2 } = await supabase
               .from('aihs')
-              .select('aih_number, patients(name)')
+              .select('aih_number, patients(name), specialty, care_character, main_cid')
               .in('aih_number', missingAihs)
               ; (rows2 || []).forEach((r: any) => {
                 const key = normalizeAih(String(r.aih_number || ''))
                 const nm = String(r?.patients?.name || '')
-                if (key && nm && !nameByAih.has(key)) nameByAih.set(key, nm)
+                if (key) {
+                  if (nm && !nameByAih.has(key)) nameByAih.set(key, nm)
+                  if (!extraInfoByAih.has(key)) {
+                    extraInfoByAih.set(key, {
+                      espec: r.specialty,
+                      car_int: r.care_character,
+                      diag_princ: r.main_cid
+                    })
+                  }
+                }
               })
           }
         } catch { }
@@ -1407,6 +1466,32 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const descFallback = mainCode && sigtapMap ? ((sigtapMap.get(mainCode) || sigtapMap.get(mainCodeDigits) || '') as string) : ''
         const mainProcDescRaw = ((mainProc?.procedure_description || mainProc?.sigtap_description || descFallback || '') as string).trim()
         const mainProcDesc = cleanProcedureDescription(mainCode, mainProcDescRaw)
+        
+        // Tentar obter dados extras da AIH (espec, car_int, diag_princ)
+        // Se sihApiAdapter já trouxe no aih_info, usar de lá. Senão, tentar do extraInfoByAih (via consulta local 'aihs')
+        const infoAih = p?.aih_info || {}
+        
+        // 🔍 DEBUG: Verificar dados da AIH
+        if (totalPatientsProcessed <= 1) {
+          console.log(`🔍 [Report] Processando AIH ${aihNumber}:`, {
+            infoAih_specialty: (infoAih as any).specialty,
+            infoAih_care_character: (infoAih as any).care_character,
+            extraInfo_espec: extraInfoByAih.get(aihNumber)?.espec,
+            extraInfo_car_int: extraInfoByAih.get(aihNumber)?.car_int
+          });
+        }
+
+        const especCode = (infoAih as any).specialty || extraInfoByAih.get(aihNumber)?.espec
+        const carIntCode = (infoAih as any).care_character || extraInfoByAih.get(aihNumber)?.car_int
+        const diagPrinc = (infoAih as any).main_cid || extraInfoByAih.get(aihNumber)?.diag_princ
+
+        // Formatar coluna Caráter
+        const specName = getSpecialtyName(especCode)
+        const carName = CareCharacterUtils.getDescription(String(carIntCode || '').replace(/^0+/, ''))
+        const caraterDisplay = (especCode || carIntCode) 
+          ? `${specName} / ${carName}`
+          : '-'
+
         const medicalForDisplay = calculable
           .filter((x: any) => isMedicalProcedure(x.procedure_code) && shouldCalculateAnesthetistProcedure(x.cbo, x.procedure_code))
           .sort((a: any, b: any) => {
@@ -1417,7 +1502,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             const vb = typeof b.value_reais === 'number' ? b.value_reais : 0
             return vb - va
           })
-        const proceduresDisplay = buildProceduresDisplay(
+        let proceduresDisplay = buildProceduresDisplay(
           medicalForDisplay.map((m: any) => {
             const code = String(m?.procedure_code || '').trim()
             const digits = code.replace(/\D/g, '')
@@ -1426,6 +1511,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           }),
           mainProcDesc || (mainCode ? `Procedimento ${mainCode}` : 'Sem procedimento principal')
         )
+
+        // Se não tiver procedimentos médicos calculáveis, tentar mostrar o procedimento principal da AIH ou CID
+        if (medicalForDisplay.length === 0) {
+           if (mainProcDesc) {
+             proceduresDisplay = `(Principal) ${mainProcDesc}`
+           } else if (diagPrinc) {
+             proceduresDisplay = `(CID Principal) ${diagPrinc}`
+           }
+        }
+
         const dischargeISO = p?.aih_info?.discharge_date || ''
         const dischargeLabel = parseISODateToLocal(dischargeISO)
         if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
@@ -1484,6 +1579,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             sequence: proc.sequence ?? proc.sequencia ?? proc.procedure_sequence
           }))
         )
+        let hasDivergentProcedure = false
         const proceduresWithPayment = (baseProcedures as any[])
           .filter((proc: any) => isMedicalProcedure(proc.procedure_code))
           .sort((a: any, b: any) => {
@@ -1495,13 +1591,29 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             const vb = typeof b.value_reais === 'number' ? b.value_reais : 0;
             return vb - va;
           })
-          .map((proc: any) => ({
-            procedure_code: proc.procedure_code,
-            procedure_description: proc.procedure_description,
-            value_reais: proc.value_reais || 0,
-            cbo: proc.cbo,
-            sequence: proc.sequence,
-          }))
+          .map((proc: any) => {
+            const code = formatSigtapCode(String(proc.procedure_code || ''))
+            const digits = code.replace(/\D/g, '')
+            
+            // Validação CBO
+            if (isSurgicalProcedure(code) && doctorCbos.length > 0) {
+              const allowedCbos = remoteCbosMap.get(code) || remoteCbosMap.get(digits)
+              if (allowedCbos && allowedCbos.length > 0) {
+                const isCompatible = checkCboCompatibility(doctorCbos, allowedCbos)
+                if (!isCompatible) {
+                  hasDivergentProcedure = true
+                }
+              }
+            }
+
+            return {
+              procedure_code: proc.procedure_code,
+              procedure_description: proc.procedure_description,
+              value_reais: proc.value_reais || 0,
+              cbo: proc.cbo,
+              sequence: proc.sequence,
+            }
+          })
         let repasseValue = 0
         if (proceduresWithPayment.length > 0) {
           const isGenSurg = /cirurg/i.test(doctorName) || (/cirurg/i.test(doctor.doctor_info.specialty || '') && /geral/i.test(doctor.doctor_info.specialty || ''))
@@ -1555,9 +1667,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             name,
             proceduresDisplay,
             dischargeLabel,
+            caraterDisplay,
             prodCompLabel || '-',
             formatCurrency(repasseValue)
           ])
+          divergentRows.push(hasDivergentProcedure)
         }
       })
 
@@ -1578,23 +1692,31 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const n = Number(cleaned)
         return Number.isFinite(n) ? n : 0
       }
-      tableData.sort((a, b) => {
-        const repA = parseBrCurrency(a[7])
-        const repB = parseBrCurrency(b[7])
+      // Reordenar divergentRows conforme a ordenação do tableData
+      // Criar array de objetos temporário para ordenar junto
+      const combined = tableData.map((row, idx) => ({ row, isDivergent: divergentRows[idx] }))
+      combined.sort((a, b) => {
+        const repA = parseBrCurrency(a.row[7])
+        const repB = parseBrCurrency(b.row[7])
         if (repA !== repB) return repB - repA
-        const procA = normalizeSortText(a[4])
-        const procB = normalizeSortText(b[4])
+        const procA = normalizeSortText(a.row[4])
+        const procB = normalizeSortText(b.row[4])
         const procCmp = procA.localeCompare(procB, 'pt-BR')
         if (procCmp !== 0) return procCmp
-        const nameA = normalizeSortText(a[3])
-        const nameB = normalizeSortText(b[3])
+        const nameA = normalizeSortText(a.row[3])
+        const nameB = normalizeSortText(b.row[3])
         return nameA.localeCompare(nameB, 'pt-BR')
       })
-      tableData.forEach((row, idx) => { row[0] = String(idx + 1) })
+      
+      // Atualizar tableData e reconstruir divergentRows ordenado
+      const sortedTableData = combined.map(c => c.row)
+      const sortedDivergentRows = combined.map(c => c.isDivergent)
+      
+      sortedTableData.forEach((row, idx) => { row[0] = String(idx + 1) })
 
       // 🆕 ADICIONAR LINHA DE TOTAL FIXO MENSAL SE APLICÁVEL
       if (isMonthly && fixedCalcReport.hasFixedRule) {
-        tableData.push([
+        sortedTableData.push([
           '',
           '',
           '',
@@ -1604,14 +1726,16 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           '-',
           formatCurrency(fixedCalcReport.calculatedPayment)
         ])
+        sortedDivergentRows.push(false)
         // Ajustar o total geral para ser o valor fixo (já que os individuais são 0)
         totalRepasse = fixedCalcReport.calculatedPayment
       }
 
       if (options?.outputFormat === 'excel') {
         const sourceLabel = options.sourceLabelOverride ?? (sihMode ? 'TABWIN' : 'GSUS')
-        const header = ['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Competência', 'Valor de Repasse']
-        const rows = tableData.map(r => [r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]])
+        const header = ['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Caráter', 'Competência', 'Valor de Repasse', 'Obs']
+        // Mapear sortedTableData (que já está ordenado) e adicionar a coluna de observação
+        const rows = sortedTableData.map((r, i) => [...r, sortedDivergentRows[i] ? 'DIVERGÊNCIA ESPECIALIDADE' : ''])
 
         const wb = XLSX.utils.book_new()
         const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
@@ -1622,8 +1746,10 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             { wch: 40 },
             { wch: 70 },
             { wch: 14 },
+            { wch: 25 }, // Caráter
             { wch: 12 },
-            { wch: 18 }
+            { wch: 18 },
+            { wch: 25 }
           ]
         XLSX.utils.book_append_sheet(wb, ws, 'Repasse')
 
@@ -1645,12 +1771,14 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       }
 
       const runPdf = (rowsOverride: Array<Array<string>>) => {
-        const rows = (rowsOverride || []).map((r, idx) => {
+        // Usar sortedTableData se rowsOverride não for fornecido ou for vazio
+        // Nota: rowsOverride é usado para preview, mas aqui estamos assumindo geração direta
+        const rows = (rowsOverride && rowsOverride.length > 0 ? rowsOverride : sortedTableData).map((r, idx) => {
           const out = [...r]
           out[0] = String(idx + 1)
           return out
         })
-        const totalRepasseCalc = rows.reduce((s, r) => s + parseBrCurrency(r[7]), 0)
+        const totalRepasseCalc = rows.reduce((s, r) => s + parseBrCurrency(r[8]), 0) // Índice mudou para 8
         const patientsCount = rows.length
 
         const doc = new jsPDF('landscape')
@@ -1743,13 +1871,23 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         doc.text(formatCurrency(totalRepasseCalc), pageWidth - 20, metricY, { align: 'right' })
         const startY = yPosition + 16
         autoTable(doc, {
-          head: [['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Competência', 'Valor de Repasse']],
+          head: [['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Caráter', 'Competência', 'Valor de Repasse']],
           body: rows,
           startY,
           theme: 'striped',
           tableWidth: 'auto',
           headStyles: { fillColor: [0, 51, 102], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 2 },
           bodyStyles: { fontSize: 8, textColor: [50, 50, 50], cellPadding: 2 },
+          didParseCell: (data) => {
+            if (data.section === 'body') {
+              const rowIndex = data.row.index
+              // sortedDivergentRows está alinhado com rows (que veio de sortedTableData)
+              // Verifica se sortedDivergentRows existe (no caso de chamada direta sem divergência, pode não existir)
+              if (typeof sortedDivergentRows !== 'undefined' && sortedDivergentRows[rowIndex]) {
+                data.cell.styles.textColor = [255, 0, 0] // Vermelho
+              }
+            }
+          },
           columnStyles: {
             0: { cellWidth: 'auto', halign: 'center' },
             1: { cellWidth: 'auto', halign: 'center' },
@@ -1757,8 +1895,9 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             3: { cellWidth: 'auto', halign: 'left' },
             4: { cellWidth: 'auto', halign: 'left', fontSize: 7 },
             5: { cellWidth: 'auto', halign: 'center' },
-            6: { cellWidth: 'auto', halign: 'center' },
-            7: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
+            6: { cellWidth: 'auto', halign: 'center', fontSize: 7 }, // Caráter
+            7: { cellWidth: 'auto', halign: 'center' },
+            8: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
           },
           styles: { overflow: 'linebreak', cellPadding: 2, fontSize: 8 },
           margin: { left: 20, right: 20 },
