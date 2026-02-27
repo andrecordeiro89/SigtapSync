@@ -39,7 +39,8 @@ import {
   RefreshCw,
   Building,
   FileSpreadsheet,
-  Loader2
+  Loader2,
+  Check
 } from 'lucide-react';
 
 import { DoctorPatientService, type DoctorWithPatients } from '../services/doctorPatientService';
@@ -864,6 +865,54 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [simplifiedPreviewOpen, setSimplifiedPreviewOpen] = useState<boolean>(false)
   const [simplifiedPreviewRows, setSimplifiedPreviewRows] = useState<Array<Array<string>>>([])
   const simplifiedPreviewConfirmRef = useRef<null | ((rows: Array<Array<string>>) => void)>(null)
+  const [tabwinSelectedCompetencias, setTabwinSelectedCompetencias] = useState<string[]>([])
+  const [tabwinAvailableCompetencias, setTabwinAvailableCompetencias] = useState<string[]>([])
+  const [tabwinLoadingCompetencias, setTabwinLoadingCompetencias] = useState<boolean>(false)
+
+  const formatTabwinCompDisplay = (c: string) => {
+    const m = c.match(/^(\d{4})(\d{2})$/)
+    return m ? `${m[2]}/${m[1]}` : c
+  }
+
+  useEffect(() => {
+    if (!tabwinReportOpen || !remoteConfigured) return
+    setTabwinSelectedCompetencias([])
+    let cancelled = false
+    const load = async () => {
+      setTabwinLoadingCompetencias(true)
+      try {
+        const { supabaseSih } = await import('../lib/sihSupabase')
+        if (!supabaseSih) return
+        const set = new Set<string>()
+        const pageSize = 1000
+        let offset = 0
+        const hospitalId = tabwinReportDoctor?.hospitals?.[0]?.hospital_id
+        for (; ;) {
+          let q = supabaseSih.from('sih_rd').select('ano_cmpt, mes_cmpt').range(offset, offset + pageSize - 1)
+          if (hospitalId) q = q.eq('hospital_id', hospitalId)
+          const { data, error } = await q
+          if (error) throw error
+          const batch = (data || []) as any[]
+          if (batch.length === 0) break
+          batch.forEach((r: any) => {
+            const y = Number(r.ano_cmpt)
+            const m = Number(r.mes_cmpt)
+            if (y && m) set.add(`${String(y).padStart(4, '0')}${String(m).padStart(2, '0')}`)
+          })
+          if (batch.length < pageSize) break
+          offset += pageSize
+        }
+        const sorted = Array.from(set).sort((a, b) => b.localeCompare(a))
+        if (!cancelled) setTabwinAvailableCompetencias(sorted)
+      } catch {
+        if (!cancelled) setTabwinAvailableCompetencias([])
+      } finally {
+        if (!cancelled) setTabwinLoadingCompetencias(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [tabwinReportOpen, tabwinReportDoctor])
   const parseBrCurrencyPreview = (s: unknown): number => {
     const raw = (s ?? '').toString()
     const cleaned = raw
@@ -1506,6 +1555,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             name,
             proceduresDisplay,
             dischargeLabel,
+            prodCompLabel || '-',
             formatCurrency(repasseValue)
           ])
         }
@@ -1529,8 +1579,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         return Number.isFinite(n) ? n : 0
       }
       tableData.sort((a, b) => {
-        const repA = parseBrCurrency(a[6])
-        const repB = parseBrCurrency(b[6])
+        const repA = parseBrCurrency(a[7])
+        const repB = parseBrCurrency(b[7])
         if (repA !== repB) return repB - repA
         const procA = normalizeSortText(a[4])
         const procB = normalizeSortText(b[4])
@@ -1551,6 +1601,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           'PAGAMENTO FIXO MENSAL',
           fixedCalcReport.appliedRule || 'Valor Fixo',
           '-',
+          '-',
           formatCurrency(fixedCalcReport.calculatedPayment)
         ])
         // Ajustar o total geral para ser o valor fixo (já que os individuais são 0)
@@ -1559,20 +1610,21 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
       if (options?.outputFormat === 'excel') {
         const sourceLabel = options.sourceLabelOverride ?? (sihMode ? 'TABWIN' : 'GSUS')
-        const header = ['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Valor de Repasse']
-        const rows = tableData.map(r => [r[0], r[1], r[2], r[3], r[4], r[5], r[6]])
+        const header = ['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Competência', 'Valor de Repasse']
+        const rows = tableData.map(r => [r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]])
 
         const wb = XLSX.utils.book_new()
         const ws = XLSX.utils.aoa_to_sheet([header, ...rows])
-        ;(ws as any)['!cols'] = [
-          { wch: 5 },
-          { wch: 18 },
-          { wch: 18 },
-          { wch: 40 },
-          { wch: 70 },
-          { wch: 14 },
-          { wch: 18 }
-        ]
+          ; (ws as any)['!cols'] = [
+            { wch: 5 },
+            { wch: 18 },
+            { wch: 18 },
+            { wch: 40 },
+            { wch: 70 },
+            { wch: 14 },
+            { wch: 12 },
+            { wch: 18 }
+          ]
         XLSX.utils.book_append_sheet(wb, ws, 'Repasse')
 
         const summarySheet = XLSX.utils.aoa_to_sheet([
@@ -1598,7 +1650,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           out[0] = String(idx + 1)
           return out
         })
-        const totalRepasseCalc = rows.reduce((s, r) => s + parseBrCurrency(r[6]), 0)
+        const totalRepasseCalc = rows.reduce((s, r) => s + parseBrCurrency(r[7]), 0)
         const patientsCount = rows.length
 
         const doc = new jsPDF('landscape')
@@ -1628,9 +1680,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const careHeader = (filterCareCharacter && filterCareCharacter !== 'all')
           ? CareCharacterUtils.formatForDisplay(filterCareCharacter, false)
           : 'TODOS'
-        const compHeader = (selectedCompetencia && selectedCompetencia !== 'all')
-          ? formatCompetencia(selectedCompetencia)
-          : 'TODAS'
+        const compHeader = tabwinSelectedCompetencias.length > 0
+          ? tabwinSelectedCompetencias.map(formatTabwinCompDisplay).join(', ')
+          : (selectedCompetencia && selectedCompetencia !== 'all')
+            ? formatCompetencia(selectedCompetencia)
+            : 'TODAS'
         const dataGeracao = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
         const line1 = [
           { label: 'Médico: ', value: doctorName, bold: true },
@@ -1689,7 +1743,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         doc.text(formatCurrency(totalRepasseCalc), pageWidth - 20, metricY, { align: 'right' })
         const startY = yPosition + 16
         autoTable(doc, {
-          head: [['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Valor de Repasse']],
+          head: [['#', 'Prontuário', 'Nº da AIH', 'Nome do Paciente', 'Procedimentos', 'Data Alta', 'Competência', 'Valor de Repasse']],
           body: rows,
           startY,
           theme: 'striped',
@@ -1703,7 +1757,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             3: { cellWidth: 'auto', halign: 'left' },
             4: { cellWidth: 'auto', halign: 'left', fontSize: 7 },
             5: { cellWidth: 'auto', halign: 'center' },
-            6: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
+            6: { cellWidth: 'auto', halign: 'center' },
+            7: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: [0, 102, 0] }
           },
           styles: { overflow: 'linebreak', cellPadding: 2, fontSize: 8 },
           margin: { left: 20, right: 20 },
@@ -1749,8 +1804,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           : undefined
       const competenciaFilter =
         selectedCompetencia &&
-        selectedCompetencia !== 'all' &&
-        selectedCompetencia.trim()
+          selectedCompetencia !== 'all' &&
+          selectedCompetencia.trim()
           ? selectedCompetencia.trim()
           : undefined
       const careFilter =
@@ -1759,8 +1814,13 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           : undefined
 
       const loadOptions: any = {
-        hospitalIds,
-        competencia: competenciaFilter
+        hospitalIds
+      }
+      // Use tabwin multi-select competências if available, else fall back to parent single prop
+      if (tabwinSelectedCompetencias.length > 0) {
+        loadOptions.competencias = tabwinSelectedCompetencias
+      } else if (competenciaFilter) {
+        loadOptions.competencia = competenciaFilter
       }
       if (careFilter) loadOptions.filterCareCharacter = careFilter
       if (dischargeDateRange && (dischargeDateRange.from || dischargeDateRange.to)) {
@@ -1828,8 +1888,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         : undefined
     const competenciaFilter =
       selectedCompetencia &&
-      selectedCompetencia !== 'all' &&
-      selectedCompetencia.trim()
+        selectedCompetencia !== 'all' &&
+        selectedCompetencia.trim()
         ? selectedCompetencia.trim()
         : undefined
     const careFilter =
@@ -1901,11 +1961,11 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           q = q.not('discharge_date', 'is', null)
         }
         const { data: rows } = await q
-        ;(rows || []).forEach((r: any) => {
-          const key = normalizeAihKey(String(r.aih_number || ''))
-          const nm = String(r?.patients?.name || '')
-          if (key && nm) nameByAih.set(key, nm)
-        })
+          ; (rows || []).forEach((r: any) => {
+            const key = normalizeAihKey(String(r.aih_number || ''))
+            const nm = String(r?.patients?.name || '')
+            if (key && nm) nameByAih.set(key, nm)
+          })
       } catch { }
     }
 
@@ -8010,7 +8070,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
           if (!tabwinReportLoading) setTabwinReportOpen(open)
         }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Repasse Médico (TABWIN)</DialogTitle>
           </DialogHeader>
@@ -8018,6 +8078,67 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             <div>Médico: <span className="font-semibold text-black">{tabwinReportDoctor?.doctor_info?.name || '-'}</span></div>
             <div>Hospital: <span className="font-semibold text-black">{tabwinReportDoctor?.hospitals?.[0]?.hospital_name || '-'}</span></div>
           </div>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-center gap-2 text-base font-semibold text-black">
+                <Calendar className="h-4 w-4" />
+                Competência SIH
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {tabwinLoadingCompetencias ? (
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Carregando competências...
+                </div>
+              ) : tabwinAvailableCompetencias.length === 0 ? (
+                <div className="text-xs text-gray-500">Nenhuma competência disponível.</div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7"
+                      onClick={() => setTabwinSelectedCompetencias(tabwinSelectedCompetencias.length === tabwinAvailableCompetencias.length ? [] : [...tabwinAvailableCompetencias])}
+                      disabled={tabwinReportLoading}
+                    >
+                      {tabwinSelectedCompetencias.length === tabwinAvailableCompetencias.length ? 'Limpar' : 'Selecionar Todas'}
+                    </Button>
+                    {tabwinSelectedCompetencias.length > 0 && (
+                      <span className="text-xs text-gray-600">{tabwinSelectedCompetencias.length} selecionada(s)</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {tabwinAvailableCompetencias.map(c => {
+                      const isSelected = tabwinSelectedCompetencias.includes(c)
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => {
+                            setTabwinSelectedCompetencias(prev =>
+                              isSelected ? prev.filter(x => x !== c) : [...prev, c]
+                            )
+                          }}
+                          disabled={tabwinReportLoading}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${isSelected
+                            ? 'bg-black text-white border-black'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                            }`}
+                        >
+                          {isSelected && <Check className="h-3.5 w-3.5" />}
+                          {formatTabwinCompDisplay(c)}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="flex items-center justify-end gap-2 pt-2">
             <Button
               variant="outline"

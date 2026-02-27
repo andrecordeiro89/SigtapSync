@@ -8,6 +8,7 @@ import type { DoctorWithPatients, ProcedureDetail } from './doctorPatientService
 type LoadOptions = {
   hospitalIds?: string[]
   competencia?: string
+  competencias?: string[]
   dischargeDateRange?: { from?: string; to?: string }
   filterCareCharacter?: '1' | '2' | string
 }
@@ -44,7 +45,22 @@ export const SihApiAdapter = {
     if (cnesList && cnesList.length > 0) rdQuery = rdQuery.in('cnes', cnesList)
     let compYear: number | undefined
     let compMonth: number | undefined
-    if (options.competencia && options.competencia.trim()) {
+    if (options.competencias && options.competencias.length > 0) {
+      // Multi-competência: build OR filter for each YYYYMM
+      const compPairs = options.competencias.map(raw => {
+        const m6 = raw.match(/^(\d{4})(\d{2})$/)
+        if (m6) return { y: parseInt(m6[1], 10), m: parseInt(m6[2], 10) }
+        const mDash = raw.match(/^(\d{4})-(\d{2})/)
+        if (mDash) return { y: parseInt(mDash[1], 10), m: parseInt(mDash[2], 10) }
+        return null
+      }).filter(Boolean) as { y: number; m: number }[]
+      if (compPairs.length === 1) {
+        rdQuery = rdQuery.eq('ano_cmpt', compPairs[0].y).eq('mes_cmpt', compPairs[0].m)
+      } else if (compPairs.length > 1) {
+        const orClauses = compPairs.map(p => `and(ano_cmpt.eq.${p.y},mes_cmpt.eq.${p.m})`).join(',')
+        rdQuery = rdQuery.or(orClauses)
+      }
+    } else if (options.competencia && options.competencia.trim()) {
       const raw = options.competencia.trim()
       // Normalizar competência para ano/mês (inteiros)
       if (/^\d{6}$/.test(raw)) {
@@ -140,19 +156,19 @@ export const SihApiAdapter = {
     const localPatientByAih = new Map<string, { name?: string; medical_record?: string }>()
     const localAihIdByAihKey = new Map<string, string>()
     const localAihKeyByAihId = new Map<string, string>()
-    ;(localAihRows || []).forEach((r: any) => {
-      const k = normalizeAih(String(r.aih_number || ''))
-      if (!k) return
-      if (r.cns_responsavel) localRespByAih.set(k, String(r.cns_responsavel))
-      const nm = r?.patients?.name
-      const mr = r?.patients?.medical_record
-      if (nm || mr) localPatientByAih.set(k, { name: nm, medical_record: mr })
-      const aihId = String(r.id || '').trim()
-      if (aihId) {
-        if (!localAihIdByAihKey.has(k)) localAihIdByAihKey.set(k, aihId)
-        if (!localAihKeyByAihId.has(aihId)) localAihKeyByAihId.set(aihId, k)
-      }
-    })
+      ; (localAihRows || []).forEach((r: any) => {
+        const k = normalizeAih(String(r.aih_number || ''))
+        if (!k) return
+        if (r.cns_responsavel) localRespByAih.set(k, String(r.cns_responsavel))
+        const nm = r?.patients?.name
+        const mr = r?.patients?.medical_record
+        if (nm || mr) localPatientByAih.set(k, { name: nm, medical_record: mr })
+        const aihId = String(r.id || '').trim()
+        if (aihId) {
+          if (!localAihIdByAihKey.has(k)) localAihIdByAihKey.set(k, aihId)
+          if (!localAihKeyByAihId.has(aihId)) localAihKeyByAihId.set(aihId, k)
+        }
+      })
 
     // Fallback: completar nomes por AIH sem respeitar competência/alta, usando a lista de AIHs remotas
     const missingKeys = aihNumbers
@@ -168,20 +184,20 @@ export const SihApiAdapter = {
         .from('aihs')
         .select('id, aih_number, patients(name, medical_record), cns_responsavel')
         .in('aih_number', variants)
-      ;(localAihByNumber || []).forEach((r: any) => {
-        const k = normalizeAih(String(r.aih_number || ''))
-        if (!k) return
-        const nm = r?.patients?.name
-        const mr = r?.patients?.medical_record
-        if (nm || mr) localPatientByAih.set(k, { name: nm, medical_record: mr })
-        const resp = r?.cns_responsavel
-        if (resp && !localRespByAih.has(k)) localRespByAih.set(k, String(resp))
-        const aihId = String(r.id || '').trim()
-        if (aihId) {
-          if (!localAihIdByAihKey.has(k)) localAihIdByAihKey.set(k, aihId)
-          if (!localAihKeyByAihId.has(aihId)) localAihKeyByAihId.set(aihId, k)
-        }
-      })
+        ; (localAihByNumber || []).forEach((r: any) => {
+          const k = normalizeAih(String(r.aih_number || ''))
+          if (!k) return
+          const nm = r?.patients?.name
+          const mr = r?.patients?.medical_record
+          if (nm || mr) localPatientByAih.set(k, { name: nm, medical_record: mr })
+          const resp = r?.cns_responsavel
+          if (resp && !localRespByAih.has(k)) localRespByAih.set(k, String(resp))
+          const aihId = String(r.id || '').trim()
+          if (aihId) {
+            if (!localAihIdByAihKey.has(k)) localAihIdByAihKey.set(k, aihId)
+            if (!localAihKeyByAihId.has(aihId)) localAihKeyByAihId.set(aihId, k)
+          }
+        })
     }
 
     const procCodesRaw = Array.from(new Set(spResults.map(p => String(p.sp_atoprof)).filter(Boolean)))
