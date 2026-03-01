@@ -80,15 +80,17 @@ const SyncAltasPage = () => {
       
       const hospitalIdToLoad = userHospitalId && userHospitalId !== 'ALL' ? userHospitalId : 'ALL';
       const pageSize = 1000; // Supabase limita a 1000 por request
+      const maxRows = 20000;
+      const maxDistinct = 72;
       let offset = 0;
-      const allAIHs: any[] = [];
+      const competenciasAIHSet = new Set<string>();
 
       while (true) {
         let queryBatch = supabase
           .from('aihs')
           .select('competencia')
           .not('competencia', 'is', null)
-          .limit(pageSize)
+          .order('competencia', { ascending: false })
           .range(offset, offset + pageSize - 1);
 
         // ✅ Filtrar por hospital se usuário não for admin
@@ -105,24 +107,21 @@ const SyncAltasPage = () => {
 
         const batchLen = batch?.length || 0;
         if (batchLen === 0) break;
-        allAIHs.push(...batch);
+        for (const row of batch as any[]) {
+          const comp = (row as any).competencia;
+          if (comp) competenciasAIHSet.add(comp);
+        }
+        if (competenciasAIHSet.size >= maxDistinct) break;
         if (batchLen < pageSize) break;
         offset += pageSize;
+        if (offset >= maxRows) break;
         // Evitar UI freeze em listas enormes
         await new Promise(r => setTimeout(r, 0));
       }
 
-      console.log(`📊 Total de AIHs carregadas: ${allAIHs.length}`);
-
       // ✅ MESMA LÓGICA DA TELA PACIENTES: Extrair competências quando AIHs são carregadas
-      if (allAIHs.length > 0) {
-        const competencias = new Set<string>();
-        allAIHs.forEach(aih => {
-          if (aih.competencia) {
-            competencias.add(aih.competencia);
-          }
-        });
-        const sorted = Array.from(competencias).sort((a, b) => b.localeCompare(a)); // Mais recente primeiro
+      if (competenciasAIHSet.size > 0) {
+        const sorted = Array.from(competenciasAIHSet).sort((a, b) => b.localeCompare(a)); // Mais recente primeiro
         
         console.log(`✅ ${sorted.length} competências únicas encontradas (AIH):`, sorted);
         
@@ -137,7 +136,7 @@ const SyncAltasPage = () => {
       // Carregar TODAS as Altas em batches, igual a tela Pacientes faz
       console.log('🔍 Carregando Altas para extrair competências (método tela Pacientes)...');
       
-      const allAltas: any[] = [];
+      const competenciasAltasSet = new Set<string>();
       let offsetAltas = 0;
 
       while (true) {
@@ -145,7 +144,7 @@ const SyncAltasPage = () => {
           .from('hospital_discharges')
           .select('competencia')
           .not('competencia', 'is', null)
-          .limit(pageSize)
+          .order('competencia', { ascending: false })
           .range(offsetAltas, offsetAltas + pageSize - 1);
 
         // ✅ Filtrar por hospital se usuário não for admin
@@ -162,24 +161,21 @@ const SyncAltasPage = () => {
 
         const batchLen = batch?.length || 0;
         if (batchLen === 0) break;
-        allAltas.push(...batch);
+        for (const row of batch as any[]) {
+          const comp = (row as any).competencia;
+          if (comp) competenciasAltasSet.add(comp);
+        }
+        if (competenciasAltasSet.size >= maxDistinct) break;
         if (batchLen < pageSize) break;
         offsetAltas += pageSize;
+        if (offsetAltas >= maxRows) break;
         // Evitar UI freeze em listas enormes
         await new Promise(r => setTimeout(r, 0));
       }
 
-      console.log(`📊 Total de Altas carregadas: ${allAltas.length}`);
-
       // ✅ MESMA LÓGICA DA TELA PACIENTES: Extrair competências quando Altas são carregadas
-      if (allAltas.length > 0) {
-        const competencias = new Set<string>();
-        allAltas.forEach(alta => {
-          if (alta.competencia) {
-            competencias.add(alta.competencia);
-          }
-        });
-        const sorted = Array.from(competencias).sort((a, b) => b.localeCompare(a)); // Mais recente primeiro
+      if (competenciasAltasSet.size > 0) {
+        const sorted = Array.from(competenciasAltasSet).sort((a, b) => b.localeCompare(a)); // Mais recente primeiro
         
         console.log(`✅ ${sorted.length} competências únicas encontradas (Altas):`, sorted);
         

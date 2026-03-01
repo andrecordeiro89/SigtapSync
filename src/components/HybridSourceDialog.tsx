@@ -617,7 +617,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
         for (; ;) {
           let q = supabaseSih
             .from('sih_rd')
-            .select('n_aih, dt_saida, hospital_id, cnes, ano_cmpt, mes_cmpt')
+            .select('n_aih, dt_saida, hospital_id, cnes, ano_cmpt, mes_cmpt, espec, car_int, diag_princ')
             .eq('hospital_id', selectedHospital)
           if (hasDateFilter) {
             q = q.not('dt_saida', 'is', null).gte('dt_saida', dischargeFrom).lt('dt_saida', endExclusive)
@@ -1133,7 +1133,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
              const code = formatSigtapCode(String(mainSp?.sp_atoprof || ''))
              const digits = code.replace(/\D/g, '')
              mainDesc = remoteDescMap.get(code) || remoteDescMap.get(digits) || sigtapLocalMap.get(code) || sigtapLocalMap.get(digits) || ''
-             if (mainDesc) proceduresDisplay = `(Principal) ${cleanProcedureDescription(code, mainDesc)}`
+             if (mainDesc) proceduresDisplay = `(Clínico) ${cleanProcedureDescription(code, mainDesc)}`
            }
            if (!mainDesc && entry.diag_princ) {
              proceduresDisplay = `(CID Principal) ${entry.diag_princ}`

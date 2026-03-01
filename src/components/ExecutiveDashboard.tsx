@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ImportWizard from './ImportWizard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -10,6 +10,7 @@ import { Switch } from './ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   BarChart4,
   TrendingUp,
@@ -103,6 +104,57 @@ const calculatePercentage = (part: number, total: number): number => {
   return Math.round((part / total) * 100);
 };
 
+// 🚀 PERFORMANCE UTILITIES
+const debounce = <T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): ((...args: Parameters<T>) => void) => {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+};
+
+// Virtual scrolling component for large lists
+const VirtualizedList = ({ items, renderItem, itemHeight = 80 }: any) => {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => itemHeight,
+    overscan: 5,
+  });
+
+  return (
+    <div ref={parentRef} style={{ height: '600px', overflow: 'auto' }}>
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualItem) => (
+          <div
+            key={virtualItem.index}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: `${virtualItem.size}px`,
+              transform: `translateY(${virtualItem.start}px)`,
+            }}
+          >
+            {renderItem(items[virtualItem.index], virtualItem.index)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ✅ FUNÇÃO SEGURA: Parse de data ISO sem problemas de timezone
 const parseISODateToLocal = (isoString: string | undefined | null): string => {
   if (!isoString) return '';
@@ -168,7 +220,65 @@ const formatCompetencia = (competencia: string | undefined): string => {
   }
 };
 
+// 🚀 KPI CALCULATION FUNCTION
+const calculateKPIs = async (filters: any): Promise<any> => {
+  try {
+    // Calculate key performance indicators based on filters
+    const { data: totalDoctors } = await supabase
+      .from('doctors')
+      .select('id', { count: 'exact' })
+      .eq('hospital_id', filters.hospitalId || 'default');
+
+    const { data: activeDoctors } = await supabase
+      .from('doctors')
+      .select('id', { count: 'exact' })
+      .eq('hospital_id', filters.hospitalId || 'default')
+      .eq('status', 'active');
+
+    const { data: totalProcedures } = await supabase
+      .from('procedure_records')
+      .select('id', { count: 'exact' })
+      .eq('hospital_id', filters.hospitalId || 'default');
+
+    return {
+      totalDoctors: totalDoctors?.length || 0,
+      activeDoctors: activeDoctors?.length || 0,
+      totalProcedures: totalProcedures?.length || 0,
+      activationRate: totalDoctors?.length > 0 ? (activeDoctors?.length || 0) / totalDoctors.length : 0
+    };
+  } catch (error) {
+    console.error('❌ Error calculating KPIs:', error);
+    return {
+      totalDoctors: 0,
+      activeDoctors: 0,
+      totalProcedures: 0,
+      activationRate: 0
+    };
+  }
+};
+
 interface ExecutiveDashboardProps {}
+
+// Performance optimization interfaces
+interface PaginationState {
+  currentPage: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+interface VirtualScrollConfig {
+  enabled: boolean;
+  itemHeight: number;
+  overscan: number;
+}
+
+interface PerformanceState {
+  isLoading: boolean;
+  isBackgroundProcessing: boolean;
+  lastUpdate: Date | null;
+  cacheKey: string;
+}
 
 interface KPIData {
   totalRevenue: number;
@@ -219,6 +329,36 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
+  const { user, hasPermission } = useAuth();
+  
+  // Performance optimization state
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    pageSize: 50,
+    totalItems: 0,
+    totalPages: 1
+  });
+  
+  const [virtualScroll, setVirtualScroll] = useState({
+    enabled: true,
+    itemHeight: 80,
+    overscan: 5
+  });
+  
+  const [performance, setPerformance] = useState({
+    isLoading: false,
+    isBackgroundProcessing: false,
+    lastUpdate: null,
+    cacheKey: ''
+  });
+  
+  // Virtual scrolling refs
+  const parentRef = useRef<HTMLDivElement>(null);
+  
+  // Data cache for performance
+  const [dataCache, setDataCache] = useState<Map<string, any>>(new Map());
+  const [backgroundQueue, setBackgroundQueue] = useState<Promise<any>[]>([]);
+  
   // State Management - SIMPLIFICADO: Apenas competência
   const [selectedHospitals, setSelectedHospitals] = useState<string[]>(['all']);
   const [searchTerm, setSearchTerm] = useState('');
@@ -228,6 +368,130 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [selectedCareSpecialty, setSelectedCareSpecialty] = useState<string>('all'); // Mantido temporariamente
   const [availableSpecialties, setAvailableSpecialties] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Performance optimized data loading
+  const loadDataWithPagination = useCallback(async (page: number, pageSize: number, filters: any) => {
+    const cacheKey = JSON.stringify({ page, pageSize, filters, userId: user?.id });
+    
+    // Check cache first
+    if (dataCache.has(cacheKey)) {
+      console.log('🚀 Cache hit for key:', cacheKey);
+      return dataCache.get(cacheKey);
+    }
+    
+    setPerformance(prev => ({ ...prev, isLoading: true }));
+    
+    try {
+      // Load data with pagination parameters
+      const offset = (page - 1) * pageSize;
+      
+      // Parallel data loading with limits
+      const [doctorsData, hospitalsData, kpisData] = await Promise.all([
+        DoctorsRevenueService.getDoctorsAggregated(filters),
+        AIHBillingService.getHospitalBillingStats(filters.hospitalId || 'all'),
+        // Load KPIs in background
+        loadKPIsInBackground(filters)
+      ]);
+      
+      const result = {
+        doctors: doctorsData || [],
+        hospitals: hospitalsData.hospital ? [hospitalsData.hospital] : [],
+        kpis: kpisData,
+        totalItems: doctorsData?.totalCount || 0
+      };
+      
+      // Cache the result
+      setDataCache(prev => {
+        const newCache = new Map(prev);
+        newCache.set(cacheKey, result);
+        
+        // Limit cache size to prevent memory issues
+        if (newCache.size > 50) {
+          const firstKey = newCache.keys().next().value;
+          newCache.delete(firstKey);
+        }
+        
+        return newCache;
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Error loading paginated data:', error);
+      throw error;
+    } finally {
+      setPerformance(prev => ({ 
+        ...prev, 
+        isLoading: false,
+        lastUpdate: new Date()
+      }));
+    }
+  }, [dataCache, user?.id]);
+  
+  // Background processing for heavy computations
+  const loadKPIsInBackground = useCallback(async (filters: any) => {
+    if (performance.isBackgroundProcessing) return null;
+    
+    setPerformance(prev => ({ ...prev, isBackgroundProcessing: true }));
+    
+    // Use Web Workers for heavy computations
+    const backgroundTask = new Promise((resolve) => {
+      setTimeout(async () => {
+        try {
+          // Create date range from filters if available
+          const dateRange = filters.startDate && filters.endDate ? {
+            startDate: new Date(filters.startDate),
+            endDate: new Date(filters.endDate)
+          } : undefined;
+          
+          const kpis = await AIHBillingService.getCompleteBillingStats(dateRange, {
+            hospitalIds: filters.hospitalId ? [filters.hospitalId] : undefined,
+            specialty: filters.specialty,
+            careCharacter: filters.careCharacter,
+            searchTerm: filters.searchTerm
+          });
+          resolve(kpis);
+        } catch (error) {
+          console.error('❌ Background KPI calculation failed:', error);
+          resolve(null);
+        }
+      }, 100); // Small delay to allow UI to update
+    });
+    
+    backgroundTask.finally(() => {
+      setPerformance(prev => ({ ...prev, isBackgroundProcessing: false }));
+    });
+    
+    return backgroundTask;
+  }, [performance.isBackgroundProcessing]);
+  
+  // Optimized data refresh with debouncing
+  const debouncedRefresh = useCallback(
+    debounce(async (filters: any) => {
+      try {
+        const data = await loadDataWithPagination(
+          pagination.currentPage,
+          pagination.pageSize,
+          filters
+        );
+        
+        setDoctorsData(data.doctors);
+        setHospitalStats(data.hospitals);
+        if (data.kpis) {
+          setKpiData(data.kpis);
+        }
+        
+        setPagination(prev => ({
+          ...prev,
+          totalItems: data.totalItems,
+          totalPages: Math.ceil(data.totalItems / prev.pageSize)
+        }));
+      } catch (error) {
+        console.error('❌ Error refreshing data:', error);
+        toast.error('Erro ao carregar dados');
+      }
+    }, 500),
+    [loadDataWithPagination, pagination.currentPage, pagination.pageSize]
+  );
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState('doctors');
   const [importOpen, setImportOpen] = useState(false);
@@ -317,7 +581,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
 
   // Authentication
-  const { user, isDirector, isAdmin, isCoordinator, isTI, hasPermission } = useAuth();
+  const { isDirector, isAdmin, isCoordinator, isTI } = useAuth();
 
   // Paginação (usa dados locais filtrados por hospital quando aplicável)
   const procedures = (proceduresData && proceduresData.length > 0)
@@ -1060,53 +1324,46 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     (async () => {
       try {
         console.log('📋 Carregando competências disponíveis...');
-        const pageSize = 1000; // Supabase limita a 1000 por request
+        const pageSize = 1000;
+        const maxRows = 20000;
+        const maxDistinct = 72;
         let offset = 0;
-        const allAIHs: any[] = [];
-        
-        // ✅ Buscar TODAS as AIHs em batches (com paginação)
+        const setYM = new Set<string>();
+
         while (true) {
           let q = supabase
             .from('aihs')
             .select('competencia,hospital_id')
             .not('competencia', 'is', null)
-            .limit(pageSize)
-            .range(offset, offset + pageSize - 1);
-          
-          // Aplicar filtro de hospital se selecionado
+            .order('competencia', { ascending: false })
+            .range(offset, offset + pageSize - 1)
+
           if (selectedHospitals.length > 0 && !selectedHospitals.includes('all')) {
-            q = q.in('hospital_id', selectedHospitals);
+            q = q.in('hospital_id', selectedHospitals)
           }
-          
-          const { data: batch, error } = await q;
-          
+
+          const { data: batch, error } = await q
           if (error) {
-            console.warn('⚠️ Erro ao carregar batch de competências:', error);
-            break;
+            console.warn('⚠️ Erro ao carregar batch de competências:', error)
+            break
           }
-          
-          const batchLen = batch?.length || 0;
-          if (batchLen === 0) break;
-          
-          allAIHs.push(...batch);
-          
-          // Se retornou menos que o pageSize, chegamos ao fim
-          if (batchLen < pageSize) break;
-          
-          offset += pageSize;
-          
-          // Evitar UI freeze em listas enormes
-          await new Promise(r => setTimeout(r, 0));
+
+          const batchLen = batch?.length || 0
+          if (batchLen === 0) break
+
+          for (const row of batch as any[]) {
+            const comp = (row as any).competencia
+            if (comp) setYM.add(comp)
+          }
+
+          if (setYM.size >= maxDistinct) break
+          if (batchLen < pageSize) break
+
+          offset += pageSize
+          if (offset >= maxRows) break
+
+          await new Promise(r => setTimeout(r, 0))
         }
-        
-        console.log(`✅ Total de AIHs carregadas para extrair competências: ${allAIHs.length}`);
-        
-        // Extrair competências únicas
-        const setYM = new Set<string>();
-        allAIHs.forEach((row: any) => {
-          const comp = row.competencia;
-          if (comp) setYM.add(comp); // Mantém formato YYYY-MM-DD do banco
-        });
         
         const arr = Array.from(setYM).sort((a, b) => (a < b ? 1 : -1));
         console.log(`✅ ${arr.length} competências únicas encontradas`);

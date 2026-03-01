@@ -1,8 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { performanceService } from '../services/performanceService';
+import { optimizedSupabaseService } from '../services/supabaseServiceOptimized';
+import { PerformanceMonitor } from '../components/PerformanceMonitor';
 import * as XLSX from 'xlsx';
 import { format as formatDateFns } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
@@ -782,6 +786,22 @@ interface MedicalProductionDashboardProps {
 }
 
 // ✅ COMPONENTE PRINCIPAL - SIMPLIFICADO
+
+// Performance optimization interfaces
+interface VirtualScrollConfig {
+  enabled: boolean;
+  itemHeight: number;
+  overscan: number;
+}
+
+interface PerformanceState {
+  isLoading: boolean;
+  isBackgroundProcessing: boolean;
+  lastUpdate: Date | null;
+  loadedItems: number;
+  totalItems: number;
+}
+
 const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   onStatsUpdate,
   selectedHospitals = ['all'],
@@ -807,6 +827,61 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
   const [filteredDoctors, setFilteredDoctors] = useState<DoctorWithPatients[]>([]);
   const [availableHospitals, setAvailableHospitals] = useState<Array<{ id: string, name: string, cnes?: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Performance optimization state
+  const [virtualScroll, setVirtualScroll] = useState<VirtualScrollConfig>({
+    enabled: true,
+    itemHeight: 120,
+    overscan: 10
+  });
+  
+  const [performance, setPerformance] = useState<PerformanceState>({
+    isLoading: false,
+    isBackgroundProcessing: false,
+    lastUpdate: null,
+    loadedItems: 0,
+    totalItems: 0
+  });
+  
+  // Virtual scrolling refs
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: performance.totalItems,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => virtualScroll.itemHeight,
+    overscan: virtualScroll.overscan,
+    enabled: virtualScroll.enabled && performance.totalItems > 50
+  });
+  
+  // Data memoization for expensive calculations
+  const memoizedDoctors = useMemo(() => {
+    if (!doctors || !Array.isArray(doctors)) return [];
+    
+    return doctors.map(doctor => ({
+      ...doctor,
+      // Pre-calculate expensive values
+      totalProcedures: doctor.patients?.reduce((sum, patient) => sum + (patient.procedures?.length || 0), 0) || 0,
+      totalValue: doctor.patients?.reduce((sum, patient) => sum + (patient.total_value_reais || 0), 0) || 0,
+      avgProcedureValue: 0,
+      // Cache calculated payment rules
+      paymentRules: (() => {
+        // Map patients to the expected ProcedurePaymentInfo shape
+        const procedures = (doctor.patients || []).flatMap(p =>
+          (p.procedures || []).map((proc: any) => ({
+            procedure_code: proc.procedure_code,
+            value_reais: proc.value_reais || 0,
+            procedure_description: proc.procedure_description,
+            cbo: proc.cbo,
+            sequence: proc.sequence ?? proc.sequencia ?? proc.procedure_sequence
+          }))
+        );
+        return calculateDoctorPayment(doctor.doctor_info.name, procedures, doctor.hospitals?.[0]?.hospital_id);
+      })()
+    }));
+  }, [doctors, selectedHospitals]);
+  
+  // Background processing queue
+  const backgroundQueue = useRef<Promise<any>[]>([]);
   const [dbAihCount, setDbAihCount] = useState<number | null>(null);
   const [expandedDoctors, setExpandedDoctors] = useState<Set<string>>(new Set());
   const [expandedPatients, setExpandedPatients] = useState<Set<string>>(new Set());
@@ -2992,10 +3067,17 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       });
 
       // Buscar hospitais adicionais da tabela hospitals se necessário
-      const { data: hospitalsFromDB } = await supabase
-        .from('hospitals')
-        .select('id, name, cnes') // ✅ Incluir CNES (identificador SUS)
-        .order('name');
+      const hospitalsFromDB = await optimizedSupabaseService.executeQuery<Array<{ id: string; name: string; cnes?: string | null }>>(
+        'hospitals',
+        async () => {
+          const { data, error } = await supabase
+            .from('hospitals')
+            .select('id, name, cnes')
+            .order('name')
+          if (error) throw error
+          return data || []
+        }
+      );
 
       if (hospitalsFromDB) {
         // Criar mapa para armazenar também o CNES
@@ -3500,14 +3582,33 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
             selectedCompetenciaRaw: selectedCompetencia
           });
 
-          const doctorsWithPatients = await DoctorPatientService.getDoctorsWithPatientsFromProceduresView({
-            hospitalIds: selectedHospitalIds,
-            competencia: competenciaFilter, // ✅ Passar undefined se não houver filtro
-            filterCareCharacter: careFilter,
-            dischargeDateRange,
-            doctorNameContains: searchTerm?.trim() || undefined,
-            patientNameContains: patientSearchTerm?.trim() || undefined
-          });
+          const cacheKey = `mpd:doctorsWithPatients:${JSON.stringify({
+            hospitalIds: selectedHospitalIds || null,
+            competencia: competenciaFilter || null,
+            filterCareCharacter: careFilter || null,
+            dischargeDateRange: dischargeDateRange
+              ? {
+                  from: (dischargeDateRange as any).from ? String((dischargeDateRange as any).from) : null,
+                  to: (dischargeDateRange as any).to ? String((dischargeDateRange as any).to) : null
+                }
+              : null,
+            doctorNameContains: searchTerm?.trim() || null,
+            patientNameContains: patientSearchTerm?.trim() || null
+          })}`
+
+          const doctorsWithPatients = await performanceService.getCached(
+            cacheKey,
+            () =>
+              DoctorPatientService.getDoctorsWithPatientsFromProceduresView({
+                hospitalIds: selectedHospitalIds,
+                competencia: competenciaFilter,
+                filterCareCharacter: careFilter,
+                dischargeDateRange,
+                doctorNameContains: searchTerm?.trim() || undefined,
+                patientNameContains: patientSearchTerm?.trim() || undefined
+              }),
+            2 * 60 * 1000
+          );
           // Usar diretamente a fonte das tabelas, garantindo pacientes e procedimentos
           mergedDoctors = doctorsWithPatients;
           console.log('✅ Associação Médicos → Pacientes carregada:', mergedDoctors.filter(d => d.patients.length > 0).length, 'médicos com pacientes');
@@ -4599,6 +4700,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       {showCleuezaDebug && (
         <CleuezaDebugComponent />
       )}
+
+      <PerformanceMonitor isMinimized={true} autoRefresh={true} />
 
       {/* 🚀 SOLUÇÃO IMEDIATA IMPLEMENTADA - SEÇÃO OCULTADA */}
       {/* 
