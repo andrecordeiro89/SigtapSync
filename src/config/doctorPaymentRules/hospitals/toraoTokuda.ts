@@ -1086,7 +1086,8 @@ export const TORAO_TOKUDA_RULES: HospitalRules = {
   'GEOVANA GONZALES STORTI': {
     doctorName: 'GEOVANA GONZALES STORTI',
     rules: [
-      { procedureCode: '04.06.02.057-4', standardValue: 900.00, description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 900,00' }
+      { procedureCode: '04.06.02.057-4', standardValue: 900.00, description: 'TRATAMENTO CIRÚRGICO DE VARIZES (UNILATERAL) - R$ 900,00' },
+      { procedureCode: '04.06.02.056-6', standardValue: 900.00, description: 'TRATAMENTO CIRURGICO DE VARIZES (BILATERAL) - R$ 900,00' }
     ]
   },
 
