@@ -26,8 +26,8 @@ export const getSpecialtyName = (code: string | number | null | undefined): stri
     const digits = String(code).trim().replace(/\D/g, '').padStart(2, '0');
     const map: Record<string, string> = {
       '01': 'Cirúrgico',
-      '02': 'Clínico',
-      '03': 'Obstétrico',
+      '03': 'Clínico',
+      '02': 'Obstétrico',
       '04': 'Pediátrico',
       '05': 'Psiquiátrico',
       '06': 'Pneumologia Sanitária',

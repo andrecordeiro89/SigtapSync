@@ -792,22 +792,25 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
 
       const candidateCnsByAih = new Map<string, string[]>()
       for (const [aihKey, rows] of spByAih.entries()) {
-        const perCns = new Map<string, { sumPtsp: number; hasNonAnesth: boolean }>()
+        const perCns = new Map<string, { sumPtsp: number; hasNonAnesth: boolean; hasAnyPtsp: boolean }>()
         rows.forEach((r: any) => {
           const cns = String(r?.sp_pf_doc || '').trim()
           if (!cns) return
-          const ptsp = Number(r?.sp_ptsp || 0)
           const cbo = String(r?.sp_pf_cbo || '').trim()
-          const prev = perCns.get(cns) || { sumPtsp: 0, hasNonAnesth: false }
+          const ptsRaw = r?.sp_ptsp
+          const ptsp = Number(ptsRaw)
+          const hasPtsp = Number.isFinite(ptsp) && ptsp > 0
+          const prev = perCns.get(cns) || { sumPtsp: 0, hasNonAnesth: false, hasAnyPtsp: false }
           perCns.set(cns, {
-            sumPtsp: prev.sumPtsp + (Number.isFinite(ptsp) ? ptsp : 0),
-            hasNonAnesth: prev.hasNonAnesth || (cbo !== '225151')
+            sumPtsp: prev.sumPtsp + (hasPtsp ? ptsp : 0),
+            hasNonAnesth: prev.hasNonAnesth || (cbo !== '225151'),
+            hasAnyPtsp: prev.hasAnyPtsp || hasPtsp
           })
         })
         if (perCns.size === 0) continue
         const entries = Array.from(perCns.entries())
         const candidates = entries
-          .filter(([, v]) => v.hasNonAnesth)
+          .filter(([, v]) => v.hasNonAnesth && v.hasAnyPtsp)
           .filter(([cns]) => !isZeroCns(cns))
           .sort((a, b) => {
             const diffPtsp = (b[1].sumPtsp || 0) - (a[1].sumPtsp || 0)
@@ -1126,8 +1129,8 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
            if (spAll.length > 0) {
              // Tentar achar o principal no SP (geralmente seq 1 ou maior valor)
              const mainSp = spAll.reduce((prev: any, curr: any) => {
-               const vPrev = Number(prev?.sp_valato || 0)
-               const vCurr = Number(curr?.sp_valato || 0)
+               const vPrev = Number(prev?.sp_ptsp || 0)
+               const vCurr = Number(curr?.sp_ptsp || 0)
                return vCurr > vPrev ? curr : prev
              }, spAll[0])
              const code = formatSigtapCode(String(mainSp?.sp_atoprof || ''))
