@@ -53,6 +53,7 @@ import HospitalRevenueDashboard from './HospitalRevenueDashboard';
 import SpecialtyRevenueDashboard from './SpecialtyRevenueDashboard';
 import MedicalProductionDashboard from './MedicalProductionDashboard';
 import MedicalStaffDashboard from './MedicalStaffDashboard';
+import AmbulatoryDashboard from './AmbulatoryDashboard';
 import ProcedureHierarchyDashboard from './ProcedureHierarchyDashboard';
 import RulesStudio from './rulesStudio/RulesStudio'
 import { CareCharacterUtils } from '../config/careCharacterCodes';
@@ -1470,6 +1471,13 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
               Corpo Médico
             </TabsTrigger>
             <TabsTrigger 
+              value="ambulatory" 
+              className="rounded-md border border-gray-300 px-4 py-2 transition-all duration-200 font-semibold text-black bg-white hover:bg-neutral-100 data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:border-black"
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              Ambulatório
+            </TabsTrigger>
+            <TabsTrigger 
               value="repasse-rules" 
               className="rounded-md border border-gray-300 px-4 py-2 transition-all duration-200 font-semibold text-black bg-white hover:bg-neutral-100 data-[state=active]:bg-black data-[state=active]:text-white data-[state=active]:border-black"
             >
@@ -2156,6 +2164,10 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
         {/* TAB: CORPO MÉDICO */}
         <TabsContent value="medical-staff" className="space-y-6">
           <MedicalStaffDashboard />
+        </TabsContent>
+
+        <TabsContent value="ambulatory" className="space-y-6">
+          <AmbulatoryDashboard />
         </TabsContent>
 
         <TabsContent value="repasse-rules" className="space-y-6">
