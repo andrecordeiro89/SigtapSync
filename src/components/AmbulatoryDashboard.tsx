@@ -10,9 +10,12 @@ import { supabaseSih } from '../lib/sihSupabase'
 import { supabase } from '../lib/supabase'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { Check, ChevronsUpDown, Loader2, Activity, AlertTriangle } from 'lucide-react'
+import { Check, ChevronsUpDown, Loader2, Activity, AlertTriangle, FileText, FileSpreadsheet } from 'lucide-react'
 import { formatCurrency, formatNumber, formatSigtapCode } from '../utils/formatters'
 import { SigtapService } from '../services/supabaseService'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 
 type AmbulatoryMode = 'APAC' | 'BPA' | 'Todos'
 
@@ -237,6 +240,125 @@ export default function AmbulatoryDashboard() {
       notApprovedRestCount: Math.max(0, notApproved.length - 10),
     }
   }, [byProcedure])
+
+  const exportProceduresPdf = () => {
+    const rows = byProcedure.map((p) => {
+      const qtdNotApproved = Math.max(0, (p.qtdApresentada || 0) - (p.qtdAprovada || 0))
+      const valNotApproved = Math.max(0, (p.valorApresentado || 0) - (p.valorAprovado || 0))
+      return [
+        String(p.procedimento || ''),
+        String(p.procedimentoNome || ''),
+        formatNumber(p.qtdApresentada || 0),
+        formatNumber(p.qtdAprovada || 0),
+        formatNumber(qtdNotApproved),
+        formatCurrency(p.valorApresentado || 0),
+        formatCurrency(p.valorAprovado || 0),
+        formatCurrency(valNotApproved),
+      ]
+    })
+
+    const doc = new jsPDF('landscape')
+    const pageWidth = doc.internal.pageSize.getWidth()
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('AMBULATÓRIO - PROCEDIMENTOS', pageWidth / 2, 18, { align: 'center' })
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Hospitais: ${selectedHospitalsLabel || '—'}`, 14, 28)
+    doc.text(`Competências: ${selectedCompetenciasLabel || '—'}`, 14, 34)
+    doc.text(`Valor apresentado: ${formatCurrency(procedureSummary.totalPresented)}`, 14, 42)
+    doc.text(`Valor aprovado: ${formatCurrency(procedureSummary.totalApproved)}`, 14, 48)
+    doc.text(`Valor não aprovado: ${formatCurrency(procedureSummary.totalNotApproved)}`, 14, 54)
+
+    autoTable(doc, {
+      head: [[
+        'Procedimento',
+        'Descrição',
+        'Qtd Apresentada',
+        'Qtd Aprovada',
+        'Qtd Não-Aprovada',
+        'Valor Apresentado',
+        'Valor Aprovado',
+        'Valor Não-Aprovado'
+      ]],
+      body: rows,
+      startY: 62,
+      theme: 'striped',
+      headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, cellPadding: 2 },
+      bodyStyles: { fontSize: 8, textColor: [40, 40, 40], cellPadding: 2 },
+      styles: { overflow: 'linebreak' },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 120 },
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+        6: { halign: 'right' },
+        7: { halign: 'right' },
+      },
+      margin: { left: 14, right: 14 },
+    })
+
+    doc.save(`Ambulatorio_Procedimentos_${new Date().toISOString().slice(0, 10)}.pdf`)
+  }
+
+  const exportProceduresExcel = () => {
+    const header = [
+      'Procedimento',
+      'Descrição',
+      'Qtd Apresentada',
+      'Qtd Aprovada',
+      'Qtd Não-Aprovada',
+      'Valor Apresentado',
+      'Valor Aprovado',
+      'Valor Não-Aprovado',
+    ]
+
+    const body = byProcedure.map((p) => {
+      const qtdNotApproved = Math.max(0, (p.qtdApresentada || 0) - (p.qtdAprovada || 0))
+      const valNotApproved = Math.max(0, (p.valorApresentado || 0) - (p.valorAprovado || 0))
+      return [
+        String(p.procedimento || ''),
+        String(p.procedimentoNome || ''),
+        Number(p.qtdApresentada || 0),
+        Number(p.qtdAprovada || 0),
+        Number(qtdNotApproved),
+        Number(p.valorApresentado || 0),
+        Number(p.valorAprovado || 0),
+        Number(valNotApproved),
+      ]
+    })
+
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet([header, ...body])
+    ;(ws as any)['!cols'] = [
+      { wch: 18 },
+      { wch: 60 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+    ]
+    XLSX.utils.book_append_sheet(wb, ws, 'Procedimentos')
+
+    const wsSummary = XLSX.utils.aoa_to_sheet([
+      ['Hospitais', selectedHospitalsLabel || '—'],
+      ['Competências', selectedCompetenciasLabel || '—'],
+      ['Valor apresentado', procedureSummary.totalPresented],
+      ['Valor aprovado', procedureSummary.totalApproved],
+      ['Valor não aprovado', procedureSummary.totalNotApproved],
+      ['Procedimentos não aprovados (qtd)', procedureSummary.notApprovedCount],
+      ['Procedimentos não aprovados (valor)', procedureSummary.notApprovedValue],
+    ])
+    XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumo')
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16)
+    XLSX.writeFile(wb, `Ambulatorio_Procedimentos_${stamp}.xlsx`)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -734,6 +856,28 @@ export default function AmbulatoryDashboard() {
                 <span className="font-semibold text-gray-800">Não aprovado:</span>
                 <span>{formatCurrency(procedureSummary.totalNotApproved)}</span>
               </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="bg-white text-black border-gray-300 hover:bg-neutral-100"
+                  onClick={exportProceduresPdf}
+                  disabled={byProcedure.length === 0}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Baixar PDF
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="bg-white text-black border-gray-300 hover:bg-neutral-100"
+                  onClick={exportProceduresExcel}
+                  disabled={byProcedure.length === 0}
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Baixar Excel
+                </Button>
+              </div>
               {procedureSummary.notApprovedCount > 0 && (
                 <div className="mt-2">
                   <div className="text-xs text-gray-700">
@@ -764,21 +908,29 @@ export default function AmbulatoryDashboard() {
                       <TableHead className="min-w-[420px]">Descrição</TableHead>
                       <TableHead className="text-right whitespace-nowrap">Qtd Apresentada</TableHead>
                       <TableHead className="text-right whitespace-nowrap">Qtd Aprovada</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Qtd Não-Aprovada</TableHead>
                       <TableHead className="text-right whitespace-nowrap">Valor Apresentado</TableHead>
                       <TableHead className="text-right whitespace-nowrap">Valor Aprovado</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">Valor Não-Aprovado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {byProcedure.map((p) => (
-                      <TableRow key={p.procedimento}>
-                        <TableCell className="font-mono text-xs whitespace-nowrap">{p.procedimento}</TableCell>
-                        <TableCell className="text-sm">{p.procedimentoNome}</TableCell>
-                        <TableCell className="text-right whitespace-nowrap">{formatNumber(p.qtdApresentada)}</TableCell>
-                        <TableCell className="text-right whitespace-nowrap">{formatNumber(p.qtdAprovada)}</TableCell>
-                        <TableCell className="text-right whitespace-nowrap">{formatCurrency(p.valorApresentado)}</TableCell>
-                        <TableCell className="text-right whitespace-nowrap">{formatCurrency(p.valorAprovado)}</TableCell>
-                      </TableRow>
-                    ))}
+                    {byProcedure.map((p) => {
+                      const qtdNotApproved = Math.max(0, (p.qtdApresentada || 0) - (p.qtdAprovada || 0))
+                      const valNotApproved = Math.max(0, (p.valorApresentado || 0) - (p.valorAprovado || 0))
+                      return (
+                        <TableRow key={p.procedimento}>
+                          <TableCell className="font-mono text-xs whitespace-nowrap">{p.procedimento}</TableCell>
+                          <TableCell className="text-sm">{p.procedimentoNome}</TableCell>
+                          <TableCell className="text-right whitespace-nowrap">{formatNumber(p.qtdApresentada)}</TableCell>
+                          <TableCell className="text-right whitespace-nowrap">{formatNumber(p.qtdAprovada)}</TableCell>
+                          <TableCell className="text-right whitespace-nowrap">{formatNumber(qtdNotApproved)}</TableCell>
+                          <TableCell className="text-right whitespace-nowrap">{formatCurrency(p.valorApresentado)}</TableCell>
+                          <TableCell className="text-right whitespace-nowrap">{formatCurrency(p.valorAprovado)}</TableCell>
+                          <TableCell className="text-right whitespace-nowrap">{formatCurrency(valNotApproved)}</TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               </div>
