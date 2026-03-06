@@ -1004,39 +1004,7 @@ export const TORAO_TOKUDA_RULES: HospitalRules = {
     ]
   },
 
-  'DJAVANI BLUM': {
-    doctorName: 'DJAVANI BLUM',
-    // Mesmas regras da MAIRA RECHI CASSAPULA
-    rules: [
-      { procedureCode: '04.09.06.013-5', standardValue: 1000.00, description: 'HISTERECTOMIA TOTAL - R$ 1.000,00' },
-      { procedureCode: '04.09.06.012-7', standardValue: 750.00, description: 'HISTERECTOMIA SUBTOTAL - R$ 750,00' },
-      { procedureCode: '04.09.06.011-9', standardValue: 1200.00, description: 'HISTERECTOMIA C/ ANEXECTOMIA (UNI / BILATERAL) - R$ 1.200,00' },
-      { procedureCode: '04.09.06.021-6', standardValue: 700.00, secondaryValue: 525.00, tertiaryValue: 420.00, description: 'OOFORECTOMIA / OOFOROPLASTIA - Principal: R$ 700,00 | 2º: R$ 525,00 | 3º+: R$ 420,00' },
-      { procedureCode: '04.09.06.018-6', standardValue: 600.00, description: 'LAQUEADURA TUBARIA - R$ 600,00' },
-      { procedureCode: '04.09.07.027-0', standardValue: 450.00, secondaryValue: 250.00, tertiaryValue: 200.00, description: 'TRATAMENTO CIRURGICO DE INCONTINÊNCIA URINÁRIA POR VIA VAGINAL - Principal: R$ 450,00 | 2º: R$ 250,00 | 3º: R$ 200,00' },
-      { procedureCode: '04.09.07.006-8', standardValue: 450.00, description: 'COLPOPERINEOPLASTIA POSTERIOR - R$ 450,00' },
-      { procedureCode: '04.09.07.005-0', standardValue: 600.00, secondaryValue: 450.00, description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR - Principal: R$ 600,00 | 2º: R$ 450,00' },
-      { procedureCode: '04.09.06.004-6', standardValue: 250.00, description: 'CURETAGEM SEMIOTICA C/ OU S/ DILATACAO DO COLO DO UTERO - R$ 250,00' },
-      { procedureCode: '04.09.07.026-2', standardValue: 250.00, description: 'TRATAMENTO CIRURGICO DE HIPERTROFIA DOS PEQUENOS LABIOS (NINFOPLASTIA) - R$ 250,00' },
-      { procedureCode: '04.08.06.031-0', standardValue: 250.00, description: 'RESSECÇÃO SIMPLES DE TUMOR ÓSSEO / DE PARTES MOLES - R$ 250,00' },
-      { procedureCode: '04.09.07.015-7', standardValue: 250.00, description: 'EXERESE DE GLÂNDULA DE BARTHOLIN / SKENE - R$ 250,00' },
-      { procedureCode: '04.09.07.019-0', standardValue: 150.00, description: 'MARSUPIALIZAÇÃO DE GLÂNDULA DE BARTOLIN - R$ 150,00' },
-      { procedureCode: '04.09.07.003-3', standardValue: 300.00, secondaryValue: 225.00, description: 'COLPOCLEISE (CIRURGIA DE LE FORT) - Principal: R$ 300,00 | Sequencial: R$ 225,00' },
-      { procedureCode: '04.09.06.019-4', standardValue: 550.00, description: 'MIOMECTOMIA - R$ 550,00' },
-      { procedureCode: '04.09.07.014-9', standardValue: 300.00, description: 'EXERESE DE CISTO VAGINAL - R$ 300,00' },
-      { procedureCode: '04.09.06.022-4', standardValue: 100.00, description: 'RESSECCAO DE VARIZES PELVICAS (ADICIONAL AO PROCEDIMENTO PRINCIPAL) - R$ 100,00' },
-      { procedureCode: '04.07.04.018-8', standardValue: 300.00, description: 'LIBERAÇÃO DE ADERÊNCIAS INTESTINAIS (ADICIONAL AO PROCEDIMENTO PRINCIPAL) - R$ 300,00' },
-      { procedureCode: '04.09.07.009-2', standardValue: 100.00, description: 'COLPORRAFIA NAO OBSTETRICA (ADICIONAL AO PROCEDIMENTO PRINCIPAL) - R$ 100,00' },
-      { procedureCode: '04.08.06.020-4', standardValue: 100.00, description: 'REINSERÇÃO MUSCULAR (CORREÇÃO DE DIÁSTESE DE RETO ABDOMINAL - ADICIONAL DO PROCEDIMENTO PRINCIPAL) - R$ 100,00' },
-      { procedureCode: '04.09.06.023-2', standardValue: 250.00, secondaryValue: 187.50, tertiaryValue: 150.00, quaternaryValue: 125.00, description: 'SALPINGECTOMIA UNI / BILATERAL - Principal: R$ 250,00 | 2º: R$ 187,50 | 3º: R$ 150,00 | 4º: R$ 125,00' },
-      { procedureCode: '04.01.02.010-0', standardValue: 150.00, description: 'EXTIRPAÇÃO E SUPRESSÃO DE LESÃO DE PELE E DE TECIDO CELULAR SUBCUTÂNEO - R$ 150,00' }
-    ],
-    multipleRules: [
-      { codes: ['04.09.06.021-6', '04.09.06.023-2'], totalValue: 900.00, description: 'OOFORECTOMIA/OOFOROPLASTIA + SALPINGECTOMIA - R$ 900,00' },
-      { codes: ['04.09.07.006-8', '04.09.07.027-0'], totalValue: 800.00, description: 'COLPOPERINEOPLASTIA POSTERIOR + TRATAMENTO INCONTINÊNCIA URINÁRIA - R$ 800,00' },
-      { codes: ['04.09.07.005-0', '04.09.07.027-0'], totalValue: 900.00, description: 'COLPOPERINEOPLASTIA ANTERIOR E POSTERIOR + TRATAMENTO INCONTINÊNCIA URINÁRIA - R$ 900,00' }
-    ]
-  },
+
 
   'JOAO ROBERTO SEIDEL DE ARAUJO': {
     doctorName: 'JOAO ROBERTO SEIDEL DE ARAUJO',
