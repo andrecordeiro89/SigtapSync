@@ -71,9 +71,14 @@ export const HOSPITAL_MAPPINGS: HospitalMapping[] = [
     name: 'Hospital GUA - Centro de Medicina Avançada'
   },
   {
-    id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+    id: '1b7fd0a9-2515-4f74-90fa-9c823398af98',
     key: 'TORAO_TOKUDA_APUCARANA',
     name: 'Hospital Torao Tokuda - Apucarana'
+  },
+  {
+    id: 'eff06b4a-8722-4ccc-acd9-e94266f06e9a',
+    key: 'HOSPITAL_MATERNIDADE_DE_RIO_BRANDO_DO_SUL_RBS',
+    name: 'Hospital Maternidade de Rio Branco do Sul - RBS'
   }
 ];
 

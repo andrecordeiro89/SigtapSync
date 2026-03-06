@@ -1080,6 +1080,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
             ''
           const qty = Number(r?.sp_qtd_ato ?? r?.sp_qt_proc ?? 1) || 1
           const val = Number(r?.sp_valato || 0) * qty
+          const ptsp = Number(r?.sp_ptsp || 0)
           
           // Validação CBO
           if (isSurgicalProcedure(code) && doctorCbos.length > 0) {
@@ -1098,6 +1099,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
             value_reais: Number.isFinite(val) ? val : 0,
             cbo: String(r?.sp_pf_cbo || ''),
             sequence: idx + 1,
+            sp_ptsp: Number.isFinite(ptsp) ? ptsp : undefined,
             aih_id: entry.aihKey,
           }
         })

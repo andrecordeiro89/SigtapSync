@@ -152,6 +152,7 @@ const applyDuplicate04First = (procedures: ProcedurePaymentInfo[]): ProcedurePay
   const out = [...list]
 
   for (const [, rows] of groups) {
+    // Initial ordering: sequence ascending, then index
     const ordered = [...rows].sort((a, b) => {
       const saRaw = parseSequence((a.p as any).sequence)
       const sbRaw = parseSequence((b.p as any).sequence)
@@ -171,19 +172,29 @@ const applyDuplicate04First = (procedures: ProcedurePaymentInfo[]): ProcedurePay
       by04.get(digits)!.push({ idx: row.idx, p: row.p, cbo, seq })
     }
 
-    for (const [, sameCode] of by04) {
+    for (const [code, sameCode] of by04) {
       if (sameCode.length <= 1) continue
-      const keep =
-        sameCode.find(x => x.seq === 1) ??
-        sameCode.find(x => x.cbo && x.cbo !== '225151' && x.cbo !== '000000') ??
-        sameCode.reduce((best, cur) => {
-          const bs = typeof best.seq === 'number' ? best.seq : Number.POSITIVE_INFINITY
-          const cs = typeof cur.seq === 'number' ? cur.seq : Number.POSITIVE_INFINITY
-          if (cs !== bs) return cs < bs ? cur : best
-          return best
-        }, sameCode[0])
+
+      // New priority: 1) highest sp_ptsp, 2) non-assistant CBO, 3) lowest sequence
+      let keep = sameCode.reduce((best, cur) => {
+        const bv = (best.p as any).sp_ptsp ?? 0
+        const cv = (cur.p as any).sp_ptsp ?? 0
+        if (cv > bv) return cur
+        if (cv < bv) return best
+        // equal sp_ptsp: check CBO
+        const bestIsAssistant = best.cbo === '225151' || best.cbo === '000000'
+        const curIsAssistant = cur.cbo === '225151' || cur.cbo === '000000'
+        if (bestIsAssistant !== curIsAssistant) {
+          return bestIsAssistant ? cur : best // non-assistant wins
+        }
+        // equal CBO status: lower sequence wins
+        const bs = typeof best.seq === 'number' ? best.seq : Number.POSITIVE_INFINITY
+        const cs = typeof cur.seq === 'number' ? cur.seq : Number.POSITIVE_INFINITY
+        return cs < bs ? cur : best
+      }, sameCode[0])
+
       for (const x of sameCode) {
-        if (x.idx !== keep.idx) out[x.idx] = { ...x.p, cbo: '225151' }
+        if (x.idx !== keep!.idx) out[x.idx] = { ...x.p, cbo: '225151' }
       }
     }
   }
