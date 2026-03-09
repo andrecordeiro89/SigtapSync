@@ -22,30 +22,8 @@ import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 import { getSigtapLocalMap, resolveSigtapDescriptionFromCsv } from '@/utils/sigtapLocal';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  Users,
-  ChevronDown,
-  ChevronRight,
-  ChevronLeft,
-  Search,
-  Stethoscope,
-  DollarSign,
-  FileText,
-  User,
-  Activity,
-  Calendar,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  TrendingUp,
-  BarChart3,
-  Database,
-  RefreshCw,
-  Building,
-  FileSpreadsheet,
-  Loader2,
-  Check
-} from 'lucide-react';
+import { Users, ChevronDown, ChevronRight, ChevronLeft, Search, Stethoscope, DollarSign, FileText, User, Activity, Calendar, CheckCircle,
+         XCircle, AlertCircle, TrendingUp, BarChart3, Database, RefreshCw, Building, FileSpreadsheet, Loader2, Check} from 'lucide-react';
 
 import { DoctorPatientService, type DoctorWithPatients } from '../services/doctorPatientService';
 import { DoctorsHierarchyV2Service } from '../services/doctorsHierarchyV2';
@@ -59,12 +37,8 @@ import CleuezaDebugComponent from './CleuezaDebugComponent';
 import ExecutiveDateFilters from './ExecutiveDateFilters';
 import { CareCharacterUtils } from '../config/careCharacterCodes';
 import { getParticipationInfo } from '../config/participationCodes';
-import { 
-  shouldCalculateAnesthetistProcedure,
-  getAnesthetistProcedureType,
-  filterCalculableProcedures,
-  getCalculableProcedures
-} from '../utils/anesthetistLogic';
+import { shouldCalculateAnesthetistProcedure, getAnesthetistProcedureType,
+         filterCalculableProcedures, getCalculableProcedures} from '../utils/anesthetistLogic';
 import { checkCboCompatibility, isSurgicalProcedure } from '../utils/cboCompatibility';
 import { formatSigtapCode } from '../utils/formatters';
 import { getSpecialtyName } from '../utils/aihLookups'

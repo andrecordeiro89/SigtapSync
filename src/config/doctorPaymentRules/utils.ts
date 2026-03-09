@@ -124,8 +124,8 @@ export function detectHospitalFromContext(
     }
   }
 
-  // Fallback: Torao Tokuda (compatibilidade)
-  return 'TORAO_TOKUDA_APUCARANA';
+  // Fallback: nenhum hospital específico → usar apenas regras VBA/HON por especialidade
+  return '';
 }
 
 // ================================================================
