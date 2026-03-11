@@ -62,8 +62,10 @@ const parseISODateToLocal = (isoString: string | undefined | null): string => {
         return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`
       }
     }
-  } catch { }
-  return ''
+  } catch (err) {
+    console.error('Error parsing date:', err)
+    return ''
+  }
 }
 
 const isMedicalProcedure = (procedureCode: string): boolean => {
@@ -194,8 +196,9 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
           .order('name')
         if (error) throw error
         if (!cancelled) setHospitals((data || []).map((h: any) => ({ id: h.id, name: h.name, cnes: h.cnes })))
-      } catch {
-        toast.error('Erro ao carregar hospitais')
+      } catch (err) {
+        console.error('Error loading hospitals:', err)
+        toast.error('Erro ao carregar hospitais. Verifique a conexão com o banco de dados.')
       } finally {
         if (!cancelled) setLoadingHospitals(false)
       }
@@ -228,8 +231,9 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
           .filter(d => d.cns && d.name)
           .sort((a, b) => a.name.localeCompare(b.name))
         if (!cancelled) setDoctors(opts)
-      } catch {
-        toast.error('Erro ao carregar médicos')
+      } catch (err) {
+        console.error('Error fetching Sih médicos:', err)
+        toast.error('Erro ao carregar médicos. Verifique a conexão com o banco de dados.')
         if (!cancelled) setDoctors([])
       } finally {
         if (!cancelled) setLoadingDoctors(false)
@@ -263,12 +267,18 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
         const set = new Set<string>()
         const pageSize = 1000
         let offset = 0
+        // Compute date filter values from state
+        const hasDateFilter = !!(dischargeFrom && dischargeTo)
+        const endExclusive = dischargeTo ? endExclusiveISODate(dischargeTo) : ''
         for (; ;) {
           let q = supabaseSih
             .from('sih_rd')
             .select('ano_cmpt, mes_cmpt')
             .range(offset, offset + pageSize - 1)
           if (selectedHospital !== 'all') q = q.eq('hospital_id', selectedHospital)
+          if (hasDateFilter) {
+            q = q.not('dt_saida', 'is', null).gte('dt_saida', dischargeFrom).lt('dt_saida', endExclusive)
+          }
           const { data, error } = await q
           if (error) throw error
           const batch = (data || []) as any[]
@@ -286,7 +296,9 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
           setAvailableCompetencias(sorted)
           setSelectedCompetencias(prev => prev.filter(c => sorted.includes(c)))
         }
-      } catch {
+      } catch (err) {
+        console.error('Error fetching Sih competências:', err)
+        toast.error('Erro ao buscar competências Sih. Verifique a conexão com o banco de dados.')
         if (!cancelled) setAvailableCompetencias([])
       } finally {
         if (!cancelled) setLoadingCompetencias(false)
@@ -294,7 +306,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
     }
     loadCompetencias()
     return () => { cancelled = true }
-  }, [open, selectedHospital])
+  }, [open, selectedHospital, dischargeFrom, dischargeTo])
 
   const specialties = useMemo(() => {
     const set = new Set<string>()
@@ -634,7 +646,11 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
               .range(rdOffset, rdOffset + pageSizeRd - 1)
 
             const { data, error } = await q
-            if (error) throw error
+            if (error) {
+              console.error('Error fetching Sih RD:', error)
+              toast.error('Erro ao buscar RD Sih. Verifique a conexão com o banco de dados.')
+              return
+            }
             const batch = (data || []) as any[]
             if (batch.length === 0) break
             batch.forEach((r: any) => rdRows.push({
@@ -684,7 +700,11 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
             .range(spOffset, spOffset + pageSizeDoctor - 1)
 
           const { data, error } = await q
-          if (error) throw error
+          if (error) {
+            console.error('Error fetching Sih procedimentos:', error)
+            toast.error('Erro ao buscar procedimentos Sih. Verifique a conexão com o banco de dados.')
+            return
+          }
           const batch = (data || []) as any[]
           if (batch.length === 0) break
           batch.forEach((r: any) => {
@@ -710,7 +730,11 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
             if (selectedHospital !== 'all') q = q.eq('hospital_id', selectedHospital)
 
             const { data, error } = await q
-            if (error) throw error
+            if (error) {
+              console.error('Error fetching Sih procedimentos:', error)
+              toast.error('Erro ao buscar procedimentos Sih. Verifique a conexão com o banco de dados.')
+              return
+            }
               ; (data || []).forEach((r: any) => {
                 const row = {
                   n_aih: String(r?.n_aih || ''),
@@ -760,9 +784,16 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
             q = q.eq('hospital_id', selectedHospital)
           }
           // Note: We do NOT apply date filter to local enrichment because the remote AIHs already match the date range
+          if (hasDateFilter) {
+            q = q.not('data_saida', 'is', null).gte('data_saida', dischargeFrom).lt('data_saida', endExclusive)
+          }
           
           const { data, error } = await q
-          if (error) throw error
+          if (error) {
+            console.error('Error fetching local AIHs:', error)
+            toast.error('Erro ao buscar AIHs locais. Verifique a conexão com o banco de dados.')
+            return
+          }
           const batch = (data || []) as any[]
           batch.forEach((r: any) => {
             localRows.push({
@@ -787,12 +818,16 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
       const spRows: any[] = []
       if (aihKeysForRemote.length > 0) {
         for (const ch of chunk(aihKeysForRemote, 80)) {
-          let spQuery = supabaseSih
+          const spQuery = supabaseSih
             .from('sih_sp')
             .select('sp_naih, sp_atoprof, sp_qt_proc, sp_qtd_ato, sp_valato, sp_ptsp, sp_pf_doc, sp_pf_cbo, sp_mm, sp_aa')
             .in('sp_naih', ch)
           const { data, error } = await spQuery
-          if (error) throw error
+          if (error) {
+            console.error('Error fetching Sih procedimentos:', error)
+            toast.error('Erro ao buscar procedimentos Sih. Verifique a conexão com o banco de dados.')
+            return
+          }
           if (data && data.length > 0) spRows.push(...data)
         }
       }
@@ -1033,7 +1068,11 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
               remoteCbosMap.set(code, cbos)
             }
           })
-      } catch { }
+      } catch (err) {
+        console.error('Error fetching Sigtap procedimentos:', err)
+        toast.error('Erro ao buscar procedimentos Sigtap. Verifique a conexão com o banco de dados.')
+        return
+      }
 
       const rowsDetailed: PreviewRow[] = []
       const totalsByDoctorHospital = new Map<string, { total: number; isMonthly: boolean; fixed: number; fixedRule: string; hospitalId?: string; hospitalName?: string; doctorName: string }>()
