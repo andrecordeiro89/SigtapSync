@@ -561,56 +561,18 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
       }
       const hospitalNameById = new Map((hospitals || []).map(h => [String(h.id), String(h.name || '')]))
 
-      const localRows: Array<{ aih: string; patient_name?: string; data_saida?: string; hospital_id?: string; prontuario?: string }> = []
-      const pageSize = 1000
-      let offset = 0
-      for (; ;) {
-        let q = supabase
-          .from('gsus_aihs_patients')
-          .select('aih, patient_name, data_saida, hospital_id, prontuario')
-        if (hasDateFilter) {
-          q = q.gte('data_saida', dischargeFrom).lt('data_saida', endExclusive)
-        }
-        q = q.range(offset, offset + pageSize - 1)
-        if (selectedHospital !== 'all') q = q.eq('hospital_id', selectedHospital)
-        const { data, error } = await q
-        if (error) throw error
-        const batch = (data || []) as any[]
-        if (batch.length === 0) break
-        batch.forEach((r: any) => {
-          localRows.push({
-            aih: String(r.aih || ''),
-            patient_name: r.patient_name ? String(r.patient_name) : undefined,
-            data_saida: r.data_saida ? String(r.data_saida) : undefined,
-            hospital_id: r.hospital_id ? String(r.hospital_id) : undefined,
-            prontuario: r.prontuario ? String(r.prontuario) : undefined,
-          })
-        })
-        if (batch.length < pageSize) break
-        offset += pageSize
-      }
-
-      const localAihFilledKeys = localRows.map(r => normalizeAih(r.aih)).filter(Boolean)
-      const aihKeys = Array.from(new Set(localAihFilledKeys))
-      const localNoAihCount = localRows.filter(r => !normalizeAih(r.aih)).length
-      const localAihFilledCount = aihKeys.length
-
+      // Helper function to chunk arrays
       const chunk = <T,>(arr: T[], size = 80): T[][] => {
         const out: T[][] = []
         for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
         return out
       }
 
-      const normalizeCnes = (cnes: unknown): string => String(cnes ?? '').replace(/\D/g, '').padStart(7, '0')
-      const selectedHospitalCnes = selectedHospital !== 'all'
-        ? (hospitals.find(h => String(h.id) === String(selectedHospital))?.cnes || '')
-        : ''
-      const cnesDigits = normalizeCnes(selectedHospitalCnes)
-      const cnesVariants = Array.from(new Set([cnesDigits, cnesDigits.replace(/^0+/, ''), cnesDigits.padStart(7, '0')].filter(Boolean)))
-
+      // ========== STEP 1: FETCH REMOTE SIH DATA (PRIMARY SOURCE) ==========
       const rdRows: Array<{ n_aih: string; dt_saida?: string; hospital_id?: string; cnes?: string; competencia?: string; espec?: string; car_int?: string; diag_princ?: string }> = []
       const remoteRdByAih = new Map<string, { dtSaida: string; hospitalId?: string; competencia?: string; espec?: string; car_int?: string; diag_princ?: string }>()
 
+      // Block A: Hospital-specific remote fetch (if specific hospital selected)
       if (selectedHospital !== 'all') {
         const pageSizeRd = 1000
         let rdOffset = 0
@@ -643,6 +605,19 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
           if (batch.length < pageSizeRd) break
           rdOffset += pageSizeRd
         }
+
+        // Generate CNES variants for fallback query (when hospital_id filter fails)
+        const cnesVariants: string[] = (() => {
+          if (selectedHospital === 'all') return []
+          const hosp = hospitals.find(h => h.id === selectedHospital)
+          const rawCnes = hosp?.cnes || ''
+          const digits = rawCnes.replace(/\D/g, '')
+          if (!digits) return []
+          const set = new Set<string>()
+          set.add(digits)
+          set.add(digits.padStart(7, '0')) // CNES is typically 7 digits
+          return Array.from(set)
+        })()
 
         if (rdRows.length === 0 && cnesVariants.length > 0) {
           rdOffset = 0
@@ -693,6 +668,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
         })
       }
 
+      // Block B: Doctor-specific remote fetch (if specific doctor selected)
       if (selectedDoctor !== 'all') {
         const doctorAihRawSet = new Set<string>()
         const pageSizeDoctor = 1000
@@ -764,8 +740,49 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
         }
       }
 
+      // After both remote fetch blocks, we have the definitive set of AIHs
       const remoteRdAihKeys = Array.from(remoteRdByAih.keys())
-      const aihKeysForRemote = Array.from(new Set([...aihKeys, ...remoteRdAihKeys]))
+      const remoteAihFoundCount = remoteRdAihKeys.length
+
+      // ========== STEP 2: FETCH LOCAL DATA (SUPPLEMENT) ==========
+      // Only fetch local records for AIHs that exist in remote SIH
+      const localRows: Array<{ aih: string; patient_name?: string; data_saida?: string; hospital_id?: string; prontuario?: string }> = []
+      if (remoteRdAihKeys.length > 0) {
+        const chunkSize = 80
+        for (let i = 0; i < remoteRdAihKeys.length; i += chunkSize) {
+          const ch = remoteRdAihKeys.slice(i, i + chunkSize)
+          let q = supabase
+            .from('gsus_aihs_patients')
+            .select('aih, patient_name, data_saida, hospital_id, prontuario')
+            .in('aih', ch)
+          // Optional: apply hospital filter to local as well for consistency
+          if (selectedHospital !== 'all') {
+            q = q.eq('hospital_id', selectedHospital)
+          }
+          // Note: We do NOT apply date filter to local enrichment because the remote AIHs already match the date range
+          
+          const { data, error } = await q
+          if (error) throw error
+          const batch = (data || []) as any[]
+          batch.forEach((r: any) => {
+            localRows.push({
+              aih: String(r.aih || ''),
+              patient_name: r.patient_name ? String(r.patient_name) : undefined,
+              data_saida: r.data_saida ? String(r.data_saida) : undefined,
+              hospital_id: r.hospital_id ? String(r.hospital_id) : undefined,
+              prontuario: r.prontuario ? String(r.prontuario) : undefined,
+            })
+          })
+        }
+      }
+
+      const localAihFilledKeys = localRows.map(r => normalizeAih(r.aih)).filter(Boolean)
+      const localAihFilledCount = localAihFilledKeys.length
+      // Since we only fetched by AIH numbers, all rows should have valid AIHs
+      const localNoAihCount = 0
+
+      // remoteRdAihKeys already defined above at line 724
+      const aihKeysForRemote = remoteRdAihKeys
 
       const spRows: any[] = []
       if (aihKeysForRemote.length > 0) {
@@ -865,7 +882,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
         diag_princ?: string
       }> = []
 
-      const combinedAihKeys = Array.from(new Set([...Array.from(uniqueLocalByAih.keys()), ...remoteRdAihKeys]))
+      const combinedAihKeys = Array.from(new Set(remoteRdAihKeys))
       for (const aihKey of combinedAihKeys) {
         const r = uniqueLocalByAih.get(aihKey)
         const rd = remoteRdByAih.get(aihKey)
@@ -883,19 +900,6 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
           diag_princ: rd?.diag_princ
         })
       }
-
-      const localRowsWithoutAih = localRows.filter(r => !normalizeAih(r.aih))
-      localRowsWithoutAih.forEach((r) => {
-        reportEntries.push({
-          aihKey: '',
-          aihNumber: '',
-          prontuario: String(r.prontuario || '').trim(),
-          patientName: (r.patient_name || '').trim() || 'Paciente',
-          dischargeISO: (r.data_saida || '').trim(),
-          hospitalId: r.hospital_id,
-          doctorCns: undefined,
-        })
-      })
 
       if (reportEntries.length === 0) {
         toast.warning('Nenhum registro encontrado no banco local para os filtros selecionados')
@@ -1224,7 +1228,6 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
         }
       })
 
-      const remoteAihFoundCount = selectedHospital !== 'all' ? remoteRdByAih.size : remoteFoundAihKeys.size
       const missingInRemoteCount = Math.max(localAihFilledCount - remoteAihFoundCount, 0)
       const info = {
         hospitalLabel,

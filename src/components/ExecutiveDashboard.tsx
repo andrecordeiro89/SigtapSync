@@ -59,6 +59,7 @@ import RulesStudio from './rulesStudio/RulesStudio'
 import { CareCharacterUtils } from '../config/careCharacterCodes';
 import { exportAnesthesiaExcel } from '../services/exportService';
 import HybridSourceDialog from './HybridSourceDialog';
+import ApprovedByCompetenceDialog from './ApprovedByCompetenceDialog';
 // import ReportGenerator from './ReportGenerator';
 // import ExecutiveDateFilters from './ExecutiveDateFilters';
 import TabwinConferenceDialog from './TabwinConferenceDialog';
@@ -552,7 +553,8 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
   const [aihKpi, setAihKpi] = useState<{ totalAIHs: number; totalRevenue: number; averageTicket: number } | null>(null);
   const [tabwinOpen, setTabwinOpen] = useState(false);
   const [isRejectedTabwinDialogOpen, setIsRejectedTabwinDialogOpen] = useState(false);
-  const [repasseSihOpen, setRepasseSihOpen] = useState(false)
+  const [repasseSihOpen, setRepasseSihOpen] = useState(false);
+  const [approvedByCompetenceOpen, setApprovedByCompetenceOpen] = useState(false);
 
   const [filtersApplied, setFiltersApplied] = useState(false);
   const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
@@ -2071,6 +2073,18 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
                   <DollarSign className="h-4 w-4" />
                   Repasse SIH
                 </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="inline-flex items-center gap-2 bg-green-800 hover:bg-green-900 text-white w-auto min-w-[180px]"
+                  onClick={() => setApprovedByCompetenceOpen(true)}
+                  title="Relatório Aprovados por Competência"
+                  disabled={isGlobalLoading}
+                  type="button"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Aprovados/Competência
+                </Button>
                 </div>
                 <Button
                   variant="default"
@@ -2188,6 +2202,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
     <TabwinConferenceDialog open={tabwinOpen} onOpenChange={setTabwinOpen} />
     <RejectedTabwinDialog open={isRejectedTabwinDialogOpen} onOpenChange={setIsRejectedTabwinDialogOpen} />
     <HybridSourceDialog open={repasseSihOpen} onOpenChange={setRepasseSihOpen} />
+    <ApprovedByCompetenceDialog open={approvedByCompetenceOpen} onOpenChange={setApprovedByCompetenceOpen} />
     {importOpen && (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
         <div className="bg-white rounded shadow-xl w-full max-w-4xl">
