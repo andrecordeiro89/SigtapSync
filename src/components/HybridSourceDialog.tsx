@@ -194,7 +194,11 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
           .select('id,name,cnes')
           .eq('is_active', true)
           .order('name')
-        if (error) throw error
+        if (error) {
+          console.error('Error loading hospitals:', error)
+          toast.error('Erro ao carregar hospitais. Verifique a conexão com o banco de dados.')
+          return
+        }
         if (!cancelled) setHospitals((data || []).map((h: any) => ({ id: h.id, name: h.name, cnes: h.cnes })))
       } catch (err) {
         console.error('Error loading hospitals:', err)
@@ -211,7 +215,7 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
     if (!open) return
     setInputDischargeFrom(dischargeFrom || '')
     setInputDischargeTo(dischargeTo || '')
-  }, [open])
+  }, [open, dischargeFrom, dischargeTo])
 
   useEffect(() => {
     if (!open) return
@@ -280,7 +284,11 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
             q = q.not('dt_saida', 'is', null).gte('dt_saida', dischargeFrom).lt('dt_saida', endExclusive)
           }
           const { data, error } = await q
-          if (error) throw error
+          if (error) {
+            console.error('Error fetching Sih competências:', error)
+            toast.error('Erro ao buscar competências Sih. Verifique a conexão com o banco de dados.')
+            return
+          }
           const batch = (data || []) as any[]
           if (batch.length === 0) break
           batch.forEach((r: any) => {
@@ -601,7 +609,11 @@ export default function HybridSourceDialog({ open, onOpenChange }: HybridSourceD
             .range(rdOffset, rdOffset + pageSizeRd - 1)
 
           const { data, error } = await q
-          if (error) throw error
+          if (error) {
+            console.error('Error fetching Sih RD:', error)
+            toast.error('Erro ao buscar RD Sih. Verifique a conexão com o banco de dados.')
+            return
+          }
           const batch = (data || []) as any[]
           if (batch.length === 0) break
           batch.forEach((r: any) => rdRows.push({
