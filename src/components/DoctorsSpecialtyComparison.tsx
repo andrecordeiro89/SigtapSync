@@ -211,7 +211,7 @@ const DoctorsSpecialtyComparison: React.FC<DoctorsSpecialtyComparisonProps> = ({
   };
   const generateWeeksBetween = (start: Date, end: Date) => {
     const arr: string[] = [];
-    let cur = startOfISOWeek(start);
+    const cur = startOfISOWeek(start);
     const last = startOfISOWeek(end);
     while (cur <= last) {
       arr.push(formatDayKey(cur));

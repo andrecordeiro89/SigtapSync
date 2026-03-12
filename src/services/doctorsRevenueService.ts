@@ -392,7 +392,7 @@ export class DoctorsRevenueService {
       calculatedPayment: number;
       appliedRule: string;
     }> = [];
-    let allCodes04: string[] = [];
+    const allCodes04: string[] = [];
     let totalProcedures04 = 0;
     let totalCalculatedPayment = 0;
     if (aihs && aihs.length > 0) {
@@ -508,7 +508,7 @@ export class DoctorsRevenueService {
     const fromISO = new Date(params.from);
     const toISO = new Date(params.to);
     const toExclusive = new Date(toISO.getFullYear(), toISO.getMonth(), toISO.getDate() + 1);
-    let aihQuery = supabase
+    const aihQuery = supabase
       .from('aihs')
       .select(`
         id,

@@ -117,7 +117,7 @@ const SyncPage = () => {
           .map(r => {
             if (!r.competencia) return null;
             
-            let comp = r.competencia;
+            const comp = r.competencia;
             
             // Se for formato de data (YYYY-MM-DD), converter para AAAAMM
             if (comp.includes('-') && comp.length === 10) {
@@ -153,7 +153,7 @@ const SyncPage = () => {
           .map(r => {
             if (!r.competencia) return null;
             
-            let comp = r.competencia;
+            const comp = r.competencia;
             
             // Se for formato de data (YYYY-MM-DD), converter para AAAAMM
             if (comp.includes('-') && comp.length === 10) {
@@ -1303,7 +1303,7 @@ const SyncPage = () => {
             
             if (codigoOriginal) {
               // Tentar encontrar em TODAS as variações
-              let descricao = 
+              const descricao = 
                 mapProcedimentos.get(codigoOriginal) || // Original
                 mapProcedimentos.get(codigoOriginal.toUpperCase()) || // Upper
                 mapProcedimentos.get(codigoOriginal.toLowerCase()) || // Lower
@@ -1729,7 +1729,7 @@ const SyncPage = () => {
 
       {/* ETAPA 3: Executar Sincronização - Esconder se houver resultado */}
       {etapa2Concluida && !resultadoSync && (
-        <Card className="border-2 border-gradient-to-r from-purple-300 to-pink-300 bg-gradient-to-r from-purple-50 to-pink-50">
+        <Card className="border-2 border-purple-300 bg-gradient-to-r from-purple-50 to-pink-50">
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
               <div>

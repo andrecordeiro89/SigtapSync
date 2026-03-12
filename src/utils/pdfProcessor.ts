@@ -551,7 +551,7 @@ export const extractProceduresFromPageText = (textContent: any, pageNumber: numb
         const procMatch = contextAfterCode.match(/\d{2}\.\d{2}\.\d{2}\.\d{3}-\d\s+Procedimento:\s*([^\n\r]+)/i);
         
         if (procMatch) {
-          let description = procMatch[1].trim().toUpperCase();
+          const description = procMatch[1].trim().toUpperCase();
           
           // Extrair financiamento do bloco para determinar complexidade
           let complexity = 'MÉDIA COMPLEXIDADE';

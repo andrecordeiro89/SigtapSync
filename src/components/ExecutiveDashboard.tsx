@@ -1095,7 +1095,7 @@ const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = () => {
 
       // ✅ Buscar CNES dos hospitais da tabela hospitals
       const hospitalIds = hospitalsData.map(h => h.hospital_id).filter(Boolean);
-      let hospitalCnesMap = new Map<string, string>();
+      const hospitalCnesMap = new Map<string, string>();
       
       if (hospitalIds.length > 0) {
         const { data: hospitalsWithCnes } = await supabase

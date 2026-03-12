@@ -331,7 +331,7 @@ const Dashboard = () => {
 
         // Buscar nome do médico relacionado às AIHs recentes
         // Preferência: requesting_physician da AIH; fallback: primeiro professional_name em procedure_records
-        let doctorByAihId = new Map<string, string>();
+        const doctorByAihId = new Map<string, string>();
         try {
           const aihIds = (recentAIHs || []).map((aih: any) => aih.id).filter(Boolean);
           if (aihIds.length > 0) {

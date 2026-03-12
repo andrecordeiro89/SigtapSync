@@ -380,7 +380,7 @@ export class ProcedureRecordsService {
       console.log(`📊 [PROCEDURE_RECORDS] Total de procedimentos na tabela: ${totalCount || 0}`);
       
       // Buscar TODOS os procedimentos usando paginação automática se necessário
-      let allProcedures: any[] = [];
+      const allProcedures: any[] = [];
       const pageSize = 1000; // Tamanho seguro por página
       let page = 0;
       let hasMore = true;

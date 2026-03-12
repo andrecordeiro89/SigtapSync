@@ -1464,7 +1464,7 @@ const PatientManagement = () => {
   const handleGeneratePatientsExcelReport = async () => {
     try {
       // Usar filteredData para garantir que apenas os dados filtrados sejam incluídos
-      let dataToExport = [...filteredData];
+      const dataToExport = [...filteredData];
       
       if (dataToExport.length === 0) {
         toast({

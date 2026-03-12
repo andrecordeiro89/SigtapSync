@@ -535,8 +535,8 @@ export class AIHPersistenceService {
     }
 
     // Resolver IDs e descrições do SIGTAP em lote antes de montar os registros
-    let codeToProcedureId: Record<string, string> = {};
-    let codeToDescription: Record<string, string> = {};
+    const codeToProcedureId: Record<string, string> = {};
+    const codeToDescription: Record<string, string> = {};
     try {
       const uniqueCodes = Array.from(new Set(
         (procedimentos || [])

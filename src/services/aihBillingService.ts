@@ -289,7 +289,7 @@ export class AIHBillingService {
         current.total_value += value;
       });
 
-      let result: AIHBillingByHospital[] = Array.from(hospitalMap.values())
+      const result: AIHBillingByHospital[] = Array.from(hospitalMap.values())
         .map(h => ({
           hospital_id: h.hospital_id,
           hospital_name: h.hospital_name,
@@ -632,7 +632,7 @@ export class AIHBillingService {
       const pageSize = 2000;
       let page = 0;
       let hasMore = true;
-      let data: any[] = [];
+      const data: any[] = [];
       while (hasMore) {
         let q = supabase
           .from('procedure_records')

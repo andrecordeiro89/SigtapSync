@@ -251,7 +251,7 @@ export class AIHCompleteProcessor {
    */
   private smartSplitProcedureText(text: string): string[] {
     // Primeiro tentar quebra natural por \n
-    let lines = text.split('\n');
+    const lines = text.split('\n');
     
     console.log(`🔧 QUEBRA INICIAL: ${lines.length} linhas naturais`);
     console.log(`📏 Tamanho do texto: ${text.length} caracteres`);
@@ -264,8 +264,8 @@ export class AIHCompleteProcessor {
       // ✅ CORREÇÃO: Buscar por códigos de procedimento e criar segmentos mais precisos
       const procedurePattern = /(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/g;
       
-      let smartLines: string[] = [];
-      let matches: { index: number; code: string }[] = [];
+      const smartLines: string[] = [];
+      const matches: { index: number; code: string }[] = [];
       
       // Primeiro, encontrar todas as posições dos códigos
       let match;
@@ -459,7 +459,7 @@ export class AIHCompleteProcessor {
    */
   private simulateSmartSplit(text: string): string[] {
     const procedurePattern = /(\d{2}\.\d{2}\.\d{2}\.\d{3}-\d)/g;
-    let matches: { index: number; code: string }[] = [];
+    const matches: { index: number; code: string }[] = [];
     
     let match;
     while ((match = procedurePattern.exec(text)) !== null) {
@@ -469,7 +469,7 @@ export class AIHCompleteProcessor {
       });
     }
     
-    let segments: string[] = [];
+    const segments: string[] = [];
     for (let i = 0; i < matches.length; i++) {
       const currentMatch = matches[i];
       const nextMatch = matches[i + 1];
@@ -765,7 +765,7 @@ export class AIHCompleteProcessor {
         // ✅ CORREÇÃO: Permitir traços e espaços no final para não cortar descrições compostas
         const uppercaseMatch = safeContext.match(/[A-ZÁÊÇÕÚÍÂ][A-ZÁÊÇÕÚÍÂ\s\/\(\)\-]{4,150}/);
         if (uppercaseMatch) {
-          let descricao = uppercaseMatch[0]
+          const descricao = uppercaseMatch[0]
             .trim()
             .replace(/\s+/g, ' ')
             .replace(/\s*\d+.*$/, '') // Cortar na primeira sequência de números
@@ -792,7 +792,7 @@ export class AIHCompleteProcessor {
       const bruteMatch = text.match(regex);
       
       if (bruteMatch && bruteMatch[1]) {
-        let descricao = bruteMatch[1]
+        const descricao = bruteMatch[1]
           .trim()
           .split(/\s+\d/)[0] // Cortar no primeiro número encontrado
           .trim();

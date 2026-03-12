@@ -1009,7 +1009,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
       ]
       let idx = 1
       let totalAIHsFound = 0
-      let excludedByDateFilter = 0
+      const excludedByDateFilter = 0
       let aihsWithoutNumber = 0
       const normalizeAih = (s: string) => s.replace(/\D/g, '').replace(/^0+/, '')
       filteredDoctors.forEach((card: any) => {
@@ -1422,8 +1422,8 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
 
       // Mapear nomes de pacientes quando fonte remota está ativa (join local AIH→patients)
       // Mapear também infos extras: espec, car_int, diag_princ para exibir no relatório
-      let nameByAih = new Map<string, string>()
-      let extraInfoByAih = new Map<string, { espec?: string; car_int?: string; diag_princ?: string }>()
+      const nameByAih = new Map<string, string>()
+      const extraInfoByAih = new Map<string, { espec?: string; car_int?: string; diag_princ?: string }>()
 
       if (sihMode) {
         try {
@@ -2131,7 +2131,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
     const tableData: Array<Array<string>> = []
     let totalRepasse = 0
 
-    let nameByAih = new Map<string, string>()
+    const nameByAih = new Map<string, string>()
     if (sihMode) {
       try {
         let q = supabase
@@ -3909,7 +3909,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         const aihNumber = normalizeAih(p?.aih_info?.aih_number)
         const dischargeISO = p?.aih_info?.discharge_date || ''
         const discharge = parseISODateToLocal(dischargeISO)
-        let name = p?.patient_info?.name || 'Paciente'
+        const name = p?.patient_info?.name || 'Paciente'
         const procsAll = p.procedures || []
         const aihKey = (p as any).aih_id || normalizeAihNumber(p?.aih_info?.aih_number) || '__single__'
         const calculable = (p as any).calculable_procedures || getCalculableProcedures(
@@ -3991,7 +3991,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
         for (const p of doctor.patients as any[]) {
           const aihKey = normalizeAihNumber(p?.aih_info?.aih_number)
           if (!aihKey) continue
-          let entry = { sum: 0, name: doctor.doctor_info.name || '', cboSet: new Set<string>(), isAnesth: false }
+          const entry = { sum: 0, name: doctor.doctor_info.name || '', cboSet: new Set<string>(), isAnesth: false }
           for (const proc of (p.procedures || [])) {
             const belongs = (proc?.professional_name || '') === (doctor.doctor_info.name || '')
             if (!belongs) continue
@@ -5234,7 +5234,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       ];
                       let idx = 1;
                       let totalAIHsFound = 0;
-                      let excludedByDateFilter = 0;
+                      const excludedByDateFilter = 0;
                       let aihsWithoutNumber = 0;
 
                       // ✅ CORREÇÃO: NÃO deduplicate por paciente - cada AIH é um registro único
@@ -5398,7 +5398,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                       const allPatients: any[] = [];
                       let totalPatientsFound = 0;
                       let excludedByDateFilter = 0;
-                      let excludedByEmptyAIH = 0;
+                      const excludedByEmptyAIH = 0;
 
                       console.log('🔍 [RELATÓRIO SIMPLIFICADO] Iniciando coleta de dados...');
                       console.log('🔍 [RELATÓRIO SIMPLIFICADO] Médicos filtrados:', filteredDoctors.length);
@@ -6217,7 +6217,7 @@ const MedicalProductionDashboard: React.FC<MedicalProductionDashboardProps> = ({
                                           let patientsWithPayment = 0; // ✅ Pacientes com repasse > 0
 
                                           // 🔍 Aprovação via fonte remota SIH: match por AIH
-                                          let approvedSet = new Set<string>();
+                                          const approvedSet = new Set<string>();
                                           try {
                                             const allAihNumbers = (doctor.patients || [])
                                               .map((p: any) => String(p?.aih_info?.aih_number || '').trim())
@@ -8656,8 +8656,8 @@ const generateValidationReport = async (
     const localSet = new Set(localNameByAih.keys())
 
     // Remoto (produção) por hospital/competência
-    let remoteSet = new Set<string>()
-    let remoteMetaByAih = new Map<string, { hospital_id?: string; competencia?: string }>()
+    const remoteSet = new Set<string>()
+    const remoteMetaByAih = new Map<string, { hospital_id?: string; competencia?: string }>()
     if (useSihSource) {
       try {
         const { SihApiAdapter } = await import('../services/sihApiAdapter')

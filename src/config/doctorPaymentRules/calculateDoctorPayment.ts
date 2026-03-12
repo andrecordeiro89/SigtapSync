@@ -176,7 +176,7 @@ const applyDuplicate04First = (procedures: ProcedurePaymentInfo[]): ProcedurePay
       if (sameCode.length <= 1) continue
 
       // New priority: 1) highest sp_ptsp, 2) non-assistant CBO, 3) lowest sequence
-      let keep = sameCode.reduce((best, cur) => {
+      const keep = sameCode.reduce((best, cur) => {
         const bv = (best.p as any).sp_ptsp ?? 0
         const cv = (cur.p as any).sp_ptsp ?? 0
         if (cv > bv) return cur

@@ -518,7 +518,7 @@ export class AIHPDFProcessor {
         for (const pattern of patterns) {
           const match = text.match(pattern);
           if (match && match[1]) {
-            let value = match[1].trim();
+            const value = match[1].trim();
             
             // Limpeza de valor
             if (value && value.length > 0) {

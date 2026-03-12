@@ -123,7 +123,7 @@ export const SihApiAdapter = {
     const spChunks = chunk(aihNumbers, 80)
     const spResults: any[] = []
     for (const ch of spChunks) {
-      let spQuery = supabaseSih
+      const spQuery = supabaseSih
         .from('sih_sp')
         .select('sp_naih, sp_atoprof, sp_qt_proc, sp_qtd_ato, sp_valato, sp_ptsp, sp_pf_doc, sp_pf_cbo, sp_cidpri, sp_complex, sp_dtsaida')
         .in('sp_naih', ch)

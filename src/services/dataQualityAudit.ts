@@ -11,7 +11,7 @@ export async function auditAssociations(hospitalIds?: string[]): Promise<Associa
   const hospitalFilter = hospitalIds && hospitalIds.length > 0 && !hospitalIds.includes('all') ? hospitalIds : undefined;
 
   const baseAihJoin = () => {
-    let q = supabase
+    const q = supabase
       .from('procedure_records')
       .select('aih_id, patient_id, hospital_id, procedure_date, aihs!inner(id, patient_id, hospital_id, admission_date, discharge_date)', { count: 'exact' })
       .limit(1); // placeholder, we will adjust below per query
